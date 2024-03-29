@@ -1,0 +1,22 @@
+Please consider citing the following works:
+
+When using eDMFT self-consistency condition:
+either
+Kristjan Haule, Chuck-Hou Yee, and Kyoo Kim. Dynamical mean-field theory within the full-potential methods: Electronic structure of CeIrIn5, CeCoIn5, and CeRhIn5. Phys. Rev. B, 81: 195107, 2010. URL http://link.aps.org/doi/10.1103/PhysRevB.81.195107.
+or
+K. Haule. Structural predictions for Correlated Electron Materials Using the Functional Dynamical Mean Field Theory Approach, Journal of the Physical Society of Japan 87 (4), 041005 (2018).
+
+When using quantum Monte Carlo impurity solver:
+Kristjan Haule. Quantum monte carlo impurity solver for cluster dynamical mean-field theory and electronic structure calculations with adjustable cluster base. Phys. Rev. B, 75:155113, Apr 2007. doi: 10.1103/PhysRevB.75.155113. URL http://link.aps.org/doi/10.1103/PhysRevB.75.155113.
+
+When using force for structural optimization or phonon calculation:
+Kristjan Haule and Gheorghe L. Pascut. Forces for structural optimizations in correlated materials within dft+embedded dmft functional approach. arXiv:1602.02819, 2016. URL http://lanl.arxiv.org/abs/1602.02819.
+
+When using total energy or free energy:
+Kristjan Haule and Turan Birol. Free energy from stationary implementation of the DFT + DMFT functional. Phys. Rev. Lett., 115:256402, Dec 2015. doi: 10.1103/PhysRevLett.115.256402. URL http://link.aps.org/doi/10.1103/PhysRevLett.115.256402.
+
+When using exact double-counting:
+Kristjan Haule. Exact double counting in combining the dynamical mean field theory and the density functional theory. Phys. Rev. Lett., 115:196403, Nov 2015. doi: 10.1103/PhysRevLett.115.196403. URL http://link.aps.org/doi/10.1103/PhysRevLett.115.196403.
+
+More general citation for DFT+DMFT:
+G. Kotliar, S. Y. Savrasov, K. Haule, V. S. Oudovenko, O. Parcollet, and C. A. Marianetti. Electronic structure calculations with dynamical mean-field theory. Rev. Mod. Phys., 78:865–951, 2006. URL http://link.aps.org/doi/10.1103/RevModPhys.78.865.

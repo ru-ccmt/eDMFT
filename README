@@ -1,0 +1,50 @@
+DMFT installation instructions:
+
+  1. From provided configuration files create your own "configure.py". You can start by
+     creating a link to one of the provided files, i.e.,
+     > ln -s configure.py.intel configure.py
+     and if necessary edit the file by specifying precise compiler names, and if needed 
+     for compilation, their paths.
+
+     If you are going to use intel fortran and intel C++ compiler,
+     you should use "configure.py.intel". If you have gnu compilers, you should choose
+     "configure.py.gnu". You could also mix the two if desired.
+     
+  2. Execute `setup.py' and you should be guided through installation process.
+     Please make sure that you have /usr/bin/time installed.
+
+  3. Learn how to use the code by reading "http://hauleweb.rutgers.edu/tutorials/"
+
+      Please consider citing the basic DFT+DMFT algorithm:
+  [1] Kristjan Haule, Chuck-Hou Yee, Kyoo Kim, Phys. Rev. B 81, 195107 (2010).
+
+     and DFT part, which is based on Wien2k code
+  [2] P. Blaha, K. Schwarz, G. Madsen, D. Kvasnicka and J. Luitz, WIEN2k,
+   An Augmented Plane Wave + Local Orbitals Program for Calculating Crystal Properties
+   (Karlheinz Schwarz, Techn. Universität Wien, Austria), 2001. ISBN 3-9501031-1-2
+
+  Consider citing, if you use some of these items
+      Continuous time Quantum Monte Carlo:
+  [3] Kristjan Haule, Phys. Rev. B 75, 155113 (2007).
+
+      Free energy implementation :
+  [4] Kristjan Haule, Turan Birol, Phys. Rev. Lett. 115, 256402 (2015).
+
+      Forces and structural optimization :
+  [5] Kristjan Haule, Gheorghe L. Pascut, arXiv:1602.02819.
+
+The code is developed by support from National Science Foundation : 
+  NSF-DMR 1405303 and  NSF DMR-0746395
+and by support of A. P. Sloan Foundation, Simons foundation, and Blavatnik foundation.
+
+The documentation at "http://hauleweb.rutgers.edu/tutorials/" is developed by the 
+support of DOE.
+
+New in 2024:
+- cif2struct.py added, which converts cif files to struct as needed by wien2k.
+ This code takes care of monoclinic structures in which cif2struct in wien code
+ fails, and converts any cif setting into wien accepted setting (for example CXZ,gamma!=90)
+- cif2indmf.py added, which creates all necessary dmft files from cif-file alone. 
+  Useful for high-throughput calculation.
+- added run_dft.py, which is similar to run_lapw, but uses internal lapw1, and lapwso, 
+  which are faster than wien/lapw[1|so] on parallel machines.
