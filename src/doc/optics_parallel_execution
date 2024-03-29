@@ -1,0 +1,23 @@
+To learn how to use optics, please read first "../optics/README.txt"
+This is just a concise algorithm for particular execution adapted
+mostly for our cluster.
+
+1) create directory and "dmft_copy.py" output from converged DMFT calculation to this new directory.
+2) perform maxent and copy "Sig.out" from maxent directory to "sig.inp" in the new directory. 
+   Also change "matsubara" flag in case.indmfl from 1 to 0, because self-energy is now on real axis.
+4) prepare "case.inop" or copy from some early calculation.
+5) prepare "dmftopt.in" or copy from some early calculation.
+6) execute
+
+   export OMP_NUM_THREADS=16                            # lapw1 will be faster using open_mp
+   mpi_prefix="...."                                    # so that we can run dmftop in parallel
+   export JOBNAME=<case>                                # give case a name
+   $WIENROOT/x lapw0 -f $JOBNAME                        # lapw0 -- potential
+   $WIENROOT/x lapw1 -f $JOBNAME                        # lapw1 -- eigenvectors
+   $WIENROOT/x optic -f $JOBNAME                        # optics matrix elements
+   ln -s $JOBNAME.mommat2 $JOBNAME.mommat               # old wien used name mommat and new mommat2
+   $WIEN_DMFT_ROOT/x_dmft.py dmftu                      # print projector by non-parallel version
+   $WIEN_DMFT_ROOT/ssplit.py                            # create sig.inp1 sig.inp2 ... self-energies
+   $mpi_prefix $WIEN_DMFT_ROOT/dmftopt dmftopt.in       # parallel execution of optics code
+   
+   

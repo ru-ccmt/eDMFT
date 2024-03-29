@@ -1,0 +1,124 @@
+%\documentclass[aps,showpacs,prb,floatfix,twocolumn]{revtex4}
+\documentclass[aps,prb,floatfix,epsfig,twocolumn,showpacs,preprintnumbers]{revtex4}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{amsmath,amssymb,graphicx,bm,epsfig}
+\usepackage{color}
+
+\newcommand{\eps}{\epsilon}
+\newcommand{\vR}{{\mathbf{R}}}
+\renewcommand{\vr}{{\mathbf{r}}}
+\newcommand{\vt}{{\mathbf{t}}}
+\newcommand{\vG}{{\mathbf{G}}}
+\newcommand{\hr}{{\hat{\textbf{r}}}}
+\newcommand{\vk}{{\mathbf{k}}}
+\newcommand{\vK}{{\mathbf{K}}}
+\newcommand{\vq}{{\mathbf{q}}}
+\newcommand{\vQ}{{\mathbf{Q}}}
+\newcommand{\vPhi}{{\mathbf{\Phi}}}
+\newcommand{\vS}{{\mathbf{S}}}
+\newcommand{\cG}{{\cal G}}
+\newcommand{\cF}{{\cal F}}
+\newcommand{\cT}{{\cal T}}
+\newcommand{\cH}{{\cal H}}
+\newcommand{\cJ}{{\cal J}}
+\newcommand{\cD}{{\cal D}}
+\newcommand{\cL}{{\cal L}}
+\newcommand{\Tr}{\mathrm{Tr}}
+\renewcommand{\a}{\alpha}
+\renewcommand{\b}{\beta}
+\newcommand{\g}{\gamma}
+\renewcommand{\d}{\delta}
+\newcommand{\npsi}{\underline{\psi}}
+\renewcommand{\Im}{\textrm{Im}}
+\renewcommand{\Re}{\textrm{Re}}
+\newcommand{\cA}{{\cal A}}
+
+
+
+\begin{document}
+
+\title{Rotations in LAPW}
+\maketitle
+
+
+%\section{Definitions}
+
+An element of the space group $\Gamma$ is composed of a rotation $R$
+and translation $\vt$. How does the symmetry operation $\Gamma$ act on
+$\vr$ is clear. But how does it work on wave functions
+$\chi_{\vk+\vK}(\vr)\equiv |\vk+\vK\rangle \equiv |\vG\rangle$? In our
+notation, the operation acts in the following way
+\begin{eqnarray}
+&& \langle \vr |\Gamma\;|\vG\rangle =   \langle R^{-1}\vr +\vt|\vG\rangle =
+e^{i\vG \vt}\langle \vr|R\vG\rangle\\
+&& \langle \vr |\Gamma^{-1}|\vG\rangle =   \langle R(\vr -\vt)|\vG\rangle =
+e^{-i R^{-1} \vG \vt}\langle \vr|R^{-1}\vG\rangle
+\end{eqnarray}
+
+To compute the electronic charge, or partial density of state, or DMFT
+local green's function, we need the following matrix elements
+\begin{equation}
+\langle l,m| i\vk\rangle \equiv  \int Y^*_{l,m}(\vr) \psi_{i\vk}(\vr) d\vr
+\end{equation}
+
+The problem is that $\vk$ is usually given only in the irreducible
+Brillowuin zone ($\vk_{IBZ}$). Furthermore the projectors should be
+specified in a local coordinate system attached to a specific atom,
+which is different from the global coordinate system. The following
+series of operations is typically performed in the electronic
+structure codes
+\begin{eqnarray}
+\langle l,m| R_0\; T_{\tau_1}\;\Gamma_n\;
+\Gamma_\alpha|i\vk_{IBZ}\rangle
+\label{E4}
+\end{eqnarray}
+Here
+\begin{itemize}
+\item $R_0$ is a local rotation in which $Y_{l,m}(\vr)$ is specified. This
+  transofrmation can be specified by user. Typically user
+  enters a new local $z$-axis and a new local $x$-axis.
+  In Wien2K code, this transformation is named \textit{crotloc(:,:)}.
+\item $T_{\tau_1}$ shifts the origin of the coordinate system from the
+  origin to the local coordinate system attached to an atom. Here we
+  shift only to the first atom of certain type.
+  In Wien2K code, this shift is named $POS(:,lfirst)$.
+\item $\Gamma_n$ is the transformation from the first atom of a certain
+  type to all equivalent atoms of this type. It is composed of a
+  rotation $R_n$ and a translation $\tau_n$, named 
+  \textit{rotij}(:,:,latom) and 
+  \textit{tauij(:,latom)} in Wien2K.
+\item $\Gamma_\alpha$ transforms an irreducible $\vk$ point to a
+  reducible $\vk$-point in the same star.
+  It is composed of a rotation $R_{\alpha}$ and translation
+  $\tau_{\alpha}$, named \textit{tmat(:,:,$\gamma$)} and
+  \textit{tau(:,$\gamma$)}.
+\end{itemize}
+
+Our transformation Eq.~(\ref{E4}) is composed of coefficients
+$\langle \vG |\vk_{IBZ}\rangle$, which are equal for all points in a
+star, and do not depend on local coordinate system. The other part of
+the coefficents depends on symmetry operations and local rotation
+\begin{eqnarray}
+\sum_\vG \langle l,m|R_0\; T_{\tau_1}\; \Gamma_n\;\Gamma_\alpha|\vG\rangle\langle \vG |\vk_{IBZ}\rangle
+\end{eqnarray}
+Finally we need to evaluate
+\begin{eqnarray}
+\langle l,m|R_0\; T_{\tau_1}\; \Gamma_n\;\Gamma_\alpha|\vG\rangle=\\
+\exp\left({i\vG\tau_\alpha + i (R_\alpha \vG) \tau_n}\right)\langle
+l,m|R_0\; T_{\tau_1}|R_n R_\alpha \vG\rangle=\\
+\exp\left({ i\vG\tau_\alpha + i (R_\alpha \vG) \tau_n + i(R_n R_\alpha \vG)\tau_1}\right)\langle
+l,m|R_0 R_n R_\alpha \vG\rangle
+\end{eqnarray}
+
+In Wien2K, we hence need to add the following phase factor
+\begin{eqnarray}
+G(:) tau(:,\gamma)+tmat(:,:,\gamma)G(:)tauij(:,latom)\\
++rotij(:,:,latom)tmat(:,:,\gamma)G(:)POS(:,lfirst)
+\end{eqnarray}
+The wave vector $\vG$ needs to be rotated by the following sequence of
+transformations
+\begin{eqnarray}
+ crotloc(:,:) rotij(:,:,latom) tmat(:,:,\gamma)G(:)
+\end{eqnarray}
+
+\end{document}

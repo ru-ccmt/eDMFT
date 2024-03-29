@@ -1,0 +1,101 @@
+Please read ./doc/* for short documentation and help with installation.
+To install, you will need to edit "Makefile.in" to set compilers and their options and libraries.
+
+Next, type "make".
+Set environment variable $WIEN_DMFT_ROOT to point to an installation directory. You can choose any directory.
+Next, type "make install".
+Finally, add your $WIEN_DMFT_ROOT to PYTHONPATH (for example export PYTHONPATH=$PYTHONPATH:$WIEN_DMFT_ROOT).
+The two environment variables should be added to your ~/.bashrc to remain set in every shell.
+
+You should also set wien2k variable $SCRATCH=".", such that vector file is printed to the current directory.
+
+You can also get help for individual python executables by adding option '-h' or '--help'.
+
+The top most scripts are "init_dmft.py" and "run_dmft.py".
+The latter runs the following steps in the self-consistent cycle:
+        
+          x lapw0        -- computes LDA potential on current LDA+DMFT charge
+          x lapw1        -- solves LDA eigenvalue problem
+          [x lapwso]     -- adds spin-orbit
+          [x dmft0]      -- computes dmft eigenvalues
+          [x mu]         -- computes dmft chemical potential
+          x dmft1        -- computes local green's function and hybridization
+          run impurity   -- runs impurity problem
+          x dmft2        -- computes LDA+DMFT valence charge, and the chemical potential
+          x lcore        -- computes LDA core charge
+          x mixer        -- mixes total charge with the previous charge
+
+
+
+------------------------------------------------------
+Magnetic calculation with paramagnetic LDA calculation. 
+This is relevant only when spin-orbit is not present.
+------------------------------------------------------
+
+In this mode LDA is run with or withouth doubling the unit cell, but it is run in
+paramagnetic mode with only one type of electrons (no magnetic
+moment).  The DMFT impurity solver breaks the symmetry and gives rise
+to different self-energies for both spins.
+
+In order to prepare this run, one needs to prepare two "indmfl" files, namely:
+   "case.indmfl"
+   "case.indmfldn"
+
+The best way to prepare them is to copy "case.indmfl" file to
+"case.indmfldn", and slightly change the index table. Should be an
+easy task.
+
+With two case.indmfl files present, the code "run_dmft.py" will use
+two "dmft2" steps to compute charge-up and charge down. Later it will
+use a routine combineud to average the charge over both up and
+down. And the rest of the paramagnetic LDA can be then used in the
+LDA+DMFT iterations.
+
+
+If one runs the code in steps and not using "run_dmft.py", the
+following steps will need additional option: One needs to run dmft2
+step in the usual way:
+
+> x_dmft.py dmft2
+
+And then one more time
+
+> x_dmft.py -l dn dmft2 -m 0
+
+for the second type of spin orientation.  The first option "-l" makes
+sure that "case.indmfldn" is used instead of "case.indmfl". The second
+option "-m 0" dissables another calculation of the chemical potential.  We
+keep the chemical potential computed by the up-spins.
+
+Finally, one needs to combine the two charge densities by
+> combineud <case>
+> mv case.clmval case.clmval_up
+> mv case.clmval_aver case.clmval
+> mv case.clmvaldn case.clmval_dn
+
+The following steps are also modified:
+
+> ssplit.py -l dn
+
+will use "case.indmfldn" to prepare self-energies "sig.inp?" for
+fortran execution. This is used inside the step "x_dmft.py -l dn
+dmft2".
+
+The execution of "x_dmft.py -l dn dmft2" also prepares different
+"dmft2dn.def" file and "case.indmf2dn" file. The latter has only one
+different option, namely "recomputeEF=0".  The former has the
+following changes:
+
+case.indmf2    -> case.indmf2dn
+case.outputdmf -> case.outputdmfdn
+case.indmfl    -> case.indmfldn
+case.clmval    -> case.clmvaldn
+case.scf2      -> case.scf2dn
+
+
+TODO: In case.scf2 we have the sum of eigenvalues :SUM which is now
+obtained by one spin species only. It would be better to have the
+average over both spins.
+
+
+

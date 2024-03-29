@@ -1,0 +1,284 @@
+%\documentclass[aps,showpacs,prb,floatfix,twocolumn]{revtex4}
+\documentclass[aps,prb,floatfix,epsfig,twocolumn,showpacs,preprintnumbers]{revtex4}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{amsmath,amssymb,graphicx,bm,epsfig}
+\usepackage{color}
+
+\newcommand{\eps}{\epsilon}
+\newcommand{\vR}{{\mathbf{R}}}
+\renewcommand{\vr}{{\mathbf{r}}}
+\newcommand{\hr}{{\hat{\textbf{r}}}}
+\newcommand{\vk}{{\mathbf{k}}}
+\newcommand{\vdelta}{{\mathbf{\delta}}}
+\newcommand{\vK}{{\mathbf{K}}}
+\newcommand{\vq}{{\mathbf{q}}}
+\newcommand{\vQ}{{\mathbf{Q}}}
+\newcommand{\vPhi}{{\mathbf{\Phi}}}
+\newcommand{\vS}{{\mathbf{S}}}
+\newcommand{\cG}{{\cal G}}
+\newcommand{\cF}{{\cal F}}
+\newcommand{\cT}{{\cal T}}
+\newcommand{\cH}{{\cal H}}
+\newcommand{\cJ}{{\cal J}}
+\newcommand{\cD}{{\cal D}}
+\newcommand{\cU}{{\cal U}}
+\newcommand{\cL}{{\cal L}}
+\newcommand{\Tr}{\mathrm{Tr}}
+\renewcommand{\a}{\alpha}
+\renewcommand{\b}{\beta}
+\newcommand{\g}{\gamma}
+\renewcommand{\d}{\delta}
+\newcommand{\npsi}{\underline{\psi}}
+\renewcommand{\Im}{\textrm{Im}}
+\renewcommand{\Re}{\textrm{Re}}
+\newcommand{\cA}{{\cal A}}
+
+
+
+\begin{document}
+
+\title{Some notes on LAPW}
+\author{Kristjan Haule}
+\affiliation{Department of Physics, Rutgers University, Piscataway, NJ 08854, USA}
+\date{\today}
+
+%\begin{abstract}
+%\end{abstract}
+\pacs{71.27.+a,71.30.+h}
+\date{\today}
+\maketitle
+
+\begin{widetext}
+The LAPW basis takes the form:
+\begin{eqnarray}
+&& \chi_{\vk+\vK}(\vr) = \frac{1}{\sqrt{V}} e^{i(\vk+\vK)\vr}
+=\frac{4\pi i^l}{\sqrt{V}}e^{i(\vk+\vK)\vr_\alpha}Y_{lm}^*(R(\hat{\vk}+\hat{\vK}))j_l(|\vk+\vK||\vr-\vr_\alpha|)Y_{lm}(R(\vr-\vr_\alpha))
+  \qquad interstitial\\
+&& \chi_{\vk+\vK}(\vr) = \left( a_{lm} u_l(|\vr-\vr_\alpha|) + b_{lm}
+  \dot{u}_l(|\vr-\vr_\alpha|)\right)
+  Y_{lm}(R(\hat{\vr}-\hat{\vr_\alpha}))\qquad MT-sphere
+\end{eqnarray}
+The matching condition at the MT-sphere $S$ gives
+\begin{eqnarray}
+\left(
+\begin{array}{cc}
+u_l(S) & \dot{u}_l(S)\\
+\frac{d}{dr} u_l(S) & \frac{d}{dr} \dot{u}_l(S)
+\end{array}
+\right)
+\left(
+\begin{array}{c}
+a_{lm}\\
+b_{lm}
+\end{array}
+\right)=
+\frac{4\pi i^l}{\sqrt{V}}e^{i(\vk+\vK)\vr_\alpha}Y_{lm}^*(R(\hat{\vk}+\hat{\vK}))
+\left(
+\begin{array}{c}
+j_l(|\vk+\vK|S)\\
+\frac{d}{dr} j_l(|\vk+\vK|S)
+\end{array}
+\right)
+\end{eqnarray}
+with the solution
+\begin{eqnarray}
+\left(
+\begin{array}{c}
+a_{lm}\\
+b_{lm}
+\end{array}
+\right)=
+\frac{4\pi i^l}{\sqrt{V}}e^{i(\vk+\vK)\vr_\alpha}Y_{lm}^*(R(\hat{\vk}+\hat{\vK}))
+%
+\left(
+\begin{array}{cc}
+\frac{d}{dr} \dot{u}_l(S)  & -\dot{u}_l(S)\\
+-\frac{d}{dr} u_l(S) & u_l(S)       
+\end{array}
+\right)
+\frac{1}{u_l(S) \frac{d}{dr} \dot{u}_l(S)-\dot{u}_l(S) \frac{d}{dr} u_l(S)}
+%
+\left(
+\begin{array}{c}
+j_l(|\vk+\vK|S)\\
+\frac{d}{dr} j_l(|\vk+\vK|S)
+\end{array}
+\right)
+\end{eqnarray}
+
+The two solutions satisfy the following equations
+\begin{eqnarray}
+&&\left(-\frac{d^2}{dr^2}+\frac{l(l+1)}{r^2}+V_{KS}(r)-\varepsilon \right) r u_l(r)=0\\
+&&\left(-\frac{d^2}{dr^2}+\frac{l(l+1)}{r^2}+V_{KS}(r)-\varepsilon \right)r \dot{u}_l(r)= r u_l(r)
+\end{eqnarray}
+We multiply the first equation by $r\dot{u}_l(r)$ and the second by $ru_l(r)$ to obtain
+\begin{eqnarray}
+\int_0^S dr\left\{ r\dot{u}_l(r) \left(-\frac{d^2}{dr^2}\right) r u_l(r)
+-r u_l(r)
+\left(-\frac{d^2}{dr^2}\right)r \dot{u}_l(r)\right\}=-\int_0^S dr r^2 u_l(r)u_l(r)
+\end{eqnarray}
+Integration by parts gives
+\begin{eqnarray}
+\left[
+- r\dot{u}_l(r) \frac{d}{dr} \left(r u_l(r)\right)
++r u_l(r) \frac{d}{dr} \left(r \dot{u}_l(r)\right)\right]_0^S
+=-1
+\end{eqnarray}
+which finally leads to
+\begin{eqnarray}
+\dot{u}_l(S) \frac{d}{dr} u_l(S)
+-u_l(S) \frac{d}{dr} \dot{u}_l(S) =\frac{1}{S^2}
+\end{eqnarray}
+
+We can than simplify the solution for $a_{lm}$ and $b_{lm}$ to 
+\begin{eqnarray}
+\left(
+\begin{array}{c}
+a_{lm}\\
+b_{lm}
+\end{array}
+\right)=
+\frac{4\pi i^l}{S^2 \sqrt{V}}e^{i(\vk+\vK)\vr_\alpha}Y_{lm}^*(R(\hat{\vk}+\hat{\vK}))
+%
+\left(
+\begin{array}{c}
+\dot{u}_l(S)\frac{d}{dr} j_l(|\vk+\vK|S)-\frac{d}{dr} \dot{u}_l(S) j_l(|\vk+\vK|S)\\
+\frac{d}{dr} u_l(S) j_l(|\vk+\vK|S)- u_l(S) \frac{d}{dr} j_l(|\vk+\vK|S)
+\end{array}
+\right)
+\end{eqnarray}
+This equation is implemented in Wien2k, and also in both dmft1 and
+dmft2 steps.
+
+
+To compute the projector, we need the overlap between a localized function
+$\phi(r) Y_L(\vr)$, and Kohn-Sham states
+\begin{eqnarray}
+\cU^{\vk,\vr_\alpha}_{i,m}=\langle \phi_l Y_{lm}|\psi_{\vk i}\rangle  =
+\sum_\vK C^\vk_{i\vK} \langle \phi_l(|\vr-\vr_\alpha|) Y_{lm}(R(\hat{\vr}-\hat{\vr}_\alpha))|\chi_{\vk+\vK}(\vr)\rangle
+\end{eqnarray}
+If function $\phi(r)$ extends sufficiently outside its MT-sphere, the
+overlap $\cU^{\vk,\vr_\alpha}_{i,m}$ will have non-zero contribution
+from all other MT-spheres. However, we will use only the envelope
+function outside its center sphere, because the increased charge in
+the neighboring spheres really should not be counted here as charge
+contribution to $\phi(r)$ function.
+
+Therefore we have  only two contributions. Inside MT-sphere we have
+\begin{eqnarray}
+\langle \phi_l(|\vr-\vr_\alpha|) Y_{lm}(\hat{\vr}-\hat{\vr}_\alpha)|\chi_{\vk+\vK}(\vr)\rangle  =
+\sum_\kappa a^\kappa_{lm} \int_0^S \phi(r)  u_l^\kappa(r) r^2 dr
+\end{eqnarray}
+and outside MT-sphere we get
+\begin{eqnarray}
+\langle \phi_l(|\vr-\vr_\alpha|) Y_{lm}(R(\hat{\vr}-\hat{\vr}_\alpha))|\chi_{\vk+\vK}(\vr)\rangle  =
+\frac{4\pi  i^l}{\sqrt{V}}  e^{i(\vk+\vK)\vr_\alpha}Y_{lm}^*(R(\hat{\vk}+\hat{\vK}))
+\int_S^{S_2} \phi_l(r) j_l(|\vk+\vK|r)r^2 dr
+\end{eqnarray}
+
+
+\section{Free energy and Total Energy}
+
+
+The equation for the total energy is
+\begin{eqnarray}
+E = \Tr(H_0 G) + \frac{1}{2}\Tr(\Sigma G) - \Phi^{DC}[n_{loc}] + \Phi^H[\rho]+\Phi^{xc}[\rho]
+\end{eqnarray}
+where
+$$H_0 = -\nabla^2 + \delta(\vr-\vr')V_{ext}(\vr)$$
+We typically evaluate it in the following way
+\begin{eqnarray}
+E = \Tr((-\nabla^2+V_{ext}+V_{H}+V_{xc}) G) + \frac{1}{2}\Tr(\Sigma G)-\Phi^{DC}[\rho_{loc}] 
+-\Tr((V_H+V_{xc})\rho) + \Phi^H[\rho]+\Phi^{xc}[\rho]
+\end{eqnarray}
+Namely, we use the Green's function of the solid to evaluate:
+\begin{eqnarray}
+E_1 = \Tr((-\nabla^2+V_{ext}+V_{H}+V_{xc}) G) -\Tr((V_H+V_{xc})\rho) + \Phi^H[\rho]+\Phi^{xc}[\rho]
+\end{eqnarray}
+and the impurity to evaluate
+\begin{eqnarray}
+E_2 =  \frac{1}{2}\Tr(\Sigma_{imp} G_{imp})-\Phi^{DC}[\rho_{imp}] 
+\end{eqnarray}
+Notice that $\frac{1}{2}\Tr(\Sigma_{imp} G_{imp})$ is not evaluated as
+a Matsubara sum, but we rather compute it from probabilities of atomic
+states, i.e.,
+\begin{eqnarray}
+ \frac{1}{2}\Tr(\Sigma_{imp} G_{imp}) = \sum_m P_m E_m - \sum_\alpha
+ \varepsilon_{imp}^\alpha n_{imp}^\alpha
+\end{eqnarray}
+
+
+
+The free energy functional is
+\begin{eqnarray}
+\Gamma[G] = \Tr\log G-\Tr\log((G_0^{-1}-G^{-1})G) + \Phi^{H}[\rho]+\Phi^{xc}[\rho]+\Phi^{DMFT}[G_{loc}]-\Phi^{DC}[\rho_{loc}]
+\end{eqnarray}
+hence stationarity gives
+\begin{eqnarray}
+G^{-1}-G_0^{-1} + V_H + V_{xc}+\Sigma_{DMFT}-V_{dc}=0
+\end{eqnarray}
+and hence
+\begin{eqnarray}
+F = \Tr\log G
+-\Tr(\Sigma G) +
+\Tr(V_{dc}\rho_{loc}) + \Phi^{DMFT}[G_{loc}]-\Phi^{DC}[\rho_{loc}]
+-\Tr((V_H + V_{xc})\rho)+
+\Phi^{H}[\rho]+\Phi^{xc}[\rho]
+\end{eqnarray}
+Since $F_{imp}$ contains $\Phi^{DMFT}$, i.e,
+\begin{eqnarray}
+F_{imp} = \Tr\log G_{imp} - \Tr(\Sigma_{imp} G_{imp}) + \Phi^{DMFT}[G_{imp}]  
+\end{eqnarray}
+we can write
+\begin{eqnarray}
+F = \Tr\log(G)-\Tr\log(G_{loc})+F_{imp}+\Tr(V_{dc} \rho_{loc}) -
+\Phi^{DC}[\rho_{loc}]
+-\Tr((V_H + V_{xc})\rho)+
+\Phi^{H}[\rho]+\Phi^{xc}[\rho]  
+\end{eqnarray}
+where
+$$F_{imp} = E_{imp}-T S_{imp}$$
+and
+$$E_{imp}=
+\Tr((\Delta+\varepsilon_{imp}-\omega_n\frac{\partial\Delta}{\partial\omega_n})
+G_{imp}) + \frac{1}{2}\Tr(\Sigma_{imp} G_{imp}) -T S_{imp}
+$$
+Hence
+\begin{eqnarray}
+F+T S_{imp} = \Tr\log(G)-\Tr\log(G_{loc})+
+%
+\Tr((\Delta+\varepsilon_{imp}-\omega_n\frac{\partial\Delta}{\partial\omega_n})
+G_{imp}) + \frac{1}{2}\Tr(\Sigma_{imp} G_{imp})
+%
++\Tr(V_{dc} \rho_{loc}) -
+\Phi^{DC}[\rho_{loc}]\nonumber\\
+-\Tr((V_H + V_{xc})\rho)+
+\Phi^{H}[\rho]+\Phi^{xc}[\rho]  
+\end{eqnarray}
+which can also be cast into the form
+\begin{eqnarray}
+F+T S_{imp} = \Tr\log(G)-\Tr\log(G_{loc})+
+\Tr((\Delta-\omega_n\frac{\partial\Delta}{\partial\omega_n}+\varepsilon_{imp}+V_{dc})G_{loc})
++ \frac{1}{2}\Tr(\Sigma_{imp} G_{imp})
+-\Phi^{DC}[\rho_{imp}]\nonumber\\
+-\Tr((V_H + V_{xc})\rho)+
+\Phi^{H}[\rho]+\Phi^{xc}[\rho]  
+\end{eqnarray}
+We thus compute the following quantities with the Green's function of
+the solid:
+\begin{eqnarray}
+F_1 = \Tr\log(G)-\Tr\log(G_{loc})+
+\Tr((\Delta-\omega_n\frac{\partial\Delta}{\partial\omega_n}+\varepsilon_{imp}+V_{dc})G_{loc})
+-\Tr((V_H + V_{xc})\rho)+
+\Phi^{H}[\rho]+\Phi^{xc}[\rho]    
+\end{eqnarray}
+and the following with the impurity:
+\begin{eqnarray}
+F_2 =   \frac{1}{2}\Tr(\Sigma_{imp} G_{imp})-\Phi^{DC}[\rho_{imp}] -T S_{imp}
+\end{eqnarray}
+Notice that $F_2$ is similar to $E_2$ (except for the entropy term), hence $E_{solid}$ and
+$F_{solid}$ contain exactly the same Monte Carlo noise.
+
+\end{widetext}
+
+\end{document}

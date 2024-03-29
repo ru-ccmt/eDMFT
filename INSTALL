@@ -1,0 +1,15 @@
+Copy or link one of the configure.py.* as your configure.py file.
+
+You have the following options:
+configure.py.macos  -- for MAC
+configure.py.intel  -- for linux based on intel compilers
+configure.py.gnu    -- for linux based on gnu   compilers
+configure.py.mix_gnu_mkl -- mixure of the last two
+
+You can edit it and set better configuration if you know where your
+fft library of gsl library is.
+
+You have to install fft library, gsl library, and python with numpy, scipy, pybind11
+
+Once you have properly set up configure.py, just run setup.py script
+

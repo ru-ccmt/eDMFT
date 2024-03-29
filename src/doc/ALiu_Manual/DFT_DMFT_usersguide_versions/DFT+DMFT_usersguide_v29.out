@@ -1,0 +1,42 @@
+\BOOKMARK [0][-]{part.1}{I Introduction}{}
+\BOOKMARK [1][-]{section.1.1}{Electronic structure of crystal and Density Functional Theory \(DFT\)}{part.1}
+\BOOKMARK [1][-]{section.1.2}{Strongly correlated systems and Dynamical Mean\137Field Theory \(DMFT\)}{part.1}
+\BOOKMARK [2][-]{subsection.1.2.1}{Strongly correlated systems}{section.1.2}
+\BOOKMARK [2][-]{subsection.1.2.2}{DMFT formulism}{section.1.2}
+\BOOKMARK [1][-]{section.1.3}{DFT + DMFT}{part.1}
+\BOOKMARK [2][-]{subsection.1.3.1}{Basics of DFT + DMFT}{section.1.3}
+\BOOKMARK [2][-]{subsection.1.3.2}{Flow chart \(Figure 1\)}{section.1.3}
+\BOOKMARK [0][-]{part.2}{II Installation}{}
+\BOOKMARK [0][-]{part.3}{III General steps for running self-consistent cycles in DFT + DMFT}{}
+\BOOKMARK [1][-]{section.3.1}{DFT part}{part.3}
+\BOOKMARK [2][-]{subsection.3.1.1}{Prepare struct-files}{section.3.1}
+\BOOKMARK [3][-]{subsubsection.3.1.1.1}{Gather all the required information}{subsection.3.1.1}
+\BOOKMARK [3][-]{subsubsection.3.1.1.2}{Generate struct-files}{subsection.3.1.1}
+\BOOKMARK [2][-]{subsection.3.1.2}{Initialize DFT calculations using init\137lapw}{section.3.1}
+\BOOKMARK [2][-]{subsection.3.1.3}{Run the self-consistency cycles \(SCF\) of DFT calculations}{section.3.1}
+\BOOKMARK [1][-]{section.3.2}{DMFT part}{part.3}
+\BOOKMARK [2][-]{subsection.3.2.1}{Initialize DMFT calculations}{section.3.2}
+\BOOKMARK [2][-]{subsection.3.2.2}{Prepare all files}{section.3.2}
+\BOOKMARK [3][-]{subsubsection.3.2.2.1}{Prepare input files \(case.indmfl, case.indmfi\) and output files}{subsection.3.2.2}
+\BOOKMARK [3][-]{subsubsection.3.2.2.2}{Prepare params.dat and sig.inp files}{subsection.3.2.2}
+\BOOKMARK [1][-]{section.3.3}{Run DFT + DMFT codes}{part.3}
+\BOOKMARK [2][-]{subsection.3.3.1}{Submit the job and run DFT + DMFT iterations}{section.3.3}
+\BOOKMARK [2][-]{subsection.3.3.2}{Monitor running of DFT + DMFT}{section.3.3}
+\BOOKMARK [2][-]{subsection.3.3.3}{Check convergence of DFT + DMFT cycles and plot the results}{section.3.3}
+\BOOKMARK [0][-]{part.4}{IV Test cases}{}
+\BOOKMARK [1][-]{section.4.1}{FCC Fe at 1500 K 0 GPa}{part.4}
+\BOOKMARK [2][-]{subsection.4.1.1}{Run DFT+DMFT codes}{section.4.1}
+\BOOKMARK [3][-]{subsubsection.4.1.1.1}{Prepare struct-files}{subsection.4.1.1}
+\BOOKMARK [3][-]{subsubsection.4.1.1.2}{Initialize calculations using init\137lapw}{subsection.4.1.1}
+\BOOKMARK [3][-]{subsubsection.4.1.1.3}{Run the self-consistency cycles \(SCF\) of DFT calculations}{subsection.4.1.1}
+\BOOKMARK [3][-]{subsubsection.4.1.1.4}{Initialize DMFT calculations}{subsection.4.1.1}
+\BOOKMARK [3][-]{subsubsection.4.1.1.5}{Prepare all files}{subsection.4.1.1}
+\BOOKMARK [3][-]{subsubsection.4.1.1.6}{Submit the job and run DFT + DMFT iterations}{subsection.4.1.1}
+\BOOKMARK [3][-]{subsubsection.4.1.1.7}{Monitor running of DFT + DMFT}{subsection.4.1.1}
+\BOOKMARK [2][-]{subsection.4.1.2}{Properties based on DMFT calculations}{section.4.1}
+\BOOKMARK [3][-]{subsubsection.4.1.2.1}{histogram.dat and Probability.dat}{subsection.4.1.2}
+\BOOKMARK [3][-]{subsubsection.4.1.2.2}{Density of States \(DOS\) and Partial Density of States\(Partial DOS\)}{subsection.4.1.2}
+\BOOKMARK [3][-]{subsubsection.4.1.2.3}{Spectral functions}{subsection.4.1.2}
+\BOOKMARK [3][-]{subsubsection.4.1.2.4}{Optics including conductivity}{subsection.4.1.2}
+\BOOKMARK [3][-]{subsubsection.4.1.2.5}{Fermi Surface}{subsection.4.1.2}
+\BOOKMARK [0][-]{subsubsection.4.1.2.5}{References}{}

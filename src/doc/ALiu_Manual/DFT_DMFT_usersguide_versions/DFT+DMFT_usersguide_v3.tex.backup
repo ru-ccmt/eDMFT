@@ -1,0 +1,378 @@
+\documentclass[12 pt]{article}
+\usepackage{graphicx}
+% \graphicspath{{/home/aliu/Documents/Latex/DFT DMFT usersguide/DFT DMFT usersguide versions/}}
+\usepackage{amsmath} % math formatting
+\usepackage{amssymb} % math symbols
+\usepackage{eulervm, bookman} % fonts for math and symbols
+\usepackage[round]{natbib} % bibliography styles
+\usepackage{textcomp}
+\usepackage{lipsum} %
+\usepackage[margin=1in, includefoot]{geometry}
+\usepackage{fancyhdr} % change header
+\pagestyle{fancy}
+\fancyhead{}
+\renewcommand{\headrulewidth}{0pt}
+
+
+\title{
+      {\Huge\textbf{User's Guide, DFT+DMFT\_14.1(2014)}}
+      \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\\
+      {\includegraphics[scale= 0.5]{DFT_DMFT}}
+      \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\\
+      } % adds title
+
+\author{
+      \large\textbf{Ang Liu, Peng Zhang and Ronald Cohen}\\
+      Cohen's Theory Group\\
+      5251 Broad Branch Road, N.W.\\
+      Washington, D.C. 20015-1305\\
+      United States of America\\
+	} % adds author
+\date{\today} % adds updated date
+% use .PNG image format whenever possible
+% save the image in same folder as . tex file
+
+%\renewcommand{\baselinestretch}{2}
+%\setlength{\baselineskip}{1cm}
+\linespread{2}
+
+\begin{document}
+
+  \linespread{1.2}
+  \maketitle
+  \thispagestyle{empty} % suppress page number
+  \newpage % add page before Contents
+  \setcounter{page}{1} % reset page counter
+  \pagenumbering{roman} % set page numbering to small roman numerals
+  \renewcommand{\contentsname}{Table of Contents}
+
+  \tableofcontents
+
+  \newpage
+  \pagenumbering{arabic} % change page numbering style from small roman to arabic
+  \setcounter{page}{1}	% reset page number
+  \part{\large\textbf{Introduction}}\label{part:intro}                                        
+    \section{\textbf{Electronic structure of crystal and Density Functional Theory(DFT)}}\label{sec:DFT}
+
+
+  Density-functional theory in the Kohn-Sham formulation is the basic tool for weakly interacting electronic 
+systems and is widely used by the electronic structure community. We will review it using the effective action
+ approach, which was introduced in this context by Fukuda.
+
+  \emph{Choice of variables.} The density of electrons {$\rho {(\textbf{r})}$} is the central quantity of DFT
+ and it is used as a physical variable in derivation of DFT functional.
+
+  \emph{Construction of exact functional.} To construct the DFT functional, we probe the system with a time-
+dependent source field \emph{J(x)}.
+
+ This modifies the action of the system (9) as follows:
+
+   $S\prime[J]$ = S + $\int $ {\emph {dx{J(x)$\psi^{+}(x)$ $\psi(x)$.}}
+
+  The partition function Z becomes a functional of the auxiliary source field J,
+
+%  Z[\emph{J}] = exp (-F[\emph{J}]) = $\int$ D[$\psi^\dag$ $\psi$]$e^{$-S^{\textquotesingle}[J]$}$.
+
+  The effective action for the density, i.e., the density functional,is obtained as the Legendre transform of
+ F with respect to $\rho (x)$.
+
+  From this point forward, we restrict the source to be time independent because we will only be constructing 
+the standard DFT. IF the time dependence were retained, one could formulate time-dependent density-functional
+ theory. The density appears as the variational derivative of the free energy with respect to the source 
+  \emph{The constraining field in DFT}. We demonstrate below that, in the context of DFT, the constraining 
+field is the sume of the well-known exchange-correlation potential and the Hartree potential $V_{xc} + V_{H}$,
+ and we refer to this quantity as $V_{int}$. This is the potential which must be added to the noninteracting
+ Hamiltonian in order to yield the exact density of the full Hamiltonian. Mathematically, $V_{int}$ is a 
+functional of the density which solves the equation
+
+  The Kohn-Sham equation gives rise to a reference system of noninteracting particles, the so-called Kohn-Sham 
+orbitals $\psi _{kj}$ which produce the interacting density
+
+  Here the Kohn-Sham potential is $V_{KS}$ = $V_{ext}$ + $V_{int}$, are the Kohn-Sham energy bands and wave 
+functions, \textbf{k} is a wave vector which runs over the first Brillouin zone, j is the band index, and 
+is the Fermi function.
+
+  \emph{Kohn-Sham Green's function}. Alternatively, the electron density can be obtained with the help of
+ the Kohn-Sham Green's function, given by
+
+   where $G_0$ is the noninteracting Green's function,
+
+  and the density can then be computed from 
+
+  The Kohn-Sham Green's function is defined in the entire space, where $V_{int}(\textbf{r})$ is adjusted 
+such that the density of the system $\rho (\textbf{r})$ can be found from . It can also be expressed in 
+terms of the Kohn-Sham particles in the following way:
+
+  Kohn-Sham decomposition. Now we come to the problem of writing exact and approximate expressions for 
+the functional. The strategy consists in performing an expansion of the functional in powers of electron
+ charge. The Kohn-Sham decomposition consists of splitting the functional into the zeroth-order term and 
+the remainder,
+
+  This is equivalent to what Kohn and Sham did in their original work. In the first temr, $e^2 =0$ only 
+for electron-electron interactions, and not for the interaction of the electron and the external potential. 
+The first term consists of the kinetic energy of the Kohn-Sham particles and the external potential. The 
+constraining field $\emph{J}_0$ is $V_{int}$ since it generates the term that needs to be added to the 
+noninteracting action in order to get the exact density. Furthermore, functional integration of Eq. gives 
+and from Eq. it follows that
+
+  The remaining part $\Delta\Gamma_{DFT}(\rho)$ is the interaction energy functional which is decomposed 
+into the Hartree and exchange-correlation energies,
+
+  $\varPhi_{DFT}^{xc}[\rho]$ at zero temperature becomes the standard exchange correlation energy in DFT.
+
+  Kohn-Sham equations as saddle-point equations. The density functional $\Gamma_{DFT}(\rho)$ can be regarded 
+as a functional which is stationary in two variables $V_{int}$ and $\rho$. Extremization with respect to $V_{int}$ 
+leads to Eq. , while stationary with respect to $\rho$ gives $V_{int}$=$\delta\Delta\Gamma/\delta\rho$, or 
+equivalently
+
+  where $V_{xc}(\textbf{r})$ is the exchange-correlation potential given by
+
+  Equations and along with Eqs and or, equivalently, Eqs and , from the system of equations of the density-
+functional theory. It should be noted that the Kohn-Sham equations give the true minimum of $\Gamma_{DFT}(\rho)$, 
+and not only the saddle point, in contrast to spectral functional theories such as the BK method. 
+
+  \emph{Exact representation for $\Phi_{DFT}^{xc}$.} The explicit form of the interaction functional 
+$\Phi_{DFT}^{xc}[\rho]$ is not available. However, it may be defined by a power series expansion which can 
+be constructed order by order using the inversion method. The latter can be given, albeit complicated, 
+a diagrammatic interpretation. Alternatively, an expression involving integration by a coupling constant 
+$\lambda e^2$ can be obtained using the Harris-Jones formula. One considers $\Phi_{DFT}[\rho, \lambda]$ at an 
+arbitrary interaction $\lambda$ and expresses it as
+
+  Here the first term is simply $K_{DFT}[G_{KS}]$ as given by Eq. which does not depend on $\lambda$. The second 
+part is the unknown functional $\Phi_{DFT}^{xc}[\rho]$. The derivative with respect to the coupling constant in Eq. 
+is given by the average
+
+  where $\Pi_{\lambda}(x, x^{\prime})$ is the density-density correlation function at a given interaction strength 
+$\lambda$ computed in the presence of a source which is $\lambda$ dependent and chosen so that the density of the 
+system is $\rho$. Since , one obtains
+
+  This expression has been used to construct more accurate exchange correlation functional. 
+
+  \emph{Approximations. } Since is not known explicitly some approximations are needed. The LDA assumes,
+
+  where is the exchange-correlation energy of the uniform electron gas, which is easily parametrized. $V_{eff}$ is 
+given as an explicit function of the local density. In practice one frequently uses analytical formulas. The idea 
+here is to fit a functional form to quantum Monte Carlo(QMC) calculations. Gradient corrections to the LDA have been 
+worked out by Perdew and co-workers. They are also frequently used in DFT calculations. 
+
+  \emph{Evaluation of the total energy.} At the saddle point, the density functional $\Gamma_{DFT}$ delievers the 
+total free energy of the system,
+
+  where the trace in the second term runs only over spatial coordinates and not over imaginary time. If temperature 
+goes to zero, the entropy contribution vanishes and the total energy formula is recovered
+
+  \emph{Assessment of the approach} From a conceptual point of view, the density-functional approach is radically 
+different from the Green's-function theory (see Sec. below). The Kohn-Sham equations and describe the Kohn-Sham 
+quasiparticles which are poles of $G_{KS}$ and are not rigorously identifiable with on-electron excitations. This 
+is very different from the Dyson equation which determines the Green's function G, which has poles at the observable 
+one-electron excitations. In principle the Kohn-Sham orbitals are a technical tool for generating the total energy. 
+They are, however, not a necessary element of the approach as DFT can be formulated without introducing the Kohn-
+Sham orbitals. In practice, they are an excellent first step in perturbative calculations of the one-electron Green's 
+function in powers of screened Coulomb interaction, as, e.g., the \emph{GW} method. Both the LDA and GW methods are 
+very successful in many materials in which one can apply the standard model of solids. However, in correlated electron 
+systems this is not always the case. Our view is that this situation cannot be remedied by either using more complicated 
+exchange-correlation functionals in density-functional theory or adding a finite number of diagrams in perturbation theory. 
+As discussed above, the spectra of strongly correlated electron systems have both correlated quasiparticle bands and 
+Hubbard bands which have no analog in one-electron theory.
+
+  The density-functional theory can also be formulated for model Hamiltonians, the concept of density being replaced 
+by the diagonal part of the density matrix in a site representation. It was tested in the context of the Hubbard 
+model by , and . \citep {Kotliar2006}
+
+    \newpage 
+    \section{\textbf{Strongly correlated systems and\\ Dynamical Mean$\_$Field Theory(DMFT)}} \label{sec:DMFT}
+      \subsection{Strongly correlated systems}\label{subsec:strongly correlated}
+
+  What do we mean by a strongly correlated phenomenon? We can answer this question from the perspective of electronic 
+structure theory, where one-electron excitations are well defined and represented as delta-function-like peaks showing 
+the locations of quasiparticles at the energy scale of the electronic spectral functions. Strong correlations 
+imply the breakdown of the effective one-particle description: the wave function of the system becomes essentially 
+many-body-like, represented by combinations of Slater determinants, and the one-particle Green's functions no longer 
+exhibit single-peaked features. 
+
+  The development of methods for studying strongly correlated materials has a long history in condensed matter physics. 
+The efforts of the many-body community have traditionally focused on the solution of model Hamiltonians (usually 
+written for a given solid-state system on physical grounds) using techniques such as diagrammatic methods, quantum 
+Monte Carlo simulations, exact diagonalization for finite-size clusters, density-matrix renormalization-group methods, 
+and so on. The development of LDA + U and self-interaction corrected (SIC) methods, many-body perturbative approaches 
+based on GW and its extensions, as well as the time-dependent version of the density-functional theory, have been 
+carried out by the electronic structure community to address the problem of the strongly correlated materials. 
+Some of the these techniques are already much more complicated and time consuming compared to the standard LDA-based 
+algorithms, and therefore the real exploration of materials is frequently performed by simplified versions utilizing 
+approximations such as the plasmon-pole form for the di-electric function, omitting the self-consistency within GW 
+or assuming locality of the GW self-energy. 
+
+  To motivate the dynamical mean-field theory approach we recall the nature of the one-electron (or one-particle) density 
+of states of strongly correlated systems may display both renormalized quasiparticles and atomiclike states 
+simultaneously. To describe this method one needs a technique which is able to treat quasiparticle bands and 
+Hubbard bands on equal footing, and which is able to interpolate between atomic and band limits. Dynamical mean-
+field theory is the simplest approach which captures these features; it has been extensively developed to study 
+model Hamiltonians. Figure shows the development of the spectrum while increasing the strength of Coulomb interaction 
+U as obtained by DMFT solution of the Hubbard model. It illustrates the necessity to go beyond static mean-field 
+treatments in situations when the on-site Hubbard U becomes comparable with the bandwidth W. 
+
+  Model Hamiltonian based DMFT methods have successfully described regimes $U\diagup W \gtrsim 1$.However, to describe
+ strongly correlated materials we need to incroporate realistic electronic structure calculations. The low-temperature 
+physics of systems near localization-delocalization crossover is nonuniversal, system specific, and sensitive to the 
+lattice structure and orbital degeneracy which is unique to each compound. We believe that incroporating this 
+information into the many-body treatment of this system is a neccessary first step before more general lessons about 
+strong-correlation phenomena can be drawn. In this respect, we recall that DFT in its common approximations, such 
+as LDA or GGA, brings a system specific description into calculations. Despite the great success of DFT for studying 
+weakly correlated solids, it has not been able thus far to address strongly correlated phenomena. So, we see that 
+both density-functional-based and many-body model Hamiltonian approaches are to a large extent complementary to 
+each other and hence can be merged. One-electron Hamiltonians, which are necessarily generated within density-functional 
+approaches (i.e., the hopping terms), can be used as input for more challenging many-body calucations. This path 
+was undertaken by Anisimov et al. who introduced the LDA+DMFT method of electronic structure for strongly correlated 
+systems and applied it to the photoemmision spectrum of . Near the Mott transition, this system shows a number of 
+features incompatible with the one-electron description. The electronic structure of Fe has been shown to be in 
+better agreement with experiment within DMFT in comparison with LDA. The photoemission spectrum near the Mott transition 
+in has been studied, as well as issues connected to the finite-temperature magnetism of Fe and Ni were explored. 
+
+  Despite these successful developments, we also emphasize a more ambitious goal: to build a general method which treats 
+all bands and all electrons on the same footing, determines both hoppings and interactions internally using a fully 
+self-consistent procedure, and accesses both energetics and spectra of correlated materials. These efforts have been 
+undertaken in a series of papers which gave us a functional description of the problem in analogy to the density-
+functional theory, and its self-consistent implementation is illustrated on pluonium. 
+
+  To summarize, there are two roads in approaching the problem of simulating correlated materials properties, which 
+we illustrate in Fig. Dynamical mean-field theory has been useful in both instances. To describe these efforts in a 
+language understandable by both elctronic structure and many-body communities, and to stress qualitative differences 
+and great similarities between DMFT and LDA, we start our review with a general many-body framework based on the 
+effective action approach to strongly correlated systems. 
+
+  \citep {Kotliar2006}
+
+      \newpage
+      \subsection{DMFT formulism}\label{subsec:DMFT formulism}
+
+DMFT is a mapping of a lattice problem onto an impurity problem. Therefore at the heart of every DMFT calculation 
+is the solution of the Anderson impurity model.
+
+  The SDFT should be viewed as an exact theory whose manifestly local constraining field is an auxiliary mass 
+operator introduced to reproduce the local part of the Green's function of the system, exactly like the Kohn-Sham 
+potential is an auxiliary operator introduced to reproduce the density of electrons in DFT. However, to obtain
+ practial results, we need practical approximations. The dynamical mean-field thoery can be thought of as an approximation 
+to the exact SDFT functional in the same spirit as LDA appears as an approximation to the exact DFT functional.
+
+  The diagrammatic rules of the exact SDFT functional can be developed but they are more complicated than in 
+Baym-Kadanoff theory as discussed by . The single-site DMFT approximation to this functional consists of taking 
+to be a sum of all graphs, constructed with as a vertex and as a propagator, which are two-particle irreducible, 
+namely, . This together with Eq. defines the DMFT approximation to the exact spectral density functional. 
+
+  It is possible to arrive at this functional by summing up diagrams or using the coupling constant integration 
+trick with a coupling-dependent Green's function having the DMFT form, namely, with a local self-energy. This 
+results in
+
+  with in Eq. the self-energy of the Anderson impurity model. It is useful to have a formulation of this DMFT 
+funcational as a function of three variables, namely, combining the hybridization with that atomic Green's 
+function to form the Weiss function, one can obtain the DMFT equations from the stationary point of a functional 
+of , and the Weiss field:
+
+  One can eliminate and from Eq. using stationary conditions and recover a functional of the Weiss field function 
+only. This form of the functional, applied to the Hubbard model, allowed the analytical determination of the nature 
+of the transition and the characterization of the zero-temperature critical points. Alternatively eliminating and 
+in favor of one obtains the DMFT approximation to the self-energy functional discussed in. 
+
+      \newpage
+    \section{\textbf{DFT+DMFT}}\label{sec:DFT+DMFT}
+      \subsection{Basics of DFT + DMFT}\label{subsec:Basics of DFT+DMFT}
+
+  As stressed in this review, the ultimate goal of our research is a fully first-principles electronic structure 
+method which can treat strongly correlated systems (i.e., see). Because this ambitious methodology is still 
+under development, we continue to rely on the simplified approach which is DFT+DMFT. One of the great merits of 
+DFT+DMFT is that it is a nearly first-principles methos. The user only needs to input the structure, the atomic 
+species, and the interactions (i.e., U). The DFT+DMFT code suite is broken into three codes. 
+
+  The first part is the DFT code, which is simply a modified version of LMTART. It has nearly identical input 
+files, with minor differences in how correlated orbitals are specified. Therefore the main inputs of this code 
+are the unit cell and the atomic species. The main role of this code is to generate and export the converged DFT 
+Hamiltonian matrix in a local basis for each k point. Therefore this code essentially generates the parameters of 
+the unperturbed Hamiltonian automatically. This information is needed to construct the local Green's function. 
+
+  The second part is the code which implements the DMFT self-consistency condition, which requires a choice of 
+correlated orbital and double counting. This code takes the Hamiltonian matrix and the self-energy as input, and 
+provides the bath function as output.
+
+  The third part is the various codes which solve the Anderson impurity model, and have been descibed in the 
+first section. These codes take the bath function as input and provide the self-energy, which is used in the 
+sel-consistency condition in the preceding step.
+
+  These three pieces allow one to perform a non-self-consistent DFT+DMFT calculation as follows. First, the DFT 
+code is used to generate the local, orthogonalized Hamiltonian matrix at each k point. Second, one starts with 
+a guess for the self-energy and uses the DMFT self-consistency condition code to find the bath function. Third, 
+the bath function is fed into the impurity solver producing a new self-energy. The second and third steps are 
+then repeated until DMFT self-consistency is achieved. This is considered a non-self-consistent DFT+DMFT calculation. 
+This process should be continued until both the total density and the local Green's function have converged. 
+
+  One should note that the above pieces which compose the DFT+DMFT suite are three separate codes. Therefore one 
+must write a simple script to iterate the above algorithm until self-consistency is reached (i.e., the self-energy 
+converges to within some tolerance). Additionally, the DFT portion of this code suite (i.e., the first part) can 
+in principle be replaced by any DFT code as long as a local basis set is generated. 
+
+      \newpage
+      \subsection{Flow charts}\label{subsec:Flow charts}
+
+\smallskip
+\begin{figure}
+ \centering
+ \includegraphics[scale=0.45]{dftpart}
+ \caption{DFT loop}
+\end{figure}
+
+\begin{figure}
+ \centering
+ \includegraphics[scale=0.45]{dmftpart}
+ \caption{DMFT loop}
+\end{figure}
+
+\begin{figure}
+ \centering
+ \includegraphics[scale=0.7]{dmft1}
+ \caption{DMFT1}
+\end{figure}
+
+
+
+
+  \newpage
+  \part{\large\textbf{Installation}}\label{part:installation}
+
+  \newpage    
+  \setcounter{section}{0}
+  \part{\large\textbf{Examples}}\label{part:examples}
+    \section{\textbf{Self-consistent cycles in DFT+DMFT for FeO}}\label{sec:self-consistent cycles}
+      \subsection{DFT}\label{subsec:DFT}
+	\subsubsection{LAPW0}\label{subsubsec:LAPW0}
+	\subsubsection{LAPW1}\label{subsubsec:LAPW1}
+	\subsubsection{LAPWS0}\label{subsubsec:LAPWS0}
+      \subsection{DMFT}\label{subsec:DMFT}
+	\subsubsection{x\_dmft.py dmft1}\label{subsubsec:dmft1}
+	\subsubsection{Impurity solver}\label{subsubsec:impurity solver}
+	\subsubsection{x\_dmft.py dmft2}\label{subsubsec:dmft2}
+      \subsection{Core charge and charge mixing}\label{subsec:core charge}
+	\subsubsection{x core}\label{subsubsec:x core}
+	\subsubsection{x mixer}\label{subsubsec:x mixer}
+      \subsection{Density of States(DOS), Spectra and Fermi Surface(FS)}\label{subsec:DOS}
+      \subsection{Transport properties}\label{subsec:transport}
+      \subsection{Magnetic ordering}\label{subsec:magnetic}
+
+  \newpage
+  \setcounter{section}{0} % reset section number
+  \appendix 
+      
+      \section{Programming guide for DFT+DMFT}\label{sec:programming}
+      \section{Trouble shooting}\label{sec:trouble shooting}
+      \section{List of options}\label{sec:list of options}
+      \section{Frequently Asked Questions}\label{sec:FAQ}
+      \section{Glossaries and Indexes}\label{sec:indexes}
+      \section{Frequently used terms}\label{sec:FUT}
+      \section{Bibliograph}\label{sec:Bibliograph}
+
+\bibliographystyle{plainnat} % set bibliography style
+\bibliography{DFT+DMFT_usersguide_v3} % include bibliography files
+
+
+  \clearpage % add page after contents
+
+\end{document}
+

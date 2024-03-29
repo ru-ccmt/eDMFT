@@ -1,0 +1,30 @@
+To create cix file for link-DMFT, one carries out the following steps:
+
+1) Produce cix-file for single site DMFT.  To do that, tou need
+ "Trans.dat" file, which contains some basic information for single
+ site DMFT. If you have similar file, just copy it to your
+ directory. If not, you can submit single site DMFT run to obtain cix
+ file. You can kill the run as soon as you have cix-file.
+
+2) Prepared case.indmfl and case.indmfi files for two-site DMFT. 
+
+3) Run "dmft1" step, to obtain the impurity levels. They will appear in case.Eimp?
+
+4) From this impurity levels (
+Ek=[E_{xz,k=0},E_{xz,k=pi},E_{yz,k=0},E_{yz,k=pi},...] ), you can
+recompute local impurity levels, which are
+Elocal=[0.5*(E_{xz,k=0}+E_{xz,k=pi}),0.5*(E_{yz,k=0}+E_{yz,k=pi}),...]. If
+these levels are similar to levels in single-site DMFT run, you can
+use cix file from the above run. If not, you can rerun "atom_d.py" and
+input the improved single-site DMFT energies. You can also change
+Hund's J in this step.
+
+Here is an example for generating single-site DMFT cix file:
+>atom_d.py l=2 J=0.7 cx=0.0 OCA_G=False "CoulombF='Ising'" "Eimp=[0.,-0.04999291,-0.03876849]"
+
+You will get new actqmc.cix
+
+5) Run link.py to compute two-site DMFT cix file:
+
+> link.py -U 6. -E "[0.,1.4378107,0.86557738,0.47224477,0.88272563,0.47754649]"
+

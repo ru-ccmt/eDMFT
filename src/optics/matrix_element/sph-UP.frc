@@ -1,0 +1,518 @@
+SUBROUTINE MOM_MAT(KUPLIMIT,KFIRST,IEF,tinterst,nbvalmax1)
+  use xa3
+  use mxyz
+  use ablm
+  use opme
+  use bindex
+  use struk
+  use lologo
+  use intu
+  use atspa
+  use loabco
+  !ad
+  !ad    calculates the momentum matrix elements as
+  !ad    < PSI(k,n') | -i*NABLA | PSI(k,n) >
+  !ad    for each band combination (n',n) and k-point k
+  !ad    for all spheres in the unit cell
+  !ad
+  !ad    REMARKS:
+  !ad    for LOs' the loops run up to LMAX2 
+  !ad    in order to use atpar in a similar way as for the LAPW's
+  !ad    the radial functions are stored for each atom
+  !ad
+  INCLUDE 'param.inc'
+  IMPLICIT REAL*8 (A-H,O-Z)
+  !ad
+  !ad _____________________ DEFINITION OF VARIABLES ____________________
+  !ad
+  
+  COMPLEX*16  YL((LMAX+1)**2)
+  COMPLEX*16  PHS,CFAC,IMAG,CZERO
+  complex*16,allocatable :: PHA(:)
+  complex*16,allocatable::   Ust(:,:,:)
+  !cad
+  !      COMPLEX*16  ALM,BLM,cLM
+  !      COMPLEX*16  OPMATX,OPMATY,OPMATZ,
+  complex*16  ione
+  !      COMPLEX*16  MX_,MY_,MZ_,SX_,SY_,SZ_,OPMX,OPMY,OPMZ
+  !cad
+  CHARACTER *4     LATTIC                                
+  CHARACTER *3     MODUS,OUTME                                         
+  CHARACTER *10    BNAME,ACONT                          
+  CHARACTER *80    TITLE     
+  !cad
+  !ole ##### Begin #####
+  !ole  LOGICAL   REL,LSO,SPIN
+  LOGICAL   REL,LSO,SPIN,MME_FLAG 
+  !ole #####  End  #####
+  LOGICAL   loor(0:lomax),lloor(0:lmax2)
+  LOGICAL   lapw(0:lmax2)
+  !ad
+  !ad   distinguish between real and complex version
+  !ad
+  complex*16,allocatable:: OPMX(:,:),OPMY(:,:),OPMZ(:,:)
+  REAL*8 :: FAC0, bk3(3)
+  COMMON /LEAD/ K1,K2,KD,KSTEP,KOUT,KSTOP
+  COMMON /COM/  EMIN,EMAX,ELECN,EULIMIT,EDLIMIT,NK,IOUT,NSPIN,NAT,NBAND,ix,NB(NKPT),MINWAV,MAXWAV,ifpmat
+  COMMON /KPOI/ S,T,Z,NEMIN,NEMAX,KKZ,N,NNLO,BNAME                 
+  COMMON /CHAR/   TITLE,LATTIC,MODUS,OUTME           
+  COMMON /GENER/  BR1(3,3),BR2(3,3)                 
+  COMMON /ATSPDT/ Ee(0:LMAX2),P(0:LMAX2),DP(0:LMAX2),PE(0:LMAX2),DPE(0:LMAX2),PEI(0:LMAX2)
+  COMMON /RADFU/  RRAD1(NRAD,LMAX1),RADE1(NRAD,LMAX1),RRAD2(NRAD,LMAX1),RADE2(NRAD,LMAX1)
+  COMMON /UHELP/  UDUM(NRAD,6)
+  COMMON /SYMo/   opimat(3,3,NSYM)
+  COMMON /XA/     R(NRAD),BK(3)
+  COMMON /MIM / MIMA(2)
+  common /loabc/   alo(0:lomax,nloat),blo(0:lomax,nloat),clo(0:lomax,nloat),elo(0:lomax,nloat),plo(0:lomax),dplo(0:lomax),pelo(0:lomax),dpelo(0:lomax),peilo(0:lomax),pi12lo(0:lomax),pe12lo(0:lomax),a1lo(nrad,0:lomax),b1lo(nrad,0:lomax)
+  common /lolog/   nlo,nlov,nlon,lapw,ilo(0:lomax),loor,lloor
+  COMMON /CLOGIC/  LSO,SPIN,REL,MME_FLAG	
+  DATA  CZERO/(0.0D0,0.0D0)/,IMAG/(0.0D0,1.0D0)/,TWO/2.0D+0/         
+!ad _________________________  DEFINE CONSTANTS  _____________________
+  PI=ACOS(-1.0D0)                                      
+  TWOPI=2.D0*PI                                          
+  ACONT='CONT      '                                
+  TEST=0.0D0                                             
+  SQRT2=SQRT(2.0D0)                                     
+  SQFP=SQRT(4.D0*PI)   
+  ione=(0d0,1.0d0)                                    
+  CIN=1.331258D-5   
+  !ad
+  !ad   conversion from Rydberg to Hartree                       
+  !ad
+  CIN=CIN*4.0D0                                               
+  IF (.NOT.REL) CIN=4.0*1.0D-22    
+  !ad __________________________________________________________________
+  !kh Notice that when spin-orbit is present, but the KS-potential has no broken symmetry between up/down, we use iso=1, rather than
+  !kh iso=2. In another words, with SO on and time reversal symmetry present, we do not compute all matrix elements, but only half of them
+  !kh In the outmat we then restore the symmetry.
+  IF (LSO.AND.SPIN) THEN
+     ISO=2
+  ELSE
+     ISO=1
+  END IF
+  !ad
+  !ad __________________ INITIALIZE MATRIX ELEMENTS  ___________________
+  !ad
+  !      call DELMATRIX  
+  !ad
+  !ad ________________ CALCULATION OF RADIAL FUNCTIONS _________________
+  !ad
+  LFIRST=1  
+  nnlo=0
+  nato=nat
+  allocate (nloO(NATO),nlovO(NATO),nlonO(NATO),iloO(0:lomax,NATO))
+  allocate (lapwO(0:lmax2,NATO),loorO(0:lomax,nato))
+  allocate ( Duu1(LMAX1,NATO,2),Duu2(LMAX1,NATO,2),Duup1(LMAX1,NATO,2),Duup2(LMAX1,NATO,2),Dupu1(LMAX1,NATO,2),Dupu2(LMAX1,NATO,2),Dupup1(LMAX1,NATO,2),Dupup2(LMAX1,NATO,2),Ruu(LMAX1,NATO,2),Ruup(LMAX1,NATO,2),Rupu(LMAX1,NATO,2),Rupup(LMAX1,NATO,2) )
+  Duu1=0
+  Duu2=0
+  Duup1=0
+  Duup2=0
+  Dupu1=0
+  Dupu2=0
+  Dupup1=0
+  Dupup2=0
+  Ruu=0
+  Ruup=0
+  Rupu=0
+  Rupup=0
+  allocate ( Duul1(LOMAX1,NATO,2), Duul2(LOMAX1,NATO,2),Dulup1(LOMAX1,NATO,2),Dulup2(LOMAX1,NATO,2),Dupul1(LOMAX1,NATO,2),Dupul2(LOMAX1,NATO,2),Dulu1(LOMAX1,NATO,2), Dulu2(LOMAX1,NATO,2),Dulul1(LOMAX1,NATO,2),Dulul2(LOMAX1,NATO,2),Ruul(LOMAX1,NATO,2),  Rulu(LOMAX1,NATO,2),Rupul(LOMAX1,NATO,2), Rulup(LOMAX1,NATO,2),Rulul(LOMAX1,NATO,2) )
+  allocate (Pn(LMAX1,NATO,2),DPn(LMAX1,NATO,2),PEn(LMAX1,NATO,2),DPEn(LMAX1,NATO,2),PEIn(0:LMAX2,NATO,2) )
+  allocate (aloO(0:lomax,NATO,nloat,2),bloO(0:lomax,NATO,nloat,2),cloO(0:lomax,NATO,nloat,2),eloO(0:lomax,NATO,nloat),ploO(0:lomax,NATO,2),dploO(0:lomax,NATO,2),peloO(0:lomax,NATO,2),dpeloO(0:lomax,NATO,2),peiloO(0:lomax,NATO,2),pi12lA(0:lomax,NATO,2),pe12lA(0:lomax,NATO,2) )
+  Duul1=0
+  Duul2=0
+  Dulup1=0
+  Dulup2=0
+  Dupul1=0
+  Dupul2=0
+  Dulu1=0
+  Dulu2=0
+  Dulul1=0
+  Dulul2=0
+  Ruul=0
+  Rulu=0
+  Ruup=0
+  Rupul=0
+  Rulup=0
+  Rulul=0
+  !ad....................... loop over all atoms ............JATOM=1,NAT
+  do JATOM=1,NAT                        
+     call CPUTIM(TTIME)
+     TATST=TTIME   
+     IF(JATOM.GT.1) LFIRST=LFIRST + MULT(JATOM-1)
+     !ad......................... loop over spins..................IS=1,ISO
+     do is=1,ISO
+        rewind(9+is)
+        call ATPAR (REL,NAT,JATOM,LFIRST,is) 
+        call SAVEAP(JATOM,is)
+        call RADINT(JATOM,is)
+        call RINTUOUT(jatom,is)
+     end do
+     !ad......................................................end..IS=1,ISO
+     nnlo=nnlo+nlo
+     call CPUTIM(TTIME) 
+     TATEN=TTIME
+     TATST=TATEN-TATST
+     WRITE(6,1111) TATST  
+     !ad
+  enddo
+  !ad __________________ RADIAL FUNCTIONS CALCULATED ___________________
+  DO NK=1,KUPLIMIT !ad......................... loop over k-points ......................
+     DO is=1,ISO   !ad.......................... loop over spins ........................
+        !kh Note that vector file is stored as |psi_i> = \sum_{Ks} A_{Ks,i} |chi_{Ks}> 
+        !kh therefore when computing matrix elements of a spin-independent operator,
+        !kh we have <psi_j|O|psi_i> = \sum_{s,KK'} A^*_{K's,j} <chi_{K's}|O|chi_{Ks}> A_{Ks,i} 
+        !kh Notice also that when time reversal is present (even when SO is switched on) iso is here set to 1.
+        !kh In the outmat one then symmetrizes the matrix elements.
+        !ad __________________ READ EIGENVECTORS (case.vector) ________________
+        !ad   first part of the vector-file has been read by atpar before
+        READ(9+is,END=999) S,T,Z,BNAME,N,NE  ! when s=1/2, spin up/down component
+        IF(BNAME.EQ.ACONT) STOP ' THIS CASE ISN`T POSSIBLE !!!'
+        if (is.eq.1) then
+           allocate (A(NE,N),bkx(n),bky(n),bkz(n),kx(n),ky(n),kz(n))
+           allocate (FJ(0:LMAX2,N),DFJ(0:LMAX2,N),e(ne))
+           allocate (PHA(ne))
+           allocate (alm(NE,(LMAX+1)**2),blm(NE,(LMAX+1)**2),clm(NE,(LMAX+1)**2))
+        endif
+        !ad................ read reciprocal lattice vectors  .................                       
+        READ(9+is) (KX(I),KY(I),KZ(I),I=1,N) 
+        !ad................... add k-point from first BZ  ....................                       
+        DO I=1,N                                                        
+           BKX(I)=(S+KX(I))                                               
+           BKY(I)=(T+KY(I))                                               
+           BKZ(I)=(Z+KZ(I))                                               
+        ENDDO
+        !ad............... read eigenvalues and coefficients  ................
+        NEMIN=1                                                     
+        NEMAX=0 
+        DO II=1,NE ! 14
+           READ(9+is) NUM,E(NUM)       
+           READ(9+is) (A(NUM,i),I=1,N)
+           IF(E(NUM).LT.EMIN) NEMIN=NEMIN+1                         
+           IF(E(NUM).LE.EMAX) NEMAX=NEMAX+1                          
+        ENDDO
+        MM=(NEMAX-NEMIN+1)*(NEMAX-NEMIN+2)/2
+        nbvalmax=nbvalmax1
+        if(nbvalmax.gt.nemax) nbvalmax=nemax
+        if (is.eq.1) then
+           allocate (OPMX(mm,2),OPMY(mm,2),OPMZ(mm,2))
+           allocate (MX_(mm),MY_(mm),MZ_(mm),SX_(mm),SY_(mm),SZ_(mm))
+           allocate (OPMATX(mm),OPMATY(mm),OPMATZ(mm)) 
+           allocate (N_(mm),NN_(mm),NIN(nemin:nemax,nemin:nemax))
+           opmx(:,:)=0.d0  ! This is the sum of up and down components
+           opmy(:,:)=0.d0  ! hence it should not be zeroth every time
+           opmz(:,:)=0.d0
+        endif
+        OPMATX(1:mm)=0.d0
+        OPMATY(1:mm)=0.d0
+        OPMATZ(1:mm)=0.d0
+        MIMA(1)=NEMIN
+        MIMA(2)=NEMAX
+        !ad
+        IF(NK.LT.KFIRST) THEN
+           WRITE(6,7012) NK,S,T,Z   
+           deallocate (A,bkx,bky,bkz,kx,ky,kz)
+           deallocate (FJ,DFJ,e)
+           deallocate (PHA)
+           deallocate (ALM,BLM,cLM)
+           deallocate (OPMX,OPMY,OPMZ)
+           deallocate (MX_,MY_,MZ_,SX_,SY_,SZ_)
+           deallocate (OPMATX,OPMATY,OPMATZ) 
+           deallocate (N_,NN_,NIN)
+           CYCLE
+        ELSE
+           WRITE(6,701) NK,S,T,Z,NEMIN,NEMAX,NE
+        ENDIF
+        ii=0
+        do nb1=nemin,nbvalmax
+           do nb2=nb1,nemax
+              ii=ii+1
+              n_(ii)=nb1
+              nn_(ii)=nb2
+              nin(nb1,nb2)=ii
+           enddo
+        enddo
+        ivmax=ii
+        !ad ________________ CONTRIBUTIONS FROM ATOMIC SPHERES _______________
+        !ad....................... loop over all atoms ............JATOM=1,NAT
+        tmat0=0.d0
+        TATST0=0.d0
+        LFIRST=1  
+        DO JATOM=1,NAT     ! 50
+           imodus1=jatom           
+           !ad..............restore radial functions for each atom...............
+           call RESTAP(JATOM,is)      
+           DO l=0,LMAX
+              IF (l.LE.LOMAX) THEN
+                 lloor(l)=loor(l)
+              ELSE
+                 lloor(l)=.FALSE.
+              END IF
+           ENDDO
+           !ad    
+           IF(JATOM.GT.1) LFIRST=LFIRST + MULT(JATOM-1) 
+           !ad..................calculation of BESSEL FUNCTIONS..................
+           call HARMON(N,BKX,BKY,BKZ,LMAX2,FJ,DFJ,RMT(JATOM))                 
+           !FAC=(4.0D0*PI*RMT(JATOM)**2/SQRT(VOL))**2
+           FAC0=4.0D0*PI*RMT(JATOM)**2/SQRT(VOL)
+           !ad.................summation over equivalent positions...............
+           LATOM=LFIRST-1                                                    
+           DO MU=1,MULT(JATOM)  ! 777
+              call CPUTIM(TTIME)
+              TATST=TTIME                                           
+              LATOM=LATOM+1 
+              !ad.............initialization of coefficients ALM,BLM,CLM ...........
+              ALM(:,:)=0.d0
+              BLM(:,:)=0.d0
+              CLM(:,:)=0.d0
+              !ad......................loop over all plane waves....................
+              DO I=1,N-(nlo+nlon+nlov)   ! 120
+                 bk3(1)=BKX(I)
+                 bk3(2)=BKY(I)
+                 bk3(3)=BKZ(I)
+                 !KH Careful: Here we do not transform to the local coordinate axis, but rathe perform calculation in the global coordinate system.
+                 !            This means that nabla is calculated in the global x,y,z system.
+                 BK = matmul(BR1,bk3)
+                 call YLM (BK,LMAX,YL)
+                 PHS=EXP( IMAG*dot_product(bk3,POS(:,latom))*TWOPI )
+                 PHA(nemin:nemax)=A(nemin:nemax,i)*PHS
+                 INDEX=0  
+                 DO L=0,LMAX2   ! 130
+                    if(lapw(l)) then
+                       AL=DFJ(L,I)*PE(L)-FJ(L,I)*DPE(L) 
+                       BL=FJ(L,I)*DP(L)-DFJ(L,I)*P(L)
+                    else
+                       AL = FJ(L,I)/P(L)/RMT(JATOM)**2
+                       BL = 0.d0
+                    endif
+                    DO M=1,2*L+1
+                       INDEX=INDEX+1
+                       !KH This could be improved by matrix multiplication, like it is done in other parts of the code
+                       ALM(nemin:nemax,INDEX) = ALM(nemin:nemax,INDEX) + AL*conjg(YL(INDEX))*PHA(nemin:nemax)             
+                       BLM(nemin:nemax,INDEX) = BLM(nemin:nemax,INDEX) + BL*conjg(YL(INDEX))*PHA(nemin:nemax)
+                    ENDDO
+                 ENDDO
+              ENDDO   !ad....................loop over all reciprocal vectors .................
+              !ad................determine ALM, BLM, and CLM for LO's...............
+              if (nlo.ne.0) call LOMAIN(nemin,nemax,lfirst,latom,n,jatom)
+              DO l=0,lmax2
+                 cfac = imag**l*fac0
+                 ALM(nemin:nemax,l**2+1:(l+1)**2) = ALM(nemin:nemax,l**2+1:(l+1)**2)*cfac
+                 BLM(nemin:nemax,l**2+1:(l+1)**2) = BLM(nemin:nemax,l**2+1:(l+1)**2)*cfac
+                 CLM(nemin:nemax,l**2+1:(l+1)**2) = CLM(nemin:nemax,l**2+1:(l+1)**2)*cfac
+              ENDDO
+              !kh.................alm, blm, clm are determined.................................
+              !kh...... Now use them to compute nabla .........................................
+              call CPUTIM(TTIME)
+              TMAT=TTIME
+              !ad ___________________ MOMENTUM MATRIX ELEMENTS _____________________
+              !ad.........matrix elements M(n',n) between basis functions...........
+              call MMATRIX(JATOM,ivmax,N_,NN_,is)
+              !ad ..............NBINDEX: index of band combination..................
+              if(nmodus.ne.0) then  ! We sometimes calculate only selected atoms, i.e., imodus(:).
+                 do imodus1=1,nmodus
+                    IF (IMODUS(imodus1).EQ.jatom) goto 776 ! This atom should not be excluded.
+                 enddo
+                 ! This atom is not in imodus(:), hence it should be excluded!
+                 goto 775
+              endif
+776           continue
+              OPMATX(:)=OPMATX(:)+MX_(:)
+              OPMATY(:)=OPMATY(:)+MY_(:)
+              OPMATZ(:)=OPMATZ(:)+MZ_(:)
+775           continue
+              call cputim(ttime)
+              tmat0=tmat0+ttime-tmat
+              TATST0=tatst0+TTIME-TATST
+           ENDDO  !ad..............summation over equivalent positions done.............
+        ENDDO     !................summation over atom types ...........................
+        write(6,441) tmat0,TATST0
+        !ad ___________________ INTERSTITIAL CONTRIBUTION ____________________
+        call cputim(ttime)
+        tinterst=tinterst-ttime
+        IF (MODUS.EQ.'ALL') THEN
+           call PLANEW(nbvalmax)
+        END IF
+        if(nmodus.ne.0) then
+           if(imodus(nmodus).eq.nat+1)  call PLANEW(nbvalmax) 
+        endif
+        call cputim(ttime)
+        tinterst=tinterst+ttime
+        OPMX(:,is)=OPMATX(:)
+        OPMY(:,is)=OPMATY(:)
+        OPMZ(:,is)=OPMATZ(:)
+        OPMATX(:) = 0.d0
+        OPMATY(:) = 0.d0
+        OPMATZ(:) = 0.d0
+     ENDDO
+     !ad....................... loop over spins done ......................
+     !KH Since eigenvectors are normalized over both spins, we need to add both spins up
+     !  to get proper normalization per band. Notice that there are twice as many bands when
+     !  iso=2 is switched on.
+     ! Up to now OPMX was just <psi_j|nabla|psi_i>. Now we transform to <psi_j|-i*nabla|psi_i>
+     OPMATX(:)=-ione*(OPMX(:,1)+OPMX(:,2))
+     OPMATY(:)=-ione*(OPMY(:,1)+OPMY(:,2))
+     OPMATZ(:)=-ione*(OPMZ(:,1)+OPMZ(:,2))
+     !Clas-start
+     ! Outputs <j,k|-i*grad|j',k> to case.pmat
+     if(ifpmat.eq.1) then 
+        write(40,'(3i8)') nk, nemin,nemax
+        write(40,'(3F16.12,a10)') s,t,z, bname
+        nbindex=0
+        do nb1=nemin,Nbvalmax
+           do nb2=nb1,nemax
+              nbindex=nbindex+1
+              write(40,*) opmatx(nbindex)
+              write(40,*) opmaty(nbindex)
+              write(40,*) opmatz(nbindex)
+           enddo
+        enddo
+     endif
+     !Clas-end
+     call OUTMAT(OUTME,Nbvalmax)
+     OPMATX(:) = 0.d0
+     OPMATY(:) = 0.d0
+     OPMATZ(:) = 0.d0
+     !........ GO FOR NEXT K POINT ........................................
+     deallocate (A,bkx,bky,bkz,kx,ky,kz)
+     deallocate (FJ,DFJ,e)
+     deallocate (PHA)
+     deallocate (ALM,BLM,cLM)
+     deallocate (OPMX,OPMY,OPMZ)
+     deallocate (MX_,MY_,MZ_,SX_,SY_,SZ_)
+     deallocate (OPMATX,OPMATY,OPMATZ) 
+     deallocate (N_,NN_,NIN)
+     !IF (KUPLIMIT.GT.NK) GOTO 4
+  ENDDO   !ad.......................loop over k-points done.....................
+  !ad
+999 CONTINUE                                                          
+  REWIND 10 
+  !ad
+  RETURN
+1111 FORMAT( /,'CPUTIM FOR ATOMIC INTEGRALS .',F10.2,/)
+441 FORMAT(' cputime for ALM/total atom-mommat-calc:    ',f8.2,'/',F8.2)  
+701 FORMAT('K-POINT',I5,': [',3f7.4,']',3x,'NEMIN-MAX: ',2I5,'   NE:',I5)
+7012 FORMAT('K-POINT',I5,': [',3f7.4,']   IGNORED',/)
+END SUBROUTINE MOM_MAT
+
+SUBROUTINE SAVEAP(JATOM,is)
+  use loabco
+  use atspa
+  use lologo
+  INCLUDE 'param.inc'
+  IMPLICIT REAL*8 (A-H,O-Z)
+  LOGICAL   loor(0:lomax),lloor(0:lmax2)
+  LOGICAL   lapw(0:lmax2)
+  COMMON /ATSPDT/  E(0:LMAX2),P(0:LMAX2),DP(0:LMAX2),PE(0:LMAX2),DPE(0:LMAX2),PEI(0:LMAX2)
+  common /loabc/   alo(0:lomax,nloat),blo(0:lomax,nloat),clo(0:lomax,nloat),elo(0:lomax,nloat),plo(0:lomax),dplo(0:lomax),pelo(0:lomax),dpelo(0:lomax),peilo(0:lomax),pi12lo(0:lomax),pe12lo(0:lomax),a1lo(nrad,0:lomax),b1lo(nrad,0:lomax)
+  common /lolog/   nlo,nlov,nlon,lapw,ilo(0:lomax),loor,lloor
+  do l=0,lmax2
+     l1=l+1
+     Pn(l1,jatom,is)=P(l)
+     DPn(l1,jatom,is)=DP(l)
+     PEn(l1,jatom,is)=PE(l)
+     DPEn(l1,jatom,is)=DPE(l)
+     PEIn(l,jatom,is)=PEI(l)
+  end do
+  do l=0,lomax
+     iloO(l,jatom)        = ilo(l)
+     do k=1,ilo(l)
+        aloO(l,jatom,k,is)     = alo(l,k)
+        bloO(l,jatom,k,is)     = blo(l,k)
+        cloO(l,jatom,k,is)     = clo(l,k)
+        eloO(l,jatom,k)        = elo(l,k)
+     enddo
+     ploO(l,jatom,is)     = plo(l)
+     dploO(l,jatom,is)    = dplo(l)
+     peloO(l,jatom,is)    = pelo(l)
+     dpeloO(l,jatom,is)   = dpelo(l)
+     peiloO(l,jatom,is)   = peilo(l)
+     pi12lA(l,jatom,is)   = pi12lo(l)
+     pe12lA(l,jatom,is)   = pe12lo(l)
+     loorO(l,jatom)       = loor(l)
+     lapwO(l,jatom)       = lapw(l)
+  end do
+  nloO(jatom)  = nlo
+  nlonO(jatom) = nlon
+  nlovO(jatom) = nlov
+  RETURN
+END SUBROUTINE SAVEAP
+
+SUBROUTINE RESTAP(JATOM,is)
+  use loabco
+  use atspa
+  use lologo
+  !ad   restores the radial functions for each atom
+  INCLUDE 'param.inc'
+  IMPLICIT REAL*8 (A-H,O-Z)
+  logical   loor(0:lomax),lloor(0:lmax2)
+  LOGICAL   lapw(0:lmax2)
+  COMMON /ATSPDT/  E(0:LMAX2),P(0:LMAX2),DP(0:LMAX2),PE(0:LMAX2),DPE(0:LMAX2),PEI(0:LMAX2)
+  common /loabc/   alo(0:lomax,nloat),blo(0:lomax,nloat),clo(0:lomax,nloat),elo(0:lomax,nloat),plo(0:lomax),dplo(0:lomax),pelo(0:lomax),dpelo(0:lomax),peilo(0:lomax),pi12lo(0:lomax),pe12lo(0:lomax),a1lo(nrad,0:lomax),b1lo(nrad,0:lomax)
+  common /lolog/   nlo,nlov,nlon,lapw,ilo(0:lomax),loor,lloor
+  do l=0,lmax2
+     l1=l+1
+     P(l)=Pn(l1,jatom,is)
+     DP(l)=DPn(l1,jatom,is)
+     PE(l)=PEn(l1,jatom,is)
+     DPE(l)=DPEn(l1,jatom,is)
+     PEI(l)=PEIn(l,jatom,is)
+  end do
+  do l=0,lomax 
+     ilo(l)   = iloO(l,jatom)
+     do k=1,ilo(l)
+        alo(l,k)   = aloO(l,jatom,k,is)
+        blo(l,k)   = bloO(l,jatom,k,is)
+        clo(l,k)   = cloO(l,jatom,k,is)
+        elo(l,k)   = eloO(l,jatom,k)
+     enddo
+     plo(l)   = ploO(l,jatom,is)
+     dplo(l)  = dploO(l,jatom,is)
+     pelo(l)  = peloO(l,jatom,is)
+     dpelo(l) = dpeloO(l,jatom,is)
+     peilo(l) = peiloO(l,jatom,is)
+     pi12lo(l)= pi12lA(l,jatom,is)
+     pe12lo(l)= pe12lA(l,jatom,is)
+     loor(l)  = loorO(l,jatom)
+     lapw(l)  = lapwO(l,jatom)
+  end do
+  !ad
+  nlo=nloO(jatom)
+  nlon=nlonO(jatom)
+  nlov=nlovO(jatom)
+  RETURN
+END SUBROUTINE RESTAP
+
+SUBROUTINE INVERSSYMDEF(A,AINV)
+  !ad   calculates the inverse AINV for the symmetry operation A
+  IMPLICIT REAL*8 (A-H,O-Z)
+  DIMENSION A(3,3),AINV(3,3)
+  det= a(1,1)*a(2,2)*a(3,3)+a(1,2)*a(2,3)*a(3,1)+a(1,3)*a(2,1)*a(3,2)-a(3,1)*a(2,2)*a(1,3)-a(1,1)*a(3,2)*a(2,3)-a(2,1)*a(1,2)*a(3,3)
+  AINV(1,1) =(   A(2,2) * A(3,3) - A(2,3) * A(3,2) ) / det
+  AINV(2,1) =( - A(2,1) * A(3,3) + A(2,3) * A(3,1) ) / det
+  AINV(3,1) =(   A(2,1) * A(3,2) - A(2,2) * A(3,1) ) / det
+  AINV(1,2) =( - A(1,2) * A(3,3) + A(1,3) * A(3,2) ) / det
+  AINV(2,2) =(   A(1,1) * A(3,3) - A(1,3) * A(3,1) ) / det
+  AINV(3,2) =( - A(1,1) * A(3,2) + A(1,2) * A(3,1) ) / det
+  AINV(1,3) =(   A(1,2) * A(2,3) - A(1,3) * A(2,2) ) / det
+  AINV(2,3) =( - A(1,1) * A(2,3) + A(1,3) * A(2,1) ) / det
+  AINV(3,3) =(   A(1,1) * A(2,2) - A(1,2) * A(2,1) ) / det
+  RETURN
+END SUBROUTINE INVERSSYMDEF
+
+!SUBROUTINE DELMATRIX(numeo)
+!  use opme
+!  INCLUDE 'param.inc'
+!  IMPLICIT REAL*8 (A-H,O-Z) 
+!  PARAMETER   (ZERO = 0.0D+0)
+!  COMMON /LEAD/ KFIRST,KLAST,KEND,KSTEP,KOUT,KSTOP
+!  COMMON /COM/  EMIN,EMAX,ELECN,EULIMIT,EDLIMIT,NK,IOUT,NSPIN,NAT,NBAND,ix,NB(NKPT),MINWAV,MAXWAV
+!  DATA  CZERO/(0.0D-0,0.0D-0)/
+!  DO NBINDEX = 1,NUMEO
+!     OPMATX(NBINDEX)=CZERO
+!     OPMATY(NBINDEX)=CZERO
+!     OPMATZ(NBINDEX)=CZERO    
+!  END DO
+!  RETURN
+!END SUBROUTINE DELMATRIX
+
+

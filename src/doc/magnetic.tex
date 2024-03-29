@@ -1,0 +1,242 @@
+%\documentclass[aps,showpacs,prb,floatfix,twocolumn]{revtex4}
+\documentclass[aps,prb,floatfix,epsfig,twocolumn,showpacs,preprintnumbers]{revtex4}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{amsmath,amssymb,graphicx,bm,epsfig}
+\usepackage{color}
+
+\newcommand{\eps}{\epsilon}
+\newcommand{\vR}{{\mathbf{R}}}
+\renewcommand{\vr}{{\mathbf{r}}}
+\newcommand{\hr}{{\hat{\textbf{r}}}}
+\newcommand{\vk}{{\mathbf{k}}}
+\newcommand{\vdelta}{{\mathbf{\delta}}}
+\newcommand{\vK}{{\mathbf{K}}}
+\newcommand{\vq}{{\mathbf{q}}}
+\newcommand{\vQ}{{\mathbf{Q}}}
+\newcommand{\vPhi}{{\mathbf{\Phi}}}
+\newcommand{\vS}{{\mathbf{S}}}
+\newcommand{\cG}{{\cal G}}
+\newcommand{\cF}{{\cal F}}
+\newcommand{\cT}{{\cal T}}
+\newcommand{\cH}{{\cal H}}
+\newcommand{\cJ}{{\cal J}}
+\newcommand{\cD}{{\cal D}}
+\newcommand{\cL}{{\cal L}}
+\newcommand{\Tr}{\mathrm{Tr}}
+\renewcommand{\a}{\alpha}
+\renewcommand{\b}{\beta}
+\newcommand{\g}{\gamma}
+\renewcommand{\d}{\delta}
+\newcommand{\npsi}{\underline{\psi}}
+\renewcommand{\Im}{\textrm{Im}}
+\renewcommand{\Re}{\textrm{Re}}
+\newcommand{\cA}{{\cal A}}
+
+
+
+\begin{document}
+
+\title{How to plot magnetic calculation in non-magnetic BZ}
+\author{Kristjan Haule}
+\affiliation{Department of Physics, Rutgers University, Piscataway, NJ 08854, USA}
+\date{\today}
+
+%\begin{abstract}
+%\end{abstract}
+\pacs{71.27.+a,71.30.+h}
+\date{\today}
+\maketitle
+
+\section{Derivation 1}
+
+The general expression for the GS is
+\begin{eqnarray}
+G_{\vk_0}(\omega) = \sum_i\int d\vr d\vr' e^{-i\vk_0 \vr}\psi_{i\vk}(\vr)\frac{1}{\omega-\epsilon_\vk^i}\psi_{i\vk}^*(\vr')e^{i\vk_0\vr'}
+\end{eqnarray}
+with $k_0$ an arbitrary momentum. Here 
+\begin{equation}
+\psi_{i\vk}(\vr)=\sum_{i\vK} A_{i\vK}^{\vk}\chi_{\vk+\vK}(\vr)
+\end{equation}
+are Kohn-Sham solutions, and $\chi$ are basis functions.
+We hence have
+\begin{widetext}
+\begin{eqnarray}
+G_{\vk_0}(\omega) = \sum_i\sum_{\vK_1,\vK_2} \langle e^{-i\vk_0
+  \vr}|\chi_{\vk+\vK_1}(\vr)\rangle
+A_{i\vK_1}^\vk\frac{1}{\omega-\epsilon_\vk^i}A_{i\vK_2}^{\vk *}\langle
+\chi_{\vk+\vK_2}(\vr')|e^{i\vk_0\vr'}\rangle
+\end{eqnarray}
+\end{widetext}
+
+For plane wave basis, the matrix elements are
+$$\langle e^{-i\vk_0 \vr}|\chi_{\vk+\vK}(\vr)\rangle = \delta_L(\vk+\vK-\vk_0) $$
+where $\delta_L$ requires that $\vk+\vK=\vk_0$ up to reciprocal vector
+of the non-magnetic unit cell!
+
+In order to avoid computing annoying matrix elements, we will use the
+same expression also in the LAPW basis set. We just need to
+generalized it for the non-orthogonal basis set.
+The generalization is
+\begin{widetext}
+\begin{eqnarray}
+G_{\vk_0}(\omega)=\sum_{\vK_1,\vK_2,i}\delta_L(\vk+\vK_1-\vk_0)A_{i\vK_1}^\vk\frac{1}{\omega-\epsilon_\vk^i}A_{i\vK_2}^{\vk *} \delta_L(\vk+\vK_2-\vk_0)\langle\chi_{\vk+\vK_1}|\chi_{\vk+\vK_2}\rangle
+\end{eqnarray}
+In order to plot fat-bands (with character), we can express $G$ inside
+the muffin thin sphere in the following way
+\begin{eqnarray}
+G_{\vk_0}^{L_1  L_2}(\omega)=\sum_{\vK_1\vK_2,i}\delta_L(\vk+\vK_1-\vk_0)A_{i\vK_1}^\vk
+a_{L_1}^{\kappa_1}(\vk+\vK_1)\frac{1}{\omega-\epsilon_\vk^i}A_{i\vK_2}^{\vk  *} a_{L_2}^{\kappa_2 *}(\vk+\vK_2)\delta_L(\vk+\vK_2-\vk_0)\langle u_{l_1}^{\kappa_1}|u_{l_2}^{\kappa_2}\rangle
+\end{eqnarray}
+which can also be written as
+\begin{eqnarray}
+G_{\vk_0}^{L_1  L_2}(\omega)=\sum_{i\kappa_1\kappa_2}
+{\cal A}_{i L_1}^{\kappa_1}(\vk)
+\frac{1}{\omega-\epsilon_\vk^i}
+{\cal A}_{i L_2}^{\kappa_2 *}(\vk)
+\langle u_{l_1}^{\kappa_1}|u_{l_2}^{\kappa_2}\rangle
+\end{eqnarray}
+\end{widetext}
+with
+\begin{equation}
+{\cal A}_{i L}^{\kappa}(\vk)=\sum_{\vK}\delta_L(\vk+\vK-\vk_0)A_{i\vK}^\vk a_{L}^{\kappa}(\vk+\vK)
+\end{equation}
+
+This expression is used to compute partial density of states in QTL
+and DMFT, except that $\delta_L$-functions then requires that
+$\vk=\vk_0$ and $\vK$ can be any reciprocal vector.
+
+For magnetic calculation, we need to perform calculation in bigger
+unit cell. Hence we have shorter reciprocal vectors. Out of reciprocal
+vectors of the magnetic BZ, we need to find those which are reciprocal
+vectors of non-magnetic BZ. Then the sum over $\vK$ above should be
+performed only over the non-magnetic reciprocal vectors.
+
+%If $\vk_0$ is
+%in first-BZ of the magnetic unit cell, or is outside it, a different
+%set of  reciprocal vectors will be summed over.
+
+\section{Alternative derivation}
+
+The green's function of LDA+DMFT in real space, expressed in terms of
+the Kohn-Sham states $\psi_{i\vk}(\vr)$, is
+\begin{equation}
+ G(\vr,\vr') = \sum_{ij\vk}\psi_{i\vk}(\vr)\left(\frac{1}{\omega+\mu-\varepsilon_\vk-P_\vk\Sigma}\right)_{ij}\psi_{j\vk}^*(\vr')
+\end{equation}
+Below, we will use the notation
+\begin{equation}
+  \left(\frac{1}{\omega+\mu-\varepsilon_\vk-P_\vk\Sigma}\right)_{ij}\equiv  g_{\vk ij}
+\end{equation}
+
+
+Magnetic unit cell is bigger, and hence we can write Green's function
+on sublatice A, on sublatice B, and the off-diagonal Green's function.
+If the Green's function is written in the position representation
+within the unit cell, it is easy to derive the green's function in the
+non-magnetic unit cell. The result is
+\begin{eqnarray}
+\left(
+\begin{array}{cc}
+ G_{\vk,AA} & G_{\vk,AB}\\
+ G_{\vk,BA} & G_{\vk,BB}
+\end{array}
+\right)
+\rightarrow\\
+G_{\vk} = G_{\vk,AA} + G_{\vk,BB} + G_{\vk,AB} e^{i\vk\vdelta} + G_{\vk,BA}e^{-i\vk\vdelta}
+\end{eqnarray}
+Here $\delta$ is the vector connecting sublatice $A$ and sublatice
+$B$. For the checkerboard AFM state, this vector is for example $(1,0,0)$. 
+
+We want to write the LAPW Green's function in terms of the four
+components of sublattices. We first note that the Kohn-Sham solutions $\psi_{i\vk}(\vr)$
+are expanded in terms of LAPW basis set functions
+$\chi_{\vk+\vK}(\vr)$ in the following way
+\begin{equation}
+\psi_{i\vk}(\vr) = \sum A^\vk_{i\vK}\chi_{\vk-\vK}(\vr)
+\end{equation}
+where $A^\vk_{\vk-\vK}$ are eigenvectors, written in \textit{case.vector}.
+Since the LAPW basis functions transform
+under shift in the same way as plane waves, we have
+\begin{widetext}
+\begin{eqnarray}
+ G(\vr_1+\vdelta_1,\vr_2+\vdelta_2) = 
+ \sum_{ij\vk,\vK,\vK'}
+ A^\vk_{i\vK} e^{i(\vk-\vK)\vdelta_1}\chi_{\vk-\vK}(\vr_1) g_{\vk ij}
+ \chi^*_{\vk-\vK'}(\vr_2)e^{-i(\vk-\vK')\vdelta_2} A^{\vk *}_{j\vK'}
+\end{eqnarray}
+The generalized expression for $G$ in the non-magnetic unit cell, in terms of the four components of
+the Green's function, is
+\begin{equation}
+G_\vk = \int d\vr \left[ G(\vr,\vr) + G(\vr,\vr+\delta)e^{i\vk\delta}+G(\vr+\delta,\vr)e^{-i\vk\vdelta}+G(\vr+\delta,\vr+\delta)\right]  
+\end{equation}
+Using the above expression for $G(\vr_1+\vdelta1,\vr_2+\vdelta_2)$, we
+have
+\begin{eqnarray}
+ G_\vk = 
+ \sum_{ij\vK,\vK'}
+ A^\vk_{i\vK} O^\vk_{\vK\vK'}A^{\vk *}_{j\vK'} g_{\vk ij}
+(1+e^{i\vK'\vdelta}+e^{-i\vK\vdelta}+e^{i(\vK'-\vK)\vdelta}) 
+\end{eqnarray}
+\end{widetext}
+where overlap is
+\begin{equation}
+O^\vk_{\vK\vK'} = \langle \chi_{\vk-\vK'}|\chi_{\vk-\vK}\rangle.
+\end{equation}
+It is clear that $e^{i \vK\vdelta}$ is unity for the reciprocal
+vectors of the non-magnetic unit cell, and it is $-1$ for the new
+reciprocal vectors, which are not part of the non-magnetic unit
+cell. Hence, if one of the $\vK$ in the above expression is the "new"
+reciprocal vector, and one is "old" (part of the non-magnetic
+reciprocal set), the sum of the exponents in the bracket vanishes. The
+same is true when both $\vK$ and $\vK'$ are "new" vectors, because
+$\vK'-\vK$ is now the "old" vector, and hence $e^{i(\vK'-vK)\vdelta}=1$.
+We see that only the terms which include the original non-magnetic
+reciprocal vectors survive in the above expression. Hence the
+expression is equivalent to the expression in the previous chapter,
+but it is more convenient for implementation.
+To compute it, we only
+need Kohn-Sham eigenvectors $A^\vk_{i\vK}$, since the overlap can also
+be expressed in terms of the overlap. The eigenvalue problem demands
+$A O A^\dagger  = 1$, hence
+\begin{equation}
+\sum_{\vK\vK'} A^\vk_{i\vK} O^\vk_{\vK \vK'} A^\vk_{j\vK'} = \delta_{ij}
+\end{equation}
+We use SVD decomposition to invert eigenvectors (because they are not
+quadratic matrice). The SVD is
+\begin{equation}
+A = U Z V  
+\end{equation}
+where $U$ and $V$ are unitary matrices, and $Z$ are singular
+values. We then have
+\begin{eqnarray}
+O = V^\dagger \frac{1}{Z} U^\dagger U \frac{1}{Z} V.
+\end{eqnarray}
+
+We would like to write the final expression in a more compact way. We
+define the "coherence"-like factors
+\begin{equation}
+ C^\vk_{ji} = 
+ \sum_{\vK \vK'} A^\vk_{i\vK} O^\vk_{\vK\vK'}A^{\vk *}_{j\vK'}(1+e^{i\vK'\vdelta}+e^{-i\vK\vdelta}+e^{i(\vK'-\vK)\vdelta}) 
+\end{equation}
+and note that $G$ is then simply given by
+\begin{equation}
+ G_\vk =  \sum_{ij} C^\vk_{ji}\; g_{\vk ij}.
+\end{equation}
+
+Finally, it is convenient to express the Green's function in terms of
+the LDA+DMFT eigenvalues and LDA+DMFT eigenvectors. We note that the
+LDA+DMFT green's function expressed in Kohn-Sham basis is
+\begin{equation}
+g_{\vk ij} = A^{R}_{\vk\omega,i l} \frac{1}{\omega+\mu-\varepsilon_{\vk
+    l\omega}} A^{L}_{\vk\omega,l j}
+\end{equation}
+Hence, we can define the LDA+DMFT frequency dependent "coherence" factors
+\begin{eqnarray}
+\widetilde{C}^\vk_{l\omega} = \sum_{ij} A^{L}_{\vk\omega,l j} C^\vk_{ji} A^{R}_{\vk\omega,i l} 
+\end{eqnarray}
+In terms of these "coherence" factors we finally have
+\begin{equation}
+G_\vk = \sum_l 
+\frac{\widetilde{C}^\vk_{l\omega}}{\omega+\mu-\varepsilon_{\vk\omega l}}
+\end{equation}
+
+\end{document}

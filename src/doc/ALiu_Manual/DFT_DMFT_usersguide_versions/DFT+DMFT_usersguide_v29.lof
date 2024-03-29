@@ -1,0 +1,26 @@
+\contentsline {figure}{\numberline {1}{\ignorespaces Flow chart of DFT+DMFT}}{15}{figure.1}
+\contentsline {figure}{\numberline {2}{\ignorespaces Main window of \emph {w2web}}}{29}{figure.2}
+\contentsline {figure}{\numberline {3}{\ignorespaces \emph {StructGen} screen before clicking ``Save Structure''}}{30}{figure.3}
+\contentsline {figure}{\numberline {4}{\ignorespaces Choosing options for Automatic determination of Radius of Muffin-Tin (RMT)}}{31}{figure.4}
+\contentsline {figure}{\numberline {5}{\ignorespaces \emph {StructGen} screen after saving}}{32}{figure.5}
+\contentsline {figure}{\numberline {6}{\ignorespaces \emph {StructGen} screen after cleaning up}}{33}{figure.6}
+\contentsline {figure}{\numberline {7}{\ignorespaces Chemical Potential v.s. number of DMFT loops in \emph {info.iterate} 0 to 90}}{52}{figure.7}
+\contentsline {figure}{\numberline {8}{\ignorespaces Chemical Potential v.s. number of DMFT loops in \emph {info.iterate} 20 to 60}}{53}{figure.8}
+\contentsline {figure}{\numberline {9}{\ignorespaces Chemical Potential v.s. number of DMFT loops in \emph {info.iterate} 20 to 90}}{53}{figure.9}
+\contentsline {figure}{\numberline {10}{\ignorespaces Impurity level v.s. number of DMFT loops in \emph {info.iterate} 0 to 90}}{54}{figure.10}
+\contentsline {figure}{\numberline {11}{\ignorespaces Self-energy v.s. number of DMFT loops in \emph {sig.inp.*.1} for $e_g$ orbitals}}{55}{figure.11}
+\contentsline {figure}{\numberline {12}{\ignorespaces Self-energy v.s. number of DMFT loops in \emph {sig.inp.*.1} for $t_{2g}$ orbitals}}{56}{figure.12}
+\contentsline {figure}{\numberline {13}{\ignorespaces Conditioned self-energy v.s. number of DMFT loops in \emph {sig.inp} before and after augmenting Monte Carlo measurements for $e_g$ orbitals}}{57}{figure.13}
+\contentsline {figure}{\numberline {14}{\ignorespaces Unconditioned self-energy v.s. number of DMFT loops in \emph {Sig.outb} before and after augmenting Monte Carlo measurements for $e_g$ orbitals}}{58}{figure.14}
+\contentsline {figure}{\numberline {15}{\ignorespaces Imaginary part of self-energy v.s. real frequency in Sig.out for $e_g$and $t_{2g}$ orbitals}}{60}{figure.15}
+\contentsline {figure}{\numberline {16}{\ignorespaces Plot \emph {histogram.dat} file}}{73}{figure.16}
+\contentsline {figure}{\numberline {17}{\ignorespaces Plot \emph {imp.0/Probability.dat} file}}{74}{figure.17}
+\contentsline {figure}{\numberline {18}{\ignorespaces Plot \emph {imp.0/Probability.dat} file 0-600}}{75}{figure.18}
+\contentsline {figure}{\numberline {19}{\ignorespaces Real part of self-energy v.s. real frequency in Sig.out for $e_g$and $t_{2g}$ orbitals}}{79}{figure.19}
+\contentsline {figure}{\numberline {20}{\ignorespaces Total Density of States on the real axis for FCC Fe}}{81}{figure.20}
+\contentsline {figure}{\numberline {21}{\ignorespaces Partial Density of States ($e_g$ and $t_{2g}$) on the real axis for FCC Fe}}{83}{figure.21}
+\contentsline {figure}{\numberline {22}{\ignorespaces Partial Density of States and Total Density of States on the real axis for FCC Fe}}{84}{figure.22}
+\contentsline {figure}{\numberline {23}{\ignorespaces First Brillouin Zone of FCC Fe lattice}}{87}{figure.23}
+\contentsline {figure}{\numberline {24}{\ignorespaces Spectral functions of FCC Fe}}{87}{figure.24}
+\contentsline {figure}{\numberline {25}{\ignorespaces Optical conductivity of FCC Fe}}{91}{figure.25}
+\contentsline {figure}{\numberline {26}{\ignorespaces Density of States based on optics calculations and comparison with Total DOS for FCC Fe}}{92}{figure.26}

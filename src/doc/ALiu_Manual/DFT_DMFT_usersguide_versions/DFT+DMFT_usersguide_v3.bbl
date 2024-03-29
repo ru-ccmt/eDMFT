@@ -1,0 +1,17 @@
+\begin{thebibliography}{1}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Kotliar et~al.(2006)Kotliar, Savrasov, Haule, Oudovenko, Parcollet,
+  and Marianetti]{Kotliar2006}
+G~Kotliar, S~Y Savrasov, K~Haule, V~S Oudovenko, O~Parcollet, and C~A
+  Marianetti.
+\newblock {Electronic structure calculations with dynamical mean-field theory}.
+\newblock \emph{Rev. Mod. Phys.}, 78:\penalty0 865--951, 2006.
+\newblock ISSN 0034-6861.
+\newblock \doi{10.1103/RevModPhys.78.865}.
+
+\end{thebibliography}

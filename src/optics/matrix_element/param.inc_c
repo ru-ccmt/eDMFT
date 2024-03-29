@@ -1,0 +1,19 @@
+!     
+!      PARAMETER (NATO=   8)
+!      PARAMETER (NMAT=   1750)
+      PARAMETER (NRAD=  799)                                              
+!      PARAMETER (NUME=  260)
+!..................................................
+! NUMBER OF BANDCOMBINATIONS,THAT CAN BE COMPUTED
+!      PARAMETER (NUMEO= 24500)                           
+! each k-point is calculated seperately therefore NKPT=3  
+      PARAMETER (NKPT=    3)                            
+!      PARAMETER (NDIF=   24)
+      PARAMETER (NSYM=   48)                                              
+      PARAMETER (LMAX=    8) 
+      PARAMETER (LMAX1=LMAX+1)
+      PARAMETER (LMAX2=LMAX)
+      PARAMETER (LOMAX=   3)
+      PARAMETER (LOMAX1= LOMAX+1)
+      PARAMETER (NLOAT=   3)
+ 

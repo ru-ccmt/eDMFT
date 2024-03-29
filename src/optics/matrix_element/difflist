@@ -1,0 +1,1181 @@
+new files  ----- old files 
+ 
+====================  atpar_op.f
+4,5d3
+<       use lolog1, only : loor1
+<       use xrpar
+21a20
+> !
+64,66c63,65
+<       READ(17+is,2000) IDUMMY                                               
+<       READ(17+is,2031)                                                   
+<       READ(17+is,iform1) ( VR(J), J=1,JRI(JATOM) )                          
+---
+>       READ(17+is,2000) IDUMMY                                              
+>       READ(17+is,2031)                                                     
+>       READ(17+is,iform1) ( VR(J), J=1,JRI(JATOM) )                           
+125,127d123
+< ! LO
+< if (xmcd.eq.1) loor1(0:lomax)=loor(0:lomax)
+< ! LO
+216c212
+<           RADE2(I,l)=BE(I)                                                 
+---
+>           RADE2(I,l)=BE(I)                                                  
+ 
+====================  case.inxop
+ 
+====================  CBxoptic
+ 
+====================  CBxopticc
+ 
+====================  compile.msg
+1,5c1,8
+< 	if [ -f .complex ]; then  make clean;  fi
+< 	rm -f *.o _tmp_.* *.P .real .complex *.mod
+< 	touch .real
+< 	cp -p param.inc_r param.inc
+< 	make TYPE='REAL' TYPE_COMMENT='!_REAL' ./CBxoptic
+---
+> rm -f *.o _tmp_.* *.P .real .complex *.mod
+> if [ -f .complex ]; then \
+> 	   make clean; \
+> 	fi
+> touch .real
+> cp -p param.inc_r param.inc
+> make TYPE='REAL' TYPE_COMMENT='!_REAL' ./optic
+> make[1]: Entering directory `/area51/WIEN2k_07/WIEN2k_10/SRC_optic'
+7,67c10,38
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c modules_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** xa3   === End of Compilation 1 ===
+< ** mxyz   === End of Compilation 2 ===
+< ** ablm   === End of Compilation 3 ===
+< ** opme   === End of Compilation 4 ===
+< ** bindex   === End of Compilation 5 ===
+< ** struk   === End of Compilation 6 ===
+< ** potnlc   === End of Compilation 7 ===
+< ** lologo   === End of Compilation 8 ===
+< ** loabco   === End of Compilation 9 ===
+< ** intu   === End of Compilation 10 ===
+< ** atspa   === End of Compilation 11 ===
+< ** core   === End of Compilation 12 ===
+< ** radfun   === End of Compilation 13 ===
+< ** moments   === End of Compilation 14 ===
+< ** lolog1   === End of Compilation 15 ===
+< ** comi   === End of Compilation 16 ===
+< ** xrpar   === End of Compilation 17 ===
+< ** fermi   === End of Compilation 18 ===
+< 1501-510  Compilation successful for file modules_tmp.f.
+< 	mv modules_tmp.o modules.o
+< 	rm modules_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c abc.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** abc   === End of Compilation 1 ===
+< "abc.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file abc.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c atpar_op.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** atpar   === End of Compilation 1 ===
+< "atpar_op.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file atpar_op.f.
+< 	xlc -q64  -c cputim.c
+< xlc: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c dvbes1.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** dvbes1   === End of Compilation 1 ===
+< "dvbes1.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file dvbes1.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c errclr.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** errclr   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file errclr.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c errflg.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** errflg   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file errflg.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c gtfnam.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** gtfnam   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file gtfnam.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c harmon.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** harmon   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file harmon.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c latgen.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** latgen   === End of Compilation 1 ===
+< "latgen.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file latgen.f.
+---
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c modules_tmp.f
+> mv modules_tmp.o modules.o
+> rm modules_tmp.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c abc.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c atpar_op.f
+> atpar_op.f(71): (col. 7) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(79): (col. 7) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(93): (col. 12) remark: PARTIAL LOOP WAS VECTORIZED.
+> atpar_op.f(110): (col. 39) remark: PARTIAL LOOP WAS VECTORIZED.
+> atpar_op.f(164): (col. 10) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(178): (col. 10) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(195): (col. 8) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(203): (col. 10) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(208): (col. 10) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(246): (col. 12) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(260): (col. 12) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(274): (col. 12) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(287): (col. 12) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(298): (col. 12) remark: LOOP WAS VECTORIZED.
+> cc -c cputim.c
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c dvbes1.f
+> dvbes1.f(21): (col. 10) remark: LOOP WAS VECTORIZED.
+> dvbes1.f(14): (col. 10) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c errclr.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c errflg.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c gtfnam.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c harmon.f
+> harmon.f(15): (col. 10) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c latgen.f
+69,160c40,71
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c lomain_op_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** lomain   === End of Compilation 1 ===
+< "lomain_op_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file lomain_op_tmp.f.
+< 	mv lomain_op_tmp.o lomain_op.o
+< 	rm lomain_op_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c mmatcv.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** mmatcv   === End of Compilation 1 ===
+< ** cleb   === End of Compilation 2 ===
+< ** threejsymbol   === End of Compilation 3 ===
+< ** fact   === End of Compilation 4 ===
+< "mmatcv.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< "mmatcv.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< "mmatcv.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file mmatcv.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c mmatrix.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** mmatrix   === End of Compilation 1 ===
+< "mmatrix.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file mmatrix.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c momradintc.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** momradintc   === End of Compilation 1 ===
+< "momradintc.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file momradintc.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c opmain.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< "opmain.f", line 321.21: 1512-047 (E) The I FORMAT edit descriptor, in literal FMT specifier, is missing a field width. A default value based on the edit descriptor and the type of the data item being processed is assumed.
+< ** cbxoptic   === End of Compilation 1 ===
+< "opmain.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file opmain.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c outerr.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** outerr   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file outerr.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c outwin.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** outwin   === End of Compilation 1 ===
+< "outwin.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file outwin.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c outmatABZ.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** outmatabz   === End of Compilation 1 ===
+< ** outsyma   === End of Compilation 2 ===
+< "outmatABZ.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file outmatABZ.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c radint.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** radint   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file radint.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c rint13.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** rint13   === End of Compilation 1 ===
+< "rint13.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file rint13.f.
+< planew.frc: REAL version extracted
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c planew_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** planew   === End of Compilation 1 ===
+< "planew_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file planew_tmp.f.
+< 	mv planew_tmp.o planew.o
+< 	rm planew_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c outmat.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** outmat   === End of Compilation 1 ===
+< ** outsym   === End of Compilation 2 ===
+< "outmat.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< "outmat.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file outmat.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c rintuout.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** rintuout   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file rintuout.f.
+< sph-UPcor.frc: REAL version extracted
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c sph-UPcor_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** cor_mat   === End of Compilation 1 ===
+< ** saveapa   === End of Compilation 2 ===
+< ** restapa   === End of Compilation 3 ===
+< ** delmatrixa   === End of Compilation 4 ===
+< "sph-UPcor_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file sph-UPcor_tmp.f.
+< 	mv sph-UPcor_tmp.o sph-UPcor.o
+< 	rm sph-UPcor_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c rotate.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** rotate   === End of Compilation 1 ===
+< "rotate.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file rotate.f.
+---
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c lomain_op_tmp.f
+> mv lomain_op_tmp.o lomain_op.o
+> rm lomain_op_tmp.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c mmatrix.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c opmain.f
+> opmain.f(134): (col. 10) remark: PARTIAL LOOP WAS VECTORIZED.
+> opmain.f(134): (col. 10) remark: PARTIAL LOOP WAS VECTORIZED.
+> opmain.f(328): (col. 7) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c outerr.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c outwin.f
+> outwin.f(31): (col. 10) remark: LOOP WAS VECTORIZED.
+> outwin.f(60): (col. 11) remark: LOOP WAS VECTORIZED.
+> outwin.f(101): (col. 10) remark: LOOP WAS VECTORIZED.
+> planew1.frc: REAL version extracted
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c planew1_tmp.f
+> planew1_tmp.f(66): (col. 24) remark: PARTIAL LOOP WAS VECTORIZED.
+> planew1_tmp.f(66): (col. 24) remark: PARTIAL LOOP WAS VECTORIZED.
+> planew1_tmp.f(117): (col. 28) remark: LOOP WAS VECTORIZED.
+> planew1_tmp.f(140): (col. 9) remark: LOOP WAS VECTORIZED.
+> mv planew1_tmp.o planew1.o
+> rm planew1_tmp.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c outmat.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c radint.f
+> radint.f(56): (col. 10) remark: LOOP WAS VECTORIZED.
+> radint.f(63): (col. 10) remark: LOOP WAS VECTORIZED.
+> radint.f(80): (col. 10) remark: LOOP WAS VECTORIZED.
+> radint.f(96): (col. 10) remark: LOOP WAS VECTORIZED.
+> radint.f(122): (col. 12) remark: LOOP WAS VECTORIZED.
+> radint.f(160): (col. 12) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c rint13.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c rintuout.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c rotate.f
+162,202c73,138
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c sph-UP_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** mom_mat   === End of Compilation 1 ===
+< ** saveap   === End of Compilation 2 ===
+< ** restap   === End of Compilation 3 ===
+< ** inverssymdef   === End of Compilation 4 ===
+< ** delmatrix   === End of Compilation 5 ===
+< "sph-UP_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< "sph-UP_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file sph-UP_tmp.f.
+< 	mv sph-UP_tmp.o sph-UP.o
+< 	rm sph-UP_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c sphbes.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** sphbes   === End of Compilation 1 ===
+< "sphbes.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file sphbes.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c symop.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** symop   === End of Compilation 1 ===
+< "symop.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file symop.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c sym.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** sym   === End of Compilation 1 ===
+< ** transform   === End of Compilation 2 ===
+< "sym.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file sym.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c ylm.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** ylm   === End of Compilation 1 ===
+< "ylm.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file ylm.f.
+< 	xlf90  -o ./CBxoptic modules.o abc.o  atpar_op.o  cputim.o  dvbes1.o errclr.o errflg.o gtfnam.o  harmon.o  latgen.o  lomain_op.o  mmatcv.o  mmatrix.o momradintc.o   opmain.o  outerr.o  outwin.o  outmatABZ.o radint.o rint13.o  planew.o outmat.o rintuout.o sph-UPcor.o  rotate.o  sph-UP.o  sphbes.o  symop.o  sym.o  ylm.o   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -L/cineca/prod/libraries/lapack/3.2.1/xl--10.1/lib  
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< 	rm param.inc
+< 	if [ -f .real ]; then  make clean;  fi
+< 	rm -f *.o _tmp_.* *.P .real .complex *.mod
+< 	touch .complex
+< 	cp -p param.inc_c param.inc
+< 	make TYPE='COMPLEX' TYPE_COMMENT='!_COMPLEX' ./CBxopticc
+---
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c sph-UP_tmp.f
+> sph-UP_tmp.f(785): (col. 14) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(176): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(177): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(178): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(179): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(180): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(181): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(182): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(183): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(184): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(185): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(186): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(187): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(206): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(207): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(208): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(209): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(210): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(211): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(212): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(213): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(214): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(215): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(216): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(217): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(218): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(219): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(220): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(221): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(294): (col. 10) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(378): (col. 12) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(380): (col. 10) remark: LOOP WAS VECTORIZED.
+> mv sph-UP_tmp.o sph-UP.o
+> rm sph-UP_tmp.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c sphbes.f
+> sphbes.f(86): (col. 10) remark: LOOP WAS VECTORIZED.
+> sphbes.f(80): (col. 10) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c symop.f
+> symop.f(52): (col. 9) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c sym.f
+> sym.f(47): (col. 16) remark: LOOP WAS VECTORIZED.
+> sym.f(31): (col. 15) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c ylm.f
+> ifort -o ./optic modules.o abc.o  atpar_op.o  cputim.o  dvbes1.o errclr.o errflg.o gtfnam.o harmon.o  latgen.o  lomain_op.o  mmatrix.o  opmain.o  outerr.o outwin.o  planew1.o  outmat.o radint.o  rint13.o  rintuout.o rotate.o sph-UP.o  sphbes.o  symop.o  sym.o  ylm.o -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -L/opt/intel/11.0/074/mkl/lib/em64t -pthread -i-static 
+> make[1]: Leaving directory `/area51/WIEN2k_07/WIEN2k_10/SRC_optic'
+> rm param.inc
+> if [ -f .real ]; then \
+> 	   make clean; \
+> 	fi
+> make[1]: Entering directory `/area51/WIEN2k_07/WIEN2k_10/SRC_optic'
+> rm -f *.o _tmp_.* *.P .real .complex *.mod
+> make[1]: Leaving directory `/area51/WIEN2k_07/WIEN2k_10/SRC_optic'
+> touch .complex
+> cp -p param.inc_c param.inc
+> make TYPE='COMPLEX' TYPE_COMMENT='!_COMPLEX' ./opticc
+> make[1]: Entering directory `/area51/WIEN2k_07/WIEN2k_10/SRC_optic'
+204,264c140,168
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c modules_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** xa3   === End of Compilation 1 ===
+< ** mxyz   === End of Compilation 2 ===
+< ** ablm   === End of Compilation 3 ===
+< ** opme   === End of Compilation 4 ===
+< ** bindex   === End of Compilation 5 ===
+< ** struk   === End of Compilation 6 ===
+< ** potnlc   === End of Compilation 7 ===
+< ** lologo   === End of Compilation 8 ===
+< ** loabco   === End of Compilation 9 ===
+< ** intu   === End of Compilation 10 ===
+< ** atspa   === End of Compilation 11 ===
+< ** core   === End of Compilation 12 ===
+< ** radfun   === End of Compilation 13 ===
+< ** moments   === End of Compilation 14 ===
+< ** lolog1   === End of Compilation 15 ===
+< ** comi   === End of Compilation 16 ===
+< ** xrpar   === End of Compilation 17 ===
+< ** fermi   === End of Compilation 18 ===
+< 1501-510  Compilation successful for file modules_tmp.f.
+< 	mv modules_tmp.o modules.o
+< 	rm modules_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c abc.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** abc   === End of Compilation 1 ===
+< "abc.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file abc.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c atpar_op.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** atpar   === End of Compilation 1 ===
+< "atpar_op.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file atpar_op.f.
+< 	xlc -q64  -c cputim.c
+< xlc: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c dvbes1.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** dvbes1   === End of Compilation 1 ===
+< "dvbes1.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file dvbes1.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c errclr.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** errclr   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file errclr.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c errflg.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** errflg   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file errflg.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c gtfnam.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** gtfnam   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file gtfnam.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c harmon.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** harmon   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file harmon.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c latgen.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** latgen   === End of Compilation 1 ===
+< "latgen.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file latgen.f.
+---
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c modules_tmp.f
+> mv modules_tmp.o modules.o
+> rm modules_tmp.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c abc.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c atpar_op.f
+> atpar_op.f(71): (col. 7) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(79): (col. 7) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(93): (col. 12) remark: PARTIAL LOOP WAS VECTORIZED.
+> atpar_op.f(110): (col. 39) remark: PARTIAL LOOP WAS VECTORIZED.
+> atpar_op.f(164): (col. 10) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(178): (col. 10) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(195): (col. 8) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(203): (col. 10) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(208): (col. 10) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(246): (col. 12) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(260): (col. 12) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(274): (col. 12) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(287): (col. 12) remark: LOOP WAS VECTORIZED.
+> atpar_op.f(298): (col. 12) remark: LOOP WAS VECTORIZED.
+> cc -c cputim.c
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c dvbes1.f
+> dvbes1.f(21): (col. 10) remark: LOOP WAS VECTORIZED.
+> dvbes1.f(14): (col. 10) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c errclr.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c errflg.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c gtfnam.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c harmon.f
+> harmon.f(15): (col. 10) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c latgen.f
+266,357c170,201
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c lomain_op_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** lomain   === End of Compilation 1 ===
+< "lomain_op_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file lomain_op_tmp.f.
+< 	mv lomain_op_tmp.o lomain_op.o
+< 	rm lomain_op_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c mmatcv.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** mmatcv   === End of Compilation 1 ===
+< ** cleb   === End of Compilation 2 ===
+< ** threejsymbol   === End of Compilation 3 ===
+< ** fact   === End of Compilation 4 ===
+< "mmatcv.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< "mmatcv.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< "mmatcv.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file mmatcv.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c mmatrix.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** mmatrix   === End of Compilation 1 ===
+< "mmatrix.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file mmatrix.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c momradintc.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** momradintc   === End of Compilation 1 ===
+< "momradintc.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file momradintc.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c opmain.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< "opmain.f", line 321.21: 1512-047 (E) The I FORMAT edit descriptor, in literal FMT specifier, is missing a field width. A default value based on the edit descriptor and the type of the data item being processed is assumed.
+< ** cbxoptic   === End of Compilation 1 ===
+< "opmain.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file opmain.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c outerr.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** outerr   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file outerr.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c outwin.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** outwin   === End of Compilation 1 ===
+< "outwin.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file outwin.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c outmatABZ.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** outmatabz   === End of Compilation 1 ===
+< ** outsyma   === End of Compilation 2 ===
+< "outmatABZ.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file outmatABZ.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c radint.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** radint   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file radint.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c rint13.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** rint13   === End of Compilation 1 ===
+< "rint13.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file rint13.f.
+< planew.frc: COMPLEX version extracted
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c planew_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** planew   === End of Compilation 1 ===
+< "planew_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file planew_tmp.f.
+< 	mv planew_tmp.o planew.o
+< 	rm planew_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c outmat.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** outmat   === End of Compilation 1 ===
+< ** outsym   === End of Compilation 2 ===
+< "outmat.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< "outmat.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file outmat.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c rintuout.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** rintuout   === End of Compilation 1 ===
+< 1501-510  Compilation successful for file rintuout.f.
+< sph-UPcor.frc: COMPLEX version extracted
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c sph-UPcor_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** cor_mat   === End of Compilation 1 ===
+< ** saveapa   === End of Compilation 2 ===
+< ** restapa   === End of Compilation 3 ===
+< ** delmatrixa   === End of Compilation 4 ===
+< "sph-UPcor_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file sph-UPcor_tmp.f.
+< 	mv sph-UPcor_tmp.o sph-UPcor.o
+< 	rm sph-UPcor_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c rotate.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** rotate   === End of Compilation 1 ===
+< "rotate.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file rotate.f.
+---
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c lomain_op_tmp.f
+> mv lomain_op_tmp.o lomain_op.o
+> rm lomain_op_tmp.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c mmatrix.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c opmain.f
+> opmain.f(134): (col. 10) remark: PARTIAL LOOP WAS VECTORIZED.
+> opmain.f(134): (col. 10) remark: PARTIAL LOOP WAS VECTORIZED.
+> opmain.f(328): (col. 7) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c outerr.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c outwin.f
+> outwin.f(31): (col. 10) remark: LOOP WAS VECTORIZED.
+> outwin.f(60): (col. 11) remark: LOOP WAS VECTORIZED.
+> outwin.f(101): (col. 10) remark: LOOP WAS VECTORIZED.
+> planew1.frc: COMPLEX version extracted
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c planew1_tmp.f
+> planew1_tmp.f(66): (col. 24) remark: PARTIAL LOOP WAS VECTORIZED.
+> planew1_tmp.f(66): (col. 24) remark: PARTIAL LOOP WAS VECTORIZED.
+> planew1_tmp.f(117): (col. 28) remark: LOOP WAS VECTORIZED.
+> planew1_tmp.f(140): (col. 9) remark: LOOP WAS VECTORIZED.
+> mv planew1_tmp.o planew1.o
+> rm planew1_tmp.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c outmat.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c radint.f
+> radint.f(56): (col. 10) remark: LOOP WAS VECTORIZED.
+> radint.f(63): (col. 10) remark: LOOP WAS VECTORIZED.
+> radint.f(80): (col. 10) remark: LOOP WAS VECTORIZED.
+> radint.f(96): (col. 10) remark: LOOP WAS VECTORIZED.
+> radint.f(122): (col. 12) remark: LOOP WAS VECTORIZED.
+> radint.f(160): (col. 12) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c rint13.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c rintuout.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c rotate.f
+359,394c203,258
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c sph-UP_tmp.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** mom_mat   === End of Compilation 1 ===
+< ** saveap   === End of Compilation 2 ===
+< ** restap   === End of Compilation 3 ===
+< ** inverssymdef   === End of Compilation 4 ===
+< ** delmatrix   === End of Compilation 5 ===
+< "sph-UP_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< "sph-UP_tmp.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file sph-UP_tmp.f.
+< 	mv sph-UP_tmp.o sph-UP.o
+< 	rm sph-UP_tmp.f
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c sphbes.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** sphbes   === End of Compilation 1 ===
+< "sphbes.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file sphbes.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c symop.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** symop   === End of Compilation 1 ===
+< "symop.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file symop.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c sym.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** sym   === End of Compilation 1 ===
+< ** transform   === End of Compilation 2 ===
+< "sym.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file sym.f.
+< 	xlf90   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -qcheck  -c ylm.f
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< ** ylm   === End of Compilation 1 ===
+< "ylm.f", 1500-036 (I) The NOSTRICT option (default at OPT(3)) has the potential to alter the semantics of a program.  Please refer to documentation on the STRICT/NOSTRICT option for more information.
+< 1501-510  Compilation successful for file ylm.f.
+< 	xlf90  -o ./CBxopticc modules.o abc.o  atpar_op.o  cputim.o  dvbes1.o errclr.o errflg.o gtfnam.o  harmon.o  latgen.o  lomain_op.o  mmatcv.o  mmatrix.o momradintc.o   opmain.o  outerr.o  outwin.o  outmatABZ.o radint.o rint13.o  planew.o outmat.o rintuout.o sph-UPcor.o  rotate.o  sph-UP.o  sphbes.o  symop.o  sym.o  ylm.o   -q64 -O3 -g -pg -qarch=pwr6 -qtune=pwr6 -L/cineca/prod/libraries/lapack/3.2.1/xl--10.1/lib  
+< xlf90: 1501-245 (W) Warning: Hard ulimit has been reduced to less than RLIM_INFINITY.  There may not be enough space to complete the compilation.
+< 	rm param.inc
+---
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c sph-UP_tmp.f
+> sph-UP_tmp.f(785): (col. 14) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(804): (col. 20) remark: PARTIAL LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(176): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(177): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(178): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(179): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(180): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(181): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(182): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(183): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(184): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(185): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(186): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(187): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(206): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(207): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(208): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(209): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(210): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(211): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(212): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(213): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(214): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(215): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(216): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(217): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(218): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(219): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(220): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(221): (col. 7) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(294): (col. 10) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(378): (col. 12) remark: LOOP WAS VECTORIZED.
+> sph-UP_tmp.f(380): (col. 10) remark: LOOP WAS VECTORIZED.
+> mv sph-UP_tmp.o sph-UP.o
+> rm sph-UP_tmp.f
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c sphbes.f
+> sphbes.f(86): (col. 10) remark: LOOP WAS VECTORIZED.
+> sphbes.f(80): (col. 10) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c symop.f
+> symop.f(52): (col. 9) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c sym.f
+> sym.f(47): (col. 16) remark: LOOP WAS VECTORIZED.
+> sym.f(31): (col. 15) remark: LOOP WAS VECTORIZED.
+> ifort  -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -c ylm.f
+> ifort -o ./opticc modules.o abc.o  atpar_op.o  cputim.o  dvbes1.o errclr.o errflg.o gtfnam.o harmon.o  latgen.o  lomain_op.o  mmatrix.o  opmain.o  outerr.o outwin.o  planew1.o  outmat.o radint.o  rint13.o  rintuout.o rotate.o sph-UP.o  sphbes.o  symop.o  sym.o  ylm.o -FR -mp1 -w -prec_div -pc80 -pad -align -DINTEL_VML -traceback -L/opt/intel/11.0/074/mkl/lib/em64t -pthread -i-static 
+> make[1]: Leaving directory `/area51/WIEN2k_07/WIEN2k_10/SRC_optic'
+> rm param.inc
+ 
+====================  difflist
+ 
+====================  difflist_orig
+ 
+====================  FILE_X_LAPW
+ 
+====================  lomain_op.frc
+73,74c73
+< !            PHS(NUM)=PHSHEL * A(I,NUM)         
+<             PHS(NUM)=PHSHEL * A(NUM,I)         
+---
+>             PHS(NUM)=PHSHEL * A(NUM,i)         
+ 
+====================  Makefile.orig
+45,48c45,47
+<         harmon.o  latgen.o  lomain_op.o  mmatcv.o  mmatrix.o  momradintc.o  \
+<         opmain.o  outerr.o  outmat.o outmatABZ.o outwin.o  planew.o \
+<         radint.o  rint13.o  rintuout.o rotate.o  \
+<         sph-UP.o  sph-UPcor.o sphbes.o  symop.o  sym.o  ylm.o
+---
+>         harmon.o  latgen.o  lomain_op.o  mmatrix.o  opmain.o  outerr.o  \
+>         outwin.o  planew.o  outmat.o radint.o  rint13.o  rintuout.o rotate.o  \
+>         sph-UP.o  sphbes.o  symop.o  sym.o  ylm.o
+ 
+====================  mmatcv.f
+ 
+====================  modules.frc
+10,28c10
+<        COMPLEX*16,allocatable::  MX_(:),MY_(:),MZ_(:)
+<        COMPLEX*16,allocatable::  SX_(:),SY_(:),SZ_(:)       
+< !       REAL*8,allocatable::  MX_2(:),MY_2(:),MZ_2(:)
+< !       REAL*8,allocatable::  MX_3(:),MY_3(:),MZ_3(:)       
+<        complex*16,allocatable :: pxpy_1(:)
+<        complex*16,allocatable :: pxmy_1(:)
+<        complex*16,allocatable :: pz_1(:)
+< !       complex*16,allocatable :: XMCD_xpy(:)    !LOXMCD
+< !       complex*16,allocatable :: XMCD_xmy(:)    !LOXMCD
+< !       complex*16,allocatable :: XMCD_z(:)      !LOXMCD
+< !       complex (16),allocatable :: pxpy_2(:)
+< !       complex (16),allocatable :: pxmy_2(:)
+< !       complex (16),allocatable :: pz_2(:)
+<        complex*16,allocatable :: mxcv_1(:)
+<        complex*16,allocatable :: mycv_1(:)              
+<        complex*16,allocatable :: mzcv_1(:)
+< !       complex (16),allocatable :: mxvc_1(:)
+< !       complex (16),allocatable :: myvc_1(:)              
+< !       complex (16),allocatable :: mzvc_1(:)       
+---
+>        COMPLEX*16,allocatable::  MX_(:),MY_(:),MZ_(:),SX_(:),SY_(:),SZ_(:)
+30c12
+<        
+---
+> 
+36d17
+<        COMPLEX*16,allocatable::  DOPMATX(:,:),DOPMATY(:,:),DOPMATZ(:,:)
+38d18
+< !       REAL*8,allocatable::  OPMATX2(:),OPMATY2(:),OPMATZ2(:)
+50d29
+<        character*3 :: moddo
+55c34
+<        real*8,allocatable :: Rnot(:),DX(:),rr(:,:)
+---
+>        real*8,allocatable :: Rnot(:),DX(:)
+95,215d73
+< !LO
+<       module core
+< 
+<         integer(4), allocatable :: ncore(:)  ! number of core states of 
+< !                                              atom iat
+< 
+<         real(8), allocatable :: ucore_temp(:,:,:,:) ! radial core wave function. 
+< !                                            (1st. rel. component)
+< 
+<         real(8), allocatable :: uscore_temp(:,:,:,:) ! radial core wave function. 
+< !                                             (2nd. rel. component)
+< 
+<         real(8), allocatable :: ucore_1(:,:) ! radial core wave function. 
+< !                                            (1st. rel. component)
+< 
+<         real(8), allocatable :: uscore_1(:,:) ! radial core wave function. 
+< !                                             (2nd. rel. component)
+< 
+< !        real(8), allocatable :: ucore_2(:,:) ! radial core wave function. 
+< !                                            (1st. rel. component)
+< 
+< !        real(8), allocatable :: uscore_2(:,:) ! radial core wave function. 
+< !                                             (2nd. rel. component)
+< 
+<         integer(4),allocatable :: nqn(:,:),kappa(:,:),nel(:,:)
+< 	
+<       end module core
+< 
+< !
+< 
+<      module radfun
+< 
+< !LO__________core radial wf => u=(f)       f=large component
+< !LO__________			(g)       g=small component
+< 
+< 	real(8),allocatable :: RRAD01(:,:)  !r times valence large component
+< !						     rrad01=r*f
+< 
+< 	real(8),allocatable :: RADE01(:,:)  !r times the energy derivative of
+< !						     the valence large component
+< !                                                    rade01=r*f(dot)
+< 
+< 	real(8),allocatable :: RRAD02(:,:)  !r*(1/alpha) times valence small component
+< !                                                    rrad02=r*g/alpha
+< !						or.....
+< !					r/2 times valence small component derivative
+< !						     rrad02=r*f(prime)/2
+< !
+< 	real(8),allocatable :: RADE02(:,:)  !r*(1/alpha) times the energy derivative of
+< !						     the valence small component
+< !                                                    rade02=r*g(dot)/alpha
+< !						or.....
+< !					r/2 times the energy derivative of the
+< !					valence large component derivative
+< !						     rade02=r*f(dot,prime)/2
+< !
+< 	real(8),allocatable :: a01lo(:,:)   !r times local orbital large component
+< !						     a01lo=r*flo
+< 
+< 	real(8),allocatable :: b01lo(:,:)   !r*(1/alpha) times local orbital small component
+< !						     b01lo=r*glo/alpha
+< !						or.....
+< !					r/2 times local orbital large component derivative
+< !						     b01lo=r*flo(prime)/2
+< 
+< 
+<      end module radfun
+<      
+< 
+<            module moments
+< 
+<         real(8), allocatable :: iucl1ul(:,:) 
+<         real(8), allocatable :: iucl1udl(:,:) 
+<         real(8), allocatable :: iuclul1(:,:) 
+<         real(8), allocatable :: iucludl1(:,:) 
+<         real(8), allocatable :: iucl1ulol(:,:)
+<         real(8), allocatable :: iuclulol1(:,:)
+< 
+< 	end module moments
+< 
+< 	
+<       module lolog1
+< 
+<         integer(4) :: nlo ! total number of used local orbitals
+< 
+<         logical,allocatable :: loor1(:) ! selects which local orbitals 
+< !                                           should be used for atom iat
+< 
+<       end module lolog1
+< 
+< 
+<       	module comi
+< 
+<         integer(4) :: natti    ! number of inequivalent atoms
+< 
+<         integer(4), allocatable :: ncg(:)  ! Total num of core states considering lm
+< 	
+<         integer(4), allocatable :: ncg1(:)  ! Total num of core states excluding  lm	
+< 
+<      	end module comi
+< 
+< 
+< 	module xrpar
+< 	
+< 	      CHARACTER(len=4) :: DUMMY		
+< 	      
+< 	      CHARACTER(len=3) :: core_name, core_name1, core_name2
+< 	      
+<               integer(4) :: xmcd
+< 
+<               logical :: LSOUP
+< 
+< 	end module xrpar	    
+< 	
+<         module fermi
+< 	
+< 	real(8) :: EF			!Fermi Energy in Ry
+<         
+< 	end module fermi	
+< 	
+< !LO 
+ 
+====================  momradintc.f
+ 
+====================  opmain.f
+1c1
+<       PROGRAM CBxoptic
+---
+>       PROGRAM OPTIC
+4,6d3
+<       use xrpar
+<       use fermi
+<       use comi
+9,10d5
+< !                         
+< !     written by Robert Ab
+11a7,8
+> !     written by Robert Ab
+> ! 
+16c13
+< !ole                November 2001   !ole Bernd Olejnik : p^a_nm NLO
+---
+> !ole                November 2001   !ole Bernd Olejnik : p^a_nm NLO 
+28c25
+< !
+---
+> !                         
+34c31
+<       CHARACTER*3      MODUS,OUTME,edge    ! edge added LP
+---
+>       CHARACTER*3      MODUS,OUTME                            
+43c40
+<       LOGICAL          REL,LSO,SPIN,MME_FLAG 
+---
+>       LOGICAL          REL,LSO,SPIN,MME_FLAG
+45d41
+<       INTEGER(4) :: atom_num,xlo	!LP
+48c44
+<       COMMON /LEAD/ K1,K2,KEND,KSTEP,KOUT,KSTOP   
+---
+>       COMMON /LEAD/ K1,K2,KEND,KSTEP,KOUT,KSTOP
+51c47
+< !                      IATNR(NATO),MULT(NATO),ISPLIT(NATO)
+---
+> !                      IATNR(NATO),MULT(NATO),ISPLIT(NATO)      
+55c51
+< !      COMMON /OPME/ OPMATX(NUMEO,2),OPMATY(NUMEO,2),OPMATZ(NUMEO,2)
+---
+> !      COMMON /OPME/ OPMATX(NUMEO,2),OPMATY(NUMEO,2),OPMATZ(NUMEO,2)  
+58c54
+< !      COMMON /CHAR/   TITLE,LATTIC,MODUS,ANAME(NATO)
+---
+> !      COMMON /CHAR/   TITLE,LATTIC,MODUS,ANAME(NATO)                    
+64c60
+< !      COMMON /POTNLC/ DUMMY2(NRAD),R0(NATO),DX(NATO),JRI(NATO)
+---
+> !      COMMON /POTNLC/ DUMMY2(NRAD),R0(NATO),DX(NATO),JRI(NATO)          
+79,81c75,76
+< !-----------------------------------------------------------------------       
+< !
+<       LSOUP=.FALSE.
+---
+> !-----------------------------------------------------------------------  
+> !      
+83c78
+<       SPIN=.FALSE.
+---
+>       SPIN=.FALSE.     
+86c81
+< !ad_____________________________ OPEN FILES ____________________________
+---
+> !ad ____________________________ OPEN FILES ____________________________
+90c85
+<       call ERRFLG(ERRFN,'Error in CBXOPTIC')
+---
+>       call ERRFLG(ERRFN,'Error in OPTIC')
+97,111d91
+< !LO
+<         if(iunit.eq.10.) then
+<         do i=80,8,-1
+<           if(fname(i-5:i).eq.'ctorup') then
+<             LSOUP=.true.
+<             SPIN=.true.
+<           else 
+<              if(fname(i-5:i).eq.'ctordn') then
+<                LSOUP=.false.
+<                SPIN=.true.
+<              endif
+<           endif
+<         enddo
+<         endif
+< !LO
+127c107
+<           goto 10
+---
+>           goto 10  
+147c127
+<       READ(20,1000) TITLE
+---
+>       READ(20,1000) TITLE                                               
+151d130
+<       natti=nat   ! LP: natti in "comi" module 
+159c138
+< !                    
+---
+> !                               
+187c166
+<             STOP ' CBXOPTIC: MULT EQ 0'                                    
+---
+>             STOP ' OPTIC: MULT EQ 0'                                    
+218c197
+<       EULIMIT=EEF+DEEF                                           
+---
+>       EULIMIT=EEF+DEEF    
+224,271d202
+< !      READ(5,*) EMIN,EMAX
+< !      READ(5,*)
+<       READ(5,*) xmcd
+<       READ(5,444) atom_num
+<       READ(5,*) edge 
+< !      READ(5,*)
+< 
+<       select case (edge)
+< 
+<       case ('K  ')
+< 
+<       core_name1='1s'
+<       xlo=1
+< 
+<       case ('L1 ')
+< 
+<       core_name1='2s'
+<       xlo=1
+<       
+<       case ('L23')
+< 
+<       core_name1='2p'
+<       core_name2='2ps'
+<       xlo=2
+< 
+<       case ('M1 ')
+< 
+<       core_name1='3s'
+<       xlo=1
+< 
+<       case ('M23')
+< 
+<       core_name1='3p'
+<       core_name2='3ps'
+<       xlo=2
+< 
+<       case ('M45')
+< 
+<       core_name1='3d'
+<       core_name2='3ds'
+<       xlo=2
+< 
+<       case default
+< 
+<       write(6,*)'Error: check edge!'
+<       stop
+< 
+<       end select
+303,304c234,235
+< 	read(5,*)icol(i)
+< 	if (icol(i).gt.NCASE) stop 'col number too large'
+---
+>         read(5,*)icol(i)
+>         if (icol(i).gt.NCASE) stop 'col number too large'
+306,316d236
+<         if(xmcd.eq.1) then
+<           write(*,*)'LSO= ',LSO
+<           if(.not.LSO) then 
+<             write(6,*) 'XMCD calculation requires spin-polarized AND spin-orbit setup'
+<             stop
+<           endif
+<       NCOL=2
+<       do i=1,NCOL
+<       icol(i)=i
+<       enddo
+<       endif
+320d239
+<         moddo = outme   !LO
+331,332c250,251
+<       endif
+< 
+---
+>       endif  
+>       
+336,340c255
+<  777  write(6,*) '  MODUS',modus
+<       if(xmcd.eq.1) then
+<       modus='ALL'
+< !      write(6,*) '  MODUS-xmcd: ',modus
+<       endif
+---
+>  777  write(6,*) '  MODUS: ',modus
+356,366d270
+< 
+<       if(xmcd.eq.1) then
+< !        WRITE(13,332) LSO,edge,(header(icol(i)),i=1,ncol),modus
+< !        WRITE(14,332) LSO,edge,(header(icol(i)),i=1,ncol),modus
+<         WRITE(13,332) LSO,edge,modus
+<         WRITE(14,332) LSO,edge,modus
+< !      else
+< !        WRITE(3,330) ncol,(header(icol(i)),i=1,ncol),modus
+< !        WRITE(9,330) ncol,(header(icol(i)),i=1,ncol),modus
+<       endif
+< 
+392c296
+< !
+---
+> !ad
+432,444c336
+<       if(xmcd.eq.0) then
+<         call MOM_MAT(KUPLIMIT,KFIRST,IEF,topmat,nbvalmax) 
+<       else
+< 
+<        do i=1,xlo
+<        if(i.eq.1) core_name=core_name1
+<        if(i.eq.2) core_name=core_name2
+< !        write(91,*) 'i=',i,'atom_num=',atom_num,'KUPLIMIT=',KUPLIMIT,'KFIRST=',KFIRST,'IEF=',IEF
+<         call COR_MAT(i,atom_num,KUPLIMIT,KFIRST,IEF)
+<        enddo
+<        TOPMAT=TOPMAT-TSTART
+< 
+<       endif
+---
+>       call MOM_MAT(KUPLIMIT,KFIRST,IEF,topmat,nbvalmax) 
+456c348
+<       STOP ' CBXOPTIC END'                
+---
+>       STOP ' OPTIC END'                
+466c358
+<       call OUTERR('CBXOPTIC',ERRMSG)
+---
+>       call OUTERR('OPTIC',ERRMSG)
+474c366
+<       call OUTERR('CBXOPTIC',ERRMSG)
+---
+>       call OUTERR('OPTIC',ERRMSG)
+476c368
+<       call OUTERR('CBXOPTIC',ERRMSG)
+---
+>       call OUTERR('OPTIC',ERRMSG)
+478c370
+<       call OUTERR('CBXOPTIC',ERRMSG)
+---
+>       call OUTERR('OPTIC',ERRMSG)
+486c378
+<       call OUTERR('CBXOPTIC',ERRMSG)
+---
+>       call OUTERR('OPTIC',ERRMSG)
+493c385
+<       CALL OUTERR('CBXOPTIC',ERRMSG)
+---
+>       CALL OUTERR('OPTIC',ERRMSG)
+495c387
+<   999 STOP 'CBXOPTIC - ERROR'
+---
+>   999 STOP 'OPTIC - ERROR'
+501,503d392
+< ! 331  format(L5,3X,A3,10(2X,A9,2X))
+<  332  format(L5,3X,A3,'     LEFT        RIGHT       ',A5)
+<  444  format(I4)	 
+525d413
+< ! 2020 FORMAT(12X,'MATRIX ELEMENTS: ',F8.1,5X,'... ',F4.0,' PERCENT')       
+ 
+====================  outmatABZ.f
+ 
+====================  planew_old.frc
+ 
+====================  rint13.f
+3,5c3
+< !
+< !LO S = INT { AX + CIN BY } = INT { AX + (1/ALPHA) BY }   
+< !LO                                                                    
+---
+> !                                                                       
+12,20c10,11
+<    if (xmcd.eq.1) then
+<       CIN=7.29927D-3   !LO CIN=ALPHA=1/137    
+<    else
+<       CIN=1.331258D-5
+<       IF(.NOT.REL) CIN=1E-22
+<       CIN=CIN*4
+<    endif
+< !       CIN=1.0D0                                            
+< !      IF(.NOT.REL) CIN=1E-22                                            
+---
+>       CIN=1.331258D-5                                                   
+>       IF(.NOT.REL) CIN=1E-22                                            
+24c15
+< !      CIN=CIN*4                                                         
+---
+>       CIN=CIN*4                                                         
+ 
+====================  #rotdef.f#
+ 
+====================  sphbes.f
+85,87c85
+<       NS=N+1
+< !      write(6,*) 'jj =',jj
+< !      write(6,*) 'ns =',ns
+---
+>       NS=N+1                                                            
+ 
+====================  sph-UPcor.frc
+ 
+====================  sph-UP_old.frc

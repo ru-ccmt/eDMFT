@@ -1,0 +1,42 @@
+\contentsline {part}{I\hspace {1em}Introduction}{1}{part.1}
+\contentsline {section}{\numberline {I.1}Electronic structure of crystal \\and Density Functional Theory (DFT)}{4}{section.1.1}
+\contentsline {section}{\numberline {I.2}Strongly correlated systems and Dynamical \\Mean\_Field Theory (DMFT)}{7}{section.1.2}
+\contentsline {subsection}{\numberline {I.2.1}Strongly correlated systems}{7}{subsection.1.2.1}
+\contentsline {subsection}{\numberline {I.2.2}DMFT formulism}{8}{subsection.1.2.2}
+\contentsline {section}{\numberline {I.3}DFT + DMFT}{11}{section.1.3}
+\contentsline {subsection}{\numberline {I.3.1}Basics of DFT + DMFT}{11}{subsection.1.3.1}
+\contentsline {subsection}{\numberline {I.3.2}Flow chart (Figure \ref {Flow chart of DFT+DMFT})}{14}{subsection.1.3.2}
+\contentsline {part}{II\hspace {1em}Installation}{16}{part.2}
+\contentsline {part}{III\hspace {1em}General steps for running self-consistent cycles in DFT + DMFT}{23}{part.3}
+\contentsline {section}{\numberline {III.1}DFT part}{23}{section.3.1}
+\contentsline {subsection}{\numberline {III.1.1}Prepare struct-files}{23}{subsection.3.1.1}
+\contentsline {subsubsection}{\numberline {III.1.1.1}Gather all the required information}{23}{subsubsection.3.1.1.1}
+\contentsline {subsubsection}{\numberline {III.1.1.2}Generate struct-files}{24}{subsubsection.3.1.1.2}
+\contentsline {subsection}{\numberline {III.1.2}Initialize DFT calculations using init\_lapw}{35}{subsection.3.1.2}
+\contentsline {subsection}{\numberline {III.1.3}Run the self-consistency cycles (SCF) of DFT calculations}{37}{subsection.3.1.3}
+\contentsline {section}{\numberline {III.2}DMFT part}{40}{section.3.2}
+\contentsline {subsection}{\numberline {III.2.1}Initialize DMFT calculations}{40}{subsection.3.2.1}
+\contentsline {subsection}{\numberline {III.2.2}Prepare all files}{42}{subsection.3.2.2}
+\contentsline {subsubsection}{\numberline {III.2.2.1}Prepare input files (case.indmfl, case.indmfi) and output files}{42}{subsubsection.3.2.2.1}
+\contentsline {subsubsection}{\numberline {III.2.2.2}Prepare \emph {params.dat} and \emph {sig.inp} files}{42}{subsubsection.3.2.2.2}
+\contentsline {section}{\numberline {III.3}Run DFT + DMFT codes}{47}{section.3.3}
+\contentsline {subsection}{\numberline {III.3.1}Submit the job and run DFT + DMFT iterations}{47}{subsection.3.3.1}
+\contentsline {subsection}{\numberline {III.3.2}Monitor running of DFT + DMFT}{50}{subsection.3.3.2}
+\contentsline {subsection}{\numberline {III.3.3}Check convergence of DFT + DMFT cycles and plot the results}{51}{subsection.3.3.3}
+\contentsline {part}{IV\hspace {1em}Test cases}{61}{part.4}
+\contentsline {section}{\numberline {IV.1}FCC Fe at 1500 K 0 GPa}{61}{section.4.1}
+\contentsline {subsection}{\numberline {IV.1.1}Run DFT+DMFT codes}{61}{subsection.4.1.1}
+\contentsline {subsubsection}{\numberline {IV.1.1.1}Prepare struct-files}{61}{subsubsection.4.1.1.1}
+\contentsline {subsubsection}{\numberline {IV.1.1.2}Initialize calculations using init\_lapw}{63}{subsubsection.4.1.1.2}
+\contentsline {subsubsection}{\numberline {IV.1.1.3}Run the self-consistency cycles (SCF) of DFT calculations}{65}{subsubsection.4.1.1.3}
+\contentsline {subsubsection}{\numberline {IV.1.1.4}Initialize DMFT calculations}{66}{subsubsection.4.1.1.4}
+\contentsline {subsubsection}{\numberline {IV.1.1.5}Prepare all files}{68}{subsubsection.4.1.1.5}
+\contentsline {subsubsection}{\numberline {IV.1.1.6}Submit the job and run DFT + DMFT iterations}{70}{subsubsection.4.1.1.6}
+\contentsline {subsubsection}{\numberline {IV.1.1.7}Monitor running of DFT + DMFT}{72}{subsubsection.4.1.1.7}
+\contentsline {subsection}{\numberline {IV.1.2}Properties based on DMFT calculations}{73}{subsection.4.1.2}
+\contentsline {subsubsection}{\numberline {IV.1.2.1}\emph {histogram.dat} and \emph {Probability.dat}}{73}{subsubsection.4.1.2.1}
+\contentsline {subsubsection}{\numberline {IV.1.2.2}Density of States (DOS) and Partial Density of States\\ (Partial DOS)}{77}{subsubsection.4.1.2.2}
+\contentsline {subsubsection}{\numberline {IV.1.2.3}Spectral functions}{85}{subsubsection.4.1.2.3}
+\contentsline {subsubsection}{\numberline {IV.1.2.4}Optics including conductivity}{88}{subsubsection.4.1.2.4}
+\contentsline {subsubsection}{\numberline {IV.1.2.5}Fermi Surface}{93}{subsubsection.4.1.2.5}
+\contentsline {part}{References}{94}{subsubsection.4.1.2.5}

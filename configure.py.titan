@@ -1,0 +1,38 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+import os
+
+class Config:
+  prefix      = os.getenv('HOME')+'/work/dbin'    # Installation path
+
+  compiler    = "INTEL"        # Compiler
+  
+  cflags      = "-O3"          # compiling flags for C++ programs
+  fflags      = "-O3"          # compiling flags for Fortran programs
+  ldflags     = ""             # linking flags for Fortran programs
+  ompflag     = "-fopenmp"     # linker/compiler flag for openmp
+
+  mpi_define  = "-D_MPI"       # should be -D_MPI for mpi code and empty for serial code.
+  pcc         = "CC"        # C compiler 
+  pcxx        = "CC"       # C++ compiler 
+  pfc         = "ftn"       # Fortran compiler 
+  
+  blasname    = "MKL"          # BLAS   library
+  blaslib     = "-mkl"         # BLAS   library
+  lapacklib   = ""             # LAPACK library
+  
+  fftwlib     = '-I'+os.getenv('FFTW_INC')+' -L'+os.getenv('FFTW_DIR')+' -lfftw3' 
+  gsl         = os.getenv('GSL_LIB')  # GSL    library
+
+  f2pylapack  = "-L/opt/intel/composer_xe_2015.2.164/mkl/lib/intel64/ -lmkl_intel_ilp64 -lmkl_core -lmkl_intel_thread -lpthread -lm -L/opt/intel/composer_xe_2015.2.164/compiler/lib/intel64 -liomp5" # adding extra libraries for f2py
+  f2pylib     = "--f90flags='-openmp ' --opt='-fast' "
+  f2pyflag    = "--opt='-O3' " # adding extra options to f2py
+  
+  arflags     = "rc"           # ar flags
+
+  make        = "make"
+  def __init__(self, version):
+    self.version = version
+  def __getattr__(self,key):
+    return None
+  

@@ -1,0 +1,34 @@
+Binomial inverse theorem:
+https://en.wikipedia.org/wiki/Binomial_inverse_theorem
+
+Self-energy is being added in the following way:
+
+U*S*U^{+} == U*S*V == U_{i,m}*S_{mm'}*V_{m',j}
+where
+V = U^+
+U_{i,m}
+
+We also define
+A == om+mu-\epsilon_k
+
+Then the Green's function is:
+
+(A + U*S*V)^{-1} = A^{-1}- A^{-1}*U*(1+S*V*A^{-1}*U)^{-1}*S*V*A^{-1} ) 
+or better yet
+(A + U*S*V)^{-1} = (1/A)*( 1- U*(1+S*V*(1/A)*U)^{-1}*S*V*(1/A) ) 
+
+G_{ij} = A^{-1}_{ii} * ( 1- X_{ij})
+
+X = U*(1+S*V*A^{-1}*U)^{-1}*S*V*A^{-1}
+
+a) C == C_{m,i} = S*V*(1/A) = S_{m,m1}*V_{m1,i}*(1/A)_{ii}       (mm)*(m,M)
+b) D == ( C*U ){mm'} = S*V*(1/A)U = C_{m,i}*U_{i,m'}                        (m,M)
+c) X ==  U * (1 + D)^{-1} * C                                                         (M,m),(m,m),(m,M)
+
+
+
+V*A^{-1}*U
+
+STrans(it,icix,i,j) = STrans(it,icix,i,j) + conjg(DMFTU(j,ind2,iorb2))*DMFTU(i,ind1,iorb1)
+
+Sigma_{ij} = DMFTU(i,ind1,iorb1) *Sigma(Sigind( iSx(ind1,iorb1),iSx(ind2,iorb2), icix ))*conjg(DMFTU(j,ind2,iorb2))

@@ -1,0 +1,60 @@
+SUBROUTINE LOMAIN(nemin,nemax,lfirst,latom,n,jatom)
+  use xa3
+  use ablm
+  use struk
+  !                                                                       
+  IMPLICIT REAL*8 (A-H,O-Z)
+  !
+  INCLUDE 'param.inc'
+  !.......ALM(index,nume) must be changed!!.......
+  COMPLEX*16              :: YL((LMAX2+1)*(LMAX2+1))
+  COMPLEX*16              :: PHSHEL,IMAG                     
+  COMPLEX*16, allocatable :: PHS(:)                    
+  COMMON /XA/     R(NRAD),BK(3)
+  COMMON /COM/  EMIN,EMAX,ELECN,EULIMIT,EDLIMIT,NK,IOUT,NSPIN,NAT,NBAND,ix,NB(NKPT),MINWAV,MAXWAV
+  COMMON /GENER/  BR1(3,3),BR2(3,3)                                 
+  !.... uhelp crises: but here called from optic past vectorreading therfor:6->4
+  COMMON /UHELP/  UDUM(NRAD,6)
+  LOGICAL          lapw(0:lmax2),loor(0:lomax),lloor(0:lmax2)
+  common /loabc/   alo(0:lomax,nloat),blo(0:lomax,nloat),clo(0:lomax,nloat),elo(0:lomax,nloat),plo(0:lomax),dplo(0:lomax),pelo(0:lomax),dpelo(0:lomax),peilo(0:lomax),pi12lo(0:lomax),pe12lo(0:lomax),a1lo(nrad,0:lomax),b1lo(nrad,0:lomax)
+  common /lolog/   nlo,nlov,nlon,lapw,ilo(0:lomax),loor,lloor
+  DATA            CZERO/(0.0D0,0.0D0)/,IMAG/(0.0D0,1.0D0)/         
+  !-----------------------------------------------------------------------    
+  !                                                                       
+  !.initiales a,b,c of lo                                      
+  !
+  allocate (PHS(NEmin:nemax))
+  PI=ACOS(-1.0D0)                                                   
+  TWOPI=2.D0*PI
+  i=n-(nlo+nlon)                                                      
+  DO L=0,LoMAX                    ! 10
+     do jlo=1,ilo(l)              ! 15
+        do jneq=1,mult(jatom)     ! 20
+           do M1=-l,+l            ! 25
+              i=i+1                                   
+              BK(1)=BKX(I)*BR1(1,1)+BKY(I)*BR1(1,2)+BKZ(I)*BR1(1,3)   
+              BK(2)=BKX(I)*BR1(2,1)+BKY(I)*BR1(2,2)+BKZ(I)*BR1(2,3)   
+              BK(3)=BKX(I)*BR1(3,1)+BKY(I)*BR1(3,2)+BKZ(I)*BR1(3,3)   
+              CALL YLM (BK,LOMAX,YL)                                     
+              ARG1=BKX(I)*POS(1,LATOM)*TWOPI                             
+              ARG2=BKY(I)*POS(2,LATOM)*TWOPI                             
+              ARG3=BKZ(I)*POS(3,LATOM)*TWOPI                             
+              PHSHEL=EXP( IMAG*(ARG1+ARG2+ARG3) )
+              DO NUM=NEMIN,NEMAX                                           
+                 PHS(NUM)=PHSHEL * A(NUM,I)         
+              ENDDO
+              DO M=-l,+l                                                    
+                 index=l*(l+1)+m+1 
+                 DO NUM=NEMIN,NEMAX                                           
+                    ALM(num,index)=ALM(num,INDEX)+alo(l,jlo)*conjg(YL(INDEX))*PHS(NUM)
+                    BLM(num,INDEX)=BLM(num,INDEX)+blo(l,jlo)*conjg(YL(INDEX))*PHS(NUM)
+                    CLM(num,index)=CLM(num,INDEX)+clo(l,jlo)*conjg(YL(INDEX))*PHS(NUM)
+                 ENDDO
+              ENDDO
+           ENDDO                   ! 25 CONTINUE
+        ENDDO                      ! 20 CONTINUE
+     ENDDO                         ! 15  CONTINUE                                                          
+  ENDDO                            ! 10  CONTINUE     
+  deallocate (PHS)          
+  return                   
+END SUBROUTINE LOMAIN

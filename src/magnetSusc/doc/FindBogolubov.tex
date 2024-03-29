@@ -1,0 +1,200 @@
+%\documentclass[prl,aps,twocolumn,floatfix]{revtex4}
+%\usepackage{amsmath,graphics,epsfig,color,verbatim,ulem}
+
+\documentclass[twocolumn,prb,preprintnumbers,amsmath,amssymb,floatfix]{revtex4}
+\usepackage[linktocpage,bookmarksopen,bookmarksnumbered]{hyperref}
+\usepackage{graphicx}
+\usepackage{dcolumn}
+\usepackage{braket}
+\usepackage{bbold}
+
+\usepackage{amsmath,graphics,epsfig,color,verbatim,ulem}
+\newcommand{\eps}{\epsilon} \renewcommand{\a}{\alpha}
+\renewcommand{\b}{\beta} \newcommand{\vR}{{\mathbf{R}}}
+\renewcommand{\vr}{{\mathbf{r}}} \newcommand{\vk}{{\mathbf{k}}}
+\newcommand{\vK}{{\mathbf{K}}} \newcommand{\vq}{{\mathbf{q}}}
+\newcommand{\vQ}{{\mathbf{Q}}} \newcommand{\vPhi}{{\mathbf{\Phi}}}
+\newcommand{\vS}{{\mathbf{S}}}
+\newcommand{\cG}{{\cal G}}
+\newcommand{\cF}{{\cal F}} \newcommand{\cD}{{\cal D}}
+\newcommand{\Tr}{\mathrm{Tr}} \newcommand{\npsi}{\underline{\psi}}
+\newcommand{\vA}{{\mathbf{A}}} \newcommand{\vE}{{\mathbf{E}}}
+\newcommand{\vj}{{\mathbf{j}}} \newcommand{\vv}{{\mathbf{v}}}
+\newcommand{\kb}{k_B} \newcommand{\cellvol}{}
+\newcommand{\trace}{\mbox{Tr}} \newcommand{\ra}{\rangle }
+\newcommand{\la}{\langle } \newcommand{\om}{\omega}
+\newcommand{\up}{\uparrow}
+\newcommand{\dn}{\downarrow}
+\renewcommand{\Im}{\mathrm{Im}} 
+\renewcommand{\Re}{\mathrm{Re}} 
+\newcommand{\nphi}{\underline{\phi}}
+\newcommand{\tIm}{\overline{\Im}}
+
+
+\begin{document}
+\special{papersize=8.5in,11in}
+\setlength{\pdfpageheight}{\paperheight}
+\setlength{\pdfpagewidth}{\paperwidth}
+
+
+\title{How to compute the gap with $\Delta$ in orbital space}
+\maketitle
+
+\section{Refresh on Nambu formalism}
+
+Nambu-Gorkov spinor is
+\begin{eqnarray}
+\Psi^\dagger_{\vk,i}=(c_{\vk i \up}^\dagger, c_{-\vk i \dn})  
+\end{eqnarray}
+and the Nambu Green's function is
+\begin{widetext}
+\begin{eqnarray}
+G_{\vk,ij}(\tau)=-\langle T_\tau
+\left(
+\begin{array}{c}
+c_{\vk i \up}(\tau)\\
+c^\dagger_{-\vk i \dn}(\tau)
+\end{array}
+\right)
+\left(
+\begin{array}{cc}
+c^\dagger_{\vk j \up} & c_{-\vk j \dn}
+\end{array}
+\right)\rangle
+=-
+\left(
+\begin{array}{cc}
+\langle T_\tau c_{\vk i \up}(\tau) c^\dagger_{\vk j \up}\rangle  &\langle T_\tau c_{\vk i \up}(\tau) c_{-\vk j \dn}\rangle\\
+\langle T_\tau c^\dagger_{-\vk i \dn}(\tau) c^\dagger_{\vk j \up}\rangle & \langle T_\tau c^\dagger_{-\vk i \dn}(\tau) c_{-\vk j \dn}\rangle
+\end{array}
+\right)
+\end{eqnarray}
+\end{widetext}
+
+We define
+\begin{eqnarray}
+\cG_{\vk,ij}(\tau) = -\langle T_\tau c_{\vk i \up}(\tau) c^\dagger_{\vk j \up}\rangle\\
+\cF_{\vk,ij}(\tau) = -\langle T_\tau c_{\vk i \up}(\tau) c_{-\vk j \dn}\rangle
+\end{eqnarray}
+and see that
+\begin{eqnarray}
+G_{22}&=&-\langle T_\tau c^\dagger_{-\vk i \dn}(\tau) c_{-\vk j \dn}\rangle=
+\langle T_\tau c_{-\vk j \dn}(-\tau) c^\dagger_{-\vk i \dn} \rangle=
+\nonumber\\
+&=&-\cG_{-\vk,ji}(-\tau)\nonumber\\
+G_{12}&=&-\langle T_\tau c^\dagger_{-\vk i \dn}(\tau) c^\dagger_{\vk j \up}\rangle=
+\cF^*_{\vk,ji}(\tau)
+\end{eqnarray}
+
+To prove the last identity, we check $\tau>0$ case, and write
+\begin{eqnarray}
+\cF^*_{\vk,ij}(\tau)=
+-\frac{1}{Z}\Tr\left(
+e^{-\beta H^*} e^{\tau H^*} c^*_{\vk i \up}e^{-\tau H^*} c^*_{-\vk j \dn}
+\right)=\nonumber\\
+-\frac{1}{Z}\Tr\left(
+\left(e^{-\beta H+\tau H}\right)^T (c^\dagger_{\vk i \up})^T \left(e^{-\tau H}\right)^T (c^\dagger_{-\vk j \dn})^T
+\right)=\nonumber\\
+-\frac{1}{Z}\Tr\left(
+\left(
+c^\dagger_{-\vk j \dn}
+e^{-\tau H}
+c^\dagger_{\vk i \up}
+e^{-\beta H+\tau H}
+\right)^T
+\right)=\nonumber\\
+-\frac{1}{Z}\Tr\left(
+e^{-\beta H+\tau H}
+c^\dagger_{-\vk j \dn}
+e^{-\tau H}
+c^\dagger_{\vk i \up}
+\right)=\nonumber\\
+-\langle
+T_\tau c^\dagger_{-\vk j \dn}(\tau)c^\dagger_{\vk i \up}
+\rangle
+\end{eqnarray}
+Hence, Bogolubov Green's function is
+\begin{eqnarray}
+G_{\vk,ij}(\tau)=
+\left(
+\begin{array}{cc}
+\cG_{\vk,ij}(\tau) & \cF_{\vk,ij}(\tau)\\
+\cF^*_{\vk,ji}(\tau) & -\cG_{-\vk,ji}(-\tau)
+\end{array}
+\right)
+\end{eqnarray}
+or in matrix notation
+\begin{eqnarray}
+G_{\vk}(\tau)=
+\left(
+\begin{array}{cc}
+\cG_{\vk}(\tau) & \cF_{\vk}(\tau)\\
+\cF^\dagger_{\vk}(\tau) & -\cG^{T}_{-\vk}(-\tau)
+\end{array}
+\right)
+\end{eqnarray}
+and in frequency
+\begin{eqnarray}
+G_{\vk}(i\omega)=
+\left(
+\begin{array}{cc}
+\cG_{\vk}(i\omega) & \cF_{\vk}(i\omega)\\
+\cF^\dagger_{\vk}(-i\omega) & -\cG^{T}_{-\vk}(-i\omega)
+\end{array}
+\right)
+\end{eqnarray}
+
+\section{ab-initio DMFT and SC gap}
+We first write LDA+DMFT solution in eigenbasis, which is frequency
+dependent
+\begin{eqnarray}
+\cG_{\vk}(i\omega,\vr\vr') = \psi^R_{\vk l}(i\omega,\vr)\frac{1}{i\omega+\mu-\varepsilon_{\vk l, i\omega}} \psi^L_{\vk l}(i\omega,\vr')
+\end{eqnarray}
+or
+\begin{eqnarray}
+\int d\vr d\vr' \psi^L_{\vk l}(i\omega,\vr) \cG^{-1}_{\vk}(i\omega,\vr\vr') \psi^R_{\vk l}(i\omega,\vr')= {i\omega+\mu-\varepsilon_{\vk l, i\omega}} 
+\nonumber
+\end{eqnarray}
+The DMFT projector $U_{\vr\alpha}$, which is used to embed the
+self-energy, can embed gap and give its real space representation as
+\begin{eqnarray}
+\Delta^\vk(\vr\vr')=U_{\vr\alpha}\Delta^\vk_{\alpha\beta}U^\dagger_{\beta\vr'}  
+\end{eqnarray}
+being non-local in band index or real space.
+We can transform it to DMFT eigenbasis by
+\begin{eqnarray}
+\bar{\Delta}^\vk_{ll'}(i\omega)=\int d\vr d\vr' \psi^L_{\vk l}(i\omega,\vr) U_{\vr\alpha}\Delta^\vk_{\alpha\beta}U^\dagger_{\beta\vr'}   \psi^R_{\vk l}(i\omega,\vr')
+\end{eqnarray}
+These projectors are computed by "dmftgk" in "e" mode, and they are
+printed to file "UL.dat " as $UAl=\psi^L_{\vk l}(i\omega,\vr)
+U_{\vr\alpha}$ and "UR.dat" as $UAr=U^\dagger_{\beta\vr'}   \psi^R_{\vk l}(i\omega,\vr')$.
+
+Finally, we need to solve for Bogolubov quasiparticles by
+diagonalizing the following Hamiltonian
+\begin{eqnarray}
+H_{BG}=
+\left(
+\begin{array}{cc}
+\varepsilon_{\vk,i\omega}-\mu & \bar{\Delta}^\vk(i\omega)\\
+\bar{\Delta}^{\vk \dagger}(-i\omega) & -\varepsilon_{-\vk,-i\omega}^T+\mu
+\end{array}
+\right)
+\end{eqnarray}
+It turns out that $\varepsilon_{\vk,i\omega}$ and
+$\bar{\Delta}(i\omega)$ do not have a branch-cut at $i\omega=0$ hence
+we can safely take the zero frequency limit. We will also assume that
+the lattice has inversion symmetry, hence
+$\varepsilon_{-\vk}=\varepsilon_{\vk}$. We hence diagonalize
+\begin{eqnarray}
+H_{BG}=
+\left(
+\begin{array}{cc}
+\varepsilon_{\vk,0}-\mu & \bar{\Delta}_\vk\\
+\bar{\Delta}_{\vk}^{\dagger} & -\varepsilon_{\vk,0}^T+\mu
+\end{array}
+\right)
+\end{eqnarray}
+The difference between the smallest positive eigenvalue $\lambda^-$ and the
+largest negative eigenvalue $\lambda^+$ is equal twice the gap $2\Delta=\lambda^+-\lambda^-$.
+
+\end{document}

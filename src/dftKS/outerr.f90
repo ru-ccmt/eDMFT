@@ -1,0 +1,27 @@
+SUBROUTINE OUTERR(SRNAME,ERRMSG)
+  CHARACTER*(*)      SRNAME
+  CHARACTER*(*)      ERRMSG
+  !
+  !     ..................................................................
+  !
+  INTEGER            STDERR
+  STDERR = 99
+  !
+  IF ((LEN(ERRMSG) .GT. 67) .AND. (LEN(SRNAME) .GT. 6)) THEN
+     WRITE (STDERR,9010) SRNAME, ERRMSG
+  ELSEIF (LEN(ERRMSG) .GT. 67) THEN
+     WRITE (STDERR,9020) SRNAME, ERRMSG
+  ELSEIF (LEN(SRNAME) .GT. 6) THEN
+     WRITE (STDERR,9030) SRNAME, ERRMSG
+  ELSE
+     WRITE (STDERR,9040) SRNAME, ERRMSG
+  ENDIF
+  !
+  call FLUSH(STDERR)
+  RETURN
+  !
+9010 FORMAT (' ''', A6, ''' - ',A67)
+9020 FORMAT (' ''', A,  ''' - ',A67)
+9030 FORMAT (' ''', A6, ''' - ',A)
+9040 FORMAT (' ''', A,  ''' - ',A)
+END SUBROUTINE OUTERR

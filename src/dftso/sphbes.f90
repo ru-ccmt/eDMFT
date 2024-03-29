@@ -1,0 +1,120 @@
+SUBROUTINE SPHBES(N,X,FJ)
+  IMPLICIT NONE
+  REAL*8, intent(out) :: FJ(*)
+  INTEGER, intent(in) :: N
+  REAL*8, intent(in)  :: X
+  ! external function
+  REAL*8 :: SPHBRU
+  ! locals
+  REAL*8 :: BRU, COB, CUFAC, FFN, FFO, FFP, FM, sdr, ser, xi
+  INTEGER :: i, j, jj, m, mm, ns
+  REAL*8, PARAMETER :: XLIM = 1.d0
+  REAL*8, PARAMETER :: HF = 0.5d0
+  REAL*8, PARAMETER :: TNHF = 1.05D1
+  REAL*8, PARAMETER :: FFT = 1.5D1
+  REAL*8, PARAMETER :: T25 = 1.D18
+  REAL*8, PARAMETER :: TN25 = 1.D-18
+  REAL*8, PARAMETER :: TN50 = 1.D-36
+  IF (N.LT.0) THEN
+     WRITE(6,*) 'ERROR : N SHOULD NOT BE NEGATIVE'
+     STOP 'sphbes'
+  ENDIF
+  IF(N.EQ.0) THEN
+     IF(X.EQ.0.D0) THEN
+        FJ(1)=1.D0
+        RETURN
+     END IF
+     FJ(1)=DSIN(X)/X
+     RETURN
+  ELSE IF(N.EQ.1) THEN
+     IF(X.EQ.0.D0) THEN
+        FJ(1)=1.D0
+        FJ(2)=0.D0
+        RETURN
+     END IF
+     FJ(1)=DSIN(X)/X
+     FJ(2)=DSIN(X)/X**2-DCOS(X)/X
+     RETURN
+  END IF
+  IF (X.LT.0.d0) THEN
+     WRITE(6,*) 'ERROR, X SHOULD NOT BE NEGATIVE'
+     STOP 'sphbes'
+  ENDIF
+  IF (X.LE.XLIM) THEN
+     !     THE FOLLOWING SECTION IS ADDED TO HANDLE THE X<1.0 CASES
+     !     USING THE POLYNOMIAL EXPANSION OF SPHERICAL BESSEL FUNCTION.
+     DO I=1,N+1
+        BRU=SPHBRU(I-1,X)
+        COB=1.D0
+        DO J=1,I-1
+           COB=COB*X/(2.D0*J+1)
+        ENDDO
+        FJ(I)=BRU*COB
+     ENDDO
+     RETURN
+  ENDIF
+  !
+  CUFAC=4.2
+  IF (X.LT.(N-2)) CUFAC=TNHF/(N+HF-X)
+  NS=N+5+X*CUFAC
+  !     ADD ADDITIONAL FACTOR
+  NS=NS + (FFT/(1.d0+DSQRT(X)))
+  !
+  IF ((NS+2).LE.100) GO TO 30
+  WRITE(6,28) X,NS
+28 FORMAT (1X,'* WARNING. FOR X=',G13.6,'   BESSH WANTS TO START AT N=',I5)
+  NS=98
+  IF (X.GT.FFT) THEN
+     CALL EXIT(1)
+  END IF
+30 CONTINUE
+  FFO=0.d0
+  FFN=TN25
+  M=NS-1
+  XI=1.d0/X
+  FM=(M+M)+1.d0
+  SDR=FM*TN50
+314 CONTINUE
+  FFP=FM*XI*FFN-FFO
+  IF (DABS(FFP).LT.T25) GO TO 315
+  SDR=SDR*TN50
+  FFP=FFP*TN25
+  FFN=FFN*TN25
+315 CONTINUE
+  SDR=SDR + (FM-2.d0)*FFP*FFP
+  FFO=FFN
+  FFN=FFP
+  IF (M.LE.N) GO TO 316
+  M=M-1
+  FM=FM-2.d0
+  GO TO 314
+316 CONTINUE
+  FJ(M)=FFN
+  FJ(M+1)=FFO
+  GO TO 33
+32 CONTINUE
+  FJ(M)=FM*XI*FJ(M+1)-FJ(M+2)
+  IF(DABS(FJ(M)).GE.T25) GO TO 56
+  SDR=SDR + (FM-2.d0)*FJ(M)*FJ(M)
+  IF (M.LE.1) GO TO 34
+33 CONTINUE
+  M = M-1
+  FM=FM-2.d0
+  GO TO 32
+34 CONTINUE
+  SER=1.d0/DSQRT(SDR)
+  MM = N+1
+  DO M=1,MM
+     FJ(M)=FJ(M)*SER
+  ENDDO
+  return 
+56 CONTINUE
+  JJ= M+1
+  NS=N+1
+  DO J = JJ,NS
+     FJ(J)=FJ(J)*TN25
+  ENDDO
+  SDR=SDR*TN50
+  GO TO 32
+  return
+END SUBROUTINE SPHBES

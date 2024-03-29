@@ -1,0 +1,116 @@
+%\documentclass[aps,showpacs,prb,floatfix,twocolumn]{revtex4}
+\documentclass[aps,prb,floatfix,epsfig,singlecolumn,showpacs,preprintnumbers]{revtex4}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{amsmath,amssymb,graphicx,bm,epsfig}
+\usepackage{color}
+\usepackage{braket}
+
+\newcommand{\eps}{\epsilon}
+\newcommand{\vR}{{\mathbf{R}}}
+\newcommand{\vF}{{\mathbf{F}}}
+\renewcommand{\vr}{{\mathbf{r}}}
+\newcommand{\hr}{{\hat{\textbf{r}}}}
+\newcommand{\vk}{{\mathbf{k}}}
+\newcommand{\vdelta}{{\mathbf{\delta}}}
+\newcommand{\vK}{{\mathbf{K}}}
+\newcommand{\vG}{{\mathbf{G}}}
+\newcommand{\vq}{{\mathbf{q}}}
+\newcommand{\vQ}{{\mathbf{Q}}}
+\newcommand{\vPhi}{{\mathbf{\Phi}}}
+\newcommand{\vS}{{\mathbf{S}}}
+\newcommand{\cG}{{\cal G}}
+\newcommand{\cR}{{\cal R}}
+\newcommand{\cF}{{\cal F}}
+\newcommand{\cT}{{\cal T}}
+\newcommand{\cO}{{\cal O}}
+\newcommand{\cH}{{\cal H}}
+\newcommand{\cJ}{{\cal J}}
+\newcommand{\cD}{{\cal D}}
+\newcommand{\cU}{{\cal U}}
+\newcommand{\cL}{{\cal L}}
+\newcommand{\Tr}{\mathrm{Tr}}
+\renewcommand{\a}{\alpha}
+\renewcommand{\b}{\beta}
+\newcommand{\g}{\gamma}
+\renewcommand{\d}{\delta}
+\newcommand{\npsi}{\underline{\psi}}
+\renewcommand{\Im}{\textrm{Im}}
+\renewcommand{\Re}{\textrm{Re}}
+\newcommand{\cA}{{\cal A}}
+\newcommand{\vcA}{\vec{\cal A}}
+\newcommand{\vcB}{\vec{\cal B}}
+\newcommand{\vcC}{\vec{\cal C}}
+\newcommand{\cB}{{\cal B}}
+\newcommand{\cC}{{\cal C}}
+\usepackage{hyperref}
+
+\begin{document}
+
+\title{Some notes on the Free Energy in DFT+DMFT}
+\author{Kristjan Haule}
+\affiliation{Department of Physics, Rutgers University, Piscataway, NJ 08854, USA}
+\date{\today}
+
+%\begin{abstract}
+%\end{abstract}
+\pacs{71.27.+a,71.30.+h}
+\date{\today}
+\maketitle
+
+\section{How is Free energy implemented?}
+
+The details of the algorithm are published in 
+\href{http://journals.aps.org/prl/abstract/10.1103/PhysRevLett.115.256402}{Phys. Rev. Lett. 115, 256402 (2015)}. 
+Here we just mention some implementation details, which are not
+completely detailed there.
+
+The total energy is printed in column six of \textit{info.iterate}. We
+compute it by
+\begin{eqnarray}
+E_6=E^H[\rho]+E^{XC}[\rho]+E_{nuc}-\Tr((V_H+V_{XC})\rho)+
+\textcolor{red}{\Tr(\varepsilon^{DFT}_\vk \rho)}+
+\textcolor{blue}{E_{imp}^{pot}-\Phi^{DC}[n_{imp}]}
+\end{eqnarray}
+The blue terms are computed from the impurity quantities, and the
+black and red
+are computed from the lattice quantities. The black are evaluated in \textit{lapw0} and \textit{lapwc}. The red
+terms are evaluated in \textit{dmft2}.
+
+The free energy is printed in column seven and eight of
+\textit{info.iterate}. The seventh column is computed by
+\begin{eqnarray}
+F_7=E^H[\rho]+E^{XC}[\rho]+E_{nuc}-\Tr((V_H+V_{XC})\rho)
++\textcolor{red}{\Tr\log( G)+\mu N-\Tr\log(G_{loc})+\Tr((\varepsilon_{imp}+V_{DC})n_{loc})}
+\\
++\textcolor{blue}{E_{imp}^{pot}
++\Tr\left((\Delta-\omega_n\frac{d\Delta}{d\omega_n})G_{imp}\right)
+-\Phi^{DC}[n_{imp}]}
+-\textcolor{green}{T S_{imp}}
+\end{eqnarray}
+The blue terms are computed from the impurity quantities, and the
+black and red
+are computed from the lattice quantities. The black are evaluated in \textit{lapw0} and \textit{lapwc}. The red
+terms are evaluated in \textit{dmft2}. The green term is missing in
+\textit{info.iterate} and needs to be computed at postprocessing as
+explained in the above PRL.
+
+The eight column is computed by
+\begin{eqnarray}
+F_8=E^H[\rho]+E^{XC}[\rho]+E_{nuc}-\Tr((V_H+V_{XC})\rho)
++\textcolor{red}{\Tr\log( G)+\mu N-\Tr((\Sigma-V_{DC})G_{loc})}
+\\
++\textcolor{blue}{E_{imp}^{pot}
++\Tr\left((\Delta-\omega_n\frac{d\Delta}{d\omega_n})G_{imp}\right)
+-\Tr\log(G_{imp})+\Tr(\varepsilon_{imp}n_{imp})+\Tr(\Sigma_{imp}G_{imp})
+-\Phi^{DC}[n_{imp}]}
+-\textcolor{green}{T S_{imp}}
+\end{eqnarray}
+
+The difference between the seventh and eight column is then
+\begin{eqnarray}
+F_8-F_7 = 
+\textcolor{red}{\Tr\log(G_{loc})-\Tr(\Sigma G_{loc})-\Tr(\varepsilon_{imp}n_{loc})}
+-\textcolor{blue}{\Tr\log(G_{imp})+\Tr(\Sigma G_{imp})+\Tr(\varepsilon_{imp}n_{imp})}
+\end{eqnarray}
+
+\end{document}

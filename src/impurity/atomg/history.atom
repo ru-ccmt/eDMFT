@@ -1,0 +1,2 @@
+./atom -J 0.68 -cx 0.0953 -n 1 -l 3 -Ex -1 -Ep 3 -Eoca 1 -para 1 -addc 0 
+./atom -J 0.68 -cx 0.0953 -n 1 -l 3 -Ex -1 -Ep 3 -qOCA -Eoca 1 -para 1 -addc 0 

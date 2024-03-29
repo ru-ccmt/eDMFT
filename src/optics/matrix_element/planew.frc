@@ -1,0 +1,178 @@
+!........1.........2.........3.........4.........5.........6.........7
+!234567890123456789012345678901234567890123456789012345678901234567890
+SUBROUTINE PLANEW(Nbvalmax)
+  use xa3
+  use opme
+  use struk
+  INCLUDE 'param.inc'                                              
+  IMPLICIT REAL*8 (A-H,O-Z)   
+  COMPLEX*16 CZERO,ITWOPI,IMAG
+  PARAMETER        (DTHREE = 3.0D+0) 
+  PARAMETER        (TWO    = 2.0D+0)
+  PARAMETER        (ONE    = 1.0D+0)
+  PARAMETER        (ZERO   = 0.0D+0)
+  PARAMETER        (CZERO  = (0.0D+0,0.0D+0))  
+  COMPLEX*16       PHS,PHA,SU,U 
+  CHARACTER*10     BNAME
+  LOGICAL          ORTHO
+  dimension kmax(3),kmin(3)
+  real*8,allocatable::    dk_(:)
+  complex*16,allocatable::SN(:,:) 
+  COMMON /ORTH/   ORTHO                
+  COMMON /GENER/  BR1(3,3),BR2(3,3)                                 
+  COMMON /COM/    EMIN,EMAX,ELECN,EULIMIT,EDLIMIT,NK,IOUT,NSPIN,NAT,NBAND,ix,NB(NKPT),MINWAV,MAXWAV
+  COMMON /KPOI/   S,T,Z,NEMIN,NEMAX,KKZ,N,NNLO,BNAME                  
+  COMMON /UHELP/  UDUM(NRAD,6)                        
+  COMMON /XA/     R(NRAD),BK(3)
+  complex*16,allocatable::   SX(:),SY(:),SZ(:)
+  complex*16,allocatable::   Ust(:,:,:)
+  DATA            IMAG/(0.0D+0,1.0D+0)/
+  DATA            PI/3.141592653898D0/,TEST/1.D-12/
+  save ust
+  ITWOPI=TWO*PI*IMAG
+  !---------------------------------------------------------------------
+  !
+  !...FOR SPHERES-IF VERCTORFILE ALLREADY READED !!
+  !
+  !ad   write(6,*)'palnew called'
+  allocate(SN(Nemin:nemax,N),dk_(N))
+  CALL CPUTIM(TTIME)
+  PWTM=TTIME
+  !D      GOTO 3003
+  !......with out lo's ????
+  NN=N-NNLO
+  !.....CALCULATE NORMALISED INTERSTITIAL VOLUME .......................
+  VI=0
+  DO I=1,NAT
+     V(I)=4*PI*(RMT(I)**3)/3
+     !SNI.............\/..................
+     VI=VI+V(I)*REAL(MULT(I)) 
+  END DO
+  VI=VOL-VI
+  !.....ADD K-POINT AND GIVE DIMENSION .......................
+  !new
+  if(.not.allocated(Ust)) then
+     print*,'creating ust'
+     kmin=0
+     kmax=0
+     do i=1,nn
+        do j=1,nn
+           if(kmin(1).gt.(kx(i)-kx(j)))kmin(1)=kx(i)-kx(j)
+           if(kmin(2).gt.(ky(i)-ky(j)))kmin(2)=ky(i)-ky(j)
+           if(kmin(3).gt.(kz(i)-kz(j)))kmin(3)=kz(i)-kz(j)
+           if(kmax(1).lt.(kx(i)-kx(j)))kmax(1)=kx(i)-kx(j)
+           if(kmax(2).lt.(ky(i)-ky(j)))kmax(2)=ky(i)-ky(j)
+           if(kmax(3).lt.(kz(i)-kz(j)))kmax(3)=kz(i)-kz(j)
+        enddo
+     enddo
+     print*, 'kmin,kmax', kmin-2,kmax+2
+     allocate (Ust(kmin(1)-2:kmax(1)+2,kmin(2)-2:kmax(2)+2,kmin(3)-2:kmax(3)+2))
+     do i=kmin(1),kmax(1)
+        do j=kmin(2),kmax(2)
+           do k=kmin(3),kmax(3)
+              bbkX=i*BR1(1,1) + j*BR1(1,2) + k*BR1(1,3)
+              bbkY=i*BR1(2,1) + j*BR1(2,2) + k*BR1(2,3)
+              bbkZ=i*BR1(3,1) + j*BR1(3,2) + k*BR1(3,3)
+              dk=sqrt(bbkX**2+bbky**2+bbkz**2)
+              U=CZERO 
+              INDATM=0
+              DO JNEQ = 1, NAT             ! 1500
+                 PHS=CZERO
+                 DO JEQ = 1, MULT(JNEQ)    ! 1700
+                    INDATM = INDATM + 1     
+                    ARGX = POS(1,INDATM)*I
+                    ARGY = POS(2,INDATM)*J
+                    ARGZ = POS(3,INDATM)*K 
+                    PHA = EXP(ITWOPI*(ARGX+ARGY+ARGZ))
+                    PHS = PHS+PHA
+                 ENDDO                     ! 1700
+                 X = DK * RMT(JNEQ)  
+                 BESR = (SIN(X) - X*COS(X)) / (X*X*X)  
+                 U = U + V(JNEQ)*PHS*BESR
+              ENDDO                        ! 1500
+              ust(i,j,k)=u
+           enddo
+        enddo
+     enddo
+  endif
+  U0=VOL
+  DO JATOM=1,nat
+     U0=U0-V(JATOM)*MULT(JATOM)                                  
+  END DO
+  ust(0,0,0)=-u0/3.d0
+  CALL CPUTIM(TTIME)
+  PWTM=TTIME
+  !old
+  DO I=1,NN
+     BK(1)=(KX(I)+S)
+     BK(2)=(KY(I)+T)  
+     BK(3)=(KZ(I)+Z)
+     bkX(I)=BK(1)*BR1(1,1) + BK(2)*BR1(1,2) + BK(3)*BR1(1,3)
+     bkY(I)=BK(1)*BR1(2,1) + BK(2)*BR1(2,2) + BK(3)*BR1(2,3)
+     bkZ(I)=BK(1)*BR1(3,1) + BK(2)*BR1(3,2) + BK(3)*BR1(3,3)
+  END DO
+  !write(6,'(3i3,f10.5)') (kx(i),ky(i),kz(i),bkx(i),i=1,20)
+  MM=(NEMAX-NEMIN+1)*(NEMAX-NEMIN+2)/2
+  allocate(SX(mm),SY(mm),SZ(mm))
+  
+  !...... SLOPE OVER BANDCOMBINATIONS ..............................
+  !
+  DO NBINDEX=1,mm
+     SX(NBINDEX)=CZERO
+     SY(NBINDEX)=CZERO
+     SZ(NBINDEX)=CZERO
+  END DO
+  DO I=1,N
+     DO NB2=NEMIN,NEMAX 
+        SN(NB2,I)=CZERO
+     END DO
+  END DO
+  DO I=1,NN              ! 229
+     DO J=I+1,NN         ! 339
+        i1=KX(I) - KX(J)
+        i2=KY(I) - KY(J)
+        i3=KZ(I) - KZ(J)
+        DO NBI=NEMIN,NEMAX
+!_COMPLEX        SN(NBI,I) = SN(NBI,I) + conjg(A(NBI,j)) * Ust(i1,i2,i3)
+!_COMPLEX        SN(NBI,J) = SN(NBI,J) + conjg(A(NBI,i)) * CONJG(Ust(i1,i2,i3))
+!_REAL           SN(NBI,I) = SN(NBI,I) + A(NBI,j) * Ust(i1,i2,i3)
+!_REAL           SN(NBI,J) = SN(NBI,J) + A(NBI,i) * CONJG(Ust(i1,i2,i3))
+        END DO
+     ENDDO             ! 339
+  ENDDO                ! 229
+  CALL CPUTIM(TTIME)
+  !      print*, 'time after 229',TTIME-PWTM
+  PWTM=TTIME
+  DO I=1,NN
+     NBINDEX=0
+     DO  NB1=NEMIN,Nbvalmax
+        DO  NB2=nb1,NEMAX
+           NBINDEX=NBINDEX+1 
+!_COMPLEX        SU =(A(NB2,i))*(VI*conjg(A(NB1,i))-DTHREE*SN(NB1,I))
+!_REAL           SU=A(NB2,i)*(VI*A(NB1,i)-DTHREE*SN(NB1,I))  
+           SX(NBINDEX) = SX(NBINDEX) + bkX(I)*SU    ! (k+G)_x * O_{G'G}
+           SY(NBINDEX) = SY(NBINDEX) + bkY(I)*SU    ! (k+G)_y * O_{G'G}
+           SZ(NBINDEX) = SZ(NBINDEX) + bkZ(I)*SU    ! (k+G)_z * O_{G'G}
+        END DO
+     END DO
+  END DO
+  NBINDEX=0
+  DO  NB1=NEMIN,Nbvalmax
+     DO  NB2=nb1,NEMAX
+        NBINDEX=NBINDEX+1 
+        OPMATX(NBINDEX)=OPMATX(NBINDEX)+SX(NBINDEX)*IMAG/VOL
+        OPMATY(NBINDEX)=OPMATY(NBINDEX)+SY(NBINDEX)*IMAG/VOL
+        OPMATZ(NBINDEX)=OPMATZ(NBINDEX)+SZ(NBINDEX)*IMAG/VOL   
+4445    format(2x,2I4,6E16.6)
+     END DO
+  END DO
+3003 CONTINUE
+
+  CALL CPUTIM(TTIME)
+  PWTM=TTIME-PWTM
+  !..... GO FOR NEXT K-POINT .......................................
+  !
+  deallocate(SN,dk_,sx,sy,sz)
+  RETURN
+701 FORMAT('PW: NEMIN-MAX{',2I3,'} KP:',I3,'(',I3,') PUNKT: [',3F7.4,'] NAME',a10,' CPUTIM :',F6.2)
+END SUBROUTINE PLANEW

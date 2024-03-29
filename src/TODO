@@ -1,0 +1,18 @@
+0) During installation check for /usr/bin/time executable. If it does not exists, use someting alternative.
+0) The new script findRot.py is intelligent enough to find rotation for all atoms in the case.indmfl file. Single execution after dmft1 step should arrange all rotations.
+1) Break up the LDA and DMFT loops such that both programs run concurently and simultaneously.
+2) The code does support ferromagnetic calculation. Just switch on Ferro in params.dat
+4) forces in the presence of SO not yet implemented.
+
+5) In dmft1 we should use Binomial theorem to speed up calculation:
+   https://en.wikipedia.org/wiki/Binomial_inverse_theorem
+   Also make sure that impurity times are saved in ':log'. They seem to be absent in current version!
+
+6) In dmft2 we should also use Binomial theorem, as well as efficient eigenvalue solvers for "Hermitian+low-rank matrices".
+
+
+explain the following routines:
+x_spaght.py
+FS_convert.py
+wfs_plot.py
+status_extend.py

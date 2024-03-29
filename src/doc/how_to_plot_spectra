@@ -1,0 +1,51 @@
+This is very short manual on plotting A(k,omega)
+
+1) after you successfuly converged your DMFT run, you need to perform analytic continuation of the self-energy (using maxent or ancont)
+2) copy necessary files to your desired directory ( dmft_copy.py  <results-dir> -a )
+3) create case.klist_band mesh
+4) run lapw1 (and lapwso) on k-mesh:  x lapw1 -f <case> -band ; ( x lapwso -f <case> -band )
+5) change case.indmfl file:
+  - change matsubara flag to 0 (because we will plot on real axis)
+  - change "nomega omega_min and omega_max" to desired number of frequency points around the Fermi level. Mesh will be equidistant
+    Note that fermi surface plot requires single point at zero frequency. However, since we need also sigma_infinity, we need to set nomega=2 and omega_min=omega_max=0
+
+One way
+-------
+6) execute "x_dmft.py dmftp"
+
+7) If you are plotting A(k,omega), plot eigenvalues with wakplot.py
+   If you are plotting Fermi surface, plot eigenvalues with "wfsplot.py eigenvals.dat"
+
+Second way using dmftgk, which can be used to plot fat bands
+------------------------------------------------------------
+6) print projector using dmftu (x_dmft.py dmftu -g --band)
+7) prepare sig.inp?_band, which contains self-energy on desired real-frequency mesh. (It might already be preapred by dmftp, if executed before)
+   Note that the Fermi surface plot here needs only a single point at zero frequency, and not two points, as is necessary for dmftp step.
+8) prepare dmftgke.in. Example of dmftgke.in is:
+"""
+e                   # mode [g/e]: we use mode to compute eigenvalues and eigenvectors
+BasicArrays.dat     # filename for projector
+0                   # matsubara
+case.energyso        # LDA-energy-file, case.energy(so)(updn)
+case.klist_band      # k-list
+case.rotlm           # for reciprocal vectors
+Udmft.0             # filename for projector
+0.0025              # gamma for non-correlated
+0.0025              # gammac
+sig.inp1_band  sig.inp2_band   # self-energy name, sig.inp(x)
+eigenvalues.dat     # eigenvalues
+UR.dat              # right eigenvector in orbital basis
+UL.dat              # left eigenvector in orbital basis
+-1.                # emin for printed eigenvalues
+ 1.                # emax for printed eigenvalues
+"""
+9) Execute dmftgke:
+   ~/dmft_w2k/main/magnetSusc/dmftgk/dmftgk dmftgke.in 
+
+  You will get eigenvalues.dat as well as "UL.dat" and "UR.dat". Now you can use unfolding, to produce UL.dat_ and UR.dat_. If you do not need to perform unfolding, 
+  you just "mv UL.dat UL.dat_" and "mv UR.dat UR.dat_" and plot.
+
+10) Plot Fermi surface with "wfsplot.py eigenvalues.dat" or plot spectra with "wakplot.py"
+
+
+

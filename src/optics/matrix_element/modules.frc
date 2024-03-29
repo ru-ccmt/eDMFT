@@ -1,0 +1,148 @@
+module xa3
+!_REAL      REAL*8,allocatable::             A(:,:)
+!_COMPLEX      COMPLEX*16,allocatable::         A(:,:)
+  REAL*8,allocatable::   BKX(:),BKY(:),BKZ(:)
+  integer,allocatable::  KX(:),KY(:),KZ(:)   
+  REAL*8,allocatable::   FJ(:,:),DFJ(:,:),E(:)
+end module xa3
+
+module mxyz
+  COMPLEX*16,allocatable::  MX_(:),MY_(:),MZ_(:)
+  COMPLEX*16,allocatable::  SX_(:),SY_(:),SZ_(:)       
+  complex*16,allocatable :: pxpy_1(:)
+  complex*16,allocatable :: pxmy_1(:)
+  complex*16,allocatable :: pz_1(:)
+  complex*16,allocatable :: mxcv_1(:)
+  complex*16,allocatable :: mycv_1(:)              
+  complex*16,allocatable :: mzcv_1(:)
+end module mxyz
+       
+module ablm
+  COMPLEX*16,allocatable::  ALM(:,:),BLM(:,:),cLM(:,:)
+end module ablm
+
+module OPME
+  COMPLEX*16,allocatable::  DOPMATX(:,:),DOPMATY(:,:),DOPMATZ(:,:)
+  COMPLEX*16,allocatable::  OPMATX(:),OPMATY(:),OPMATZ(:)
+end module OPME
+
+module BINDEX     
+  integer,allocatable ::  N_(:),NN_(:),NIN(:,:)
+end module BINDEX
+
+module struk
+  real*8 AA,BB,CC,ALPHA(3),VOL,PIA(3)
+  real*8,allocatable :: POS(:,:),RMT(:),V(:),ZZ(:)
+  integer,allocatable:: IATNR(:),MULT(:),ISPLIT(:),imodus(:)      
+  CHARACTER*10,allocatable::     ANAME(:)
+  character*3 :: moddo
+  integer nmodus
+end module struk
+
+module potnlc
+  real*8,allocatable :: Rnot(:),DX(:),rr(:,:)
+  integer,allocatable :: JRI(:)  
+end module potnlc
+
+module lologo
+  integer,allocatable:: nloO(:),nlovO(:),nlonO(:),iloO(:,:)
+  logical,allocatable:: lapwO(:,:),loorO(:,:)
+end module lologo
+
+module loabco
+  real*8,allocatable::  aloO(:,:,:,:),bloO(:,:,:,:),cloO(:,:,:,:),eloO(:,:,:),ploO(:,:,:),dploO(:,:,:),peloO(:,:,:),dpeloO(:,:,:),peiloO(:,:,:),pi12lA(:,:,:),pe12lA(:,:,:)
+endmodule loabco
+
+module INTU
+  real*8,allocatable:: Duu1(:,:,:),Duu2(:,:,:),Duup1(:,:,:),Duup2(:,:,:),Dupu1(:,:,:),Dupu2(:,:,:),Dupup1(:,:,:),Dupup2(:,:,:),Ruu(:,:,:),Ruup(:,:,:),Rupu(:,:,:),Rupup(:,:,:)
+  real*8,allocatable:: Duul1(:,:,:), Duul2(:,:,:),Dulup1(:,:,:),Dulup2(:,:,:),Dupul1(:,:,:),Dupul2(:,:,:),Dulu1(:,:,:), Dulu2(:,:,:),Dulul1(:,:,:),Dulul2(:,:,:),Ruul(:,:,:),  Rulu(:,:,:),Rupul(:,:,:), Rulup(:,:,:),Rulul(:,:,:)
+end module intu
+
+module atspa
+  real*8,allocatable::   Pn(:,:,:),DPn(:,:,:),PEn(:,:,:),DPEn(:,:,:),PEIn(:,:,:)
+end module atspa
+!LO
+module core
+  integer(4), allocatable :: ncore(:)  ! number of core states of 
+  !                                              atom iat
+  real(8), allocatable :: ucore_temp(:,:,:,:) ! radial core wave function. 
+  !                                            (1st. rel. component)
+  real(8), allocatable :: uscore_temp(:,:,:,:) ! radial core wave function. 
+  !                                             (2nd. rel. component)
+  real(8), allocatable :: ucore_1(:,:) ! radial core wave function. 
+  !                                            (1st. rel. component)
+  real(8), allocatable :: uscore_1(:,:) ! radial core wave function. 
+  !                                             (2nd. rel. component)
+  !        real(8), allocatable :: ucore_2(:,:) ! radial core wave function. 
+  !                                            (1st. rel. component)
+  !        real(8), allocatable :: uscore_2(:,:) ! radial core wave function. 
+  !                                             (2nd. rel. component)
+  integer(4),allocatable :: nqn(:,:),kappa(:,:),nel(:,:)
+end module core
+!
+module radfun
+  
+!LO__________core radial wf => u=(f)       f=large component
+!LO__________			(g)       g=small component
+
+  real(8),allocatable :: RRAD01(:,:)  !r times valence large component
+  !						     rrad01=r*f
+  real(8),allocatable :: RADE01(:,:)  !r times the energy derivative of
+  !						     the valence large component
+  !                                                    rade01=r*f(dot)
+  real(8),allocatable :: RRAD02(:,:)  !r*(1/alpha) times valence small component
+  !                                                    rrad02=r*g/alpha
+  !						or.....
+  !					r/2 times valence small component derivative
+  !						     rrad02=r*f(prime)/2
+  !
+  real(8),allocatable :: RADE02(:,:)  !r*(1/alpha) times the energy derivative of
+  !						     the valence small component
+  !                                                    rade02=r*g(dot)/alpha
+  !						or.....
+  !					r/2 times the energy derivative of the
+  !					valence large component derivative
+  !						     rade02=r*f(dot,prime)/2
+  !
+  real(8),allocatable :: a01lo(:,:)   !r times local orbital large component
+  !						     a01lo=r*flo
+  real(8),allocatable :: b01lo(:,:)   !r*(1/alpha) times local orbital small component
+  !						     b01lo=r*glo/alpha
+  !						or.....
+  !					r/2 times local orbital large component derivative
+  !						     b01lo=r*flo(prime)/2
+end module radfun
+
+module moments
+  real(8), allocatable :: iucl1ul(:,:) 
+  real(8), allocatable :: iucl1udl(:,:) 
+  real(8), allocatable :: iuclul1(:,:) 
+  real(8), allocatable :: iucludl1(:,:) 
+  real(8), allocatable :: iucl1ulol(:,:)
+  real(8), allocatable :: iuclulol1(:,:)
+end module moments
+
+module lolog1
+  integer(4) :: nlo ! total number of used local orbitals
+  logical,allocatable :: loor1(:) ! selects which local orbitals 
+  !                                           should be used for atom iat
+end module lolog1
+
+module comi
+  integer(4) :: natti    ! number of inequivalent atoms
+  integer(4), allocatable :: ncg(:)  ! Total num of core states considering lm
+  integer(4), allocatable :: ncg1(:)  ! Total num of core states excluding  lm	
+end module comi
+
+module xrpar
+  CHARACTER(len=4) :: DUMMY		
+  CHARACTER(len=3) :: core_name, core_name1, core_name2
+  integer(4) :: xmcd
+  logical :: LSOUP
+end module xrpar
+
+module fermi
+  real(8) :: EF			!Fermi Energy in Ry
+end module fermi
+	
+!LO 

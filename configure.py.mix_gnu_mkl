@@ -1,0 +1,42 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+
+class Config:
+  prefix      = "bin"    # Installation path
+
+  compiler    = "GNU"          # Compiler
+  fc          = "gfortran"     # Fortran compiler
+  cc          = "gcc"          # C compiler
+  cxx         = "g++"          # C++ compiler
+
+
+  cflags      = "-O2"          # linker flags for C programs
+  fflags      = "-O2"          # linker flags for Fortran programs
+  ldflags      = ""             # linker flags debuggin programs
+  ompflag     = "-fopenmp"     # linker/compiler flag for openmp
+
+  mpi_define  = "-D_MPI"       #
+  pcc         = "mpicc"        # C compiler 
+  pcxx        = "mpicxx"       # C++ compiler 
+  pfc         = "mpif90"       # Fortran compiler 
+  
+  blasname    = "mkl"          # BLAS   library
+  blaslib     = "-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_gf_lp64.a ${MKLROOT}/lib/intel64/libmkl_sequential.a ${MKLROOT}/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm -ldl"         # BLAS   library
+  lapacklib   = ""             # LAPACK library
+  fftwinc     = "-I${MKLROOT}/include/fftw"
+  fftwlib     = "-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_gf_lp64.a ${MKLROOT}/lib/intel64/libmkl_sequential.a ${MKLROOT}/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm -ldl"  # FFTW   library
+  gslinc      = ""
+  gsl         = "-lgsl -lcblas"     # GSL    library
+
+
+  f2pylib     = "--f90flags='-openmp '"	       # F2PY   library	
+  f2pyflag    = "--opt='-O2'"	       # F2PY   library	
+
+  ranlib      = ""             # Ranlib
+  arflags     = "rc"           # ar flags
+
+  make        = "make"
+  def __init__(self, version):
+    self.version = version
+  def __getattr__(self,key):
+    return None

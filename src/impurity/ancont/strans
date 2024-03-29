@@ -1,0 +1,92 @@
+#!/usr/bin/perl
+# @Copyright 2007 Kristjan Haule 
+
+use Math::Trig;
+use Math::Complex;
+
+push @files, "<&STDIN" unless -t STDIN;
+
+foreach (@ARGV){
+    if (-s $_){
+	push @files, $_;
+    } else{
+	push @trans, $_;
+    }
+}
+
+foreach (@trans)
+{
+    if ($_ eq "-h")
+    {
+	print "**************** TRANS **************\n";
+	print "**      transform data files       **\n";
+	print "** Copyright     Kristjan Haule    **\n";
+	print "** Version 2.0            5.5.1999 **\n";   
+	print "*************************************\n";
+	print "\n";
+	print "[... |] trans f1(#1, #2, ...) [f2(#1, #2, ...)]\n";
+	print "\n";
+	print "Example: cat file | trans #1 #3-#2 \"tan(#4)\"\n";
+	exit;
+    }      
+    s/\#(\d+):(\d+)/\$spl\[${\($1-1)}\]\[${\($2-1)}\]/g;
+    s/\#(\d+)/\$spl\[0\]\[${\($1-1)}\]/g;
+}
+
+foreach (@files){
+    open $_, $_;
+}
+
+@{$spl[0]} = (' ');
+    
+LB: while (defined($spl[0][0])){
+    $i=0;
+    foreach $f (@files){
+	$_ = <$f>;
+	if (/\#/){
+#            chop($_);
+            print; $_ = <$f>;
+        }
+	@{$spl[$i++]} = split(' ',$_);
+    }
+    
+    if (not defined($spl[0][0])) {
+	last LB;
+    }
+	
+    $line = "";
+    foreach $col (@trans){
+	$val = eval $col;
+	$line .= $val . " ";
+    }
+
+    print "$line\n";
+}
+
+sub ferm{
+  return 1.0/(exp(@_[0])+1);
+}
+sub min{
+    return (@_[0]<@_[1]) ? @_[0] : @_[1];
+}
+sub max{
+    return (@_[0]>@_[1]) ? @_[0] : @_[1];
+}
+
+sub nbose{
+  return 1.0/(exp(@_[0])-1);
+}
+sub sqr{
+    return @_[0]*@_[0];
+}
+sub sign{
+    return @_[0]>=0 ? 1 : -1;
+}
+sub Hbethe{
+    my $ceta = @_[0];
+    return -0.5*(Im($ceta)-sign(Re($ceta))*sign(Im($ceta))*Im(sqrt($ceta**2-4.)))/pi;
+}
+sub HBethe{
+    my $ceta = @_[0];
+    return -2*(Im($ceta)-sign(Re($ceta))*sign(Im($ceta))*Im(sqrt($ceta**2-1)))/pi;
+}

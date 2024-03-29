@@ -1,0 +1,18 @@
+1) Switch on force calculation in dmft2 step. 
+  Change the flag "TOT" in case.in2 file to "FOR"
+2) Increase number of DFT steps in "params.dat" file, so that DFT is basically converged at each self-energy update.
+  Change "max_lda_iterations=100" in "params.dat"
+3) Finally, switch on structure optimization by changing the flag "MSR1" in case.inm to "MSR1a"
+
+Note that it is more efficient to first converge the DMFT calculation
+[using "MSR1" mixer setting and "max_lda_iterations=10"], and once
+self-energy stops changing, one can change the two parameters to
+["MSR1a" and "max_lda_iterations=100"].  
+
+Alternatively, one can resubmit a converged DMFT run for
+optimization. In this case, it is a good idea to set "runIMP=False" at
+the very beginning, so that structure is optimized on well converged
+self-energy. During the job is going through the first iteration, one
+should switch "runIMP=True", so that self-energy is updated in the
+second iteration.
+

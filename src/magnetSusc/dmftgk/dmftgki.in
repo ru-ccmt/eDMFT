@@ -1,0 +1,13 @@
+g                   # mode
+BasicArrays.dat     # filename for projector
+1                   # matsubara
+Ba122.energy        # LDA-energy-file, case.energy(so)(updn)
+Ba122.klist         # k-list
+Ba122.rotlm         # for reciprocal vectors
+Udmft.0             # filename for projector
+0.025               # gamma for non-correlated
+0.025               # gammac
+sig.inp1i           # self-energy name, sig.inp(x)
+G_k1i               # name of the output gk
+G_local1i           # name of the output glocal
+g_local1i           # name of the output glocal-diagonal

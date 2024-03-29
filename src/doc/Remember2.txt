@@ -1,0 +1,17 @@
+To reduce RMT proceed in the following way:
+
+    1) reduce_rmt_lapw -r 3  # meand 3% reduction, creates case.struct_new
+    2) x clminter            # will take case.struct_new and case.clmsum to create case.clmsum_new
+    
+    finally, copy  case.*_new to case.*
+
+To do c-DMFT calculation, proceed in the following way:
+   1) edit case.in1(c) and change the linearizatin energy of the correlated orbital to a large number, like 20.3  
+      The line should look like : (<n>   20.30      0.000 CONT 1)
+   2) edit case.in2(c) and change total number of electrons. You should remove n electrons for d^n calculation.
+   3) edit case.inc and add the needed core states.
+        -increase number of orbitals, and put some nonzero shift for the orbital (otherise the states will not fit into core)
+        -for 3d_{3/2} add: 
+               3, 2,<occup>                # 3d_3/2
+        -for 3d_{1/2} add:
+               3,-3,<occup>                # 3d_5/2

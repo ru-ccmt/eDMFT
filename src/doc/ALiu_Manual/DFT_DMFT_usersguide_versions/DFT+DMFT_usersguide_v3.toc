@@ -1,0 +1,32 @@
+\contentsline {part}{I\hspace {1em}\relax \fontsize {14.4}{18}\selectfont \textbf {Introduction}}{1}
+\contentsline {section}{\numberline {1}\textbf {Electronic structure of crystal and Density Functional Theory(DFT)}}{1}
+\contentsline {section}{\numberline {2}\textbf {Strongly correlated systems and\\ Dynamical Mean$\_$Field Theory(DMFT)}}{7}
+\contentsline {subsection}{\numberline {2.1}Strongly correlated systems}{7}
+\contentsline {subsection}{\numberline {2.2}DMFT formulism}{11}
+\contentsline {section}{\numberline {3}\textbf {DFT+DMFT}}{13}
+\contentsline {subsection}{\numberline {3.1}Basics of DFT + DMFT}{13}
+\contentsline {subsection}{\numberline {3.2}Flow charts}{15}
+\contentsline {part}{II\hspace {1em}\relax \fontsize {14.4}{18}\selectfont \textbf {Installation}}{19}
+\contentsline {part}{III\hspace {1em}\relax \fontsize {14.4}{18}\selectfont \textbf {Examples}}{20}
+\contentsline {section}{\numberline {1}\textbf {Self-consistent cycles in DFT+DMFT for FeO}}{20}
+\contentsline {subsection}{\numberline {1.1}DFT}{20}
+\contentsline {subsubsection}{\numberline {1.1.1}LAPW0}{20}
+\contentsline {subsubsection}{\numberline {1.1.2}LAPW1}{20}
+\contentsline {subsubsection}{\numberline {1.1.3}LAPWS0}{20}
+\contentsline {subsection}{\numberline {1.2}DMFT}{20}
+\contentsline {subsubsection}{\numberline {1.2.1}x\_dmft.py dmft1}{20}
+\contentsline {subsubsection}{\numberline {1.2.2}Impurity solver}{20}
+\contentsline {subsubsection}{\numberline {1.2.3}x\_dmft.py dmft2}{20}
+\contentsline {subsection}{\numberline {1.3}Core charge and charge mixing}{20}
+\contentsline {subsubsection}{\numberline {1.3.1}x core}{20}
+\contentsline {subsubsection}{\numberline {1.3.2}x mixer}{20}
+\contentsline {subsection}{\numberline {1.4}Density of States(DOS), Spectra and Fermi Surface(FS)}{20}
+\contentsline {subsection}{\numberline {1.5}Transport properties}{20}
+\contentsline {subsection}{\numberline {1.6}Magnetic ordering}{20}
+\contentsline {section}{\numberline {A}Programming guide for DFT+DMFT}{21}
+\contentsline {section}{\numberline {B}Trouble shooting}{21}
+\contentsline {section}{\numberline {C}List of options}{21}
+\contentsline {section}{\numberline {D}Frequently Asked Questions}{21}
+\contentsline {section}{\numberline {E}Glossaries and Indexes}{21}
+\contentsline {section}{\numberline {F}Frequently used terms}{21}
+\contentsline {section}{\numberline {G}Bibliograph}{21}

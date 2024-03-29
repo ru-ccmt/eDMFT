@@ -1,0 +1,43 @@
+Make sure that quantization axis points in the direction of your local axis. If this is not the case 
+case.outdmft1.0 will issue a warning.
+
+To point quantization axis in the direction of local z-axis, you must specify correct z-axis in case.inso file. 
+Note that case.inso file expects vector in lattice coordinates (and not cartesian coordinates), while case.indmfl 
+file contains rotation matrix in cartesian coordinates. 
+
+The correct algorithm to determin quantization axis is:
+
+
+1) Find BR1 in case.rotlm, and from this find the unit vectors of your structure, i.e.,
+
+  S2C = Inverse[BR1]*2*Pi
+
+  The matrix S2C transforms any vector in lattice coordinates to cartesian coordinates. 
+
+Alternatively, you can check case.outputkgen, and find R1,R2,R3.
+S2C = [[R1x,R2x,R3x],[R1y,R2y,R3y],[R1z,R2z,R3z]]
+
+2) Find your local z-axis in your case.indmfl file, as the third row of the 3x3 matrix. Let's call it ezc.
+   It is specified only when locrot=-1. Note that if locrot=0, your z-axis is simply (0,0,1).
+
+  Convert the z-axis specified in cartezian coordinates to lattice coordinates by
+  
+  ezl = Inverse[S2C].ezc
+  Now input ezl to case.inso file.
+
+
+Example: 
+triclinc unit cell with angles ang[1..3] is given by the following unit vectors:
+
+a_1 = a*{Sin[gp] Sin[ang[2]], Cos[gp] Sin[ang[2]], Cos[ang[2]]}
+a_2 = b*{0, Sin[ang[1]], Cos[ang[1]]}
+a_3 = c*{0, 0, 1}
+with gp = ArcCos[(Cos[ang[3]] - Cos[ang[2]]Cos[ang[1]])/(Sin[ang[1]] Sin[ang[2]])]
+
+S2C is therefore:
+
+  S2C = Transpose[a_1,a_2,a_3]
+
+One can check that BR1 == Inverse[S2C]*2*Pi
+
+

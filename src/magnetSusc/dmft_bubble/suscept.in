@@ -1,0 +1,12 @@
+Ba122.klist    # filename with k-list
+Ba122.qlist2   # filename with Qlist
+rmesh.dat      # real axis mesh
+G_k1r_         # file with real axis k-dependent Gren's function
+G_local1r_     # file with real axis local Gren's function
+chi0_real.     # name of the Bubble on real axis
+G_k1i_         # imaginary axis k-dependent Green's function
+G_local1i_     # imaginary axis local Green's function
+tvertex.dat    # ctqmc local vertex function
+100            # inverse temperature for bose function in Sq(omega)
+0.0            # Small shift
+

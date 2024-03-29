@@ -1,0 +1,72 @@
+compile a python module by:
+
+>make
+
+to obtain: "chi2f.so"
+
+Edit Makefile to set your target directory. Copy executables by
+
+>make install
+
+
+To produce self-energy, averaged over a few runs. Let's try this into subdirectory example.
+
+> cd example
+> ../saverage.py -h
+gives you some help
+
+> ../saverage.py -s sig.inp.* -o Sig.average
+produces Sig.average
+
+with standard deviation for all columns of the self-energy
+
+
+Edit "run.sh" for your case.
+The first few lines create separate self-energy file for each orbital. The resulting files contain real and imaginary part of the self-energy and its standard deviation.
+
+Next few lines create subdirectories for each orbital and these lines also copy necessary files to the subdirectories.
+
+The important line to edit is:
+
+"for x in `seq 1 5`; do cd n.$x; ./ancont.py -sig Sig.$x -nom 100 -beta 100. -wexp 1.15 -Ng 60 -FermiLiquid True -L0 20 -lcut 0.18 -b 0.9 -alpha4 1. -p0 0.1 -vunity 0.01 ; cd ../; done"
+
+You have to set inverse temperature "beta", the number of frequency points that you trust to be well computed by "ctqmc". Usually somewhat smaller then the points sampled.
+
+The rest of the parameters are a bit more tricky. They need to be adjusted until the script finds a good fit to the ctqmc data.
+
+You can learn about the rest of the parameters by typing:
+
+>./ancont.py -h
+
+Then run
+>run.sh
+
+
+Monitor the following quantities on the screen:
+
+"chi2= 0.088320616846 chi3= 0.0111713171873 chi4= 0.000808916527416 chi5= 0 nrm= 2.05694452017"
+
+The important thing is that chi2 is small, smaller then unity. If it is not, analytic continuation is miserable, and parameters need to be changed.
+
+The low energy expansion of the self-energy might also be somewhat important.
+The line "der" shows you the current Taylor expansion of the self-energy.
+der= [0.90432140816249273, -1.0080726447504542, -0.0066679158801228045, -0.0066670747815080417, 0.075514334985171419, -0.77922179470511432]
+The line "exp" shows you the expected Taylor expansion, obtained from maginary axis data
+exp= [0.9046613300956925, -1.0216473508857853, 0.098478420359917343, -0.0066670806187933496, 0.075514297233971558, -0.77918665497398654]
+
+The most important are the first number and the forth number. They are the Real(Sigma(0)) and Im(Sigma(0)). The rest are derivatives of the same quantity. The higher order derivatives are not so good, but they are not very reliably determined anyway...
+
+When "ancont.py" succeeds, you can go into each subdirectory and plot "Siom.xx". Each iteration is saved with successive number xx.
+Plot all columns, and you will see how good is the fit of the ctqmc data on imaginary axis. Normally, human eyes should not see much difference between the fit and the data.
+Plot the self-energy on the real axis. It is stored in "Sres.xx"
+The final results is stored in "Sig.out".
+
+The real axis representation of the functions, which are used to fit self-energy, are stored in "bfunc.dat". If the fit fails, it is usualy because the low-energy function was not choosen properly. The low energy
+function is the last column of the "bfunc.dat" file. You might want to cut this function at lower frequency by reducing "vunity" or "p0" in the above "ancont.py" line.
+
+The final self-energy on real axis appears in "sig.out".
+
+The ultimate confidence in the reults can only be obtained once the spectral function is computed on the real axis, using the self-energy on the real axis.
+This spectral function should be compared to the maximum entropy method for the spectral function. If the two results are roughly compatible, one can trust results.
+
+

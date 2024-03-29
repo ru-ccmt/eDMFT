@@ -1,0 +1,175 @@
+!........1.........2.........3.........4.........5.........6.........7
+!234567890123456789012345678901234567890123456789012345678901234567890
+      SUBROUTINE PLANEW
+      use xa3
+      use opme
+      use struk
+      INCLUDE 'param.inc'                                              
+      IMPLICIT REAL*8 (A-H,O-Z)   
+      COMPLEX*16 CZERO,ITWOPI,IMAG
+      PARAMETER        (DTHREE = 3.0D+0) 
+      PARAMETER        (TWO    = 2.0D+0)
+      PARAMETER        (ONE    = 1.0D+0)
+      PARAMETER        (ZERO   = 0.0D+0)
+      PARAMETER        (CZERO  = (0.0D+0,0.0D+0))  
+
+!      COMPLEX*16       OPMATX,OPMATY,OPMATZ 
+      COMPLEX*16       PHS,PHA,SU,U 
+      CHARACTER*10     BNAME
+      LOGICAL          ORTHO
+
+!!_REAL      REAL*8             A
+!!_COMPLEX      COMPLEX*16          A
+
+!ad
+!      DIMENSION       SN(NUME,NMAT),dk_(NMAT)
+      real*8,allocatable::    dk_(:)
+      complex*16,allocatable::SN(:,:) 
+!ad
+!      COMMON /XA3/    A(NMAT,NUME)
+!      COMMON /STRUK/  POS(3,NDIF),AA,BB,CC,ALPHA(3),RMT(NATO),V(NATO), &
+!                      PIA(3),VOL,ZZ(NATO), &
+!                      IATNR(NATO),MULT(NATO),ISPLIT(NATO)
+      COMMON /ORTH/   ORTHO                
+      COMMON /GENER/  BR1(3,3),BR2(3,3)                                 
+      COMMON /COM/    EMIN,EMAX,ELECN,EULIMIT,EDLIMIT, &
+                      NK,IOUT,NSPIN,NAT,NBAND,ix,NB(NKPT),MINWAV,MAXWAV
+      COMMON /KPOI/   S,T,Z,NEMIN,NEMAX,KKZ,N,NNLO,BNAME                  
+      COMMON /UHELP/  UDUM(NRAD,6)                        
+      COMMON /XA/     R(NRAD),BK(3)
+!      COMMON /XA01/   SX(NUMEO),SY(NUMEO),SZ(NUMEO)
+      complex*16,allocatable::   SX(:),SY(:),SZ(:)
+!      COMMON /OPME/   OPMATX(NUMEO),OPMATY(NUMEO),OPMATZ(NUMEO)
+!
+      DATA            IMAG/(0.0D+0,1.0D+0)/
+      DATA            PI/3.141592653898D0/,TEST/1.D-12/
+      ITWOPI=TWO*PI*IMAG
+!---------------------------------------------------------------------
+!
+!...FOR SPHERES-IF VERCTORFILE ALLREADY READED !!
+!
+!ad   write(6,*)'palnew called'
+      allocate(SN(Nemin:nemax,N),dk_(N))
+      CALL CPUTIM(TTIME)
+      PWTM=TTIME
+!D      GOTO 3003
+!......with out lo's ????
+      NN=N-NNLO
+!.....CALCULATE NORMALISED INTERSTITIAL VOLUME .......................
+      VI=0
+      DO I=1,NAT
+       V(I)=4*PI*(RMT(I)**3)/3
+!SNI.............\/..................
+       VI=VI+V(I)*REAL(MULT(I)) 
+      END DO 
+      VI=VOL-VI
+!.....ADD K-POINT AND GIVE DIMENSION .......................
+      DO I=1,NN
+        BK(1)=(KX(I)+S)
+        BK(2)=(KY(I)+T)  
+        BK(3)=(KZ(I)+Z)
+      bkX(I)=BK(1)*BR1(1,1) + BK(2)*BR1(1,2) + BK(3)*BR1(1,3)
+      bkY(I)=BK(1)*BR1(2,1) + BK(2)*BR1(2,2) + BK(3)*BR1(2,3)
+      bkZ(I)=BK(1)*BR1(3,1) + BK(2)*BR1(3,2) + BK(3)*BR1(3,3)
+
+      END DO
+
+      MM=(NEMAX-NEMIN+1)*(NEMAX-NEMIN+2)/2
+      allocate(SX(mm),SY(mm),SZ(mm))
+!      IF (MM.GT.NUMEO) THEN 
+!                       WRITE(6,*) MM,'GREATER THAN NUMEO:(PW)',NUMEO 
+!                       STOP 'MM GREATER THAN NUMEO (PW)'
+!                       END IF
+
+!...... SLOPE OVER BANDCOMBINATIONS ..............................
+!
+      DO NBINDEX=1,mm
+          SX(NBINDEX)=CZERO
+          SY(NBINDEX)=CZERO
+          SZ(NBINDEX)=CZERO
+      END DO  
+      DO I=1,N
+        DO NB2=NEMIN,NEMAX 
+          SN(NB2,I)=CZERO
+        END DO
+      END DO
+          DO 229 I=1,NN 
+	do j = i+1, NN
+              DK=SQRT( (bkX(I)-bkX(J))*(bkX(I)-bkX(J)) &
+                     + (bkY(I)-bkY(J))*(bkY(I)-bkY(J)) &
+                     + (bkZ(I)-bkZ(J))*(bkZ(I)-bkZ(J)) )
+		dk_(j) = dk
+	end do
+            DO 339 J=I+1,NN         
+	DK = dk_(j)
+              U=CZERO 
+              INDATM=0
+              DO 150 JNEQ = 1, NAT 
+                PHS=CZERO
+                DO 170 JEQ = 1, MULT(JNEQ)
+                  INDATM = INDATM + 1     
+!............test for <ik> = <ki>* ........(change sign of arg !) ..
+                  ARGX = POS(1,INDATM)*(KX(I) - KX(J))
+                  ARGY = POS(2,INDATM)*(KY(I) - KY(J))
+                  ARGZ = POS(3,INDATM)*(KZ(I) - KZ(J)) 
+!                                         .......
+!SNI.........................generic
+                   PHA = EXP(ITWOPI*(ARGX+ARGY+ARGZ))
+!                                         ^^^^^^^
+                   PHS = PHS+PHA
+  170            CONTINUE     
+                X = DK * RMT(JNEQ)  
+                BESR = (SIN(X) - X*COS(X)) / (X*X*X)  
+                U = U + V(JNEQ)*PHS*BESR
+  150           CONTINUE 
+              DO NBI=NEMIN,NEMAX
+!_COMPLEX        SN(NBI,I) = SN(NBI,I) + conjg(A(J,NBI)) * U
+!_COMPLEX        SN(NBI,J) = SN(NBI,J) + conjg(A(I,NBI)) * CONJG(U)
+!_REAL           SN(NBI,I) = SN(NBI,I) + A(J,NBI) * U
+!_REAL           SN(NBI,J) = SN(NBI,J) + A(I,NBI) * CONJG(U)
+              END DO 
+  339   CONTINUE  
+  229 CONTINUE 
+      DO I=1,NN
+        NBINDEX=0
+        DO  NB1=NEMIN,NEMAX
+!          DO  NB2=NEMIN,NEMAX
+!..hermi
+          DO  NB2=nb1,NEMAX
+            NBINDEX=NBINDEX+1 
+!_COMPLEX            SU =(A(I,NB2))*(VI*conjg(A(I,NB1))-DTHREE*SN(NB1,I))
+!_REAL           SU=A(I,NB2)*(VI*A(I,NB1)-DTHREE*SN(NB1,I))  
+            SX(NBINDEX) = SX(NBINDEX) + bkX(I)*SU 
+            SY(NBINDEX) = SY(NBINDEX) + bkY(I)*SU
+            SZ(NBINDEX) = SZ(NBINDEX) + bkZ(I)*SU 
+            END DO
+          END DO
+      END DO
+      NBINDEX=0
+      DO  NB1=NEMIN,NEMAX
+!        DO  NB2=NEMIN,NEMAX
+!..hermi
+        DO  NB2=nb1,NEMAX
+          NBINDEX=NBINDEX+1 
+          OPMATX(NBINDEX)=OPMATX(NBINDEX)+SX(NBINDEX)*IMAG/VOL
+          OPMATY(NBINDEX)=OPMATY(NBINDEX)+SY(NBINDEX)*IMAG/VOL
+          OPMATZ(NBINDEX)=OPMATZ(NBINDEX)+SZ(NBINDEX)*IMAG/VOL   
+ 4445 format(2x,2I4,6E16.6)
+!     write(43,4445) NB1,NB2,SX(NBINDEX)*IMAG/VOL,
+!    & SY(NBINDEX)*IMAG/VOL,SZ(NBINDEX)*IMAG/VOL
+        END DO 
+      END DO
+ 3003 CONTINUE
+
+      CALL CPUTIM(TTIME)
+      PWTM=TTIME-PWTM
+!ad   WRITE(6,701) NEMIN,NEMAX,KKK,KKZ,S,T,Z,BNAME,PWTM   
+
+
+!..... GO FOR NEXT K-POINT .......................................
+!
+      deallocate(SN,dk_,sx,sy,sz)
+      RETURN
+  701 FORMAT('PW: NEMIN-MAX{',2I3,'} KP:',I3,'(',I3, &
+       ') PUNKT: [',3F7.4,'] NAME',a10,' CPUTIM :',F6.2)
+      END

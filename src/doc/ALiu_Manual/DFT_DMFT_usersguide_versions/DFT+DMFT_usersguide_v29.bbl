@@ -1,0 +1,41 @@
+\begin{thebibliography}{4}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Blaha et~al.(2001)Blaha, Schwarz, and Madsen]{Blaha2001}
+P~Blaha, K~Schwarz, and GKH Madsen.
+\newblock {WIEN2K, An Augmented Plane Wave+ Local Orbitals Program for
+  Calculating Crystal Properties (TU Wien, Austria, 2001)}.
+\newblock \emph{ISBN 3-9501031-1-2}, page 2001, 2001.
+\newblock ISSN 39501311.
+\newblock \doi{citeulike-article-id:6205108}.
+
+\bibitem[Haule et~al.(2010)Haule, Yee, and Kim]{Haule2010}
+Kristjan Haule, Chuck-Hou Yee, and Kyoo Kim.
+\newblock {Dynamical mean-field theory within the full-potential methods:
+  Electronic structure of CeIrIn\_\{5\} , CeCoIn\_\{5\} , and CeRhIn\_\{5\}},
+  2010.
+\newblock ISSN 1098-0121.
+
+\bibitem[Kotliar et~al.(2006)Kotliar, Savrasov, Haule, Oudovenko, Parcollet,
+  and Marianetti]{Kotliar2006}
+G~Kotliar, S~Y Savrasov, K~Haule, V~S Oudovenko, O~Parcollet, and C~A
+  Marianetti.
+\newblock {Electronic structure calculations with dynamical mean-field theory}.
+\newblock \emph{Rev. Mod. Phys.}, 78:\penalty0 865--951, 2006.
+\newblock ISSN 0034-6861.
+\newblock \doi{10.1103/RevModPhys.78.865}.
+
+\bibitem[Kotliar and Vollhardt(2004)]{Kotliar2004}
+Gabriel Kotliar and Dieter Vollhardt.
+\newblock {Strongly Correlated Materials: Insights From Dynamical Mean-Field
+  Theory}.
+\newblock \emph{Physics Today}, 57:\penalty0 53, 2004.
+\newblock ISSN 00319228.
+\newblock \doi{10.1063/1.1712502}.
+\newblock URL \url{http://link.aip.org/link/PHTOAD/v57/i3/p53/s1\&Agg=doi}.
+
+\end{thebibliography}
