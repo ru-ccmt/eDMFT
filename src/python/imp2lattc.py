@@ -1,5 +1,6 @@
 from numpy import *
 from itertools import chain
+import sys
 
 def SimplifySiginds(siginds):
     """Takes dictionary of Sigind's and creates list of non-zero values

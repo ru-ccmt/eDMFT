@@ -162,8 +162,8 @@ def cmp_sigind_legend(qsplit, L, nsites, nspins):
     legend_base = legend_table[qsplit][L].split() # ['eg','t2g']
     sigind_one  = func(sigind_base, nspins)       #
     sigind_one_unique = list(set(sigind_one)-{0})
-    print('sigind_base=', sigind_base, 'sigind_base_unique=', sigind_base_unique, 'legend_base=', legend_base, 'nspins=', nspins)
-    print('sigind_one=', sigind_one, 'sigind_one_unique=', sigind_one_unique)
+    #print('sigind_base=', sigind_base, 'sigind_base_unique=', sigind_base_unique, 'legend_base=', legend_base, 'nspins=', nspins)
+    #print('sigind_one=', sigind_one, 'sigind_one_unique=', sigind_one_unique)
     legend_one  = func(sigind_base_unique, nspins, legend_base)
     #print('legend_one=', legend_one)
     sigind = diag(dup_shift(sigind_one, nsites))

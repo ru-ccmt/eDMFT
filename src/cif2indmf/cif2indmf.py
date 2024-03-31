@@ -31,7 +31,7 @@ sym_elements={'H': ['D','T'], 'D': ['H','T'], 'T': ['H','D'],
 
 cor_elements={3:["V","Cr","Mn","Fe","Co","Ni","Cu"],
               4:["Nb","Mo","Tc","Ru","Rh","Pd"],
-              5:["W","Re","Os","Ir","Pt"],
+              5:["Ta","W","Re","Os","Ir","Pt"],
               6:["Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu"],
               7:["Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr"]}
 Us={3: 10., 4: 8.0, 5: 7.0, 6: 6.0, 7: 5.5}
@@ -107,7 +107,7 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
     print('Analizing', strc.aname[jatom], 'at', strc.pos[first_atom[jatom]], 'with N=', n, file=log)
     return FindCageBasis(neighbrs, matrix_w2k, log)
 
-def Cif2Indmf(fcif, Nkp=300, writek=True, logfile='cif2struct.log'):
+def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, DC='exacty', onreal=False, fixmu=False, beta=50, QMC_M=5e6, CoulombU=None, CoulombJ=None, qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log'):
     case = os.path.splitext(fcif)[0] # get case
     
     (strc, lat) = Cif2Struct(fcif, Nkp, writek, logfile, cmp_neighbors=True)
@@ -134,6 +134,7 @@ def Cif2Indmf(fcif, Nkp=300, writek=True, logfile='cif2struct.log'):
     acor=[]
     cor_type={}
     for k in cor_elements:
+        if k not in input_cor: continue
         acor.extend(cor_elements[k])
         for el in cor_elements[k]:
             cor_type[el]=k
@@ -158,7 +159,7 @@ def Cif2Indmf(fcif, Nkp=300, writek=True, logfile='cif2struct.log'):
         locrot_shift = 0 if (R is None or allclose(R, identity(3))) else -1
         
         L = 2 if cor_type[el]<6 else 3
-        qsplit=2 # for now hard-code this qsplit withouth SO
+        #qsplit=2 # for now hard-code this qsplit withouth SO
         iatom0 = first_atom[jatom]
         grp=[]
         for i in range(strc.mult[jatom]):
@@ -186,29 +187,33 @@ def Cif2Indmf(fcif, Nkp=300, writek=True, logfile='cif2struct.log'):
             for i in range(3): print( ('{:12.8f} '*3).format(*Rv[i,:]), file=log)
             print(file=log)
 
-    head_vars={'hybr_emin':-10., 'hybr_emax':10., 'projector':5, 'matsubara':1, 'broadc':0.025, 'broadnc':0.025, 
+    matsubara = 0 if onreal else 1
+    recomputeEF = 0 if fixmu else 1
+    
+    head_vars={'hybr_emin':-10., 'hybr_emax':10., 'projector':5, 'matsubara':matsubara, 'broadc':0.025, 'broadnc':0.025, 
                 'om_npts':200, 'om_emin':-3, 'om_emax':1}
 
     indmf = Indmf(case)
     indmf.Initialize_From_Dict(cix, atoms, cixgrp, head_vars)
     indmf.write()
-    indmfl = CreateIndmflFromIndmf(indmf, options_so=False, cmpProjector=False, log=log)
+    indmfl = CreateIndmflFromIndmf(indmf, options_so=so, cmpProjector=False, log=log)
     #print(indmfl)
     indmfl.write()
 
     indmfi = Indmfi(indmfl)
     indmfi.write()
 
+    
     params={}
     params['solver']= ('CTQMC', '# impurity solver')
-    params['DCs']= ('exacty', '# double counting scheme')
+    params['DCs']= (DC, '# double counting scheme')
     params['max_dmft_iterations'] = (1,   '# number of iteration of the dmft-loop only')
     params['max_lda_iterations']  = (100, '# number of iteration of the LDA-loop only')
     params['finish']              = (50,  '# number of iterations of full charge loop (1 = no charge self-consistency')
     params['ntail']               = (300, '# on imaginary axis, number of points in the tail of the logarithmic mesh')
-    params['cc']                  = (5e-5,'# the charge density precision to stop the LDA+DMFT run')
-    params['ec']                  = (5e-5,'# the energy precision to stop the LDA+DMFT run')
-    params['recomputeEF']         = (1,   '# Recompute EF in dmft2 step. If recomputeEF = 2, it tries to find an insulating gap.')
+    params['cc']                  = (1e-5,'# the charge density precision to stop the LDA+DMFT run')
+    params['ec']                  = (1e-5,'# the energy precision to stop the LDA+DMFT run')
+    params['recomputeEF']         = (recomputeEF,   '# Recompute EF in dmft2 step. If recomputeEF = 2, it tries to find an insulating gap.')
     with open('params.dat','w') as f:
         for k,val in params.items():
             if type(val[0])==str:
@@ -220,6 +225,9 @@ def Cif2Indmf(fcif, Nkp=300, writek=True, logfile='cif2struct.log'):
         for i,jatom in enumerate(cixgrp):
             el = Element_name(strc.aname[jatom])
             typ = cor_type[el]
+
+            UCoulomb = Us[typ] if CoulombU is None else CoulombU
+            JCoulomb = Js[typ] if CoulombJ is None else CoulombJ
             # determining starting nf0 from the oxidation state and atomic configuration
             nf0 = 0
             elem = Element(el)
@@ -231,18 +239,18 @@ def Cif2Indmf(fcif, Nkp=300, writek=True, logfile='cif2struct.log'):
                     nf0 = r[2] - strc.oxi_state[jatom]
                     break
             print('nf0['+el+']=',nf0,' atomic configuration=',nf_conf,' oxidation=', nf_oxi, file=log)
-            iparams={"exe"                : ["ctqmc"            , "# Name of the executable"],
-                     "U"                  : [Us[typ]              , "# Coulomb repulsion (F0) for "+el],
-                     "J"                  : [Js[typ]              , "# Hunds coupling  (J) for "+el],
+            iparams={"exe"                : ["ctqmc"             , "# Name of the executable"],
+                     "U"                  : [UCoulomb             , "# Coulomb repulsion (F0) for "+el],
+                     "J"                  : [JCoulomb             , "# Hunds coupling  (J) for "+el],
                      "CoulombF"           : ["'Ising'"            , "# Can be set to Full"],
-                     "beta"               : [50                   , "# Inverse temperature"],
+                     "beta"               : [beta                 , "# Inverse temperature"],
                      "svd_lmax"           : [30                   , "# We will use SVD basis to expand G, with this cutoff"],
-                     "M"                  : [5e6                  , "# Total number of Monte Carlo steps"],
+                     "M"                  : [int(QMC_M)           , "# Total number of Monte Carlo steps"],
                      "mode"               : ["SH"                 , "# We will use self-energy sampling, and Hubbard I tail"],
-                     "nom"                : [300                  , "# Number of Matsubara frequency points sampled"],
-                     "tsample"            : [200                  , "# How often to record measurements"],
+                     "nom"                : [200                  , "# Number of Matsubara frequency points sampled"],
+                     "tsample"            : [400                  , "# How often to record measurements"],
                      "GlobalFlip"         : [1000000              , "# How often to try a global flip"],
-                     "warmup"             : [3e5                  , "# Warmup number of QMC steps"],
+                     "warmup"             : [int(3e5)             , "# Warmup number of QMC steps"],
                      "nf0"                : [nf0                  , "# Nominal occupancy nd for double-counting"],
                      }
             print(file=f)
@@ -255,8 +263,19 @@ def Cif2Indmf(fcif, Nkp=300, writek=True, logfile='cif2struct.log'):
                     print('     {:20s}: [{:15s},'.format('"'+k+'"',str(val[0])), '"'+val[1]+'"],', file=f)
             print('}',file=f)
     
+def expand_intlist(input):
+    '''Expand out any ranges in user input of integer lists.
+    Example: input  = "1,2,4-6"
+             output = [1, 2, 4, 5, 6]'''
+    from functools import reduce
+    import operator
+    def parse1(x):
+        y = x.split('-')
+        return [int(x)] if len(y) == 1 else list(range(int(y[0]), int(y[1])+1))
+    return reduce(operator.add, [parse1(x) for x in input.split(',')])
+
 if __name__ == '__main__':
-    usage = """usage: %cif2indmfl.py [ options ] filename.cif
+    usage = """usage: %cif2indmf.py [ options ] filename.cif
 
     Converts cif file (Crystallographic Information File) to input files for eDMFT calculation, 
     case.struct, case.indmfl and case.indmfi. It can also produce high symmetry 
@@ -264,15 +283,33 @@ if __name__ == '__main__':
     """
     parser = optparse.OptionParser(usage)
     parser.add_option('-w', '--writek',  dest='wkp', action='store_true', default=False, help="weather to write case.klist_band high symmetry k-path (default False)")
-    parser.add_option('-N', '--Nkp',     dest='Nkp', type='int', default=300, help="number of k-points along the high symmetry path")
-    parser.add_option('-l', '--log',     dest='log', type='str', default='cif2struct.log', help="info file")
+    parser.add_option('-s', '--so',      dest='so',  action='store_true', default=False, help="is this with spin-orbit or not (default False)")
+    parser.add_option('-r', '--real',    dest='real',action='store_true', default=False, help="real axis sets matsubara to 0 in indmffile (default False)")
+    parser.add_option('-f', '--fix',     dest='fixmu',action='store_true', default=False, help="fix the chemical potential for Mott insulators (default False)")
+    
+    parser.add_option('-N', '--Nkp',     dest='Nkp', type='int', default=300, help="number of k-points along the high symmetry path (default 300)")
+    parser.add_option('-l', '--log',     dest='log', type='str', default='cif2struct.log', help="info file (default cif2struct.log)")
+    parser.add_option('-c', '--cor',     dest='cor', type='str', default='all', help="which atom types are correlated. all or 3,4 or 3-5 or 6-7 (default all)")
+    parser.add_option('-d', '--dc',      dest='DC',  type='str', default='exacty', help="The type of double-counting: exact, exacty, exactd, nominal (default exacty)")
+    parser.add_option('-U', '--U',       dest='CoulombU', type=float, default=None, help="Coulomb U if we want to set it through input (default None, set inside for each type)")
+    parser.add_option('-J', '--J',       dest='CoulombJ', type=float, default=None, help="Coulomb J if we want to set it through input (default None, set inside for each type)")
+    parser.add_option('-b', '--beta',    dest='beta',  type=float, default=50, help="inverse temperature (default 50/eV->232K)")
+    parser.add_option('-M', '--QMC_M',   dest='QMC_M', type=float, default=5e6, help="Number of MC steps per core (default = 5M)")
+    parser.add_option('-q', '--qsplit',  dest='qsplit', type=int, default=2, help="qsplit (default = 2)")
+    
+    
+    
     # Next, parse the arguments
     (options, args) = parser.parse_args()
     if len(args)!=1:
         print('Need exactly one argument: the name of cif file')
         sys.exit(1)
     fcif = args[0]
-
-    Cif2Indmf(fcif, Nkp=options.Nkp, writek=options.wkp, logfile=options.log)
+    if options.cor=='all':
+        cor=[3,4,5,6,7]
+    else:
+        cor = expand_intlist(options.cor)
     
+    Cif2Indmf(fcif, cor, options.so, options.DC, options.real, options.fixmu, options.beta, options.QMC_M, options.CoulombU, options.CoulombJ,
+                  options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log)
 

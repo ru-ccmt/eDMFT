@@ -71,7 +71,9 @@ if __name__ == '__main__':
                 cstr = str(isrt)
             for line in lines:
                 if line[:8]==':QTL'+cstr+':':
-                    ni = float(line.split()[1+l]) # correlated occupancy
+                    #ni = float(line.split()[1+l]) # correlated occupancy
+                    nn = [float(line[8+7*i:8+7*(i+1)]) for i in range(4)]
+                    ni = nn[l]
                     #nf0 = round(ni)
                     break
             ni_cix[icix]=ni
