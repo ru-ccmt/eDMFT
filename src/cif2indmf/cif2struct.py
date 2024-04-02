@@ -840,6 +840,8 @@ class CifParser_W2k:
                     grp.append([ii])
                 #print(spec+' grp=', grp)
             groups.append(grp)  # all groups for this element
+
+        #print('groups=', groups)
         # Since groups is only index array to coord_by_element, we will rather create a dictionary self.w2k_coords={},
         # which is easier to use. The keys will be name of the site, which might need to be modified when
         # multiple inequivalent sites have the same name.
@@ -895,16 +897,22 @@ class CifParser_W2k:
                         self.Z_element[_spec_] = self.Z_element[spec]
                     cname[icif] = _spec_
                     #print(spec, 'grp=', gr, 'icif=', icif)
-            #print(groups_resort)
+
+            # This is needed because cif file can have site-occupancies=0.5, in which case structure has smaller number of sites that cif-file
+            #groups_resort = [x for x in groups_resort if x]
+            #print('groups_resort=', groups_resort)
+            
             first_sites_index=[]
             self.w2k_coords={}
             for ii,group in enumerate(groups_resort):
+                if len(group)==0: continue
                 psite = self.structure.sites[group[0]]
                 self.w2k_coords[cname[ii]] = [self.structure.sites[j].frac_coords for j in group]
                 first_sites_index.append( group[0] )
                 #print(cname[ii], coords, psite.label, self.cname[ii], psite.species, psite.species_string)
                 #self.Z_element[cname[ii]] = psite.specie.Z
-
+            #print('w2k_coord=', self.w2k_coords)
+            
         if not ResortToCif:
             self.w2k_coords={}
             for idx,spec in enumerate(indx_by_element): # over all coordinates from pymatgen.structure
@@ -936,7 +944,6 @@ class CifParser_W2k:
             #for site in self.structure:
             #    for specie, amt in site.species.items():
             #        print(specie, amt, (getattr(specie, "oxi_state", 0) or 0) )
-
             #print('first_sites_index=', first_sites_index)
             #print('first_sites=', first_sites)
             center_indices, points_indices, offsets, distances = self.structure.get_neighbor_list(r=4.0, sites=first_sites, numerical_tol=1e-4)
@@ -947,7 +954,10 @@ class CifParser_W2k:
                 t=self.structure.sites[i]
                 coord = t.frac_coords @ self.structure.lattice.matrix
                 #print('coords=', coord)
-                oxi_st = int(getattr(t.specie, "oxi_state", 0) or 0)
+                try:
+                    oxi_st = int(getattr(t.specie, "oxi_state", 0) or 0)
+                except:
+                    oxi_st=0
                 self.oxi_state[jatom]=oxi_st
                 print('ATOM: {:3d} {:3s} AT {:9.5f} {:9.5f} {:9.5f}={:9.5f} {:9.5f} {:9.5f}'.format(jatom+1,self.structure.sites[i].species_string,*t.coords,*t.frac_coords),file=log)
                 mask = center_indices==jatom
@@ -979,7 +989,11 @@ class CifParser_W2k:
                     if distances_[j]>1e-5:
                         nn = points_indices_[j]
                         r = self.structure.sites[nn]
-                        oxidation = int(getattr(r.specie, "oxi_state", 0) or 0)
+                        try:
+                            oxidation = int(getattr(r.specie, "oxi_state", 0) or 0)
+                        except:
+                            oxidation=0
+                        #print('r=', r, 'oxydation=', oxidation)
                         Rj_fract = r.frac_coords + offsets_[j]
                         dRj_fract = Rj_fract - t.frac_coords
                         #Rj = Rj_fract @ self.structure.lattice.matrix
