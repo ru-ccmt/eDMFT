@@ -105,11 +105,13 @@ if __name__=='__main__':
     env = utils.W2kEnvironment()
     case = env.case
 
-    print('case=%s, nom=%s, ntail=%s, insig=%s, outsig=%s' %  (case, options.nom, options.ntail, options.insig, options.outsig+'[1-n]'))
+    print('case=%s, nom=%s, ntail=%s, insig=%s, outsig=%s, extn=%s' %  (case, options.nom, options.ntail, options.insig, options.outsig+'[1-n]', options.m_extn))
 
     inl = indmffile.Indmfl(case, 'indmfl'+options.m_extn)
     inl.read()
 
+    #print('inl=', inl)
+    
     # Searching for s_oo and Edc
     (s_oo, Edc) = Find_s_oo_and_Edc(options.insig)
     

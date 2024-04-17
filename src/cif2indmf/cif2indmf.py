@@ -43,6 +43,18 @@ def Element_name(name):
     else:
         return name[:1]
 
+def Compare_neigbors(dRj,dRs,log):
+    N = len(dRj)
+    if len(dRs)!=N:
+        return False
+    for i in range(N):
+        diff = sum(abs(dRs-dRj[i]),axis=1)
+        iwhich = argmin(diff)
+        print('atom['+str(iwhich)+'] -> atom['+str(i)+'] with accuracy=', diff[iwhich], file=log)
+        if diff[iwhich]>1e-7:
+            return False
+    return True
+        
 def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
     """This function decides how many available neighbors in strc.neighbrs[jatom]
        will be taken to try and construct a polyhedra out of vertices.
@@ -79,9 +91,10 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
                     break
                 n+=1
             neighbrs = strc.neighbrs[jatom][:n]
+        n_str=0
     else: # n==1
         #print('electronegativity=',strc.neighbrs[jatom][0][3])
-        if strc.neighbrs[jatom][0][3]>0:
+        if strc.neighbrs[jatom][0][3]>=0:
             print('WARNING: At analizing', strc.aname[jatom], 'at', '[{:5.3f},{:5.3f},{:5.3f}]'.format(*strc.pos[first_atom[jatom]]),
                       'we disregard the first neighbor {:s} at [{:5.3f},{:5.3f},{:5.3f}]'.format(strc.neighbrs[jatom][0][1],*strc.neighbrs[jatom][0][2]), file=log)
             name0 = Element_name(strc.neighbrs[jatom][1][1])
@@ -93,6 +106,7 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
                     break
                 n+=1
             neighbrs = strc.neighbrs[jatom][1:n+1] # here we drop the first atom and take only the next shell.
+            n_str=1
         else:
             print('WARN: Only one atom appears to be valid neighbor', file=log)
             
@@ -103,14 +117,22 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
                     break
                 n+=1
             neighbrs = strc.neighbrs[jatom][:n]
-            
-    print('Analizing', strc.aname[jatom], 'at', strc.pos[first_atom[jatom]], 'with N=', n, file=log)
-    return FindCageBasis(neighbrs, matrix_w2k, log)
-
-def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, DC='exacty', onreal=False, fixmu=False, beta=50, QMC_M=5e6, CoulombU=None, CoulombJ=None, qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log'):
-    case = os.path.splitext(fcif)[0] # get case
+            n_str=0
     
-    (strc, lat) = Cif2Struct(fcif, Nkp, writek, logfile, cmp_neighbors=True)
+    print('Analizing', strc.aname[jatom], 'at', strc.pos[first_atom[jatom]], 'with N=', n, file=log)
+    R, N = FindCageBasis(neighbrs, matrix_w2k, log)
+    if R is not None:
+        return R, (n_str,n_str+N)
+    else:
+        return identity(3), (n_str,n_str+1)
+    
+
+def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty', onreal=False,
+              fixmu=False,beta=50, QMC_M=5e6, CoulombU=None, CoulombJ=None,
+              qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log'):
+    case = os.path.splitext(fcif)[0] # get case
+
+    (strc, lat) = Cif2Struct(fcif, Nkp, writek, Qmagnetic, logfile, cmp_neighbors=True)
 
     log = open(logfile, 'a')
 
@@ -142,20 +164,66 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, DC='exacty', onreal=False, 
     first_atom = zeros(len(strc.mult),dtype=int)
     for jatom in range(len(strc.mult)-1):
         first_atom[jatom+1] = first_atom[jatom] + strc.mult[jatom]
-    
+    type_jatom=[]
+    for jatom in range(strc.nat):
+        type_jatom += [jatom]*strc.mult[jatom]
+    #type_atom = {}
+    #for i in range(len(first_atom)):
+    #    type_atom[first_atom[i]]=i
+        
     to_frac = linalg.inv(matrix_w2k)
     vesta_vs_w2k = to_frac @ matrix_vesta
     icix=1
     cixgrp={}
     cix={}
     atoms={}
+    Rj = {}
+    Nj = {}
     for jatom in range(strc.nat):
         el = Element_name(strc.aname[jatom])
         if el not in acor: continue
-        #if cor_type[el] != 3: continue
+        if Qmagnetic:
+            Found_equivalent=False
+            # check if this atom is related by moment-flipped from another atom
+            if first_atom[jatom] in strc.flipped:
+                similar = type_jatom[strc.flipped[first_atom[jatom]]]
+                if similar in Rj:
+                    nnn = Nj[similar] # how many neigbors should we look at?
+                    dRj = array([strc.neighbrs[jatom][i][2] for i in range(nnn[0],nnn[1])])   # this atom neigbors
+                    dRs = array([strc.neighbrs[similar][i][2] for i in range(nnn[0],nnn[1])]) # similar atom's neighbors, which was already processed
+                    print('We are trying to use transformed local axis of',strc.aname[similar], 'for atom', strc.aname[jatom], file=log)
+                    print('positions of neigbors around', strc.aname[similar], 'which we are checking:', file=log)
+                    for j in range(len(dRs)):
+                        print('    [{:10.6f},{:10.6f},{:10.6f}]'.format(*dRs[j,:]), file=log)
+                    
+                    Found_Rotation=False
+                    aRx = strc.rotation_flipped[first_atom[jatom]]
+                    for ir,Rx in enumerate(aRx):
+                        dRjn = dRj @ Rx.T
+                        print('using rotation:',file=log)
+                        for ij in range(3):
+                            print('    [{:2d},{:2d},{:2d}]'.format(*Rx[ij,:]), file=log)
+                        print('transformed positions of neigbors around', strc.aname[jatom], 'which we are checking:', file=log)
+                        for j in range(len(dRjn)):
+                            print('    [{:10.6f},{:10.6f},{:10.6f}]'.format(*dRjn[j,:]), file=log)
+                        
+                        Found_Rotation = Compare_neigbors(dRjn,dRs,log)
+                        print('Works=', Found_Rotation, file=log)
+                        if Found_Rotation:
+                            break
+                    if Found_Rotation:
+                        Rt = linalg.inv(Rx)
+                        R = Rj[similar] @ Rt.T
+                        Found_equivalent=True
+                        print('Accepting above transformation to transform local axis of '+strc.aname[similar]+' to axis of',
+                                  strc.aname[jatom]+' at ',strc.pos[first_atom[jatom]],file=log)
+            if not Found_equivalent:
+                R, nnn = SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log)
+        else:
+            R, nnn = SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log)
         
-        R = SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log)
-
+        Rj[jatom] = R
+        Nj[jatom] = nnn
         locrot_shift = 0 if (R is None or allclose(R, identity(3))) else -1
         
         L = 2 if cor_type[el]<6 else 3
@@ -200,10 +268,94 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, DC='exacty', onreal=False, 
     #print(indmfl)
     indmfl.write()
 
-    indmfi = Indmfi(indmfl)
-    indmfi.write()
+    if Qmagnetic:
+        # When moments are canted, it can happen that m1 is mostly opposite to m2 and m2 is mostly opposite to m3,
+        # but m1 and m3 appear as quite far away from parallel. In this case we correct the flipping
+        # so that m1 and m3 are treated as parallel.
+        print('before checking for canted moments type_jatom=', type_jatom, file=log)
+        for i1 in strc.flipped:
+            for i2 in strc.flipped:
+                    j1 = strc.flipped[i1]
+                    j2 = strc.flipped[i2]
+                    if j1==j2 and type_jatom[i1]!=type_jatom[i2]:
+                        print('i1=', i1, 'i2=', i2, 'j1=', j1, 'j2=', j2, 'type_jatom[i1]=', type_jatom[i1], 'type_jatom[i2]=', type_jatom[i2], file=log)
+                        type_jatom[i1]=type_jatom[i2] = min(type_jatom[i1],type_jatom[i2])
+                    if j1 in strc.flipped:
+                        k1 = strc.flipped[j1]
+                        if type_jatom[i1]!=type_jatom[k1]:
+                            type_jatom[i1]=type_jatom[k1]=min(type_jatom[i1],type_jatom[k1])
+                    if j2 in strc.flipped:    
+                            k2 = strc.flipped[j2]
+                            if type_jatom[i2]!=type_jatom[k2]:
+                                type_jatom[i2]=type_jatom[k2]=min(type_jatom[i2],type_jatom[k2])
 
-    
+        print('after checking for canted moments type_jatom=', type_jatom, file=log)
+        # With flipped we connected the first atom in supergroup paramegntic structure with all other atoms split into
+        # ups and downs in magnetic structure. However, here we want to connect one on one atoms with up and down spins
+        # For example, we would have up=[1,2] and down=[3,4], which might show flipped[3]=1 and flipped[4]=1
+        # But we would like to have flipped[3]=1 and flipped[4]=2
+        remain=[]        
+        cix2atom={}
+        atom2cix={}
+        for icix in indmfl.cix:
+            (iatom,L,qsplit) = indmfl.cix[icix][0]
+            cix2atom[icix]=iatom
+            atom2cix[iatom]=icix
+            remain.append(iatom-1)
+            
+        print('cix2atom=', cix2atom, file=log)
+        print('remain=', remain, file=log)
+
+        # finally go our indmfl file and flip the needed siginds
+        indmfldn = indmfl.copy()
+        for iatm in strc.flipped:
+            if iatm not in remain: continue
+            remain.remove(iatm)
+            jatm = strc.flipped[iatm]
+            #print('start with iatm=', iatm, 'jatm=', jatm)
+            found=True
+            if jatm not in remain:
+                jatm_type = type_jatom[jatm]
+                found=False
+                for jat in remain:
+                    if type_jatom[jat]==jatm_type:
+                        found=True
+                        break
+                if found:
+                    jatm = jat
+            #print('continue with iatm=', iatm, 'jatm=', jatm, 'found=', found)
+            if found:
+                icix1 = atom2cix[iatm+1]
+                icix2 = atom2cix[jatm+1]
+                remain.remove(jatm)
+                print('flipping[atom='+str(iatm+1)+',icix='+str(icix1)+']=atom='+str(jatm+1)+',icix='+str(icix2), file=log)
+                indmfldn.siginds[icix1], indmfldn.siginds[icix2] = indmfl.siginds[icix2], indmfl.siginds[icix1]
+
+        print('remain at the end=', remain, file=log)
+        if remain:
+            # for those atoms that are not flipped, we need to treat them as different, i.e., different impurity problem
+            last_entry_up = max([max(indmfl.siginds[icix].ravel()) for icix in indmfl.cix])
+            min_in_remain = min([list(set(indmfldn.siginds[atom2cix[iatm+1]].ravel()))[1] for iatm in remain])
+            index_shift = last_entry_up +1 - min_in_remain
+            for iatm in remain:
+                icix = atom2cix[iatm+1]
+                indmfldn.siginds[icix] = copy(indmfl.siginds[icix])
+                n = len(indmfldn.siginds[icix])
+                for i in range(n):
+                    for j in range(n):
+                        if indmfldn.siginds[icix][i,j]!=0:
+                            indmfldn.siginds[icix][i,j] += index_shift
+                #print('indmfl.siginds[icix]=  ', indmfl.siginds[icix], file=log)
+                #print('indmfldn.siginds[icix]=', indmfldn.siginds[icix], file=log)
+        indmfldn.write(filename=case+'.indmfldn')
+        indmfi = Indmfi(indmfl, indmfldn)
+        indmfi.write()
+    else:
+        indmfi = Indmfi(indmfl)
+        indmfi.write()
+
+    #print('cixgrp=', cixgrp)
+    #print('cix2atom=', indmfi.cix2atom)
     params={}
     params['solver']= ('CTQMC', '# impurity solver')
     params['DCs']= (DC, '# double counting scheme')
@@ -222,7 +374,13 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, DC='exacty', onreal=False, 
                 print('{:20s}={:15s}'.format(k,str(val[0])), val[1], file=f)
         
         iparams={}
-        for i,jatom in enumerate(cixgrp):
+        i_i=0
+        #for i,jatom in enumerate(cixgrp):
+        for icx,latom in indmfi.cix2atom.items():
+            jatom = type_jatom[latom-1]
+            #if Qmagnetic and i%2==1:
+            #    continue  # only every second impurity problem is needed.
+                
             el = Element_name(strc.aname[jatom])
             typ = cor_type[el]
 
@@ -254,14 +412,15 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, DC='exacty', onreal=False, 
                      "nf0"                : [nf0                  , "# Nominal occupancy nd for double-counting"],
                      }
             print(file=f)
-            print('# Impurity problem number '+str(i),file=f)
-            print('iparams'+str(i)+'={',file=f)
+            print('# Impurity problem number '+str(i_i),file=f)
+            print('iparams'+str(i_i)+'={',file=f)
             for k,val in iparams.items():
                 if type(val[0])==str:
                     print('     {:20s}: [{:15s},'.format('"'+k+'"','"'+str(val[0])+'"'), '"'+val[1]+'"],', file=f)
                 else:
                     print('     {:20s}: [{:15s},'.format('"'+k+'"',str(val[0])), '"'+val[1]+'"],', file=f)
             print('}',file=f)
+            i_i += 1
     
 def expand_intlist(input):
     '''Expand out any ranges in user input of integer lists.
@@ -296,8 +455,7 @@ if __name__ == '__main__':
     parser.add_option('-b', '--beta',    dest='beta',  type=float, default=50, help="inverse temperature (default 50/eV->232K)")
     parser.add_option('-M', '--QMC_M',   dest='QMC_M', type=float, default=5e6, help="Number of MC steps per core (default = 5M)")
     parser.add_option('-q', '--qsplit',  dest='qsplit', type=int, default=2, help="qsplit (default = 2)")
-    
-    
+    parser.add_option('-m', '--magnet',  dest='Qmagnetic', action='store_true', default=False, help="should produce magnetic dft struct that allows broken symmetry from mcif")
     
     # Next, parse the arguments
     (options, args) = parser.parse_args()
@@ -310,6 +468,6 @@ if __name__ == '__main__':
     else:
         cor = expand_intlist(options.cor)
     
-    Cif2Indmf(fcif, cor, options.so, options.DC, options.real, options.fixmu, options.beta, options.QMC_M, options.CoulombU, options.CoulombJ,
+    Cif2Indmf(fcif, cor, options.so, options.Qmagnetic, options.DC, options.real, options.fixmu, options.beta, options.QMC_M, options.CoulombU, options.CoulombJ,
                   options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log)
 

@@ -71,14 +71,14 @@ class WStruct:
                           [-self.b*sin_alpha*cos_gamma,self.b*sin_alpha*sin_gamma,self.b*cos_alpha],
                           [0, 0, self.c]])
         
-    def ScanCif(self, filein, log=sys.stdout, writek=False, cmp_neighbors=False):
+    def ScanCif(self, filein, log=sys.stdout, writek=False, Qmagnetic=True, cmp_neighbors=False):
         """ Here is the majority of the algorithm to convert cif2struct.
         We start by allocating CifParser_W2k, which reads cif using paymatgen, and 
         extracts necessary information.
         Below we than arrange this information in the way W2k needs it in struct file.
         
         """
-        cif = CifParser_W2k(filein, log, cmp_neighbors)
+        cif = CifParser_W2k(filein, log, Qmagnetic, cmp_neighbors)
         
         nsym = len(cif.parser.symmetry_operations)
         self.timat = zeros((nsym,3,3),dtype=int)
@@ -98,7 +98,6 @@ class WStruct:
                     if max(gl)<2:
                         glide_plane = gl
         print('Final glide_plane for CXY/CXZ/CYZ lattice=', glide_plane, file=log)
-        
         
         self.sgnum = int(cif.sgnum)
         self.sgname = re.sub(r'\s+', '', cif.sgname, flags=re.UNICODE)
@@ -122,6 +121,15 @@ class WStruct:
             sga = SpacegroupAnalyzer(cif.structure)
             primitive = sga.get_primitive_standard_structure()
             kpath = HighSymmKpath(primitive)
+            #
+            #strc1 = cif.structure.copy()
+            #print('strc1=', strc1)
+            #strc1.remove_site_property("magmom")
+            #print('strc2=', strc1)
+            #primitive = strc1.to_primitive()
+            #print('strc1=', primitive)
+            #kpath = HighSymmKpath(primitive)
+            #
             self.kpath = kpath._kpath['kpoints']
             
         for i,spec in enumerate(cif.w2k_coords):
@@ -233,7 +241,8 @@ class WStruct:
 
         # Remove atoms that don't belong into primitive unit cell, as per w2k requirement
         if self.lattyp in ['B', 'F', 'CXY', 'CXZ', 'CYZ']:
-            ll = 0
+            i_w2k = 0
+            indx_kept=[]
             the_same = TheSame(self.lattyp)
             for spec in cif.w2k_coords:
                 all_coords = cif.w2k_coords[spec]
@@ -242,6 +251,8 @@ class WStruct:
                 #for i in range(len(the_same.tv)):
                 #    print(i, the_same.tv[i])
                 kept = [0]
+                indx_kept.append(i_w2k)
+                i_w2k += 1
                 for i in range(1,len(all_coords)):
                     Qunique = True
                     for kt in kept:
@@ -250,12 +261,25 @@ class WStruct:
                             break
                     if Qunique:
                         kept.append(i)
+                        indx_kept.append(i_w2k)
+                    i_w2k += 1
                 to_remove=set(range(len(all_coords)))-set(kept)
                 print(spec, ': ', 'out of ', len(cif.w2k_coords[spec]), 'atoms we keep=', kept, file=log)
                 for i in sorted(to_remove, reverse=True):
                     del cif.w2k_coords[spec][i]
                 print(spec, ':', 'end up with', len(cif.w2k_coords[spec]), file=log)
-
+            #for i in range(len(indx_kept)):
+            #    print('indx_kept['+str(i)+']=', indx_kept[i], file=log)
+            in_primitive={}
+            for i in range(len(indx_kept)):
+                in_primitive[indx_kept[i]]=i
+            for i in in_primitive:
+                print('in_primitive['+str(i)+']=', in_primitive[i], file=log)
+            
+        else:
+            Nall = sum([len(cif.w2k_coords[spec]) for spec in cif.w2k_coords])
+            in_primitive = range(Nall)
+            
         print('After removing atoms not in primitive cell, we have the following cif.w2k_coords list:', file=log)
         for spec in cif.w2k_coords:
             for ipos,pos in enumerate(cif.w2k_coords[spec]):
@@ -314,7 +338,32 @@ class WStruct:
         #print('iatnr=', self.iatnr, file=log)
         #print('isplit=', self.isplit, file=log)
         self.neighbrs = cif.neighbrs
-    
+
+        if Qmagnetic:
+            if self.lattyp in ['B', 'F', 'CXY', 'CXZ', 'CYZ']:
+                self.flipped = {}
+                self.rotation_flipped = {}
+                self.timerevr_flipped = {}
+                for ii in cif.flipped:
+                    if ii in in_primitive and cif.flipped[ii] in in_primitive:
+                        jj = in_primitive[ii]
+                        self.flipped[jj] = in_primitive[cif.flipped[ii]]
+                        self.rotation_flipped[jj] = cif.rotation_flipped[ii]
+                        self.timerevr_flipped[jj] = cif.timerevr_flipped[ii]
+                print('str.flipped:', file=log)
+                for ii in self.flipped:
+                    print(str(ii)+'->'+str(self.flipped[ii]), file=log)
+                    for i in range(len(self.timerevr_flipped[ii])):
+                        print('    T='+str(self.timerevr_flipped[ii][i]), file=log)
+                        print('    R={:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][0,:]), file=log)
+                        for j in range(1,3):
+                            print('      {:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][j,:]), file=log)
+            else:
+                self.flipped = cif.flipped
+                self.rotation_flipped = cif.rotation_flipped
+                self.timerevr_flipped = cif.timerevr_flipped
+                
+        
     def ReadStruct(self, fname, log=sys.stdout):
         f = open(fname, 'r')
         self.title = next(f).strip()
@@ -469,7 +518,8 @@ class WStruct:
                 print('                    {:10.7f}{:10.7f}{:10.7f}'.format(*self.rotloc[jatom][:,1]), file=f)
                 print('                    {:10.7f}{:10.7f}{:10.7f}'.format(*self.rotloc[jatom][:,2]), file=f)
             nsym = shape(self.tau)[0]
-            print('{:4d}      NUMBER OF SYMMETRY OPERATIONS'.format(nsym), file=f)
+            #print('{:4d}      NUMBER OF SYMMETRY OPERATIONS'.format(nsym), file=f)
+            print('{:4d}      NUMBER OF SYMMETRY OPERATIONS'.format(0), file=f)  # because w2k should determine the symmetry operations, which sometimes don't agree
             for iord in range(nsym):
                 for j in range(3):
                     print('{:2d}{:2d}{:2d} {:10.8f}'.format(*self.timat[iord,j,:], self.tau[iord,j]), file=f)
@@ -704,7 +754,7 @@ def get_matching_coord(coord, parser, coord_to_species):
 
     
 class CifParser_W2k:
-    def __init__(self, fname, log=sys.stdout, cmp_neighbors=False):
+    def __init__(self, fname, log=sys.stdout, Qmagnetic=True, cmp_neighbors=False):
         self.log = log
         self.parser = CifParser(fname,occupancy_tolerance=3)
         cif_as_dict = self.parser.as_dict()       # get dictionary of cif information
@@ -735,17 +785,24 @@ class CifParser_W2k:
                     self.sgname = data['_symmetry_space_group_name_H-M']
                 elif '_space_group_name_H-M_alt' in data:
                     self.sgname = data['_space_group_name_H-M_alt']
+                elif '_parent_space_group.name_H-M' in data:
+                    self.sgname = data['_parent_space_group.name_H-M']
+                elif '_parent_space_group.name_H-M_alt' in data:
+                    self.sgname = data['_parent_space_group.name_H-M_alt']
                 if '_symmetry_Int_Tables_number' in data:
                     self.sgnum = data['_symmetry_Int_Tables_number']
                 elif '_symmetry_space_group_IT_number' in data:
                     self.sgnum = data['_symmetry_space_group_IT_number']
                 elif '_space_group_IT_number' in data:
                     self.sgnum = data['_space_group_IT_number']
-                
+                elif '_parent_space_group.IT_number' in data:
+                    self.sgnum = data['_parent_space_group.IT_number']
+                    
                 print('Information directly extracted from cif file:', file=log)
                 for k2, v2 in data.items():
                     print('key=', k+':'+k2,' value=', v2, file=log)
                 print(file=log)
+                print('structure directly from given input cif file', file=log)
                 print('---------------------------------------------', file=log)
                 print('ca=', self.ca, 'cb=', self.cb, 'cc=', self.cc, 'calpha=', self.calpha, 'cbeta=', self.cbeta, 'cgamma=', self.cgamma, file=log)
                 print('sgname=', self.sgname, 'sgnum=', self.sgnum, 'ssetting=', self.ssetting, file=log)
@@ -814,39 +871,262 @@ class CifParser_W2k:
                 indx_by_element[site.species_string] = [ii]
             self.Z_element[site.species_string]=Znuc[ii]
 
+        magnetic=False
+        if hasattr(self.parser.symmetry_operations[0], 'time_reversal'):
+            magnetic=True
+        Qmagnetic = magnetic and Qmagnetic
+        
         #print('indx_by_element=', indx_by_element)
         print('Number of symmetry operations available=', len(self.parser.symmetry_operations), file=log)
-        groups=[] # Will contain groups of equivalent sites
+        print('magnetic cif=', magnetic, file=log)
+        for isym,op in enumerate(self.parser.symmetry_operations):
+            timat = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
+            tau = op.affine_matrix[:3,3]
+            if np.allclose(timat,np.identity(3,dtype=int)):
+                if sum(abs(tau))==0:
+                    symmetry_operations_type='I'
+                else:
+                    symmetry_operations_type='T'
+            elif np.allclose(timat,-np.identity(3,dtype=int)) and sum(abs(tau))==0:
+                symmetry_operations_type='P'
+            else:
+                symmetry_operations_type='R'
+            if magnetic:
+                print(isym, ':', 'Time='+str(op.time_reversal), symmetry_operations_type, file=log)
+            else:
+                print(isym,':', symmetry_operations_type, file=log)
+            for i in range(3):
+                print('{:2d}{:2d}{:2d} {:10.8f}'.format(*timat[i,:], tau[i]), file=log)
+        
         acoords = [site.frac_coords%1.0 for site in self.structure.sites] # all coordinates but always inside home unit cell
+        amagmoms = [0 for site in self.structure.sites]
+        min_Molap = 0.7  # We will treat magnetic moments (anti)parallel if their overlap is more than that
+        if Qmagnetic:
+            for i,site in enumerate(self.structure.sites):
+                if 'magmom' in site.properties:
+                    amagmoms[i] = site.properties["magmom"].moment
+            #print('amagmoms=', amagmoms, file=log)
+            operations_to_remove=set()
+            self.flipped={}
+            #non_flipped={}
+            self.rotation_flipped={}
+            #rotation_non_flipped={}
+            self.timerevr_flipped={}
+            #timerevr_non_flipped={}
+            groups=[]
+            for spec in indx_by_element:  # Next we loop through element in this structure
+                indices = indx_by_element[spec] # indices on sites of the same element
+                site = self.structure.sites[indices[0]]
+                Mi = site.properties["magmom"].moment
+                if sum(abs(Mi))<1e-5:
+                    continue
+                print(site.species_string+'['+str(indices[0])+']', site.frac_coords, 'M['+str(indices[0])+']=', Mi, file=log)
+                grp = [[indices[0]]]  # we have just one group with the first entry in coords. All entries in coords will have index in grp
+                grp_compare=[0]
+                for ii in indices[1:]: # loop over possibly equivalent sites (of the same element)
+                    coord = acoords[ii]    # fractional coordinate of that site self.structure.sites[ii]
+                    site = self.structure.sites[ii]
+                    Qequivalent=False  # for now we thing this might not be equivalent to any other site in grp
+                    Mj = site.properties["magmom"].moment
+                    mj = linalg.norm(Mj)
+                    print(site.species_string+'['+str(ii)+']', coord, 'M['+str(ii)+']=', site.properties["magmom"].moment, file=log)
+                    for ig,op in enumerate(self.parser.symmetry_operations): # loop over all symmetry operations
+                        ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
+                        Mjp = op.operate_magmom(Mj).moment
+                        for itg,ty in enumerate(grp):                         # if coord is equivalent to any existing group in grp, say grp[i]==ty, then one of ncoord should be equal to first entry in grp[i]
+                            i_grp_compare=grp_compare[itg]
+                            #print('grp_compare=', grp_compare, 'igrp_compare=', i_grp_compare, file=log)
+                            coord0 = acoords[ty[i_grp_compare]]            # the first entry in the group grp[i][0]
+                            M0 = amagmoms[ty[i_grp_compare]]
+                            if sum(abs(ncoord-coord0))<1e-5:   # is it equal to current coord when a symmetry operation is applied?
+                                if sum(abs(M0-Mjp))<1e-5:
+                                    print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,'and M['+str(ii)+']=', Mj.tolist(),
+                                              ' gives r['+str(ty[i_grp_compare])+']=',coord0,
+                                              ' and M['+str(ty[i_grp_compare])+']=', M0.tolist(), file=log)
+                                    m0 = linalg.norm(M0)
+                                    Molap = dot(Mj,M0)/(mj*m0) if (mj!=0 and m0!=0) else 0
+                                    print('Molap=', Molap, file=log)
+                                    moments_equal = sum(abs(Mj-M0))<1e-5 or (Molap>min_Molap and abs(m0-mj)<1e-5)
+                                    if not moments_equal: #sum(abs(Mj-M0))>1e-5 and Molap<min_Molap:
+                                        # If we treat up/down together, we should skip that
+                                        # But if up is treated separately from down, and spin is flipped, we have to remove such symmetry operation
+                                        # and declare that the two atoms are different
+                                        moments_opposite = sum(abs(Mj+M0))<1e-5 or (Molap<-min_Molap and abs(m0-mj)<1e-5)
+                                        if moments_opposite: #sum(abs(Mj+M0))<1e-5 or Molap < -min_Molap:
+                                            self.flipped[ii]=ty[i_grp_compare]
+                                            if ii not in self.rotation_flipped:
+                                                self.rotation_flipped[ii]=[ array(np.round(op.affine_matrix[:3,:3]),dtype=int) ]
+                                                self.timerevr_flipped[ii]=[ op.time_reversal ]
+                                            else:
+                                                self.rotation_flipped[ii].append( array(np.round(op.affine_matrix[:3,:3]),dtype=int) )
+                                                self.timerevr_flipped[ii].append( op.time_reversal )
+                                            if Molap > -0.99999:
+                                                print('WARNING Moments are only approximately antiparallel Molap=', Molap,
+                                                          'and we are treating them as intiparallel', file=log)
+                                            #if i_grp_compare<len(ty)-1:
+                                            #    i_grp_compare += 1
+                                            #    print('i_grp_compare increased to', i_grp_compare, 'because ty=', ty, file=log)
+                                        #else:
+                                        #    non_flipped[ii]=ty[i_grp_compare]
+                                        #    if ii not in rotation_non_flipped:
+                                        #        rotation_non_flipped[ii] = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
+                                        #        timerevr_non_flipped[ii] = op.time_reversal
+                                        operations_to_remove.add(ig)
+                                        print('Since moments are different ig=', ig, 'should be removed flipped=', self.flipped, file=log)
+                                    else:
+                                        # Only if spin direction is the same we can say that these are truly
+                                        # equivalent
+                                        Qequivalent=True               # we found which group it corresponds to
+                                        if ii not in ty:
+                                            ty.append(ii)                  # grp[i]=ty is extended with coord[i]
+                                        if (Molap<0.99999):
+                                            print('WARNING: Moments are only approximately equal Molap='+str(Molap),
+                                                      'and we are treating them as equal', file=log)
+                                            print('Since moments are approx. equal ig=', ig, ' is kept and '+str(ii)+' is in group with ',ty, file=log)
+                                        else:
+                                            print('Since moments are equal ig=', ig, ' is kept and '+str(ii)+' is in group with ',ty, file=log)
+                                        #print('After adding ii='+str(ii)+' grp=', grp, file=log)
+                                        break                          # loop over groups and also symmetry operations can be finished
+                    if not Qequivalent:                        # if this site (coord) is not equivalent to any existing group in grp, than we create a new group with a single entry [i]
+                        grp.append([ii])
+                        print('Starting anew with ii='+str(ii)+' grp=', grp, file=log)
+                        grp_compare.append(0)
+                        
+                    if ii in self.flipped:
+                        jj = self.flipped[ii]
+                        for itg,ty in enumerate(grp):
+                            if jj in ty:
+                                if len(ty)>grp_compare[itg]+1:
+                                    grp_compare[itg]+=1
+                groups.append(grp)  # all groups for this element
+            print('groups for magnetic atoms=', groups, file=log)
+            # Sometimes the symmetry operations for time-reversal symmetry are not given, and moments are antiparallel, but above
+            # algorithm does not recognize that, because it is not given as one of the symmetry operations.
+            # We here check is we have such a case
+            if len(self.flipped)==0:
+                for grp in groups:
+                    used=[]
+                    for i in range(len(grp)):
+                        grp1 = grp[i]
+                        for j in range(len(grp)):
+                            grp2 = grp[j]
+                            #if i==j or len(grp2)!=len(grp1): continue
+                            if i==j: continue
+                            for i1 in grp1:
+                                site1 = self.structure.sites[i1]
+                                Mi1 = site1.properties["magmom"].moment
+                                m1 = linalg.norm(Mi1)
+                                for i2 in grp2:
+                                    site2 = self.structure.sites[i2]
+                                    Mi2 = site2.properties["magmom"].moment
+                                    m2 = linalg.norm(Mi2)
+                                    Molap = dot(Mi1,Mi2)/(m1*m2)
+                                    if abs(m1-m2)>1e-5:
+                                        continue
+                                    print('i1={:2d} i2={:2d} m1={:8.4f} m2={:8.4f}'.format(i1,i2,m1,m2),
+                                              'M1=', Mi1, 'M2=', Mi2, 'Molap={:5.3f}'.format(Molap), 'used=', used, file=log)
+                                    if Molap<-min_Molap:
+                                        if i1 not in self.flipped and i2 not in used:
+                                            self.flipped[i1]=i2
+                                            used.append(i2)
+                                            self.timerevr_flipped[i1]=[]
+                                            self.rotation_flipped[i1]=[]
+                                        
+                                        
+            print('atoms which are flipped of each other:', file=log)
+            for ii in self.flipped:
+                print(str(ii)+'->'+str(self.flipped[ii]), file=log)
+                for i in range(len(self.timerevr_flipped[ii])):
+                    print('    T='+str(self.timerevr_flipped[ii][i]), file=log)
+                    print('    R={:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][0,:]), file=log)
+                    for j in range(1,3):
+                        print('      {:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][j,:]), file=log)
+                
+                
+            print('symmetry operations that need to be removed=', operations_to_remove, file=log)
+            operations_to_remove = sorted(list(operations_to_remove))
+            for iop in operations_to_remove[::-1]:
+                del self.parser.symmetry_operations[iop]
+            print('Symmetry operations left:', file=log)
+            for isym,op in enumerate(self.parser.symmetry_operations):
+                timat = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
+                tau = op.affine_matrix[:3,3]
+                if np.allclose(timat,np.identity(3,dtype=int)):
+                    if sum(abs(tau))==0:
+                        symmetry_operations_type='I'
+                    else:
+                        symmetry_operations_type='T'
+                elif np.allclose(timat,-np.identity(3,dtype=int)) and sum(abs(tau))==0:
+                    symmetry_operations_type='P'
+                else:
+                    symmetry_operations_type='R'
+                if magnetic:
+                    print(isym, ':', 'Time='+str(op.time_reversal), symmetry_operations_type, file=log)
+                else:
+                    print(isym,':', symmetry_operations_type, file=log)
+                for i in range(3):
+                    print('{:2d}{:2d}{:2d} {:10.8f}'.format(*timat[i,:], tau[i]), file=log)
+        
+        groups=[] # Will contain groups of equivalent sites
         for spec in indx_by_element:  # Next we loop through element in this structure
             indices = indx_by_element[spec] # indices on sites of the same element
             grp = [[indices[0]]]  # we have just one group with the first entry in coords. All entries in coords will have index in grp
+            site = self.structure.sites[indices[0]]
+            if Qmagnetic:
+                Mi = site.properties["magmom"].moment
+                if sum(abs(Mi))>0:
+                    mfinite=True
+                    print(site.species_string, site.frac_coords, 'Mi=', site.properties["magmom"].moment, file=log)
+                else:
+                    mfinite=False
             for ii in indices[1:]: # loop over possibly equivalent sites (of the same element)
                 coord = acoords[ii]    # fractional coordinate of that site self.structure.sites[ii]
+                site = self.structure.sites[ii]
                 Qequivalent=False  # for now we thing this might not be equivalent to any other site in grp
-                for op in self.parser.symmetry_operations: # loop over all symmetry operations
+                if Qmagnetic and mfinite:
+                    Mj = site.properties["magmom"].moment
+                    print(site.species_string, coord, 'Mj=', site.properties["magmom"].moment, file=log)
+                for ig,op in enumerate(self.parser.symmetry_operations): # loop over all symmetry operations
                     ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
+                    #if Qmagnetic and mfinite:
+                    #    Mjp = op.operate_magmom(Mj).moment
                     for ty in grp:                         # if coord is equivalent to any existing group in grp, say grp[i]==ty, then one of ncoord should be equal to first entry in grp[i]
                         coord0 = acoords[ty[0]]            # the first entry in the group grp[i][0]
+                        M0 = amagmoms[ty[0]]
                         #print('coord0=', ty[0], coord0)
                         if sum(abs(ncoord-coord0))<1e-5:   # is it equal to current coord when a symmetry operation is applied?
-                            #print(' ncoord=', ncoord, 'is equivalent to typ', ty) # yes, coord is in group ty
-                            Qequivalent=True               # we found which group it corresponds to
-                            ty.append(ii)                  # grp[i]=ty is extended with coord[i]
-                            break                          # loop over groups and also symmetry operations can be finished
-                    if Qequivalent:                        # once we find which group this site corresponds to, we can finish the loop over symmetry operations
+                            if Qmagnetic and mfinite:
+                                Molap = dot(Mj,M0)/(linalg.norm(Mj)*linalg.norm(M0))
+                                if Molap > min_Molap: #sum(abs(Mj-M0))<=1e-5:
+                                    # Only if spin direction is the same we can say that these are truly
+                                    #print('coordinates equal M0=',M0, 'Mj=', Mj, 'ig=', ig, file=log)????
+                                    print('Group['+str(ig)+'] applied to r=',coord,'and M=', Mj,' gives r=', coord0, ' and M0=', M0, file=log)
+                                    Qequivalent=True               # we found which group it corresponds to
+                                    ty.append(ii)                  # grp[i]=ty is extended with coord[i]
+                                    #print('Since moments are equal ig=', ig, 'survives magnetic calc', file=log)
+                                    break                          # loop over groups and also symmetry operations can be finished
+                            else:# we don't have moments, hence it is equivalent
+                                #print(' ncoord=', ncoord, 'is equivalent to typ', ty) # yes, coord is in group ty
+                                Qequivalent=True               # we found which group it corresponds to
+                                ty.append(ii)                  # grp[i]=ty is extended with coord[i]
+                                break                          # loop over groups and also symmetry operations can be finished
+                    if Qequivalent:
                         break
                 if not Qequivalent:                        # if this site (coord) is not equivalent to any existing group in grp, than we create a new group with a single entry [i]
                     grp.append([ii])
+                    #print('Starting anew with ii='+str(ii)+' grp=', grp, file=log)
                 #print(spec+' grp=', grp)
             groups.append(grp)  # all groups for this element
 
-        #print('groups=', groups)
+        print('groups=', groups, file=log)
+        
         # Since groups is only index array to coord_by_element, we will rather create a dictionary self.w2k_coords={},
         # which is easier to use. The keys will be name of the site, which might need to be modified when
         # multiple inequivalent sites have the same name.
         # The values in the dictionary are all equivalent sites,i.e., their fractional coordinates
-        ResortToCif=True
+        # For magnetic calculation, we add additional splitting of atoms in groups (due to orientation of momemnts) and hence we lost connection to cif file.
+        # It would need more elaborate sorting, which is not done yet.
+        ResortToCif= not Qmagnetic
         if ResortToCif:
             # It is quite inconvenient that pymatgen structure does not sort atoms in the same order as they are sorted in cif file.
             # We here resort all atoms so that they appear in the same order as in cif file.
@@ -858,10 +1138,16 @@ class CifParser_W2k:
             groups_resort=[[] for i in range(len(cif_coords))] # groups in the right order
             cname=[[] for i in range(len(cif_coords))]  # name for the atom in final struct file
             for idx,spec in enumerate(indx_by_element):
+
+                grp = groups[idx] # group of atoms of the same element. But not necessary equivalent. For example, all oxygen atoms in the structure.
+                print('idx=', idx, 'spec=', spec, 'grp=', grp)
+                
                 # Instead of comparing with all coordinates from the cif file, we only compare with those
                 # that start with the same letter, i.e., likely correspond to the same element.
                 which_icif = [i for i in range(len(self.cname)) if self.cname[i][0]==spec[0]] # those are probably for the same element
-                grp = groups[idx] # group of atoms of the same element. But not necessary equivalent. For example, all oxygen atoms in the structure.
+
+                print('which_icif=', which_icif)
+                
                 for ig in range(len(grp)): # over all groups of oxygen atoms
                     gr = grp[ig]           # here we have a single group of oxygen atoms, which are all equivalent
                     # all coordinates of equivalent atoms and combined together into array
@@ -900,7 +1186,7 @@ class CifParser_W2k:
 
             # This is needed because cif file can have site-occupancies=0.5, in which case structure has smaller number of sites that cif-file
             #groups_resort = [x for x in groups_resort if x]
-            #print('groups_resort=', groups_resort)
+            print('groups_resort=', groups_resort)
             
             first_sites_index=[]
             self.w2k_coords={}
@@ -909,9 +1195,12 @@ class CifParser_W2k:
                 psite = self.structure.sites[group[0]]
                 self.w2k_coords[cname[ii]] = [self.structure.sites[j].frac_coords for j in group]
                 first_sites_index.append( group[0] )
+                print('ii=', ii, 'group=', group)
+                #all_sites_order.extend( group )
                 #print(cname[ii], coords, psite.label, self.cname[ii], psite.species, psite.species_string)
                 #self.Z_element[cname[ii]] = psite.specie.Z
             #print('w2k_coord=', self.w2k_coords)
+            #print('all_sites_order=', all_sites_order)
             
         if not ResortToCif:
             self.w2k_coords={}
@@ -931,15 +1220,50 @@ class CifParser_W2k:
                         self.Z_element[_spec_] = self.Z_element[spec]
 
             first_sites_index=[]
+            all_sites_order=[]
             for grp in groups:
                 for gr in grp:
                     jatom = len(first_sites_index)
                     first_sites_index.append(gr[0])
+                    all_sites_order.extend(gr)
+            all_sites_index=zeros(len(all_sites_order),dtype=int)
+            for i in range(len(all_sites_order)):
+                all_sites_index[all_sites_order[i]]=i
+            print('all_sites_order=', all_sites_order,file=log)
+            #print('all_sites_index=', all_sites_index.tolist(), file=log)
 
+        if Qmagnetic:
+            # We need to resort the index used in flipped to current order in self.w2k_coords
+            _flipped_={}
+            _timerevr_flipped_={}
+            _rotation_flipped_={}
+            for ii in self.flipped:
+                jj = all_sites_index[ii]
+                _flipped_[jj] = all_sites_index[self.flipped[ii]]
+                if self.timerevr_flipped[ii]:
+                    _timerevr_flipped_[jj] = self.timerevr_flipped[ii]
+                    _rotation_flipped_[jj] = self.rotation_flipped[ii]
+                else:
+                    _timerevr_flipped_[jj] = []
+                    _rotation_flipped_[jj] = []
+            self.flipped = _flipped_
+            self.timerevr_flipped = _timerevr_flipped_
+            self.rotation_flipped = _rotation_flipped_
+            print('now resorted atoms which are flipped of each other:', file=log)
+            for ii in self.flipped:
+                print(str(ii)+'->'+str(self.flipped[ii]), file=log)
+                for i in range(len(self.timerevr_flipped[ii])):
+                    print('    T='+str(self.timerevr_flipped[ii][i]), file=log)
+                    print('    R={:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][0,:]), file=log)
+                    for j in range(1,3):
+                        print('      {:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][j,:]), file=log)
+
+
+        Add_oxi=False
         self.neighbrs=[]
         if cmp_neighbors:
             first_sites = [self.structure.sites[i] for i in first_sites_index]
-            self.structure.add_oxidation_state_by_guess()
+            if Add_oxi: self.structure.add_oxidation_state_by_guess()
             self.oxi_state={}
             #for site in self.structure:
             #    for specie, amt in site.species.items():
@@ -954,11 +1278,14 @@ class CifParser_W2k:
                 t=self.structure.sites[i]
                 coord = t.frac_coords @ self.structure.lattice.matrix
                 #print('coords=', coord)
-                try:
-                    oxi_st = int(getattr(t.specie, "oxi_state", 0) or 0)
-                except:
-                    oxi_st=0
-                self.oxi_state[jatom]=oxi_st
+                if Add_oxi:
+                    try:
+                        oxi_st = int(getattr(t.specie, "oxi_state", 0) or 0)
+                    except:
+                        oxi_st=0
+                    self.oxi_state[jatom]=oxi_st
+                else:
+                    self.oxi_state[jatom]=0
                 print('ATOM: {:3d} {:3s} AT {:9.5f} {:9.5f} {:9.5f}={:9.5f} {:9.5f} {:9.5f}'.format(jatom+1,self.structure.sites[i].species_string,*t.coords,*t.frac_coords),file=log)
                 mask = center_indices==jatom
                 points_indices_ = points_indices[mask]
@@ -989,9 +1316,12 @@ class CifParser_W2k:
                     if distances_[j]>1e-5:
                         nn = points_indices_[j]
                         r = self.structure.sites[nn]
-                        try:
-                            oxidation = int(getattr(r.specie, "oxi_state", 0) or 0)
-                        except:
+                        if Add_oxi:
+                            try:
+                                oxidation = int(getattr(r.specie, "oxi_state", 0) or 0)
+                            except:
+                                oxidation=0
+                        else:
                             oxidation=0
                         #print('r=', r, 'oxydation=', oxidation)
                         Rj_fract = r.frac_coords + offsets_[j]
@@ -1252,10 +1582,10 @@ def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, log=sys.stdout):
         print('END', file=fk)
 
 
-def Cif2Struct(fcif, Nkp=300, writek=True, logfile='cif2struct.log', cmp_neighbors=False):
+def Cif2Struct(fcif, Nkp=300, writek=True, Qmagnetic=True, logfile='cif2struct.log', cmp_neighbors=False):
     log = open(logfile, 'w')
     strc = WStruct()           # w2k structure, for now empty
-    strc.ScanCif(fcif, log, writek, cmp_neighbors)    # here is most of the algorithm
+    strc.ScanCif(fcif, log, writek, Qmagnetic, cmp_neighbors)    # here is most of the algorithm
     case = os.path.splitext(fcif)[0] # get case
     strc.WriteStruct(case+'.struct', log) # writting out struct file
     lat = Latgen(strc, case, log)  # checking Bravais lattice in wien2k and its consistency.
@@ -1371,6 +1701,7 @@ if __name__ == '__main__':
     parser.add_option('-N', '--Nkp',     dest='Nkp', type='int', default=300, help="number of k-points along the high symmetry path")
     parser.add_option('-l', '--log',     dest='log', type='str', default='cif2struct.log', help="info file")
     parser.add_option('-n', '--neigh',   dest='neigh', action='store_false', default=True, help="compute neighbors and evaluate Rmt")
+    parser.add_option('-m', '--magnet',  dest='Qmagnetic', action='store_true', default=False, help="should produce magnetic dft struct that allows broken symmetry from mcif")
     # Next, parse the arguments
     (options, args) = parser.parse_args()
     if len(args)!=1:
@@ -1380,4 +1711,4 @@ if __name__ == '__main__':
 
     #print('fcif=', fcif)
     #print('options=', options.Nkp, options.wkp)
-    Cif2Struct(fcif, Nkp=options.Nkp, writek=options.wkp, logfile=options.log, cmp_neighbors=options.neigh)
+    Cif2Struct(fcif, Nkp=options.Nkp, writek=options.wkp, Qmagnetic=options.Qmagnetic, logfile=options.log, cmp_neighbors=options.neigh)

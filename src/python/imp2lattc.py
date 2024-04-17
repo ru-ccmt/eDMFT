@@ -24,13 +24,15 @@ def ImpurityLatticeConnection( cols, icols, log ):
     for i in icols: # all impurity problems
         imp2latt[i]=[]
         for j in cols: # all correlated atoms
-            dif = set(icols[i])-set(cols[j]) # checks if the same indices
-            atm_consistent_with_imp = len(dif)==0 # true when all indices are equal and set diff is empty
-            if atm_consistent_with_imp and len(icols[i])==len(cols[j]) and len(icols[i])>0:
+            imp_cols = set(icols[i])
+            atm_cols = set(cols[j])
+            dif = imp_cols-atm_cols # checks if the same indices
+            imp_contains_atm = (len(imp_cols)==len(atm_cols) and len(dif)==0) or (len(imp_cols)>len(atm_cols) and len(dif)==len(imp_cols)-len(atm_cols))
+            #print('i=', i, 'j=', j, 'dif=', dif, 'imp_contains_atm=', imp_contains_atm)
+            if imp_contains_atm and len(icols[i])>0:
                 imp2latt[i].append(j)
         if len(imp2latt)==0:
             print('WARNING: in ImpurityLatticeConnection impurity['+str(i)+'] has no connection with correlated atom',file=log)
-
     all_atoms_in_impurities = sorted(chain(*imp2latt.values()))
     all_atoms = sorted([j for j in cols])
     if all_atoms_in_impurities != all_atoms:

@@ -17,7 +17,7 @@ from numpy import linalg
 import numpy as np
 import heapq
     
-def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance=1.0):
+def FindCageBasis(neighs, matrix, log, max_bond_variance=0.85, max_angle_variance=1.0):
     """Find the best directions for the local coordinate system, which is non-orthogonal.
     """
     def Find_two_closest_smallest_values(ph0, where):
@@ -56,7 +56,9 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
             ('tetrahedra',4, [arccos(-1/3.)]*3),
             ('square-piramid',5, [pi/2]*4),
             ('cuboctahedron',12,[pi/3]*4+[pi/2]*2+[2*pi/3]*4+[pi]),
+            ('triangular-bipyramid', 5, [pi/2]*2+[2/3*pi]*2),
             ('truncated tetrahedron',12,[arccos(7/11)]*3+[arccos(-1/11)]*4+[arccos(-5/11)]*2+[arccos(-9/11)]*2)]
+            # 
         # NEED:   square antiprism
     cases_outside=[('peak-of-tetrahedron',3, [pi/2]*2),
                    ('peak-of-square-piramid',4,[pi/3]*3),
@@ -77,7 +79,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         grps = grps[1:]-grps[0] # We take out the first group
     if len(grps) == 0: # Could not find any shape
         print('Could not detect the type of environment, Boiling out.', file=log)
-        return None
+        return None,None
     
     tobohr = 1/0.5291772083
     
@@ -113,8 +115,8 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         ws = sum(exp(1-(dist[:N]/lav)**6))
         # Second, compare all angles to those expected
         angs = array([sorted(phi[i,:N])[1:] for i in range(N)])    # remove the smallest angle, because it is zero on diagonal
-        
         chi1 = abs(ws-N)/2.
+        
         if ctype=='square-piramid':
             var0 = np.var(angs, axis=1)
             itop = argmin(var0) # index of the top atom
@@ -123,16 +125,31 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
             r_base = rij[base]  # these vectors should be in the same plane. Let's check
             r_inplane = r_base[1:]-r_base[0]
             vol = abs(cross(r_inplane[0],r_inplane[1]) @ r_inplane[2])/6. # vol should be zero
-            top_to_base = mean(angs[itop])
-            cs = cos(top_to_base)
-            two_base = arccos(cs**2)
-            one_base = arccos(2*cs**2-1)
+            top_to_base = mean(angs[itop]) 
+            cs = cos(top_to_base)    # 
+            two_base = arccos(cs**2) # 
+            one_base = arccos(2*cs**2-1) # one_base = 2*top_to_base
             if one_base>top_to_base:
                 angles = array([two_base,two_base,top_to_base,one_base])
             else:
                 angles = array([two_base,two_base,one_base,top_to_base])
             sm=sum((angs[base]-angles)**2)
-            chi2 = (sum((angs[base]-angles)**2)/(N-1)**2 + var0[itop])*2 + vol/10.
+            #print('Vol in square piramid=', vol, file=log)
+            chi2 = (sm/(N-1)**2 + var0[itop])*2 + vol/3
+        elif ctype=='triangular-bipyramid':
+            max_ang = [max(angs[i]) for i in range(N)]
+            bipyramid_ind = sorted(range(N), key=lambda i: -max_ang[i])
+            top_bot = bipyramid_ind[0:2]
+            base = bipyramid_ind[2:N]
+            angles = [pi/2]*3 + [pi]
+            diff = sum((angs[top_bot]-array(angles))**2)
+            #print('angs[top_bot]=', angs[top_bot]*180/pi, 'diff=', diff, file=log)
+            chi2 = sqrt(sum((angs[top_bot]-array(angles))**2)/(N*(N-1.)))*2
+            angles = [pi/2]*2 + [2*pi/3]*2            
+            diff = sum((angs[base]-array(angles))**2)
+            #print('angs[base]=', angs[base]*180/pi, 'diff=', diff, file=log)
+            chi2 += sqrt(sum((angs[base]-array(angles))**2)/(N*(N-1.)))*2
+            #print('chi2=', chi2)
         else:
             chi2 = sqrt( sum((angs-angles)**2)/angs.size )*2
         
@@ -151,7 +168,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         voln=0
         for l in range(2,N-1):
             voln += abs(rjk0[l] @ normal_plane)/6.
-        #print('voln=', voln, file=log)
+        #print('voln[N='+str(N)+']=', voln, 'normal_plane=', normal_plane, file=log)
         if voln>1e-4: break  # these points are not on the same plane
         # check if all equal distances.
         chi1=0
@@ -164,9 +181,30 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
             #Vol = abs(dot(cross(rij[0],rij[1]),rij[2]))/6.
             #chi1 += 2*exp(-Vol*20.)  # we don't want volume to be small, because than it is different shape
             chi2 = (phi[0,1]-phi[0,2])**2
-            chi2 += 0.18 # so that we take tetrahedra when chi2 of tetrahedra is 0.08 or smaller
+            n_down = rij[0]+rij[1]+rij[2]
+            n_down /= linalg.norm(n_down)
+            n_plane = cross(rij[1]-rij[0],rij[2]-rij[0])
+            n_plane /= linalg.norm(n_plane)
+            is_in_center = (1-abs(dot(n_down,n_plane)))**2 * 3.
+            #print('rij=', rij[:3,:], file=log)
+            #print('    is_in_center of peak-of-tetrahedron=', is_in_center, 'n_down=', n_down, 'n_plane=', n_plane, file=log)
+            chi2 += 0.26+is_in_center # so that we take tetrahedra when chi2 of tetrahedra is 0.08 or smaller
         if N==4:
-            chi2 += 0.05 # so that we take octahedra is chi2 of octahedar is smaller than 0.05
+            n_down = rij[0]+rij[1]+rij[2]+rij[3]
+            #print('n_down=', n_down, file=log)
+            if linalg.norm(n_down)>1e-6:
+                n_down /= linalg.norm(n_down)
+                in_plane_=[]
+                in_plane_.append( cross(rij[1]-rij[0],rij[2]-rij[0]) )
+                in_plane_.append( cross(rij[1]-rij[0],rij[3]-rij[0]) )
+                in_plane_.append( cross(rij[2]-rij[0],rij[3]-rij[0]) )
+                i_which = argmax([linalg.norm(in_plane_[i]) for i in range(3)])
+                in_plane = in_plane_[i_which]
+                in_plane /= linalg.norm(in_plane)
+                is_in_center = (1-abs(dot(n_down,in_plane)))**2 * 3.
+                chi2 += is_in_center
+                #print('is_in_center=', is_in_center, file=log)
+            chi2 += 0.2 # so that we take octahedra is chi2 of octahedar is smaller than 0.05
         criteria.append( (ctype, chi1, chi2 ) ) # now remember how good is this guess in terms of coordination number and angle variance
         print('trying {:15s}: accuracy {:6.3f} <w>-N={:6.3f} <phi>-<phi0>={:6.3f}'.format(ctype,chi1**2+chi2**2,chi1,chi2), file=log)
     
@@ -174,9 +212,10 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
     criteria = sorted(criteria, key=lambda ct: ct[1]**2 + ct[2]**2 ) # sort according to the  (angle-variance*2*pi)^2+(bond-variance)^2
     #best_so_far = criteria[0][1]**2+criteria[0][2]**2
     best_so_far = criteria[0][2]
+    cutoff_for_best = 0.2
     #print('best_so_far=', criteria[0][2],file=log)
     have_four_neighbors = have_n_neigbors[4] # len(neighs) == 4 or (len(neighs)>4 and neighs[4][0]-neighs[3][0]>1e-4)
-    if best_so_far>0.1 and have_four_neighbors:
+    if best_so_far>cutoff_for_best and have_four_neighbors:
         # It is likely not a regular tetrahedron, hence checking for planar quadrilateral
         N=4
         dr = rij[1:N]-rij[0]
@@ -187,9 +226,8 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         V3 = abs(cross(rij[0],rij[1]) @ rij[2])/6.
         if (V2+V3<best_so_far):
             criteria.insert(0, ('planar quadrilateral', V2, V3) )
-    
     have_five_neigbors = have_n_neigbors[5] # len(neighs) == 5 or (len(neighs)>5 and neighs[5][0]-neighs[4][0]>1e-4)
-    if (best_so_far>0.1) and have_five_neigbors:
+    if best_so_far>cutoff_for_best and have_five_neigbors:
         # trying square piramid in which origin is in the basal plane of the piramid
         N=5
         min_angle_diff = 0.5
@@ -251,8 +289,10 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
                     #print('nu=', nu, 'nv1=', nv1, 'nv2=', nv2, 'nv3=', nv3, 'n1=', n1)
                 R0.append(nz)
                 R0_ready = R0
+
+    #best_so_far = criteria[0][2]
     have_six_neighbors = have_n_neigbors[6] # len(neighs)==6 or (len(neighs)>6 and (neighs[6][0]-neighs[5][0]>1e-3))
-    if best_so_far>0.1 and have_six_neighbors:
+    if best_so_far>cutoff_for_best and have_six_neighbors:
         # likely not octahedra, hence checking for trigonal prism
         # Could not find something in literature, hence long elaborate algorithm.
         N=6
@@ -268,7 +308,6 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         ph0[0]=3*pi          # for searching for the minimum we eliminate first atom.
         (j1,j2) = Find_two_closest_smallest_values(ph0, range(1,N)) # Now finding two other neighbors in triangle with 0.
         #print('ph['+str(j1)+']=',ph0[j1]*180/pi,'ph['+str(j2)+']=',ph0[j2]*180/pi)
-        
         n1 = (rij[0]+rij[j1]+rij[j2]) # unit vector from the origin to the center of the triangle. It is along the trigonal prism.
         n1 *= 1./linalg.norm(n1)
         #print('n1=', n1)
@@ -284,6 +323,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
             n03 = rjk[0,j]/djk[0,j]  #== (rij[0]-rij[j])/linalg.norm(rij[0]-rij[j])
             in_direction_n1[j] = dot(n03,n1)  # is vector from j to 0 in direction of n1?
             #print('j=', j, 'n03=', n03, 'in_dir=', in_direction_n1[j])
+        #print('in_direction_n1=', in_direction_n1, file=log)
         j3 = argmax(in_direction_n1) # find the best one, for which vector 0->j3 is along n1.
         #print('j3=', j3)
         in_direction_n1 = zeros(N)
@@ -300,7 +340,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         # by the direction to both triangles formed by [0,j1,j2] and [j3,j4,j5]
         nx = (rij[0]+rij[j1]+rij[j2])-(rij[j3]+rij[j4]+rij[j5])
         nx *= 1/linalg.norm(nx)
-        #print('nx=', nx)
+        #print('nx=', nx, 'js=', [0,j1,j2,j3,j4,j5], rij[[0,j1,j2,j3,j4,j5],:], file=log)
 
         prism_vol = abs(cross(triangle_1,triangle_2) @ nx)
         #print('prism_vol=', prism_vol, file=log)
@@ -311,6 +351,8 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         paral_0_j3 = dot(nx,rjk[0,j3]/djk[0,j3])
         paral_j1_j4 = dot(nx,rjk[j1,j4]/djk[j1,j4])
         paral_j2_j5 = dot(nx,rjk[j2,j5]/djk[j2,j5])
+        #print('paral=', paral_0_j3, paral_j1_j4, paral_j2_j5, 'vol=', prism_vol, file=log)
+        
         chi2 = (abs(paral_0_j3-1)+abs(paral_j1_j4-1)+abs(paral_j2_j5-1))*1.5
         chi2r = 2*exp(-prism_vol*20) # volume should not be zero
         # We accept trigonal prism with triangle which is not necessary equilateral, but can have
@@ -319,6 +361,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         chi3 = min(abs(phi[0,j1]-phi[0,j2]),abs(phi[0,j1]-phi[j1,j2]),abs(phi[0,j2]-phi[j1,j2]))
         chi3 +=min(abs(phi[j3,j4]-phi[j3,j5]),abs(phi[j3,j4]-phi[j4,j5]),abs(phi[j3,j5]-phi[j4,j5]))
         chi3 *= 2*pi
+        #print('chi2=', chi2, 'chi3=', chi3, 'chi2r=', chi2r, file=log)
         chi2 += chi2r
         print('trying {:15s}: accuracy {:6.3f} <w>-N={:6.3f} <phi>-<phi0>={:6.3f}'.format('trigonal prism',chi2**2+chi3**2,chi2,chi3), file=log)
         if (chi2<max_bond_variance and chi3<max_angle_variance and chi2<best_so_far):
@@ -327,18 +370,49 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
             # we take the largest side of the triangle to lay in the xy plane.
             cases = (djk[0,j1],djk[j1,j2],djk[0,j2])
             if abs(cases[0]-cases[1])<1e-3 and abs(cases[0]-cases[2])<1e-3: # degenerate case
-                nz1 = -(rij[0]+rij[j1]+rij[j3]+rij[j4])
-                nz1 *= 1/linalg.norm(nz1)
                 ny1 = rjk[j1,0]+rjk[j4,j3]
                 ny1 *= 1/linalg.norm(ny1)
-                nz2 = -(rij[j1]+rij[j2]+rij[j4]+rij[j5])
-                nz2 *= 1/linalg.norm(nz2)
+                nz1 = -(rij[0]+rij[j1]+rij[j3]+rij[j4])
+                #print('ny1=', ny1, 'nz1=', nz1, file=log)
+                lnz1 = linalg.norm(nz1)
+                if lnz1<1e-4:
+                    nz1 = cross(nx, ny1)
+                    print('   It seems tensegrity-prism, choosing nz1=', nz1, file=log)
+                else:
+                    nz1 /= lnz1
+                    if linalg.norm(cross(nz1,ny1))<1e-4:
+                        nz1 = cross(nx, ny1)
+                        print('   It seems tensegrity-prism, choosing nz1=', nz1, file=log)
                 ny2 = rjk[j1,j2]+rjk[j4,j5]
                 ny2 *= 1/linalg.norm(ny2)
-                nz3 = -(rij[0]+rij[j2]+rij[j3]+rij[j5])
-                nz3 *= 1/linalg.norm(nz3)
+                nz2 = -(rij[j1]+rij[j2]+rij[j4]+rij[j5])
+                #print('ny2=', ny2, 'nz2=', nz2, file=log)
+                lnz2 = linalg.norm(nz2)
+                if lnz2<1e-4:
+                    nz2 = cross(nx, ny2)
+                    print('   It seems tensegrity-prism, choosing nz2=', nz2, file=log)
+                else:
+                    nz2 /= lnz2
+                    if linalg.norm(cross(nz2,ny2))<1e-4:
+                        nz2 = cross(nx, ny2)
+                        print('   It seems tensegrity-prism, choosing nz2=', nz2, file=log)
                 ny3 = rjk[j2,0]+rjk[j5,j3]
                 ny3 *= 1/linalg.norm(ny3)
+                nz3 = -(rij[0]+rij[j2]+rij[j3]+rij[j5])
+                #print('ny3=', ny3, 'nz3=', nz3, file=log)
+                lnz3 = linalg.norm(nz3)
+                if lnz3<1e-4:
+                    nz3 = cross(nx,ny3)
+                    print('   It seems tensegrity-prism, choosing nz3=', nz3, file=log)
+                else:
+                    nz3 /= lnz3
+                    if linalg.norm(cross(nz3,ny3))<1e-4:
+                        nz3 = cross(nx, ny3)
+                        print('   It seems tensegrity-prism, choosing nz3=', nz3, file=log)
+                #print('nx=', nx, 'ny1=', ny1, 'nz1=', nz1, file=log)
+                #print('nx=', nx, 'ny1=', ny2, 'nz1=', nz2, file=log)
+                #print('nx=', nx, 'ny1=', ny3, 'nz1=', nz3, file=log)
+                
                 Rs = [ResortToDiagonal(array([nx,ny1,nz1])),
                       ResortToDiagonal(array([nx,ny2,nz2])),
                       ResortToDiagonal(array([nx,ny3,nz3]))]
@@ -366,6 +440,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
                     ny3 = rjk[j2,0]+rjk[j5,j3]
                     ny3 *= 1/linalg.norm(ny3)
                     R0_ready = [nx,ny3,nz3]
+            #print('R0_ready=', R0_ready, file=log)
             criteria.insert(0, ('trigonal prism', chi2, chi3) )
         
     # First take the cage, which has most similar angles.
@@ -377,13 +452,14 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         ctype = criteria[1]
     else: # If the second is not OK, we boil out at the moment
         #print('Could not detect the type of environment, Boiling out.')
-        return None
+        return None,None
     print('Found the environment is {:s}  (<w-n>= {:8.3f},<phi>= {:8.3f})'.format(*ctype), file=log)
     
     if ctype[0]=='octahedra':
+        N=6
         # Now that we know it is octahedra, we take all vectors to atoms, and construct the best coordinate system that
         # goes through these atoms
-        nis = [rij_norm[i] for i in range(6)] # all unit vectors, but list
+        nis = [rij_norm[i] for i in range(N)] # all unit vectors, but list
         R0=[]
         for i in range(3):
             nu = nis.pop(0)      # first unit vector
@@ -395,10 +471,11 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
     elif ctype[0]=='tetrahedra':
         # Now that we know it is tetrahedra, we take vectors which go through the middle of the two atoms, and construct
         # the best coordinate system with such vectors.
-        n0 = rij[:4] # all unit vectors
+        N=4
+        n0 = rij[:N] # all unit vectors
         nis=[]
-        for i in range(4):
-            for j in range(i+1,4):
+        for i in range(N):
+            for j in range(i+1,N):
                 ni = n0[i]+n0[j]           # new unit vectors are between each pair of vertices
                 ni *=  1./linalg.norm(ni)  # and normalize
                 nis.append(ni)
@@ -412,6 +489,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
             R0.append(n1)       # we have a good unit vector
             #print n1, nu, nv, arccos(cosp[which])*180/pi
     elif ctype[0]=='cube':
+        N=8
         # For each vector to atom, we should find 3 other atoms which have smallest angle between them
         # Now we have four vectors with small angle, which define the phase of a cube.
         # We then sum this four vectors, and get unit vector along x,y, or z
@@ -437,58 +515,88 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         R0 = [nx,ny,nz]
         R0 = [nx,ny,nz]
     elif ctype[0]=='planar quadrilateral':
-        n0 = rij_norm[:4] # all unit vectors
-        # We again take vectors which go through the middle of the two atoms, and construct
-        # the best coordinate system with such vectors.
-        nis=[]
-        for i in range(4):
-            for j in range(i+1,4):
-                ni = n0[i]+n0[j]           # new unit vectors are between each pair of vertices
-                d = linalg.norm(ni)
-                if d>1e-10:
-                    ni *=  1./linalg.norm(ni)  # and normalize
-                nis.append(ni)
-        nrm = linalg.norm(nis,axis=1)
-        indx = sorted(range(len(nis)), key=lambda i:-nrm[i])
-        # the smallest two nis are essentially zero, because the system is complanar. We throw away the two zero vectors.
-        nis_ = [nis[indx[i]] for i in range(0,4)]
-        R0=[]
-        for i in range(2):
-            nu = nis_.pop(0) # first unit vector
-            which = argmin([dot(nu,ni) for ni in nis_] ) # which one has most negative dot product is the opposite
-            nv = nis_.pop(which)  # nv is opposite to nu
-            n1 = nu-nv           # now take the average of the two, which are opposite
-            n1 *= 1./linalg.norm(n1) # and normalize
-            R0.append(n1)       # we have a good unit vector
-        R0.append(cross(R0[0],R0[1])) # because is planar, the z should be out of the plane
+        N=4
+        n0 = rij[:N]
+        olap=zeros((N,N))
+        for i in range(N):
+            for j in range(i,N):
+                olap[i,j] = n0[i] @ n0[j]
+        i_opposite = argmin(olap[0,:])
+        nx = n0[0]-n0[i_opposite]
+        nx *= 1/linalg.norm(nx)
+        remain = [i for i in range(1,4) if i!=i_opposite]
+        j_opposite = argmin(olap[remain[0],:])
+        ny = n0[remain[0]]-n0[j_opposite]
+        ny *= 1/linalg.norm(ny)
+        R0 = [nx,ny,cross(nx,ny)]
+        #
+        ##n0 = rij_norm[:N] # all unit vectors
+        ## We again take vectors which go through the middle of the two atoms, and construct
+        ## the best coordinate system with such vectors.
+        #nis=[]
+        #for i in range(N):
+        #    for j in range(i+1,N):
+        #        ni = n0[i]+n0[j]           # new unit vectors are between each pair of vertices
+        #        d = linalg.norm(ni)
+        #        if d>1e-10:
+        #            ni *=  1./linalg.norm(ni)  # and normalize
+        #        nis.append(ni)
+        #nrm = linalg.norm(nis,axis=1)
+        #indx = sorted(range(len(nis)), key=lambda i:-nrm[i])
+        ## the smallest two nis are essentially zero, because the system is complanar. We throw away the two zero vectors.
+        #nis_ = [nis[indx[i]] for i in range(0,4)]
+        #
+        #print('rij=', n0, file=log)
+        #print('nis_=', nis_, file=log)
+        #
+        #R0=[]
+        #for i in range(2):
+        #    nu = nis_.pop(0) # first unit vector
+        #    olap = [dot(nu,ni) for ni in nis_]
+        #    which = argmin(olap) # which one has most negative dot product is the opposite
+        #    nv = nis_.pop(which)  # nv is opposite to nu
+        #    n1 = nu-nv           # now take the average of the two, which are opposite
+        #    n1 *= 1./linalg.norm(n1) # and normalize
+        #    print('')
+        #    print('nu=', nu, 'olap=', olap, 'which=', which, 'nv=', nv, 'n1=', n1, file=log)
+        #    print('nis_=', nis_, file=log)
+        #    R0.append(n1)       # we have a good unit vector
+        #R0.append(cross(R0[0],R0[1])) # because is planar, the z should be out of the plane
     elif ctype[0]=='peak-of-tetrahedron':
-        nz = -(rij[0]+rij[1]+rij[2])/3.
-        nz_length = linalg.norm(nz)
-        if (nz_length > 1e-10):
-            nz *= 1./linalg.norm(nz)
-            n1 = rij[0]-(rij[0]@nz)*nz
-            n1 *= 1./linalg.norm(n1)
-            n2 = rij[1]+rij[2]-((rij[1]+rij[2])@nz)*nz
-            n2 *= 1./linalg.norm(n2)
-            nx = (n1-n2)/linalg.norm(n1-n2)
-            ny = cross(nz,nx)
+        N=3
+        vol = cross(rij[0],rij[1]) @ rij[2]
+        n_base = cross(rij[1]-rij[0], rij[2]-rij[0])
+        n_base *= 1./linalg.norm(n_base)
+        hv = (rij[0]+rij[1]+rij[2])/3.
+        h = abs(hv @ n_base)              # height
+        ra = (dist[0]+dist[1]+dist[2])/3. # average distance
+        #print('vol=', vol, 'h/(ra/3)=', h/(ra/3), file=log)
+        if vol>10 and (h > 0.5*ra/3 and h < 2*ra/3):
+            # if tetrahedron has sufficient volume so that it is not just in-plane
+            R0= [rij_norm[0], rij_norm[1], rij_norm[2]]
         else:
-            n1 = rij_norm[0]
-            n2 = rij[1]+rij[2]
-            n2 *= 1/linalg.norm(n2)
-            nx = (n1-n2)/linalg.norm(n1-n2)
-            ny = rij[1]-rij[2]
-            ny = ny - (ny@nx)*nx
-            ny *= 1/linalg.norm(ny)
-            nz = cross(nx,ny)
-        R0=[nx,ny,nz]
+            #nz = -hv
+            nz_length = linalg.norm(hv)
+            if (nz_length > 1e-5):
+                nz = -hv/nz_length
+                n1 = rij[0]-(rij[0]@nz)*nz
+                n1 *= 1./linalg.norm(n1)
+                n2 = rij[1]+rij[2]-((rij[1]+rij[2])@nz)*nz
+                n2 *= 1./linalg.norm(n2)
+                nx = (n1-n2)/linalg.norm(n1-n2)
+                ny = cross(nz,nx)
+            else:
+                n1 = rij_norm[0]
+                n2 = rij[1]+rij[2]
+                n2 *= 1/linalg.norm(n2)
+                nx = (n1-n2)/linalg.norm(n1-n2)
+                ny = rij[1]-rij[2]
+                ny = ny - (ny@nx)*nx
+                ny *= 1/linalg.norm(ny)
+                nz = cross(nx,ny)
+            R0=[nx,ny,nz]
     elif ctype[0]=='peak-of-square-piramid':
         N=4
-        nz = -(rij[0]+rij[1]+rij[2]+rij[3])/4.
-        nz_length = linalg.norm(nz)
-        if (nz_length > 1e-10):
-            nz *= 1./nz_length
-        #print('nz=', nz, file=log)
         djk0 = linalg.norm(rij[1:N]-rij[0],axis=1)
         i_diagonal = argmax(djk0)+1               # this one is on diagonal of the square
         which = [i for i in range(1,4) if i!=i_diagonal] # these two are nearest neighbors in a square
@@ -500,14 +608,24 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         nx *= 1/linalg.norm(nx)
         ny = n2-n3
         ny *= 1/linalg.norm(ny)
+
+        vol = abs(cross(rij[0],rij[which[0]]) @ rij[i_diagonal])+(cross(rij[0],rij[which[1]]) @ rij[i_diagonal])
+        #print('vol2=', vol, file=log)
         #print('i_diagonal=', i_diagonal, 'which=', which, file=log)
         #print('n1=', n1, 'n2=', n2, 'n3=', n3, 'n4=', n4, file=log)
         #print('nx=', nx, 'ny=', ny, file=log)
-        if nz_length < 0.05:
+        if (vol>0.5):
+            nz = -(rij[0]+rij[1]+rij[2]+rij[3])/4.
+            nz_length = linalg.norm(nz)
+            if (nz_length > 1e-10):
+                nz *= 1./nz_length
+            #print('nz=', nz, file=log)
+        else:
             # if the piramid is completely squashed, we can not
             nz = cross(nx,ny)
-        R0=[nx,ny,nz]
+        R0=[(nx+ny)/sqrt(2),(nx-ny)/sqrt(2),nz]
     elif ctype[0]=='peak-of-hexagonal-piramid':
+        N=6
         ix = argmax(rij_norm[:6,0])
         nx = rij_norm[ix]
         pr = rij_norm[:6,:] @ nx
@@ -522,6 +640,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         nz = cross(nx,ny)
         R0 = [nx,ny,nz]
     elif ctype[0]=='cuboctahedron':
+        N=12
         djk = zeros((N,N))   # and their distances
         for j in range(N):
             for k in range(j+1,N):
@@ -569,27 +688,30 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
         n3_better *= 1/linalg.norm(n3_better)
         R0 = [n1_better, n2_better, n3_better]
     elif ctype[0]=='truncated tetrahedron':
+        N=12
         #rt = array([[3, 1, 1],[1, 3, 1],[1, 1, 3],[-3, -1, 1],[-1, -3, 1],[-1, -1, 3],
         #        [-3, 1, -1],[-1, 3, -1],[-1, 1, -3],[3, -1, -1],[1, -3, -1],[1, -1, -3]])
-        print('ERROR: Not yet implemented! You should work on this....', file=log)
+        print('WARNING:ERROR: truncated tetrahedron not yet implemented! You should work on this....', file=log)
         R0=identity(3)
     elif ctype[0]=='trigonal prism' or ctype[0]=='square prism with base':
         R0 = R0_ready
+        N=6 if ctype[0]=='trigonal prism' else 5
     elif ctype[0]=='square-piramid':
-        #var0 = np.var(angs, axis=1)
-        #itop = argmin(var0)
-        #base = list(range(N))
-        #base.remove(itop)
-        #top_to_base = mean(angs[itop])
-        n2 = sum(rij[base],axis=0)
+        N=5
+        var0 = np.var(angs, axis=1)
+        itop = argmin(var0) # index of the top atom
+        base = list(range(N))
+        base.remove(itop)   # index to the points in the base of piramid
+        r_base = rij[base]  # these vectors should be in the same plane.
+        n2 = sum(r_base,axis=0)
         n2 *= 1/linalg.norm(n2)
         n1 = rij_norm[itop]
-        nz = n1-n2
+        nz = n1-n2 if dot(n1,n2)<0 else n1+n2
         nz *= 1/linalg.norm(nz)
-        j1 = base[0]
+        j1 = base[0]            # first atom in the base
         phi[j1,j1]=2*pi
-        j2 = argmin(phi[j1,:5])
-        #print('base=', base, 'itop=', itop, 'j1=', j1, 'j2=', j2)
+        phi[j1,itop]=2*pi
+        j2 = argmin(phi[j1,:5]) # j2 is closest neigbor of j1 in the base
         j3,j4 = list( set(range(5))-set([itop,j1,j2]) )
         nx = rij[j1]+rij[j2]-(rij[j3]+rij[j4])
         nx -= (nx @ nz)* nz
@@ -601,23 +723,50 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.7, max_angle_variance
             ny -= rij[j3]-rij[j4]
         ny -= (ny @ nz)* nz
         ny *= 1/linalg.norm(ny)
+        #print('n2=', n2, 'n1=', n1, 'nz=', nz, file=log)
+        #print('base=', base, 'itop=', itop, 'j1=', j1, 'j2=', j2, file=log)
+        #print('nx=', nx, 'ny=', ny, file=log)
+        #R0 = [nx,ny,nz]
+        # We decided to rotate for pi/2 around z axis
+        R0 = [(nx+ny)/sqrt(2),(nx-ny)/sqrt(2),nz]
+    elif ctype[0]=='triangular-bipyramid':
+        N=5
+        top_bot = bipyramid_ind[0:2]
+        base = bipyramid_ind[2:N]
+        #print('base=', base, 'top_bot=', top_bot, file=log)
+        #print('r_base=', rij[base], file=log)
+        #print('r_tb = ', rij[top_bot], file=log)
+        nz = rij[top_bot[0]] - rij[top_bot[1]]
+        nz *= 1/linalg.norm(nz)
+        #print('nz=', nz, file=log)
+        #imin = argmin(dist[base])
+        imax = argmax(dist[base])
+        imax = base[imax]
+        #print('imax=', imax, file=log)
+        ny = rij[imax]
+        ny *= 1/linalg.norm(ny)
+        #print('ny=', ny, file=log)
+        base.remove(imax)
+        nx = (rij[base[0]]-rij[base[1]])
+        nx *= 1/linalg.norm(nx)
+        #print('nx=', nx, file=log)
         R0 = [nx,ny,nz]
     else:
-        print('Noy yet implemented')
-        sys.exit(0)
+        print('Noy yet implemented', file=log)
+        return None,None
     
     #for i in range(3): print( ('{:12.8f} '*3).format(*R0[i]))
     # Now orthogonalizing the set of vectors
     U,S,V = linalg.svd(R0)
 
-    if (min(S)<0.6 or max(S)>1.4):
+    if (min(S)<0.3 or max(S)>2.):
         print('WARN: Since singular values are far from unity (S=',S, ') we decided that this polyhedron is a bad choice. Resorting to global coordinate axis.', file=log)
-        return None
+        return None,None
     
     R = dot(U,V)
     R = ResortToDiagonal(R)
     print('singular values=', S, file=log)
-    return R
+    return R,N
 
 def ResortToDiagonal(R):
     # We now resort, so that the rotation is close to identity
@@ -713,7 +862,7 @@ if __name__ == '__main__':
         neighbrs.append([dst,name,neigh,0])
     # Main part of the algorithm
     log = sys.stdout
-    R = FindCageBasis(neighbrs, S2C, log)
+    R,N = FindCageBasis(neighbrs, S2C, log)
     if R is not None:
         Rf = R @ to_frac
         print('Rotation to input into case.indmfl by locrot=-1 : ', file=log)

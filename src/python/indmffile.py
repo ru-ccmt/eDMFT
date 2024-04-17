@@ -8,8 +8,9 @@ note: self.cps  -> self.cix
 """
 import operator, os, re, sys
 from copy import deepcopy
+import copy
 from os.path import isfile
-from numpy import array, log, sign, mod, zeros
+from numpy import array, log, sign, mod, zeros, shape, bmat, asarray
 from functools import reduce
 from utils import L2str, L2num
 
@@ -76,9 +77,9 @@ class IndmfBase:
 
     Derived classes are responsible for filling in self.cixgrp
     '''
-    def __init__(self, case):
+    def __init__(self, case, extn='indmf'):
         self.case = case
-        self.extn = 'indmf'      # derived classes should override this
+        self.extn = extn      # derived classes should override this
         self.initvars()
         self.__create_inverses()
         
@@ -649,8 +650,8 @@ class Indmfl(IndmfBase):
     EF = fermi level in eV
     '''
     def __init__(self, case, extn='indmfl'):
-        IndmfBase.__init__(self, case)
-        self.extn = extn #'indmfl'
+        IndmfBase.__init__(self, case, extn)
+        #self.extn = extn #'indmfl'
 
         # Finding the chemical potential
         EF_exists = os.path.isfile('EF.dat')
@@ -693,7 +694,9 @@ class Indmfl(IndmfBase):
         return IndmfBase.member_vars(self) + myvars
 
     def read(self, filename = None):
-        if filename==None: filename=self.case+'.indmfl'
+        if filename==None:
+            #filename=self.case+'.indmfl'
+            filename = self.case+'.'+self.extn
         lines = self.readlines(filename)
         self.parse_head(lines)
         self.emin, self.emax = self.hybr_emin, self.hybr_emax
@@ -844,15 +847,38 @@ class Indmfl(IndmfBase):
         if self.emin==0 and self.emax==0:
             string += 'WARNING Projector is not yet set!\n'
         return string
-
+    def copy(self):
+        copy_inl = Indmfl(self.case)
+        for attr,val in vars(self).items():
+            setattr(copy_inl, attr, copy.copy(val))
+        return copy_inl
+    
 class Indmfi:
-    def __init__(self, indmfl):
+    def __init__(self, indmfl, indmfldn=None):
         self.case = indmfl.case
         self.sigind={}
-        #print('cixgrp=', indmfl.cixgrp)
+        self.cix2atom={}
+        sigvals=set()
         for icix,cixs in indmfl.cixgrp.items():
             icx = cixs[0]  # just take sigind of first correlated problem  (TODO: modify appropriately for broken symmetry runs)
-            self.sigind[icx] = indmfl.siginds[icx]
+            if indmfldn==None:
+                self.sigind[icx] = indmfl.siginds[icx]
+                self.cix2atom[icx] = indmfl.cix[icx][0][0]
+            else:
+                sigind1 = indmfl.siginds[icx]
+                sigind2 = indmfldn.siginds[icx]
+                c_sigvals = set(sigind1.ravel())-{0}
+                d_sigvals = set(sigind2.ravel())-{0}
+                u = set.intersection(sigvals, c_sigvals) # checking if these sigind has already appeared. Than we don't need to define new impurity
+                v = set.intersection(sigvals, d_sigvals) # if did not appear yet, we found new impurity
+                sigvals.update(c_sigvals)
+                sigvals.update(d_sigvals)
+                if len(u)==0 or len(v)==0:
+                    zros = zeros(shape(sigind1), dtype=int)
+                    sigs = bmat([[sigind1, zros], [zros, sigind2]])
+                    self.sigind[icx] = asarray(sigs)
+                    self.cix2atom[icx]=indmfl.cix[icx][0][0]
+    
     def write(self):
         with open(self.case + '.indmfi', 'w') as f:
             print(len(self.sigind), '  # number of sigind blocks', file=f)
@@ -862,7 +888,11 @@ class Indmfi:
                 print(sigind.shape[0], '  # dimension of this sigind block', file=f)
                 max_sigfig = 1 + int(log(max(sigind.flat))/log(10))
                 format = '{:'+str(max_sigfig)+'d} '
-                for row in sigind:
+                #print('sigind=', type(sigind), sigind)
+                for j in range(dim):
+                    row  = sigind[j,:]
+                    #print('shape(row)=', shape(row))
+                    #print('dim=', dim, 'format=', format, 'row=', row)
                     print((format*dim).format(*row), file=f)
             f.close()
     
@@ -879,3 +909,17 @@ def ParsIndmfi(case):
         iSiginds[icix] = array(imp,dtype=int)
     return iSiginds
 
+if __name__ == '__main__':
+    import utils
+    w2k = utils.W2kEnvironment() 
+    inl = Indmfl(w2k.case)
+    inl.read()
+
+    inldn = inl.copy()
+
+    inldn.siginds[1], inldn.siginds[2] = inl.siginds[2], inl.siginds[1]
+    
+    for cix in inl.siginds:
+        print(cix, inl.siginds[cix])
+        print(cix, inldn.siginds[cix])
+    
