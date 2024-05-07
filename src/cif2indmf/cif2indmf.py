@@ -71,14 +71,21 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
        If the group has a single atom which is electron-negative, we just add to it the next shell
        of atoms with the same distance.
     """
+    name_me = Element_name(strc.aname[jatom])
     name0 = Element_name(strc.neighbrs[jatom][0][1]) # which element?
     possible=[name0]                                 # definitely all atoms of this element
     if name0 in sym_elements: possible.extend(sym_elements[name0])
+
+    #print('name0=', name0, 'possible=', possible, 'name_me=', name_me)
+    
     n=0
     for ngh in strc.neighbrs[jatom]:
         if Element_name(ngh[1]) not in possible:
             break
         n+=1
+    n0=n
+    #print('n=', n)
+    
     if n>1:
         neighbrs = strc.neighbrs[jatom][:n]
         if n>2: # with three or more vertices I can calculate polyhedron
@@ -90,7 +97,10 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
                 if ngh[0]-dst1>1e-3:
                     break
                 n+=1
-            neighbrs = strc.neighbrs[jatom][:n]
+            if n>6 and name0==name_me:
+                neighbrs = strc.neighbrs[jatom][n0:n]
+            else:
+                neighbrs = strc.neighbrs[jatom][:n]
         n_str=0
     else: # n==1
         #print('electronegativity=',strc.neighbrs[jatom][0][3])
@@ -129,14 +139,23 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
 
 def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty', onreal=False,
               fixmu=False,beta=50, QMC_M=5e6, CoulombU=None, CoulombJ=None,
-              qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log'):
+              qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log', keepH=False, ndecimals=3):
     case = os.path.splitext(fcif)[0] # get case
 
-    (strc, lat) = Cif2Struct(fcif, Nkp, writek, Qmagnetic, logfile, cmp_neighbors=True)
+    (strc, lat) = Cif2Struct(fcif, Nkp, writek, Qmagnetic, logfile, cmp_neighbors=True, convertH2R=not keepH, ndecimals=ndecimals)
 
     log = open(logfile, 'a')
 
     matrix_w2k = lat.rbas_conventional
+    #if strc.H2Rtrans:
+    #    possible_matrix_w2k = strc.hex2rho @ lat.rbas
+    #    
+    #    print(('hexagonal setting M=\n'+('{:9.5f} '*3+'\n')*3).format(*ravel(matrix_w2k)), file=log)
+    #    print('V_hex=', linalg.det(matrix_w2k), file=log)
+    #    print(('rhombohedral settin M=\n'+('{:9.5f} '*3+'\n')*3).format(*ravel(possible_matrix_w2k)), file=log)
+    #    print('V_rom=', linalg.det(possible_matrix_w2k), file=log)
+    #    matrix_w2k = possible_matrix_w2k
+        
     matrix_vesta = strc.Matrix(vesta=True)
     
     indx=0
@@ -172,6 +191,7 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
     #    type_atom[first_atom[i]]=i
         
     to_frac = linalg.inv(matrix_w2k)
+    to_frac_I = matrix_w2k
     vesta_vs_w2k = to_frac @ matrix_vesta
     icix=1
     cixgrp={}
@@ -213,10 +233,15 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
                             break
                     if Found_Rotation:
                         Rt = linalg.inv(Rx)
-                        R = Rj[similar] @ Rt.T
+                        Rtt = to_frac @ Rt.T @ to_frac_I
+                        R = Rj[similar] @ Rtt
+                        #R = Rj[similar] @ Rt.T
                         Found_equivalent=True
                         print('Accepting above transformation to transform local axis of '+strc.aname[similar]+' to axis of',
                                   strc.aname[jatom]+' at ',strc.pos[first_atom[jatom]],file=log)
+                        print('Using transformation:', file=log)
+                        for j in range(3):
+                            print('    [{:10.6f},{:10.6f},{:10.6f}]'.format(*Rtt[j,:]), file=log)
             if not Found_equivalent:
                 R, nnn = SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log)
         else:
@@ -249,6 +274,12 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
             print('Rotation in fractional coords : ', file=log)
             print(file=log)
             for i in range(3): print( ('{:12.8f} '*3).format(*Rf[i,:]*strc.tobohr), file=log)
+            #if strc.H2Rtrans:
+            #    Rff = Rf @ strc.hex2rho
+            #    print(file=log)
+            #    print('Rotation in fractional coords and rhombohedral settings: ', file=log)
+            #    print(file=log)
+            #    for i in range(3): print( ('{:12.8f} '*3).format(*Rff[i,:]*strc.tobohr), file=log)
             print(file=log)
             print('Rotation for VESTA coords : ', file=log)
             print(file=log)
@@ -456,6 +487,8 @@ if __name__ == '__main__':
     parser.add_option('-M', '--QMC_M',   dest='QMC_M', type=float, default=5e6, help="Number of MC steps per core (default = 5M)")
     parser.add_option('-q', '--qsplit',  dest='qsplit', type=int, default=2, help="qsplit (default = 2)")
     parser.add_option('-m', '--magnet',  dest='Qmagnetic', action='store_true', default=False, help="should produce magnetic dft struct that allows broken symmetry from mcif")
+    parser.add_option('-H', '--hexagonal',dest='keepH', action='store_true', default=False, help="switches off hexagonal to rhombohedral conversion")
+    parser.add_option('-p', '--ndecimals',  dest='ndecimals', type='int', default=3, help="precision when determining the equivalency of atoms we take nn distance with precision ndecimals. Compatible with w2k nn method.")
     
     # Next, parse the arguments
     (options, args) = parser.parse_args()
@@ -469,5 +502,5 @@ if __name__ == '__main__':
         cor = expand_intlist(options.cor)
     
     Cif2Indmf(fcif, cor, options.so, options.Qmagnetic, options.DC, options.real, options.fixmu, options.beta, options.QMC_M, options.CoulombU, options.CoulombJ,
-                  options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log)
+                  options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log, keepH=options.keepH, ndecimals=options.ndecimals)
 

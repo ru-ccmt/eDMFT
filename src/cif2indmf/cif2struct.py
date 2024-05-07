@@ -28,8 +28,8 @@ class WStruct:
         self.tobohr = 1/0.5291772083
         hex2ort = array([[0,1,0],[sqrt(3.)/2.,-0.5,0],[0,0,1]])
         ort2rho = array([[1/sqrt(3),1/sqrt(3),-2/sqrt(3)],[-1,1,0],[1,1,1]])
-        hex2rho = hex2ort @ ort2rho
-        self.rho2hex = linalg.inv(hex2rho)
+        self.hex2rho = hex2ort @ ort2rho
+        self.rho2hex = linalg.inv(self.hex2rho)
         self.HRtransf = False
         self.inAngs = inAngs
         
@@ -71,14 +71,14 @@ class WStruct:
                           [-self.b*sin_alpha*cos_gamma,self.b*sin_alpha*sin_gamma,self.b*cos_alpha],
                           [0, 0, self.c]])
         
-    def ScanCif(self, filein, log=sys.stdout, writek=False, Qmagnetic=True, cmp_neighbors=False):
+    def ScanCif(self, filein, log=sys.stdout, writek=False, Qmagnetic=True, cmp_neighbors=False, convertH2R=True, ndecimals=3):
         """ Here is the majority of the algorithm to convert cif2struct.
         We start by allocating CifParser_W2k, which reads cif using paymatgen, and 
         extracts necessary information.
         Below we than arrange this information in the way W2k needs it in struct file.
         
         """
-        cif = CifParser_W2k(filein, log, Qmagnetic, cmp_neighbors)
+        cif = CifParser_W2k(filein, log, Qmagnetic, cmp_neighbors, ndecimals)
         
         nsym = len(cif.parser.symmetry_operations)
         self.timat = zeros((nsym,3,3),dtype=int)
@@ -197,23 +197,51 @@ class WStruct:
                 print('{:10.6f} {:10.6f} {:10.6f}'.format(*pos), file=log)
         
         # Correcting for W2k settings, found in cif2struct
+        # Note that this Hexagonal versus Rhombohedral settings is still somewhat misterious in w2k, and this algorithm probably does not work in general
+        self.H2Rtrans = False
+        if convertH2R and (self.sgnum in [146,148,155,160,161,166,167]): # trigonal groups with R : [R3,R-3,R32,R3m,R3c,R-3m,R-3c]
+            if abs(self.alpha-90)<1e-5 and abs(self.beta-90)<1e-5 and abs(self.gamma-120)<1e-5: # trigonal, but w2k wants hexagonal settings
+                case1 = array([1,2,2])  # (1/3,2/3,2/3)
+                case2 = array([1,1,2])  # (1/3,1/3,2/3)
+                hexagonal_copies=0
+                for isym in range(len(self.tau)):
+                    if array_equal(self.timat[isym],identity(3,dtype=int)):
+                        if sum(abs(self.tau[isym,:]))!=0:
+                            dR = sort(self.tau[isym,:]*3)
+                            if sum(abs(dR-case1))<1e-5 or sum(abs(dR-case2))<1e-5:
+                                hexagonal_copies += 1
+                print('hexagonal_copies=',hexagonal_copies, file=log)
+                if hexagonal_copies==2:
+                    print('Hexagonal copies of atoms exist, hence eliminating (1/3,2/3,2/3)&(2/3,1/3,1/3) shifts ', file=log)
+                    self.H2Rtrans = True
+                    self.lattyp = 'R'
+        
         RHtransf = False
         RHexeption = False
         if self.sgnum in [146,148,155,160,161,166,167]: # trigonal groups with R : [R3,R-3,R32,R3m,R3c,R-3m,R-3c]
             small = 1e-6
-            if abs(self.alpha-90)<small and abs(self.beta-90)<small and abs(self.gamma-120) < small: # trigonal, but w2k pretends it is hexagonal
-                self.lattyp = 'H'
-                RHexeption = True
+            if abs(self.alpha-90)<small and abs(self.beta-90)<small and abs(self.gamma-120) < small: # trigonal, but w2k wants hexagonal settings
+                if not self.H2Rtrans:
+                    self.lattyp = 'H'
+                    RHexeption = True
             else:
-                # self.lattyp should be 'R'
+                #if self.lattyp!='R':
+                #    print('ERROR: cif.lattyp should be R but it is ', self.lattyp, file=log)
+                self.lattyp = 'R'
                 RHtransf = True
-                aa = self.a*2.0*sin(self.alpha/180*pi/2)
+                aa = self.a*2.0*sin(self.alpha/2*(pi/180))
                 bb = aa
                 cc = 3*sqrt(self.a**2 - aa**2/3)
                 self.a, self.b, self.c = aa, bb, cc
                 self.alpha, self.beta, self.gamma = 90., 90., 120.
                 print('WARNING: We are changing trigonal group '+str(self.sgnum)+' to equivalent hexagonal settings. However, we choose alpha,beta,gamma=90,90,120, which might not be appropriate.', file=log)
                 print('If errors, please correct this algorithm in cif2struct.py', file=log)
+                #for spec in cif.w2k_coords:
+                #    for ipos,pos in enumerate(cif.w2k_coords[spec]):
+                #        pos1 = (pos @ self.rho2hex) % 1.0
+                #        print('Changed pos {:10.6f} {:10.6f} {:10.6f} to {:10.6f} {:10.6f} {:10.6f}'.format(*pos,*pos1), file=log)
+                #        pos1 = pos
+                
                 
         if self.sgnum in [143,144,145,147,149,150,151,152,153,154,156,157,158,159,162,163,164,165,168,169,170,171,172,
                               173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194]:
@@ -238,20 +266,24 @@ class WStruct:
                         if pos[0]!=0.0 and pos[1]!=0 and 1e-15<abs(pos[0]+pos[1])<small:
                             print(':WARNING: trigonal or hexagonal SG: position for '+spec+':pos['+str(ipos)+',:2]='+str(pos[:2])+'->',pos[0],-pos[0], file=log)
                             pos[1] = -pos[0]
-
+        
         # Remove atoms that don't belong into primitive unit cell, as per w2k requirement
-        if self.lattyp in ['B', 'F', 'CXY', 'CXZ', 'CYZ']:
+        vol_ratio = {'B':2, 'F':4, 'CXY':2, 'CXZ':2, 'CYZ':2, 'R':3 }
+        if self.lattyp in ['B', 'F', 'CXY', 'CXZ', 'CYZ'] or self.H2Rtrans:
             i_w2k = 0
+            To_correct={}
+            To_correct_indx={}
             indx_kept=[]
+            indx_to_remove=[]
             the_same = TheSame(self.lattyp)
             for spec in cif.w2k_coords:
                 all_coords = cif.w2k_coords[spec]
-                #print(spec,'all_coords=', all_coords, file=log)
-                #print('shifts=')
-                #for i in range(len(the_same.tv)):
-                #    print(i, the_same.tv[i])
+                #print('   all_coords['+spec+']=', len(all_coords), file=log)
+                #for i in range(len(all_coords)):
+                #    print('      ', all_coords[i].tolist(), file=log)
                 kept = [0]
                 indx_kept.append(i_w2k)
+                i_w2k_start = i_w2k
                 i_w2k += 1
                 for i in range(1,len(all_coords)):
                     Qunique = True
@@ -264,41 +296,203 @@ class WStruct:
                         indx_kept.append(i_w2k)
                     i_w2k += 1
                 to_remove=set(range(len(all_coords)))-set(kept)
-                print(spec, ': ', 'out of ', len(cif.w2k_coords[spec]), 'atoms we keep=', kept, file=log)
+                ratio = len(cif.w2k_coords[spec])/len(kept)
+                print(spec, ': ', 'out of ', len(cif.w2k_coords[spec]), 'atoms we keep=', len(kept),':', kept, file=log)
+                if (fabs(ratio-vol_ratio[self.lattyp])>1e-3):
+                    print('ERROR: conventional/primitive volume ratio is', vol_ratio[self.lattyp], 'while # atoms kept ratio=', ratio, file=log)
+                    To_correct[spec] = copy(cif.w2k_coords[spec])
+                    To_correct_indx[spec]= range(i_w2k_start,i_w2k_start+len(cif.w2k_coords[spec]))
+                    _indx_kept_ = array(indx_kept)
+                    indx_to_remove += _indx_kept_[ logical_and(_indx_kept_ >= i_w2k_start, _indx_kept_ < i_w2k) ].tolist()
+                    print('indx_to_remove=', indx_to_remove, file=log)
+                    
                 for i in sorted(to_remove, reverse=True):
                     del cif.w2k_coords[spec][i]
-                print(spec, ':', 'end up with', len(cif.w2k_coords[spec]), file=log)
+                #print(spec, ':', 'end up with', len(cif.w2k_coords[spec]), file=log)
             #for i in range(len(indx_kept)):
             #    print('indx_kept['+str(i)+']=', indx_kept[i], file=log)
+            if len(To_correct)>0:
+                #------------------------------------------------------------------------------------------------------------
+                # The algorithm below is correcting special rare cases in which not enough group operations are removed during
+                # construction of subgroups for magnetic up/dn calculation. Namely, when magnetic *.mcif is used, we 
+                # produce structure file for up spin and down spin separately. But many group operations of the magetic space
+                # group must be removed. In previous algorithm we already removed most such group operations, because they don't
+                # preserve spin orientation. However, some group operations might preserve spin orientations, but would still not
+                # be part of the space group for separate up/dn calculation. This issue is reflected in the removal of atoms that 
+                # are not part of the primitive unit cell. We might keep too many atoms in the primitive cell, because their grouping
+                # into equivalent groups was not correctly performed above. This is because too many group operations were left in 
+                # cif.parser.symmetry_operations.
+                # We attempt to correct for this problem by the following algorithm:
+                #   if number of removed atoms going from conventional to primitive unit cell is equal to the volume reduction,
+                #       nothing needs to be done
+                #   If reduced number of atoms going from conventional to primitive unit cell does not match volume reduction,
+                #       we check which atoms in such subgroup are missplaced. This is achieved by checking if all atoms considered
+                #       equivalent can be generated by applying all symmetry operations. If an atom can not generate all equivalent
+                #       atoms, we try to place it in anothe subgroup of the same element. If alternative placement now allows one to 
+                #       generate all equivalent atoms in the alternative subgroup, we place such atom in the alternative subgroups. 
+                #       After such reshufling we eliminate again all atoms not in primitive cell, and check if reduced number of atoms 
+                #       matches volume reduction of the primitive cell. If yes, we successfuly regrouped atoms. If no, we stop, 
+                #       and algorithm should be improved.
+                #-------------------------------------------------------------------------------------------------------------
+                Exchange=[]
+                for spec in To_correct:
+                    all_coords = To_correct[spec]
+                    print('To_correct['+str(spec)+']=', len(To_correct[spec]), file=log)
+                    for i in range(len(all_coords)):
+                        print('      {:2d}'.format(i), all_coords[i].tolist(), 'ind=', To_correct_indx[spec][i], file=log)
+                    
+                    to_correct=[]
+                    for k in range(len(all_coords)):
+                        equivs=[k]+[i for i in range(len(all_coords)) if i!=k and the_same(all_coords[i], all_coords[k])]
+                        print('equivs['+str(k)+']=', equivs, file=log)
+                        if len(equivs)!=vol_ratio[self.lattyp]:
+                            to_correct.append(k)
+                    print('to_correct=', to_correct, file=log)
+                    spcs = [spc for spc in To_correct if spc!=spec and Element_name(spc)==Element_name(spec)]
+                    print('spcs=', spcs, file=log)
+                    Nsym = len(cif.parser.symmetry_operations)
+                    for k in to_correct:
+                        coord = all_coords[k]
+                        is_equivalent={}
+                        ncoords = zeros((Nsym,3))
+                        for ig,op in enumerate(cif.parser.symmetry_operations): # loop over all symmetry operations
+                            ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
+                            ncoords[ig] = ncoord
+                            dx = sum(abs(all_coords - ncoord),axis=1)
+                            #print('ncoord=', ncoord, 'dx=', dx, file=log)
+                            if any(dx<1e-5):
+                                ie = argmin(dx)
+                                if ie not in is_equivalent:
+                                    is_equivalent[ie] = ig
+                                #print('is_equivalent=', is_equivalent, file=log)
+                                #print('ncoord=', ncoord, '=coord['+str(ie)+']=', all_coords[ie], file=log)
+                        print('Checking', spec+'['+str(k)+'] with r=', coord, 'and len(all_coords)=', len(all_coords),
+                                  'is_equivalent to how_many=', len(is_equivalent), file=log)
+                        #print('  is_equivalent['+str(k)+']=', len(is_equivalent), is_equivalent, file=log)
+                        if len(is_equivalent)<len(all_coords):
+                            for spc in spcs:
+                                is_equivalent2={}
+                                other_coords = To_correct[spc]
+                                print('  Trying to put '+spec+'['+str(k)+'] with '+spc, 'which has # atoms=', len(other_coords), file=log)
+                                for ig in range(Nsym):
+                                    dx = sum(abs(other_coords - ncoords[ig]),axis=1)
+                                    if any(dx<1e-5):
+                                        ie = argmin(dx)
+                                        if ie not in is_equivalent2:
+                                            is_equivalent2[ie] = ig
+                                print('  in '+spc+' is_equivalent to how many=', len(is_equivalent2)+1, file=log)
+                                if len(is_equivalent2)==len(other_coords)-1:
+                                    print('  It seems '+spec+'['+str(k)+'] fits better with '+spc+' hence moving it', file=log)
+                                    Exchange.append( (spec,k,spc,   To_correct_indx[spec][k]) )
+                                    break
+                print('Exchange=', Exchange, file=log)
+                Exchange = sorted(Exchange, key=lambda x: -x[1])
+                print('Exchange=', Exchange, file=log)
+                
+                To_correct2={}
+                for spec in To_correct:
+                    all_coords = To_correct[spec]
+                    To_correct2[spec]=[[] for i in range(len(all_coords))]
+                    for i in range(len(all_coords)):
+                        To_correct2[spec][i] = (To_correct[spec][i], To_correct_indx[spec][i])
+                
+                for spc1,i,spc2,ii in Exchange:
+                    To_correct2[spc2].append(To_correct2[spc1][i])
+                    del To_correct2[spc1][i]
+                
+                for spec in To_correct2:
+                    print('To_correct['+str(spec)+']=', len(To_correct2[spec]), file=log)
+                    for i in range(len(To_correct2[spec])):
+                        print('      {:2d}'.format(i), To_correct2[spec][i][0].tolist(), To_correct2[spec][i][1], file=log)
+
+                for spec in To_correct2:
+                    all_coords = To_correct2[spec]
+                    kept = [0]
+                    for i in range(1,len(all_coords)):
+                        Qunique = True
+                        for kt in kept:
+                            if the_same(all_coords[i][0], all_coords[kt][0]):
+                                Qunique = False
+                                break
+                        if Qunique:
+                            kept.append(i)
+                    to_remove=set(range(len(all_coords)))-set(kept)
+                    ratio = len(To_correct2[spec])/len(kept)
+                    print(spec, ': ', 'out of ', len(To_correct2[spec]), 'atoms we keep=', len(kept),':', kept, file=log)
+                    if (fabs(ratio-vol_ratio[self.lattyp])>1e-3):
+                        print('ERROR: conventional/primitive volume ratio is', vol_ratio[self.lattyp], 'while # atoms kept ratio=', ratio, file=log)
+                        sys.exit(1)
+                    for i in sorted(to_remove, reverse=True):
+                        del To_correct2[spec][i]
+
+                print('before modify: indx_kept=', indx_kept, file=log)
+                indx_where_to_insert = min([indx_kept.index(i) for i in indx_to_remove])
+                print('indx_where_to_insert=', indx_where_to_insert, file=log)
+                indx_kept = [i for i in indx_kept if i not in indx_to_remove]
+                indx_kept_extention=[]
+                for spec in To_correct2:
+                    print('To_correct['+str(spec)+']=', len(To_correct2[spec]), file=log)
+                    for i in range(len(To_correct2[spec])):
+                        print('      {:2d}'.format(i), To_correct2[spec][i][0].tolist(), To_correct2[spec][i][1], file=log)
+                    cif.w2k_coords[spec] = array([To_correct2[spec][i][0] for i in range(len(To_correct2[spec]))])
+                    indx_kept_extention += [To_correct2[spec][i][1] for i in range(len(To_correct2[spec]))]
+                indx_kept = indx_kept[:indx_where_to_insert] + indx_kept_extention + indx_kept[indx_where_to_insert:]
+                print('indx_kept=', indx_kept, file=log)
+                #-----------------------------------------------------------------------------------------------------------------------------
+                        
             in_primitive={}
             for i in range(len(indx_kept)):
                 in_primitive[indx_kept[i]]=i
             for i in in_primitive:
                 print('in_primitive['+str(i)+']=', in_primitive[i], file=log)
-            
         else:
             Nall = sum([len(cif.w2k_coords[spec]) for spec in cif.w2k_coords])
             in_primitive = range(Nall)
-            
+
         print('After removing atoms not in primitive cell, we have the following cif.w2k_coords list:', file=log)
         for spec in cif.w2k_coords:
             for ipos,pos in enumerate(cif.w2k_coords[spec]):
                 print('name='+spec, 'Z='+str(cif.Z_element[spec]), pos, file=log)
-
-        if False: # This is something cif2struct does when it can not find symmetry operations in cif file.
-            if RHexeption:
-                self.HRtransf = True
-            if RHtransf:
-                self.HRtransf = True
                 
-                for spec in cif.w2k_coords:
-                    for pos in cif.w2k_coords[spec]:
-                        pos = dot(pos, self.rho2hex) % 1.0
+        if self.H2Rtrans:
+            for spec in cif.w2k_coords:
+                for i,pos in enumerate(cif.w2k_coords[spec]):
+                    cif.w2k_coords[spec][i] = dot(pos, self.hex2rho) % 1.0
+            # Converting symmetry operations from hexagonal to rhombohedral setting
+            for isym in range(len(self.tau)):
+                #print('operation before trans=', self.timat[isym,:], self.tau[isym,:], file=log)
+                self.timat[isym,:,:] = np.round( self.hex2rho.T @ self.timat[isym,:,:] @ self.rho2hex.T )
+                self.tau[isym,:] = (self.tau[isym,:] @ self.hex2rho) % 1.0
+                #print('operation after  trans=', self.timat[isym,:], self.tau[isym,:], file=log)
+            # Take only unique operations
+            timat_new = [self.timat[0,:,:]]
+            tau_new = [self.tau[0,:]]
+            for isym in range(1,len(self.tau)):
+                Qunique=True
+                for j in range(len(tau_new)):
+                    if sum(abs(self.timat[isym,:,:]-timat_new[j]))<1e-7 and sum(abs(self.tau[isym,:]-tau_new[j]))<1e-7:
+                        Qunique = False
+                if Qunique:
+                    timat_new.append(self.timat[isym,:,:])
+                    tau_new.append(self.tau[isym,:])
+            if len(tau_new)<len(self.tau):
+                self.timat = array(timat_new)
+                self.tau = array(tau_new)
             
-                # stores something in temp file
-            # a lot more code in spacegroup.f
-        #usespg = False
-            
+            print('After converting to rombohedral setting, using', file=log)
+            for i in range(3):
+                print(('{:6.2f}'*3).format(*self.hex2rho[i,:]), file=log)
+            print('  we have the following atoms in primitive cell are:', file=log)
+            for spec in cif.w2k_coords:
+                for ipos,pos in enumerate(cif.w2k_coords[spec]):
+                    print('name='+spec, 'Z='+str(cif.Z_element[spec]), pos, file=log)
+
+            print('Unique:', file=log)
+            for isym in range(len(tau_new)):
+                print('isym=', isym, file=log)
+                for i in range(3):
+                    print(('{:4.0f}'*3).format(*timat_new[isym][i]), '  {:10.5g}'.format(tau_new[isym][i]), file=log)
+                
         self.nat = len(cif.w2k_coords)
         self.mult = [len(cif.w2k_coords[spec]) for spec in cif.w2k_coords]
         self.aname = [spec for spec in cif.w2k_coords]
@@ -321,11 +515,6 @@ class WStruct:
         else:
             self.rmt    = [2.0 for spec in cif.w2k_coords]
             
-        if self.lattyp in ['CXY','CXZ','CYZ','F','B']:
-            # for these Bravais lattices the glide planes should be eliminated from w2k symmetry operations
-            # because w2k adds them in by hand. Hence it is better to generate symmetry operations by w2k initialization
-            # then remove half of the symmetry operations here.
-            self.tau=[]
             
         print(('\npymatgen_conventional=\n'+('\n'.join(['{:9.5f} '*3+' ==a'+str(i+1) for i in range(3)]))).format(
             *ravel(latt_matrix*self.tobohr)), file=log)
@@ -339,8 +528,65 @@ class WStruct:
         #print('isplit=', self.isplit, file=log)
         self.neighbrs = cif.neighbrs
 
+        #if self.lattyp in ['CXY','CXZ','CYZ','F','B']:
+        #    # for these Bravais lattices the glide planes should be eliminated from w2k symmetry operations
+        #    # because w2k adds them in by hand. Hence it is better to generate symmetry operations by w2k initialization
+        #    # then remove half of the symmetry operations here.
+        #    self.tau=[]
+        if self.lattyp in ['B', 'F', 'CXY', 'CXZ', 'CYZ']:
+            #print('Here we have lattyp=', self.lattyp)
+            if self.lattyp=='B':
+                Ltrans = array([[0.5,0.5,0.5]])
+            elif self.lattyp=='F':
+                Ltrans= array([[0,0.5,0.5],[0.5,0,0.5],[0.5,0.5,0]])
+            elif self.lattyp=='CXY':
+                Ltrans=array([[0.5,0.5,0]])
+            elif self.lattyp=='CXZ':
+                Ltrans=array([[0.5,0,0.5]])
+            elif self.lattyp=='CYZ':
+                Ltrans=array([[0,0.5,0.5]])
+            else:
+                print('ERROR: Not implemented Ltrans')
+            timat=[]
+            tau=[]
+            for isym in range(len(self.tau)):
+                timat.append(self.timat[isym,:,:])
+                tau.append(self.tau[isym,:])
+            timat_keep=[]
+            tau_keep=[]
+            while len(tau)>0:
+                imin = argmin([sum(abs(tau[isym])) for isym in range(len(tau))])
+                T0=timat[imin]
+                t0=tau[imin]
+                #print('t0=', t0, 'T0=', T0, file=log)
+                remove=[]
+                for isym in range(len(tau)):
+                    if allclose(timat[isym],T0):
+                        dt = (tau[isym]-t0)%1.0
+                        d0 = sum(abs(dt))
+                        diff = sum(abs(Ltrans-dt),axis=1)
+                        if d0<1e-7:
+                            timat_keep.append(timat[isym])
+                            tau_keep.append(tau[isym])
+                            remove.append(isym)
+                        elif any(diff<1e-7):
+                            remove.append(isym)
+                        
+                #print('Symm operations remove=', remove, file=log)
+                for i in sorted(remove,reverse=True):
+                    del(tau[i])
+                    del(timat[i])
+            print('Symmetry operations keept after modifying for this Bravais lattice:', file=log)
+            for i in range(len(tau_keep)):
+                for j in range(3):
+                    print('{:2d}{:2d}{:2d} {:10.8f}'.format(*timat_keep[i][j,:], tau_keep[i][j]), file=log)
+                print('      {:2d}'.format(i+1), file=log)
+            self.timat=array(timat_keep)
+            self.tau=array(tau_keep)
+
+        self.flipped=None
         if Qmagnetic:
-            if self.lattyp in ['B', 'F', 'CXY', 'CXZ', 'CYZ']:
+            if self.lattyp in ['B', 'F', 'CXY', 'CXZ', 'CYZ'] or self.H2Rtrans:
                 self.flipped = {}
                 self.rotation_flipped = {}
                 self.timerevr_flipped = {}
@@ -450,9 +696,7 @@ class WStruct:
             i = 0
             for jatom in range(self.nat):
                 for m in range(self.mult[jatom]):
-                    self.pos[i,:] = np.dot(self.pos[i,:], self.hex2rho)
-                    self.pos[i,:] = np.where(self.pos[i,:] < 0.0, self.pos[i,:] + 1.0, self.pos[i,:])
-                    self.pos[i,:] = np.where(self.pos[i,:] > 1.0, self.pos[i,:] - 1.0, self.pos[i,:])
+                    self.pos[i,:] = (self.pos[i,:] @ self.hex2rho) % 1.0
                     i += 1
         #### Warning: W2k can handle only CXZ & gamma!=90 monoclinic case, hence
         # we convert CXY and CYZ monoclinic to CXZ. 
@@ -551,6 +795,17 @@ class WStruct:
                         R = self.neighbrs[jatom][i][2]
                         R[1],R[2],R[0]=R[0],R[1],R[2]
 
+            # converts also symmetry operations
+            Tp  = array([[0,1,0], [0,0,1], [1,0,0]], dtype=int)
+            TpI = array([[0,0,1], [1,0,0], [0,1,0]], dtype=int)
+            for isym in range(len(self.tau)):
+                self.tau[isym,1],self.tau[isym,2],self.tau[isym,0] = self.tau[isym,0],self.tau[isym,1],self.tau[isym,2]
+                self.timat[isym,:,:] = TpI @ self.timat[isym,:,:] @ Tp
+            if self.flipped is not None:
+                for ii in self.flipped:
+                    for i in range(len(self.rotation_flipped[ii])):
+                        self.rotation_flipped[ii][i][:,:] = TpI @ self.rotation_flipped[ii][i][:,:] @ Tp
+                        
         elif direction==-1:
             self.sgname = self.sgname + ' con'
             self.c, self.a, self.b = self.a, self.b, self.c
@@ -570,6 +825,16 @@ class WStruct:
                         R = self.neighbrs[jatom][i][2]
                         R[2],R[0],R[1]=R[0],R[1],R[2]
                     
+            # converts also symmetry operations
+            TpI = array([[0,1,0], [0,0,1], [1,0,0]], dtype=int)
+            Tp  = array([[0,0,1], [1,0,0], [0,1,0]], dtype=int)
+            for isym in range(len(self.tau)):
+                self.tau[isym,2],self.tau[isym,0],self.tau[isym,1] = self.tau[isym,0],self.tau[isym,1],self.tau[isym,2]
+                self.timat[isym,:,:] = TpI @ self.timat[isym,:,:] @ Tp
+            if self.flipped is not None:
+                for ii in self.flipped:
+                    for i in range(len(self.rotation_flipped[ii])):
+                        self.rotation_flipped[ii][i][:,:] = TpI @ self.rotation_flipped[ii][i][:,:] @ Tp
         else:
             print('ERROR: Not defined')
             
@@ -598,8 +863,21 @@ class WStruct:
                 for i in range(len(self.neighbrs[jatom])):
                     R = self.neighbrs[jatom][i][2]
                     R[i1], R[i2] = R[i2], R[i1]
-                    
         
+        # converts also symmetry operations
+        Ts = array(identity(3),dtype=int)
+        Ts[i1,:]=0
+        Ts[i2,:]=0
+        Ts[i1,i2]=Ts[i2,i1]=1
+        for isym in range(len(self.tau)):
+            self.tau[isym,i1],self.tau[isym,i2] = self.tau[isym,i2],self.tau[isym,i1]
+            self.timat[isym,:,:] = Ts @ self.timat[isym,:,:] @ Ts
+
+        if self.flipped is not None:
+            for ii in self.flipped:
+                for i in range(len(self.rotation_flipped[ii])):
+                    self.rotation_flipped[ii][i][:,:] = Ts @ self.rotation_flipped[ii][i][:,:] @ Ts
+
 def Z2r0(Z):
     "This is the choice for real space integration mesh (point closest to nucleous) in w2k."
     if (Z>71): return 5e-6
@@ -607,6 +885,12 @@ def Z2r0(Z):
     if (18<Z<=36): return 5e-5
     if (Z<=18): return 1e-4
     return 5e-6
+
+def Element_name(name):
+    if len(name)>1 and name[1].islower():
+        return name[:2]
+    else:
+        return name[:1]
 
 def getlattype(sgname, sgnum, glide_plane):
     """ In W2k we need Bravais lattice type, which is either P,B,F,H,R,CXY=C,CXZ=B,CYZ=A
@@ -697,6 +981,12 @@ class TheSame:
             for i in [-1,1]:
                 for j in [-1,1]:
                     self.tv.append([0.0, 0.5*i, 0.5*j])
+        elif lattyp == 'R':
+            for i in [-1,0,1]:
+                for j in [-1,0,1]:
+                    for k in [-1,0,1]:
+                        self.tv.append([1/3.+i, 2/3.+j, 2/3.+k])
+                        self.tv.append([2/3.+i, 1/3.+j, 1/3.+k])
         self.tv = array(self.tv)
     def __call__(self, r1, r2):
         small = 1e-5
@@ -754,7 +1044,7 @@ def get_matching_coord(coord, parser, coord_to_species):
 
     
 class CifParser_W2k:
-    def __init__(self, fname, log=sys.stdout, Qmagnetic=True, cmp_neighbors=False):
+    def __init__(self, fname, log=sys.stdout, Qmagnetic=True, cmp_neighbors=False, ndecimals=3):
         self.log = log
         self.parser = CifParser(fname,occupancy_tolerance=3)
         cif_as_dict = self.parser.as_dict()       # get dictionary of cif information
@@ -822,6 +1112,7 @@ class CifParser_W2k:
         #
         for idx, dct in enumerate(self.parser._cif.data.values()):
             try:
+                #print('dct=', dct)
                 self.structure = self.parser._get_structure(dct,primitive=False,symmetrized=False, check_occu=True)
                 if self.structure:
                     break
@@ -908,12 +1199,9 @@ class CifParser_W2k:
             #print('amagmoms=', amagmoms, file=log)
             operations_to_remove=set()
             self.flipped={}
-            #non_flipped={}
             self.rotation_flipped={}
-            #rotation_non_flipped={}
             self.timerevr_flipped={}
-            #timerevr_non_flipped={}
-            groups=[]
+            mgroups=[]
             for spec in indx_by_element:  # Next we loop through element in this structure
                 indices = indx_by_element[spec] # indices on sites of the same element
                 site = self.structure.sites[indices[0]]
@@ -998,13 +1286,14 @@ class CifParser_W2k:
                             if jj in ty:
                                 if len(ty)>grp_compare[itg]+1:
                                     grp_compare[itg]+=1
-                groups.append(grp)  # all groups for this element
-            print('groups for magnetic atoms=', groups, file=log)
+                mgroups.append(grp)  # all groups for this element
+            print('groups for magnetic atoms=', mgroups, file=log)
+            
             # Sometimes the symmetry operations for time-reversal symmetry are not given, and moments are antiparallel, but above
             # algorithm does not recognize that, because it is not given as one of the symmetry operations.
             # We here check is we have such a case
             if len(self.flipped)==0:
-                for grp in groups:
+                for grp in mgroups:
                     used=[]
                     for i in range(len(grp)):
                         grp1 = grp[i]
@@ -1032,7 +1321,21 @@ class CifParser_W2k:
                                             self.timerevr_flipped[i1]=[]
                                             self.rotation_flipped[i1]=[]
                                         
-                                        
+            print('indx_by_element', indx_by_element, file=log)
+            ##-----------------------------------------------------------------------------------------------------------------------------
+            # Next we just make atoms of the same element equivalent, and later check the environment around
+            # each atom to determine splitting. This is the same as w2k nn routine, and it seems to be most efficient
+            # way to determine grouping of atoms. Namely, symmetry operations are sometimes not correctly given, 
+            # or we get umbiguous results with symmetry operations.
+            for spec in indx_by_element:  
+                indices = indx_by_element[spec] # indices on sites of the same element
+                site = self.structure.sites[indices[0]]
+                Mi = site.properties["magmom"].moment
+                if sum(abs(Mi))<1e-5:
+                    mgroups.append([indices])
+            mgroups = sorted(mgroups, key=lambda a: a[0][0])
+            print('starting with groups for magnetic atoms=', mgroups, file=log)
+            
             print('atoms which are flipped of each other:', file=log)
             for ii in self.flipped:
                 print(str(ii)+'->'+str(self.flipped[ii]), file=log)
@@ -1041,7 +1344,6 @@ class CifParser_W2k:
                     print('    R={:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][0,:]), file=log)
                     for j in range(1,3):
                         print('      {:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][j,:]), file=log)
-                
                 
             print('symmetry operations that need to be removed=', operations_to_remove, file=log)
             operations_to_remove = sorted(list(operations_to_remove))
@@ -1066,60 +1368,180 @@ class CifParser_W2k:
                     print(isym,':', symmetry_operations_type, file=log)
                 for i in range(3):
                     print('{:2d}{:2d}{:2d} {:10.8f}'.format(*timat[i,:], tau[i]), file=log)
-        
-        groups=[] # Will contain groups of equivalent sites
-        for spec in indx_by_element:  # Next we loop through element in this structure
-            indices = indx_by_element[spec] # indices on sites of the same element
-            grp = [[indices[0]]]  # we have just one group with the first entry in coords. All entries in coords will have index in grp
-            site = self.structure.sites[indices[0]]
-            if Qmagnetic:
-                Mi = site.properties["magmom"].moment
-                if sum(abs(Mi))>0:
-                    mfinite=True
-                    print(site.species_string, site.frac_coords, 'Mi=', site.properties["magmom"].moment, file=log)
-                else:
-                    mfinite=False
-            for ii in indices[1:]: # loop over possibly equivalent sites (of the same element)
-                coord = acoords[ii]    # fractional coordinate of that site self.structure.sites[ii]
-                site = self.structure.sites[ii]
-                Qequivalent=False  # for now we thing this might not be equivalent to any other site in grp
-                if Qmagnetic and mfinite:
-                    Mj = site.properties["magmom"].moment
-                    print(site.species_string, coord, 'Mj=', site.properties["magmom"].moment, file=log)
-                for ig,op in enumerate(self.parser.symmetry_operations): # loop over all symmetry operations
-                    ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
-                    #if Qmagnetic and mfinite:
-                    #    Mjp = op.operate_magmom(Mj).moment
-                    for ty in grp:                         # if coord is equivalent to any existing group in grp, say grp[i]==ty, then one of ncoord should be equal to first entry in grp[i]
-                        coord0 = acoords[ty[0]]            # the first entry in the group grp[i][0]
-                        M0 = amagmoms[ty[0]]
-                        #print('coord0=', ty[0], coord0)
-                        if sum(abs(ncoord-coord0))<1e-5:   # is it equal to current coord when a symmetry operation is applied?
-                            if Qmagnetic and mfinite:
-                                Molap = dot(Mj,M0)/(linalg.norm(Mj)*linalg.norm(M0))
-                                if Molap > min_Molap: #sum(abs(Mj-M0))<=1e-5:
-                                    # Only if spin direction is the same we can say that these are truly
-                                    #print('coordinates equal M0=',M0, 'Mj=', Mj, 'ig=', ig, file=log)????
-                                    print('Group['+str(ig)+'] applied to r=',coord,'and M=', Mj,' gives r=', coord0, ' and M0=', M0, file=log)
+            
+            ##-----------------------------------------------------------------------------------------------------------------------------
+            # When we reduce the symmetry due to magnetism, some atoms might be missplaced.
+            # Here we are using algorithm from w2k nn program, which looks at all neighbors of atoms, and
+            # if several shells of atoms have equivalent neigbors, they are equivalent. Otherwise they are not.
+            print('all_neigbrs:', file=log)
+            all_sites = [self.structure.sites[i] for i in range(len(self.structure.sites))]
+            center_indices, points_indices, offsets, distances = self.structure.get_neighbor_list(r=4.7, sites=all_sites, numerical_tol=1e-4)
+            all_neighbrs=[]
+            for i,isite in enumerate(all_sites):
+                coord = isite.frac_coords @ self.structure.lattice.matrix
+                #print('ATOM: {:3d} {:3s} AT {:9.5f} {:9.5f} {:9.5f}={:9.5f} {:9.5f} {:9.5f}'.
+                #          format(i+1,self.structure.sites[i].species_string,*isite.coords,*isite.frac_coords),file=log)
+                mask = center_indices==i
+                points_indices_ = points_indices[mask]
+                offsets_ = offsets[mask]
+                distances_ = distances[mask]
+                names_ = [self.structure.sites[p_i].species_string for p_i in points_indices_]
+                cmp_to_sort = Cmp2Sort(distances_,names_,self.structure.sites[i].species_string)
+                idx=sorted(range(len(distances_)), key=cmp_to_key(cmp_to_sort))
+                _neighbrs_={}
+                for j in idx:
+                    if distances_[j]>1e-5:
+                        nn = points_indices_[j]
+                        dd = distances_[j]
+                        r = self.structure.sites[nn]
+                        Rj_fract = r.frac_coords + offsets_[j]
+                        #print('  ATOM:{:3d} {:5s} AT {:9.5f} {:9.5f} {:9.5f} IS AWAY {:13.6f} ANG'.format(nn,r.species_string,*Rj_fract, distances_[j]), file=log)
+                        sdst = str(np.round(distances_[j],decimals=ndecimals))
+                        if sdst in _neighbrs_:
+                            _neighbrs_[sdst].append(nn)
+                        else:
+                            _neighbrs_[sdst] = [nn]
+                all_neighbrs.append(_neighbrs_)
+            print('Going over all neighbors to determine equivalency:', file=log)
+            #print('mgroups=', mgroups, file=log)
+            
+            element=[]
+            for i in range(len(mgroups)):
+                els = [el for el in indx_by_element if mgroups[i][0][0] in indx_by_element[el]]
+                element.append(els[0])
+            #element = [el for el in indx_by_element]
+            print('element=', element)
+            igroups=[[] for i in range(len(self.structure))]
+            ele2grp={}
+            for i in range(len(mgroups)):
+                for j in range(len(mgroups[i])):
+                    ele = element[i]+str(j+1)
+                    ele2grp[ele] = (i,j)
+                    for k in range(len(mgroups[i][j])):
+                        igroups[mgroups[i][j][k]] = ele
+            
+            print('igroups=', igroups, file=log)
+            print('ele2grp=', ele2grp, file=log)
+            print('mgroups=', mgroups, file=log)
+            
+            split_finish=True
+            for itt in range(10):
+                print('Iteration=', itt+1, file=log)
+                fingerprint=[]
+                for ii in range(len(all_sites)):
+                    fingerp=[]
+                    for ds in all_neighbrs[ii]:
+                        fgprnt = ds+' '+' '.join([str(g) for g in sorted([igroups[j] for j in all_neighbrs[ii][ds]])])
+                        fingerp.append(fgprnt)
+                    print('atoms[{:2d}]:'.format(ii), fingerp, file=log)
+                    fingerprint.append(fingerp)
+                grp_fingerprint={}
+                for i in range(len(mgroups)):
+                    for j in range(len(mgroups[i])):
+                        ele = element[i]+str(j+1)
+                        ii = mgroups[i][j][0]
+                        grp_fingerprint[ele] = fingerprint[ii]
+                #print('grp_fingerprint=', grp_fingerprint)
+                print('neigbors of inequivalent atom types after iteration {}'.format(itt+1), file=log)
+                for ele in grp_fingerprint:
+                    print('  ', ele, grp_fingerprint[ele], file=log)
+                    
+                split_finish=True
+                for ii in range(len(all_sites)):
+                    my_ele=igroups[ii]
+                    expect = grp_fingerprint[my_ele]
+                    have = fingerprint[ii]
+                    if have != expect:
+                        split_finish=False
+                        print('atom[{:2d}] WARNING have != expect'.format(ii), file=log)
+                        print('atom[{:2d}] with name={:s} neigbr='.format(ii,my_ele), have, file=log)
+                        print('atom[{:2d}] with name={:s} expect='.format(ii,my_ele), expect, file=log)
+                        (i_m,j_m) = ele2grp[my_ele]
+                        FoundGroup=False
+                        for ele,fgp in grp_fingerprint.items():
+                            if have==fgp:
+                                FoundGroup=True
+                                (i,j) = ele2grp[ele]
+                                mgroups[i][j].append(ii)
+                                mgroups[i_m][j_m].remove(ii)
+                                igroups[ii] = ele
+                                print('Found', my_ele, 'goes into', ele, 'mgroups=', mgroups, file=log)
+                                break
+                        if not FoundGroup:
+                            j_new = len(mgroups[i_m])
+                            mgroups[i_m].append([ii])
+                            mgroups[i_m][j_m].remove(ii)
+                            my_ele_new = element[i_m]+str(j_new+1)
+                            grp_fingerprint[my_ele_new] = have
+                            ele2grp[my_ele_new] = (i_m, j_new)
+                            igroups[ii] = my_ele_new
+                            print('Not found', my_ele, 'changed to', my_ele_new, 'mgroups=', mgroups, file=log)
+                if not split_finish:
+                    print('igroups=', igroups, file=log)
+                    print('ele2grp=', ele2grp, file=log)
+                    print('grp_fingerprint=', grp_fingerprint, file=log)
+                
+                if split_finish:
+                    break
+            
+            print('mgroups=', mgroups, file=log)
+            groups = mgroups
+            ##-----------------------------------------------------------------------------------------------------------------------------
+        else:
+            groups=[] # Will contain groups of equivalent sites
+            for spec in indx_by_element:  # Next we loop through element in this structure
+                indices = indx_by_element[spec] # indices on sites of the same element
+                grp = [[indices[0]]]  # we have just one group with the first entry in coords. All entries in coords will have index in grp
+                site = self.structure.sites[indices[0]]
+                if Qmagnetic:
+                    Mi = site.properties["magmom"].moment
+                    if sum(abs(Mi))>0:
+                        mfinite=True
+                        print(site.species_string, site.frac_coords, 'Mi=', site.properties["magmom"].moment, file=log)
+                    else:
+                        mfinite=False
+                for ii in indices[1:]: # loop over possibly equivalent sites (of the same element)
+                    coord = acoords[ii]    # fractional coordinate of that site self.structure.sites[ii]
+                    site = self.structure.sites[ii]
+                    Qequivalent=False  # for now we thing this might not be equivalent to any other site in grp
+                    if Qmagnetic and mfinite:
+                        Mj = site.properties["magmom"].moment
+                        print(site.species_string, coord, 'Mj=', site.properties["magmom"].moment, file=log)
+                    for ig,op in enumerate(self.parser.symmetry_operations): # loop over all symmetry operations
+                        ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
+                        #if Qmagnetic and mfinite:
+                        #    Mjp = op.operate_magmom(Mj).moment
+                        for ty in grp:                         # if coord is equivalent to any existing group in grp, say grp[i]==ty, then one of ncoord should be equal to first entry in grp[i]
+                            coord0 = acoords[ty[0]]            # the first entry in the group grp[i][0]
+                            M0 = amagmoms[ty[0]]
+                            #print('coord0=', ty[0], coord0)
+                            if sum(abs(ncoord-coord0))<1e-5:   # is it equal to current coord when a symmetry operation is applied?
+                                if Qmagnetic and mfinite:
+                                    Molap = dot(Mj,M0)/(linalg.norm(Mj)*linalg.norm(M0))
+                                    if Molap > min_Molap: #sum(abs(Mj-M0))<=1e-5:
+                                        # Only if spin direction is the same we can say that these are truly
+                                        #print('coordinates equal M0=',M0, 'Mj=', Mj, 'ig=', ig, file=log)????
+                                        print('Group['+str(ig)+'] applied to r=',coord,'and M=', Mj,' gives r=', coord0, ' and M0=', M0, file=log)
+                                        Qequivalent=True               # we found which group it corresponds to
+                                        ty.append(ii)                  # grp[i]=ty is extended with coord[i]
+                                        #print('Since moments are equal ig=', ig, 'survives magnetic calc', file=log)
+                                        break                          # loop over groups and also symmetry operations can be finished
+                                else:# we don't have moments, hence it is equivalent
+                                    #print(' ncoord=', ncoord, 'is equivalent to typ', ty) # yes, coord is in group ty
+                                    print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,
+                                              'gives r['+str(ty[0])+']=', coord0, file=log)
                                     Qequivalent=True               # we found which group it corresponds to
                                     ty.append(ii)                  # grp[i]=ty is extended with coord[i]
-                                    #print('Since moments are equal ig=', ig, 'survives magnetic calc', file=log)
                                     break                          # loop over groups and also symmetry operations can be finished
-                            else:# we don't have moments, hence it is equivalent
-                                #print(' ncoord=', ncoord, 'is equivalent to typ', ty) # yes, coord is in group ty
-                                Qequivalent=True               # we found which group it corresponds to
-                                ty.append(ii)                  # grp[i]=ty is extended with coord[i]
-                                break                          # loop over groups and also symmetry operations can be finished
-                    if Qequivalent:
-                        break
-                if not Qequivalent:                        # if this site (coord) is not equivalent to any existing group in grp, than we create a new group with a single entry [i]
-                    grp.append([ii])
-                    #print('Starting anew with ii='+str(ii)+' grp=', grp, file=log)
-                #print(spec+' grp=', grp)
-            groups.append(grp)  # all groups for this element
-
-        print('groups=', groups, file=log)
-        
+                        if Qequivalent:
+                            break
+                    if not Qequivalent:                        # if this site (coord) is not equivalent to any existing group in grp, than we create a new group with a single entry [i]
+                        grp.append([ii])
+                        #print('Starting anew with ii='+str(ii)+' grp=', grp, file=log)
+                    #print(spec+' grp=', grp)
+                groups.append(grp)  # all groups for this element
+            print('groups=', groups, file=log)
+            
         # Since groups is only index array to coord_by_element, we will rather create a dictionary self.w2k_coords={},
         # which is easier to use. The keys will be name of the site, which might need to be modified when
         # multiple inequivalent sites have the same name.
@@ -1140,13 +1562,13 @@ class CifParser_W2k:
             for idx,spec in enumerate(indx_by_element):
 
                 grp = groups[idx] # group of atoms of the same element. But not necessary equivalent. For example, all oxygen atoms in the structure.
-                print('idx=', idx, 'spec=', spec, 'grp=', grp)
+                #print('idx=', idx, 'spec=', spec, 'grp=', grp)
                 
                 # Instead of comparing with all coordinates from the cif file, we only compare with those
                 # that start with the same letter, i.e., likely correspond to the same element.
                 which_icif = [i for i in range(len(self.cname)) if self.cname[i][0]==spec[0]] # those are probably for the same element
 
-                print('which_icif=', which_icif)
+                #print('which_icif=', which_icif)
                 
                 for ig in range(len(grp)): # over all groups of oxygen atoms
                     gr = grp[ig]           # here we have a single group of oxygen atoms, which are all equivalent
@@ -1186,7 +1608,7 @@ class CifParser_W2k:
 
             # This is needed because cif file can have site-occupancies=0.5, in which case structure has smaller number of sites that cif-file
             #groups_resort = [x for x in groups_resort if x]
-            print('groups_resort=', groups_resort)
+            #print('groups_resort=', groups_resort)
             
             first_sites_index=[]
             self.w2k_coords={}
@@ -1195,7 +1617,7 @@ class CifParser_W2k:
                 psite = self.structure.sites[group[0]]
                 self.w2k_coords[cname[ii]] = [self.structure.sites[j].frac_coords for j in group]
                 first_sites_index.append( group[0] )
-                print('ii=', ii, 'group=', group)
+                #print('ii=', ii, 'group=', group)
                 #all_sites_order.extend( group )
                 #print(cname[ii], coords, psite.label, self.cname[ii], psite.species, psite.species_string)
                 #self.Z_element[cname[ii]] = psite.specie.Z
@@ -1427,11 +1849,22 @@ class Latgen:
           self.br2[2,0] =  1.0
           self.br2[2,1] =  1.0
           self.br2[2,2] =  1.0
+          #
           self.rvfac = 6.0/sqrt(3.0)
           self.ortho = False
           for j in range(3):
             self.br2[j,:] *= self.pia[j]
-          self.br1[:,:] = self.br2[:,:]
+          if strc.H2Rtrans:
+            # hexagonal conventional cell, but using w2k rhombohedral choice of vectors
+            self.br1 = self.br2 @ linalg.inv(strc.hex2rho)
+            #self.br1[0,0] = 2.0/sqrt(3.0)
+            #self.br1[0,1] = 1.0/sqrt(3.0)
+            #self.br1[1,1] = 1.0
+            #self.br1[2,2] = 1.0
+            #for j in range(3):
+            #  self.br1[j,:] *= self.pia[j]
+          else:
+            self.br1[:,:] = self.br2[:,:]
         elif strc.lattyp[:1] == 'C': # base centered
           print('base centered lattice type', strc.lattyp, file=fout)
           if strc.lattyp[1:3] == 'XZ':   # gamma might not be 90
@@ -1499,8 +1932,18 @@ class Latgen:
             # primitive BZ. All other systems use conventional BZ.
             # cif2struct converts all monoclinic CXY to CXZ, hence the only
             # problematic case is CYZ monoclinic structure. Need to check carefuly that it works.
-            self.k2icartes = identity(3,dtype=int)
-            self.k2cartes  = self.br2
+            if strc.H2Rtrans:
+                # hexagonal conventional cell, but using w2k rhombohedral choice of vectors
+                #R=array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])
+                #self.k2icartes = R
+                #self.k2cartes = self.br2*linalg.inv(R)
+                #self.k2icartes = array((diag(1/self.pia) @ self.br2).round(), dtype=int)
+                #self.k2cartes = diag(self.pia)
+                self.k2icartes = identity(3,dtype=int)
+                self.k2cartes  = self.br2
+            else:
+                self.k2icartes = identity(3,dtype=int)
+                self.k2cartes  = self.br2
 
         #if writek:
         #    with open(case+'.pkl', 'wb') as f:
@@ -1508,16 +1951,24 @@ class Latgen:
         #        pickle.dump(self.k2cartes, f)
             
         #save('k2icartes.npy', self.k2icartes)
+
+        #print('self.br2=', self.br2)
+        
         print(('\nw2k_conventional=\n'+('\n'.join(['{:9.5f} '*3+' ==a'+str(i+1) for i in range(3)]))).format(
             *ravel(self.rbas_conventional)), file=fout)
         print('Unit cell volume=', self.Vol, file=fout)
         print('Ortho=', self.ortho, file=fout)
         print(('BR2=\n'+('{:9.5f} '*3+'\n')*3).format(*ravel(self.br2)), file=fout)
         print(('gbas=\n'+('{:9.5f} '*3+'\n')*3).format(*ravel(self.gbas)), file=fout)
-        print(('w2k_primitive(rbas)=\n'+('{:9.5f} '*3+'\n')*3).format(*ravel(self.rbas)), file=fout)
-        print(('k2icartes=\n'+('{:3d} '*3+'\n')*3).format(*ravel(self.k2icartes)), file=fout)
+        #print(('w2k_primitive(rbas)=\n'+('{:9.5f} '*3+'\n')*3).format(*ravel(self.rbas)), file=fout)
+        print(('w2k_primitive(rbas)=\n'+('\n'.join(['{:9.5f} '*3+' ==a'+str(i+1) for i in range(3)]))).format(
+            *ravel(self.rbas)), file=fout)
+        if strc.H2Rtrans:
+            print(('k2icartes=\n'+('{:12.7f} '*3+'\n')*3).format(*ravel(self.k2icartes)), file=fout)
+        else:
+            print(('k2icartes=\n'+('{:3d} '*3+'\n')*3).format(*ravel(self.k2icartes)), file=fout)
     
-def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, log=sys.stdout):
+def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, H2Rtrans=False, log=sys.stdout):
     """
     fname     -- filename, should be case.klist_band
     Nt        -- total number of k-points (approximately, because we find integer denominated path)
@@ -1530,7 +1981,12 @@ def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, log=sys.stdout):
             return max(i1,i2)
         else:
             return int(i1*i2/gcd(i1,i2))
-
+    if H2Rtrans:
+        kpath={'\Gamma':[0,0,0],'T':[0.5,0.5,0.5],'M4':[0.37127,0.75747,0.37127],'L':[0,0.5,0],
+               'H0':[0.24253,0.5,-0.24253],'M0':[0.37127,0.37127,-0.24253],'FB':[0.5,0.5,0],
+               'Q':[0.37127,0.62874,0],'B':[0.5,0.75747,0.24253],"M4'":[0.37127,0.75747,0.37127],
+               "B'":[0.24253,0.75747,0.5],"T'":[1/2,1/2,1/2]}
+    
     labels = [label for label in kpath]    # it is easier to work here with lists
     Ks = [kpath[label] for label in kpath] # so store labels and K-points
     print('Kpoints in the mesh:', file=log)
@@ -1582,91 +2038,16 @@ def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, log=sys.stdout):
         print('END', file=fk)
 
 
-def Cif2Struct(fcif, Nkp=300, writek=True, Qmagnetic=True, logfile='cif2struct.log', cmp_neighbors=False):
+def Cif2Struct(fcif, Nkp=300, writek=True, Qmagnetic=True, logfile='cif2struct.log', cmp_neighbors=False, convertH2R=True, ndecimals=3):
     log = open(logfile, 'w')
     strc = WStruct()           # w2k structure, for now empty
-    strc.ScanCif(fcif, log, writek, Qmagnetic, cmp_neighbors)    # here is most of the algorithm
+    strc.ScanCif(fcif, log, writek, Qmagnetic, cmp_neighbors, convertH2R, ndecimals)    # here is most of the algorithm
     case = os.path.splitext(fcif)[0] # get case
     strc.WriteStruct(case+'.struct', log) # writting out struct file
     lat = Latgen(strc, case, log)  # checking Bravais lattice in wien2k and its consistency.
-
-    #corr = range(strc.nat)
-    #
-    #first_atom = zeros(len(strc.mult),dtype=int)
-    #for jatom in range(len(strc.mult)-1):
-    #    first_atom[jatom+1] = first_atom[jatom] + strc.mult[jatom]
-    #
-    #if cmp_neighbors:
-    #    matrix_w2k = lat.rbas_conventional
-    #    matrix_vesta = strc.Matrix(vesta=True)
-    #
-    #    to_frac = linalg.inv(matrix_w2k)
-    #    vesta_vs_w2k = to_frac @ matrix_vesta
-    #    #print('vesta_vs_w2k=', vesta_vs_w2k)
-    #
-    #    #print('VESTA=')
-    #    #for i in range(3): print( ('{:12.8f} '*3).format(*matrix_vesta[i,:]/strc.tobohr))
-    #        
-    #    to_fract = linalg.inv(matrix_w2k)
-    #    
-    #    indx=0
-    #    for jatom in range(len(strc.neighbrs)):
-    #        print('ATOM: {:3d} {:3s} AT {:9.5f} {:9.5f} {:9.5f}'.format(jatom+1,strc.aname[jatom],*strc.pos[indx]),file=log)
-    #        for j,ngh in enumerate(strc.neighbrs[jatom]):
-    #            dRj = ngh[2] @ matrix_w2k
-    #            dRp = ngh[2] @ matrix_vesta
-    #            dst = linalg.norm(dRj)
-    #            dst2 = linalg.norm(dRp)
-    #            jname = ngh[1]
-    #            if len(jname)>3: jname=jname[:3]
-    #            print('  ATOM: {:3s} AT {:9.5f} {:9.5f} {:9.5f} IS AWAY {:13.6f} {:13.6f} {:13.6} ANG'.format(jname,*dRj,ngh[0]*strc.tobohr,dst,dst2), file=log)
-    #        indx += strc.mult[jatom]
-    #    for jatom in corr:
-    #        name0 = Element_name(strc.neighbrs[jatom][0][1])
-    #        n=0
-    #        for ngh in strc.neighbrs[jatom]:
-    #            #print('n=',n,'ngh=',ngh,'el=',Element_name(ngh[1]),'name0=',name0)
-    #            if Element_name(ngh[1])!=name0:
-    #                break
-    #            n+=1
-    #        #print('n=',n)
-    #        if n>1:
-    #            neighbrs = strc.neighbrs[jatom][:n]
-    #        else: # n==1
-    #            if name0==Element_name(strc.aname[jatom]): # skip the first atom and take the rest
-    #                print('WARNING: At analizing', strc.aname[jatom], 'at', '[{:5.3f},{:5.3f},{:5.3f}]'.format(*strc.pos[first_atom[jatom]]),
-    #                          'we disregard the first neighbor {:s} at [{:5.3f},{:5.3f},{:5.3f}]'.format(strc.neighbrs[jatom][0][1],*strc.neighbrs[jatom][0][2]), file=log)
-    #                name0 = Element_name(strc.neighbrs[jatom][1][1])
-    #                n=0
-    #                for ngh in strc.neighbrs[jatom][1:]:
-    #                    if Element_name(ngh[1])!=name0:
-    #                        break
-    #                    n+=1
-    #                neighbrs = strc.neighbrs[jatom][1:n+1]
-    #            
-    #        print('Analizing', strc.aname[jatom], 'at', strc.pos[first_atom[jatom]], 'with N=', n, file=log)
-    #        R = FindCageBasis(neighbrs, matrix_w2k, log)
-    #        if R is not None:
-    #            Rv = R @ vesta_vs_w2k
-    #            Rf = R @ to_frac
-    #
-    #            print('Rotation to input into case.indmfl by locrot=-1 : ', file=log)
-    #            print(file=log)
-    #            for i in range(3): print( ('{:12.8f} '*3).format(*R[i,:]), file=log)
-    #            print(file=log)
-    #            print('Rotation in fractional coords : ', file=log)
-    #            print(file=log)
-    #            for i in range(3): print( ('{:12.8f} '*3).format(*Rf[i,:]*strc.tobohr), file=log)
-    #            print(file=log)
-    #            print('Rotation for VESTA coords : ', file=log)
-    #            print(file=log)
-    #            for i in range(3): print( ('{:12.8f} '*3).format(*Rv[i,:]), file=log)
-    #            print(file=log)
-    #        
-    #        
             
     if writek:
-        W2k_klist_band(case+'.klist_band', Nkp, strc.kpath, lat.k2icartes, lat.k2cartes, log)
+        W2k_klist_band(case+'.klist_band', Nkp, strc.kpath, lat.k2icartes, lat.k2cartes, strc.H2Rtrans, log)
     return (strc, lat)
 
 
@@ -1702,6 +2083,9 @@ if __name__ == '__main__':
     parser.add_option('-l', '--log',     dest='log', type='str', default='cif2struct.log', help="info file")
     parser.add_option('-n', '--neigh',   dest='neigh', action='store_false', default=True, help="compute neighbors and evaluate Rmt")
     parser.add_option('-m', '--magnet',  dest='Qmagnetic', action='store_true', default=False, help="should produce magnetic dft struct that allows broken symmetry from mcif")
+    parser.add_option('-H', '--hexagonal',  dest='keepH', action='store_true', default=False, help="switches off hexagonal to rhombohedral conversion")
+    parser.add_option('-p', '--ndecimals',  dest='ndecimals', type='int', default=3, help="precision when determining the equivalency of atoms we take nn distance with precision ndecimals. Compatible with w2k nn method.")
+    
     # Next, parse the arguments
     (options, args) = parser.parse_args()
     if len(args)!=1:
@@ -1711,4 +2095,5 @@ if __name__ == '__main__':
 
     #print('fcif=', fcif)
     #print('options=', options.Nkp, options.wkp)
-    Cif2Struct(fcif, Nkp=options.Nkp, writek=options.wkp, Qmagnetic=options.Qmagnetic, logfile=options.log, cmp_neighbors=options.neigh)
+    Cif2Struct(fcif, Nkp=options.Nkp, writek=options.wkp, Qmagnetic=options.Qmagnetic, logfile=options.log,
+                   cmp_neighbors=options.neigh, convertH2R=not options.keepH, ndecimals=options.ndecimals)
