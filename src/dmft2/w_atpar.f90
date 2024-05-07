@@ -347,7 +347,7 @@ CONTAINS
   END SUBROUTINE retrieve_w_atpar
   
   SUBROUTINE Read_nsh()
-    USE param, ONLY: filename_V_nsh, lomax, ngau
+    USE param, ONLY: filename_V_nsh, lomax, ngau,nloat
     USE com, ONLY: nat
     USE readPotential, ONLY: init_V_nsh, read_V_nsh, close_V_nsh
     IMPLICIT NONE
@@ -358,6 +358,7 @@ CONTAINS
     ! We first read the entire potential to determine maximal number of nonzero components (ngau)
     allocate( Vts_(3,3,ngau) )      ! non-spherical potential matrix elements
     allocate( lpv_(ngau), lv_(ngau), mpv_(ngau), mv_(ngau) )
+    !write(6,*) 'in Read_nsh : nloat=', nloat
     ihmx_max=0
     CALL init_V_nsh(filename_V_nsh, 9902) 
     !WRITE(6,*) 'First read_V_nsh'
@@ -369,6 +370,8 @@ CONTAINS
     enddo
     CALL close_V_nsh()
     ngau = ihmx_max+1  ! CAREFUL: NGAU was constant in original code. Here we change it to the smallest acceptable number.
+    write(6,*) 'after first reading case.nsh NGAU set to', ngau
+    
     deallocate( Vts_ )
     deallocate( lpv_, lv_, mpv_, mv_ )
 

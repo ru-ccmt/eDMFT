@@ -108,6 +108,8 @@ SUBROUTINE cmpLogGdloc(logG, eimp_nd, eimp_nd2, DeltaG, forb, TrGSigVdc, Gdloc, 
      epsinf=0
      deg=0
      ndtot=0
+     icx_ind=0
+     it_ind=0
      do icix=1,ncix
         do ip=1,cixdim(icix)
            it = Sigind(ip,ip,icix)
@@ -119,10 +121,13 @@ SUBROUTINE cmpLogGdloc(logG, eimp_nd, eimp_nd2, DeltaG, forb, TrGSigVdc, Gdloc, 
               Bi(it2) = -aimag(sigma(it,icix,nomega))*omega(nomega)
               icx_ind(it2)=icix
               it_ind(it2)=it
+              WRITE(6,*) 'icix=', icix, 'it=', it, 'it2=', it2
            endif
         enddo
      enddo
-
+     WRITE(6,*) 'icx_ind=', icx_ind
+     WRITE(6,*) 'it_ind=', it_ind
+     
      allocate(Delta(nomega,ntcix))
      allocate(Delta_all(nom_all), dDelta_all(nom_all), CC(nom_all), GDC(nom_all))
 
@@ -316,15 +321,18 @@ SUBROUTINE cmpLogGdloc(logG, eimp_nd, eimp_nd2, DeltaG, forb, TrGSigVdc, Gdloc, 
         enddo
         WRITE(6,*)
      enddo
+
      if (Olap_Renormalize) then
      WRITE(6,'(A)') '-Tr(G*(Sigma-Vdc))*Olap for each orbital in mRy/Br:'
      do ip=1,nipc
         WRITE(6,'(A,A,A)',advance='no') '   ',label(ip-1),':'
         do it2=1,ntcix
            icix = icx_ind(it2)
-           it = it_ind(it2)
-           renormalize = 1/(SOlapm(it,it,icix)*SOlapm(it,it,icix))
-           WRITE(6,'(f14.7,1x)',advance='no') -(GS_static(ip-1,it2)+GS_dynamic(ip-1,it2))*renormalize*1000
+           if (icix.gt.0) then
+              it = it_ind(it2)
+              renormalize = 1/(SOlapm(it,it,icix)*SOlapm(it,it,icix))
+              WRITE(6,'(f14.7,1x)',advance='no') -(GS_static(ip-1,it2)+GS_dynamic(ip-1,it2))*renormalize*1000
+           endif
         enddo
         WRITE(6,*)
      enddo
@@ -375,6 +383,7 @@ SUBROUTINE cmpLogGdloc(logG, eimp_nd, eimp_nd2, DeltaG, forb, TrGSigVdc, Gdloc, 
         enddo
         close(888)
      endif
+     
      deallocate(Delta)
      !print *, 'eimp_nd=', eimp_nd
      deallocate( icx_ind, it_ind )

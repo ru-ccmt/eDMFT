@@ -98,7 +98,7 @@ CONTAINS
     REAL*8  :: xx(3), xz(3), thetaz, phiz, thetax, phix, ddd, check
     REAL*8, allocatable :: wtmpx(:)
     LOGICAL :: Qident
-    INTEGER :: ncix2, ip, iq, it2, minv
+    INTEGER :: ncix2, ip, iq, it2, minv, a_minsigind
     INTEGER, allocatable :: cix_atom(:), cdim(:)
 
     READ(fhr,*) DM_Emin,DM_Emax,irenormalize,projector
@@ -272,6 +272,7 @@ CONTAINS
     Sigind=0  
     Qident=.True.
     ntcix=0
+    a_minsigind=10000
     do wicix=1,ncix
        READ(fhr,*) icix, wndim, size  ! icix, size-of-matrix, L, number of independent components of the matrix
        cdim(icix) = wndim
@@ -283,7 +284,7 @@ CONTAINS
        csize(icix)=size
        READ(fhr,*) ! Comment: Independent components are
        READ(fhr,*) (legend(i,icix),i=1,size)
-
+       
        READ(fhr,*) ! Comment: Sigind follows
        do i=1,wndim
           READ(fhr,*) (Sigind(i,j,icix),j=1,wndim)
@@ -292,7 +293,7 @@ CONTAINS
           !   Sigind(i,j,icix)=abs(Sigind(i,j,icix))
           !enddo
        enddo
-
+       
        minsigind_p=10000
        maxsigind_p=0
        minsigind_m=10000
@@ -303,11 +304,14 @@ CONTAINS
                 maxsigind_p = max(maxsigind_p,Sigind(i,j,icix))
              endif
              if (Sigind(i,j,icix).lt.0) minsigind_m = min(minsigind_m,-Sigind(i,j,icix))
-             if (Sigind_orig(i,j,icix).gt.ntcix) then
-                ntcix=Sigind_orig(i,j,icix)
-             endif
+             !if (Sigind_orig(i,j,icix).gt.ntcix) then
+             !   ntcix=Sigind_orig(i,j,icix)
+             !endif
           enddo
        enddo
+       if (minsigind_p.lt.a_minsigind) a_minsigind=minsigind_p
+       if (minsigind_m.lt.a_minsigind) a_minsigind=minsigind_m
+       
        maxsigind_p = maxsigind_p-minsigind_p+1
        if (maxsigind_p.lt.0) maxsigind_p = 0
        !if (minsigind.ne.1) then                                                                                                                                                                            
@@ -379,6 +383,20 @@ CONTAINS
        endif
     enddo
 
+    if (a_minsigind.gt.1) then
+       write(6,*) 'a_minsigind=', a_minsigind
+       do icix=1,ncix
+          do ip=1,cdim(icix)
+             do iq=1,cdim(icix)
+                if (Sigind_orig(ip,iq,icix) > 0) then
+                   Sigind_orig(ip,iq,icix) = Sigind_orig(ip,iq,icix)-(a_minsigind-1)
+                endif
+             enddo
+          enddo
+       enddo
+    endif
+    ntcix = maxval(Sigind_orig)
+    
     if (Qforce) then
        ! For calculation of forces we use Sigind_orig. It can happen that many similar atoms are treated by the same Sigind_orig,
        ! which makes the force to be averaged over several atoms, rather than calculating the force on each atom separately.
@@ -434,25 +452,40 @@ CONTAINS
              enddo
           enddo
           
-          if (Qprint) then
-             do icix=1,ncix
-                latom = cix_atom(icix)
-                jatom = isort(latom)
-                if (jatom.ne.iat) cycle
-                write(fh_stdout,*)' Unique Correlated index for forces', icix
-                do ip=1,cdim(icix)
-                   do iq=1,cdim(icix)
-                      write(fh_stdout,'(I3)',advance='no') Sigind_orig(ip,iq,icix)
-                   enddo
-                   write(fh_stdout,*)
-                enddo
-             end do
-          end if
+          !if (Qprint) then
+          !   do icix=1,ncix
+          !      latom = cix_atom(icix)
+          !      jatom = isort(latom)
+          !      if (jatom.ne.iat) cycle
+          !      write(fh_stdout,*)' Unique Correlated index for forces', icix
+          !      do ip=1,cdim(icix)
+          !         do iq=1,cdim(icix)
+          !            write(fh_stdout,'(I3)',advance='no') Sigind_orig(ip,iq,icix)
+          !         enddo
+          !         write(fh_stdout,*)
+          !      enddo
+          !   end do
+          !end if
        end do
        ntcix = maxval(Sigind_orig)
        call set_del()
     endif
 
+    if (Qprint) then
+       write(fh_stdout,*) 'ntcix=', ntcix
+       do icix=1,ncix
+          latom = cix_atom(icix)
+          jatom = isort(latom)
+          write(fh_stdout,'(A,I3,A,I3)') 'Unique Correlated index for forces icix=', icix, ', jatom=', jatom
+          do ip=1,cdim(icix)
+             do iq=1,cdim(icix)
+                write(fh_stdout,'(I3)',advance='no') Sigind_orig(ip,iq,icix)
+             enddo
+             write(fh_stdout,*)
+          enddo
+       end do
+    end if
+    
     DEALLOCATE(wtmpx)
     deallocate( cix_atom, cdim )
 
