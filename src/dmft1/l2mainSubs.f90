@@ -567,11 +567,6 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
   !-----------------------
   DATA IMAG/(0.0D0,1.0D0)/
   !-----------------------
-  write_Eimpx = .True.
-  fh_Eimpx = 6
-  !filename = 'Eimpx.dat'
-  !open(fh_Eimpx,file=TRIM(filename),status='unknown')
-  if (write_Eimpx) WRITE(fh_Eimpx,*) 'Full matrix of impurity levels follows'
 
   Deltac=0
   Olapc=0
@@ -586,6 +581,12 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
   do iom=2,nomega
      if (abs(omega(iom)).LT.abs(omega(iomega0))) iomega0=iom
   enddo
+  fh_Eimpx = 6
+  WRITE(fh_Eimpx,*) 'omega~0 is', omega(iomega0), 'at i=', iomega0
+  write_Eimpx = .True.
+  !filename = 'Eimpx.dat'
+  !open(fh_Eimpx,file=TRIM(filename),status='unknown')
+  if (write_Eimpx) WRITE(fh_Eimpx,*) 'Full matrix of impurity levels follows'
   
   DO icix=1,ncix
 

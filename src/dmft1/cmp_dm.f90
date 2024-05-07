@@ -153,29 +153,41 @@ SUBROUTINE Print_DensityMatrix(gmloc, g_inf, g_ferm, omega, maxdim, ncix, Sigind
   REAL*8, allocatable :: omega_all(:)
   COMPLEX*16, allocatable :: dg_all(:)
   INTEGER, allocatable :: cind(:), cini(:)
-  INTEGER :: iom, n0_om, nom_all, cixdm, icix, ip, iq, fh_DM, cixdms, it
+  INTEGER :: iom, n0_om, nom_all, cixdm, icix, ip, iq, fh_DM, cixdms, it, ifirstm
   REAL*8  :: pi, beta, nf, wgh
   COMPLEX*16 :: df2, df3
   real*8, PARAMETER       :: Ry2eV = 13.60569193
   !
+
+  !WRITE(6,*) '@ maxdim,ncix=', maxdim, ncix
+  
   allocate( DM(maxdim,maxdim,ncix) )
   pi = 2*acos(0.d0)
-  beta = pi/omega(1)
-  if (beta.LT.0) then
+  ifirstm=1
+  if (omega(1).lt.1e-5) ifirstm=2  ! sometimes we add zero frequency so that first matsubara is second frequency
+  beta = pi/omega(ifirstm)
+  if (beta.LE.0) then
      ! You are probably on real axis and should not select matsubara
+     deallocate(DM)
      return
+  else
+     WRITE(6,*) 'From frequency estimating beta=', beta, 'Ry'! 'ifirstm=', ifirstm, 'omega()=', omega(ifirstm)
   endif
-  do iom=1,nomega
-     if (abs((omega(iom)*beta/pi+1)/2. - iom).GT.1e-1) EXIT
+  ! (2n+2)/2
+  do iom=ifirstm,nomega
+     if (abs((omega(iom)*beta/pi+1)/2. - (iom-ifirstm+1)).GT.1e-1) EXIT
   enddo
   n0_om = iom-1
   nom_all = int((omega(nomega)*beta/pi+1)/2.+0.1)
+
   allocate(omega_all(nom_all))
   do iom=1,nom_all
      omega_all(iom) = (2*iom-1)*pi/beta
   enddo
   allocate( dg_all(nom_all) )
   
+  !WRITE(6,*) '@ n0_om=', n0_om, 'nom_all=', nom_all
+
   DM(:,:,:)=0.d0
   DO icix=1,ncix
      cixdm = cixdim(icix)
@@ -184,7 +196,7 @@ SUBROUTINE Print_DensityMatrix(gmloc, g_inf, g_ferm, omega, maxdim, ncix, Sigind
            ! Interpolating gloc on all Matsubara points
            dg(:) = gmloc(ip,iq,icix,:)-g_inf(ip,iq,icix,:)
            !print *, 'n0_om=', n0_om, 'nomega=', nomega
-           dg_all(:n0_om) = dg(:n0_om)
+           dg_all(:n0_om) = dg(ifirstm:n0_om+ifirstm-1)
            if (n0_om.lt.nomega) then
               df2 = NumericSecondDeriv(dg,omega,n0_om,nomega)
               df3 = NumericSecondDeriv(dg,omega,nomega-1,nomega)
