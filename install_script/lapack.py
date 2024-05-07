@@ -82,7 +82,6 @@ What do you want to do ?
 
 
     def check_lapack(self):
-        print("Checking if provided LAPACK works...", end=' ')
         # This function simply generates a C program
         # that contains few calls to LAPACK routine and then
         # checks if compilation, linking and execution are succesful
@@ -105,6 +104,8 @@ What do you want to do ?
 
         ldflg = self.config.lapacklib+' '+self.config.blaslib+'  -lm'
         ccomm = self.config.fc+' -o tmpf '+'tmpf.f '+ldflg
+        print('checking with:', ccomm)
+        print("Checking if provided LAPACK works...", end=' ')
         (output, error, retz) = shellcmd(ccomm)
 
         if(retz != 0):

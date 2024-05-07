@@ -7,7 +7,7 @@ import re, os, glob, shutil
 from os.path import getsize
 
 # DFT type quantities (w2k files)
-f0 = ['.struct','.in0','.clmsum','.inm','.inM','.clmup','.clmdn']
+f0 = ['.struct','.in0','.clmsum','.clmsum_old','.inm','.inM','.clmup','.clmdn']
 f1 = ['.in1','.in1c','.klist','.inso','.in2c']
 f2 = ['.in2','.kgen']
 fc = ['.inc','.scf2','.incup','.incdn']

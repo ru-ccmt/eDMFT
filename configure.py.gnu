@@ -11,7 +11,7 @@ class Config:
 
 
   cflags      = "-O2"          # linker flags for C programs
-  fflags      = "-O2"          # linker flags for Fortran programs
+  fflags      = "-O2 -fallow-argument-mismatch"          # linker flags for Fortran programs
   ldflags      = ""             # linker flags debuggin programs
   ompflag     = "-fopenmp"     # linker/compiler flag for openmp
 
@@ -21,8 +21,8 @@ class Config:
   pfc         = "mpif90"       # Fortran compiler 
   
   blasname    = "GNU"          # BLAS   library
-  blaslib     = "-lblas"         # BLAS   library
-  lapacklib   = "-llapack"             # LAPACK library
+  blaslib     = "-L/opt/gnu/12.3.0/OpenBLAS/lib -lopenblas"         # BLAS   library
+  lapacklib   = "-L/opt/gnu/12.3.0/lib64 -llapack"             # LAPACK library
   fftwlib     = "-lfftw3_omp -lfftw3"  # FFTW   library
   gsl         = "-lgslcblas -lgsl"     # GSL    library
 

@@ -85,7 +85,6 @@ What do you want to do ?
 
     def check_blas(self):
 
-        print("Checking if provided BLAS works...", end=' ')
         # This function simply generates a FORTRAN program
         # that contains few calls to BLAS routine and then
         # checks if compilation, linking and execution are succesful
@@ -117,6 +116,8 @@ What do you want to do ?
 
         #fcomm = self.config.fc+' -o tmpf '+'tmpf.f '+self.config.blaslib+' '+self.config.ldflags_fc+' -lm'
         fcomm = self.config.fc+' -o tmpf '+'tmpf.f '+self.config.blaslib+' -lm'
+        print('checking with:', fcomm)
+        print("Checking if provided BLAS works...", end=' ')
         (output, error, retz) = shellcmd(fcomm)
 
         if(retz != 0):
@@ -132,7 +133,76 @@ What do you want to do ?
             sys.exit()
 
         delfiles(['tmpf.f','tmpf'])
-        print('yes')
+        print('fortran yes')
+        
+        writefile('tmpc.cc',"""
+#include <iostream>
+#include <stdlib.h>
+#include <string>
+
+#ifdef NO_APPEND_FORTRAN
+# define FNAME(x) x
+#else
+# define FNAME(x) x##_
+#endif
+
+
+extern "C" {
+  void FNAME(dgemm)(const char* transa, const char* transb, const int* m, const int* n, const int* k, const double* alpha, const double* A, const int* lda, const double* B, const int* ldb, const double* beta, double* C, const int* ldc);
+}
+
+inline void xgemm(const std::string& transa, const std::string& transb, const int m, const int n,
+                  const int k, const double alpha, const double* A,
+                  const int lda, const double* B, const int ldb, const double beta,
+                  double* C, const int ldc)
+{
+  FNAME(dgemm)(transa.c_str(), transb.c_str(), &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc);
+}
+
+int main(){
+  int Na=2, Nb=2, Ndb=2;
+  double *A, *B, *C;
+  A = new double[Na*Nb];
+  B = new double[Nb*Ndb];
+  C = new double[Na*Ndb];
+  
+  A[0]=1;A[1]=0;A[2]=0;A[3]=1;
+  B[0]=1;B[1]=0;B[2]=0;B[3]=1;
+  
+  xgemm("N", "N", Ndb, Na, Nb, 1.0, B, Ndb, A, Nb, 0.0, C, Ndb);
+  
+  std::cout<<C[0]<<","<<C[1]<<","<<C[2]<<","<<C[3]<<std::endl;
+  
+  delete[] A;
+  delete[] B;
+  delete[] C;
+}
+        """)
+
+        ccomm = self.config.cxx+' -o tmpc '+'tmpc.cc '+self.config.blaslib+' -lm'
+        print('checking with:', ccomm)
+        print("Checking if provided BLAS works...", end=' ')
+        (output, error, retz) = shellcmd(ccomm)
+
+        if(retz != 0):
+            print('\n\nBLAS: provided BLAS cannot be used with C++! aborting...')
+            print('error is:\n','*'*50,'\n',ccomm,'\n',error.decode('UTF-8'),'\n','*'*50)
+            sys.exit()
+
+        comm = './tmpc'
+        (output, error, retz) = shellcmd(comm)
+        out=output.decode('UTF-8')
+        if(retz != 0):
+            print('\n\nBLAS: provided BLAS cannot be used with C++! aborting...')
+            print('error is:\n','*'*50,'\n',comm,'\n',error.decode('UTF-8'),'\n','*'*50)
+            sys.exit()
+        if not re.search('1,0,0,1',out):
+            print('The blas dgemm is not returning correct output. Check your blas library please')
+            print('The message is', out)
+            sys.exit()
+            
+        delfiles(['tmpc.cc','tmpc'])
+        print('C++ yes')
 
         return 0;
 

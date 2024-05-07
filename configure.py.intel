@@ -11,13 +11,16 @@ class Config:
   ldflags     = ""             # linking flags for Fortran programs
   ompflag     = "-fopenmp"     # linker/compiler flag for openmp
 
+  cc          = "icx"          # new C compiler
+  cxx         = "icpx"         # new C++ compiler
+  
   mpi_define  = "-D_MPI"       # should be -D_MPI for mpi code and empty for serial code.
   pcc         = "mpicc"        # C compiler 
   pcxx        = "mpicxx"       # C++ compiler 
   pfc         = "mpif90"       # Fortran compiler 
   
   blasname    = "MKL"             # BLAS   library
-  blaslib     = "-mkl" # BLAS   library
+  blaslib     = "-qmkl-ilp64=parallel -qmkl" # BLAS   library
   lapacklib   = ""             # LAPACK library
   fftwlib     = "-lfftw3_omp -lfftw3"     # FFTW   library
   gsl         = "-lgslcblas -lgsl"  # GSL    library

@@ -1,6 +1,11 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# First please set:
+# export MKLROOT=/opt/intel/oneapi/2024.0
+# export LD_LIBRARY_PATH=$MKLROOT/lib
+
+
 class Config:
   prefix      = "bin"    # Installation path
 
@@ -21,10 +26,10 @@ class Config:
   pfc         = "mpif90"       # Fortran compiler 
   
   blasname    = "mkl"          # BLAS   library
-  blaslib     = "-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_gf_lp64.a ${MKLROOT}/lib/intel64/libmkl_sequential.a ${MKLROOT}/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm -ldl"         # BLAS   library
+  blaslib     = "-L${MKLROOT}/lib -lmkl_intel_ilp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"         # BLAS   library
   lapacklib   = ""             # LAPACK library
   fftwinc     = "-I${MKLROOT}/include/fftw"
-  fftwlib     = "-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_gf_lp64.a ${MKLROOT}/lib/intel64/libmkl_sequential.a ${MKLROOT}/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm -ldl"  # FFTW   library
+  fftwlib     = "-L${MKLROOT}/lib -lmkl_intel_ilp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"  # FFTW   library
   gslinc      = ""
   gsl         = "-lgsl -lcblas"     # GSL    library
 

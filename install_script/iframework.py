@@ -71,7 +71,7 @@ class Framework:
 
         if ((str.upper(self.config.compiler) == 'INTEL')):
             if self.config.cc==None or self.config.cc == '':
-              self.config.cc = 'icc'
+              self.config.cc = 'icx'
               print("""
 You specified """+self.config.compiler+""" as your main compiler 
 and left  --cc  parameter empty, assuming it equal to """+self.config.cc+".\n")
@@ -83,7 +83,7 @@ You specified """+self.config.compiler+""" as your main compiler
 and left  --fc  parameter empty, assuming it equal to """+self.config.fc+".\n")
             
             if self.config.cxx==None or self.config.cxx == '':
-              self.config.cxx = 'icpc'
+              self.config.cxx = 'icpx'
               print("""
 You specified """+self.config.compiler+""" as your main compiler 
 and left  --cxx  parameter empty, assuming it equal to """+self.config.cxx+".\n")
