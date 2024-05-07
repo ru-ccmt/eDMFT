@@ -55,7 +55,7 @@ public:// methods
   double time_direct(int type, int i) const {return type==cd ? _time_s[i] : _time_e[i];}
   
   template <int boson_fermion>
-  const funProxy<dcomplex>& exp_direct(int type, int i) const {cerr<<"Should not happen"<<endl; }//return NULL;}
+  const funProxy<dcomplex>& exp_direct(int type, int i) const {cerr<<"Should not happen"<<endl; return _exp_e[0];}//return NULL;}
   
   int btype_s(int i) const {return _btype_s[index_s[i]];}
   int btype_e(int i) const {return _btype_e[index_e[i]];}

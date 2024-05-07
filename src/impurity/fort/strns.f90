@@ -20,7 +20,7 @@ SUBROUTINE cmp_t2c(T2C, is, ilsb, ltpan, lmtind, ndim, norb, natom, nsort, lmaxu
 !f2py integer intent(hide), depend(ltpan)          :: lmaxu=shape(ltpan,0)-1
   ! Temporary variables
   COMPLEX*16 :: TC(-3:3,7,0:3)             ! sph->cubic convertion matrix
-  INTEGER    :: iatom, isort, l, lm, inds, inde, i, j
+  INTEGER    :: iatom, isort, l, lm, inds, inde!, j, i
 !!! T2C is matrix to covert the self-energy or Hamiltonian 
 !!! matrixes from spherical to cubic: 
 !!! SE_c=(T2C)^{+}*SE_s*T2C
@@ -426,7 +426,7 @@ SUBROUTINE TRANS1(A1,KEY)
 !*  Returns T if key=1, returns reciprocal(T) if key=2.   *
 !**********************************************************
   IMPLICIT REAL*8 (A-H,O-Z)
-  COMPLEX*16 T1(-1:1,3),T1R(3,-1:1),WORK(3),A1(3,3)
+  COMPLEX*16 T1(-1:1,3),T1R(3,-1:1),A1(3,3)!,WORK(3)
   ! mu=-1
   T1(-1,1)=1.D0/SQRT(2.D0)
   T1(-1,2)=1.D0/SQRT(2.D0)*(0.D0,-1.D0)
@@ -513,7 +513,7 @@ SUBROUTINE TRANS2(A2,KEY)
 !*  Returns T if key=1, returns reciprocal(T) if key=2.   *
 !**********************************************************
   IMPLICIT REAL*8 (A-H,O-Z)
-  COMPLEX*16 T2(-2:2,5),T2R(5,-2:2),WORK(5),A2(5,5)
+  COMPLEX*16 T2(-2:2,5),T2R(5,-2:2),A2(5,5)!,WORK(5)
   ! mu=-2
   T2(-2,1)=(0.D0,0.D0)
   T2(-2,2)=(0.D0,0.D0)
@@ -631,7 +631,7 @@ SUBROUTINE TRANS3(A3,KEY)
 !*  Returns T if key=1, returns reciprocal(T) if key=2.   *
 !**********************************************************
   IMPLICIT REAL*8 (A-H,O-Z)
-  COMPLEX*16 T3(-3:3,7),T3R(7,-3:3),WORK(7),A3(7,7)
+  COMPLEX*16 T3(-3:3,7),T3R(7,-3:3),A3(7,7)!,WORK(7)
   ! SET RECIPROCAL TRANSFORMATION FIRST
   T3R(1,-3)=+sqrt(5.d0/16.d0)*(1.d0,0.d0)
   T3R(1,-2)=(0.d0,0.d0)

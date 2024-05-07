@@ -42,7 +42,7 @@ CONTAINS
     CALL MPI_INIT( ierr )
     CALL MPI_COMM_SIZE( MPI_COMM_WORLD, nprocs, ierr)
     CALL MPI_COMM_RANK( MPI_COMM_WORLD, myrank, ierr)
-!    PRINT *,'nprocs=',nprocs,'myrank =',myrank 
+    !WRITE(6,*) 'nprocs=',nprocs,'myrank =',myrank 
     master = 0
     write(cpuID,'(I3)') myrank
     ! Get command-line arguments

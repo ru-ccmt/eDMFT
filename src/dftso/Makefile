@@ -23,7 +23,7 @@ llattice:
 latpar :
 	cd atpar && ${MAKE} libatpar.a
 
-lapwso : $(OBJS) llattice latpar
+lapwso : $(OBJS) # llattice latpar
 	$(FORT) -o $@ $(OBJS) $(LDFLAGS) $(LFLIBS)
 
 

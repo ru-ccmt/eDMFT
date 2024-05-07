@@ -12,6 +12,6 @@ dpybind.so  : dpybind.cc
 	$(C++) $(BLITZ) $(PYBND) -O2 dpybind.cc -o dpybind.so
 
 clean:
-	rm -rf build gaunt.*.so dpybind.*.so dpybind.so
+	rm -rf build gaunt.*so dpybind.*.so dpybind.so
 	rm -rf *.dSYM 
 

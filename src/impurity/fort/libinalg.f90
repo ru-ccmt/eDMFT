@@ -368,6 +368,7 @@ SUBROUTINE eig_order_real_part(ev, idxarr, ndim)
   ALLOCATE(sortonr(ndim), sorted(ndim))
   !---------- Initialize arrays ----------
   idxarr = 0
+  idx=0
   sortonr = DBLE(ev)
   sorted = .FALSE.
   !---------- Create index array for real value ----------
@@ -467,7 +468,7 @@ subroutine check_causality(E, small_positive, isize)
   INTEGER, intent(in)       :: isize  
   !f2py integer intent(hide), depend(E)  :: isize=shape(E,0)
   INTEGER :: i
-  REAL*8  :: a
+  !REAL*8  :: a
   DO i=1,isize
      IF (dimag(E(i)).GT.-small_positive) E(i) = dcmplx(dreal(E(i)),-small_positive)
   ENDDO
@@ -479,8 +480,8 @@ subroutine check_causality2(sig, small_positive, isize)
   REAL*8, intent(in)        :: small_positive
   INTEGER, intent(in)       :: isize  
   !f2py integer intent(hide), depend(sig)  :: isize=shape(sig,0)
-  INTEGER :: i, j
-  REAL*8  :: a
+  INTEGER :: i!, j
+  !REAL*8  :: a
   DO i=1,isize
      IF (dimag(sig(i,i)).GT.-small_positive) sig(i,i) = dcmplx(dreal(sig(i,i)),-small_positive)
   ENDDO

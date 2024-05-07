@@ -121,7 +121,7 @@ def MaximumEntropy(p, tau, Gt):
     
     for itt in range(p['Nitt']):
         print(itt, 'Restarting maxent with rfac=', rfac, 'alpha=', alpha)
-        iseed = random.randint(0,2**32-1)
+        iseed = random.randint(0,2**16-1)
         
         me.maxent(Aw,rfac,alpha,temp,Ker,sxt,Gt,model,dom,p['Asteps'],iseed)
         S = me.entropy(Aw,model,dom)
