@@ -71,14 +71,14 @@ class WStruct:
                           [-self.b*sin_alpha*cos_gamma,self.b*sin_alpha*sin_gamma,self.b*cos_alpha],
                           [0, 0, self.c]])
         
-    def ScanCif(self, filein, log=sys.stdout, writek=False, Qmagnetic=True, cmp_neighbors=False, convertH2R=True, ndecimals=3):
+    def ScanCif(self, filein, log=sys.stdout, writek=False, Qmagnetic=True, cmp_neighbors=False, convertH2R=True, ndecimals=3, nradius=4.7):
         """ Here is the majority of the algorithm to convert cif2struct.
         We start by allocating CifParser_W2k, which reads cif using paymatgen, and 
         extracts necessary information.
         Below we than arrange this information in the way W2k needs it in struct file.
         
         """
-        cif = CifParser_W2k(filein, log, Qmagnetic, cmp_neighbors, ndecimals)
+        cif = CifParser_W2k(filein, log, Qmagnetic, cmp_neighbors, ndecimals, nradius)
         
         nsym = len(cif.parser.symmetry_operations)
         self.timat = zeros((nsym,3,3),dtype=int)
@@ -1044,7 +1044,7 @@ def get_matching_coord(coord, parser, coord_to_species):
 
     
 class CifParser_W2k:
-    def __init__(self, fname, log=sys.stdout, Qmagnetic=True, cmp_neighbors=False, ndecimals=3):
+    def __init__(self, fname, log=sys.stdout, Qmagnetic=True, cmp_neighbors=False, ndecimals=3, nradius=4.7):
         self.log = log
         self.parser = CifParser(fname,occupancy_tolerance=3)
         cif_as_dict = self.parser.as_dict()       # get dictionary of cif information
@@ -1206,7 +1206,8 @@ class CifParser_W2k:
                 indices = indx_by_element[spec] # indices on sites of the same element
                 site = self.structure.sites[indices[0]]
                 Mi = site.properties["magmom"].moment
-                if sum(abs(Mi))<1e-5:
+                amoments = [sum(abs(amagmoms[i])) for i in indices]
+                if sum(amoments)<1e-5:
                     continue
                 print(site.species_string+'['+str(indices[0])+']', site.frac_coords, 'M['+str(indices[0])+']=', Mi, file=log)
                 grp = [[indices[0]]]  # we have just one group with the first entry in coords. All entries in coords will have index in grp
@@ -1233,6 +1234,7 @@ class CifParser_W2k:
                                               ' and M['+str(ty[i_grp_compare])+']=', M0.tolist(), file=log)
                                     m0 = linalg.norm(M0)
                                     Molap = dot(Mj,M0)/(mj*m0) if (mj!=0 and m0!=0) else 0
+                                    if (mj==0 and m0==0): Molap = 1.0
                                     print('Molap=', Molap, file=log)
                                     moments_equal = sum(abs(Mj-M0))<1e-5 or (Molap>min_Molap and abs(m0-mj)<1e-5)
                                     if not moments_equal: #sum(abs(Mj-M0))>1e-5 and Molap<min_Molap:
@@ -1329,9 +1331,10 @@ class CifParser_W2k:
             # or we get umbiguous results with symmetry operations.
             for spec in indx_by_element:  
                 indices = indx_by_element[spec] # indices on sites of the same element
-                site = self.structure.sites[indices[0]]
-                Mi = site.properties["magmom"].moment
-                if sum(abs(Mi))<1e-5:
+                #site = self.structure.sites[indices[0]]
+                #Mi = site.properties["magmom"].moment
+                amoments = [sum(abs(amagmoms[i])) for i in indices]
+                if sum(amoments)<1e-5:
                     mgroups.append([indices])
             mgroups = sorted(mgroups, key=lambda a: a[0][0])
             print('starting with groups for magnetic atoms=', mgroups, file=log)
@@ -1375,7 +1378,7 @@ class CifParser_W2k:
             # if several shells of atoms have equivalent neigbors, they are equivalent. Otherwise they are not.
             print('all_neigbrs:', file=log)
             all_sites = [self.structure.sites[i] for i in range(len(self.structure.sites))]
-            center_indices, points_indices, offsets, distances = self.structure.get_neighbor_list(r=4.7, sites=all_sites, numerical_tol=1e-4)
+            center_indices, points_indices, offsets, distances = self.structure.get_neighbor_list(r=nradius, sites=all_sites, numerical_tol=1e-4)
             all_neighbrs=[]
             for i,isite in enumerate(all_sites):
                 coord = isite.frac_coords @ self.structure.lattice.matrix
@@ -2038,10 +2041,10 @@ def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, H2Rtrans=False, log=sy
         print('END', file=fk)
 
 
-def Cif2Struct(fcif, Nkp=300, writek=True, Qmagnetic=True, logfile='cif2struct.log', cmp_neighbors=False, convertH2R=True, ndecimals=3):
+def Cif2Struct(fcif, Nkp=300, writek=True, Qmagnetic=True, logfile='cif2struct.log', cmp_neighbors=False, convertH2R=True, ndecimals=3, nradius=4.7):
     log = open(logfile, 'w')
     strc = WStruct()           # w2k structure, for now empty
-    strc.ScanCif(fcif, log, writek, Qmagnetic, cmp_neighbors, convertH2R, ndecimals)    # here is most of the algorithm
+    strc.ScanCif(fcif, log, writek, Qmagnetic, cmp_neighbors, convertH2R, ndecimals, nradius)    # here is most of the algorithm
     case = os.path.splitext(fcif)[0] # get case
     strc.WriteStruct(case+'.struct', log) # writting out struct file
     lat = Latgen(strc, case, log)  # checking Bravais lattice in wien2k and its consistency.
@@ -2085,6 +2088,7 @@ if __name__ == '__main__':
     parser.add_option('-m', '--magnet',  dest='Qmagnetic', action='store_true', default=False, help="should produce magnetic dft struct that allows broken symmetry from mcif")
     parser.add_option('-H', '--hexagonal',  dest='keepH', action='store_true', default=False, help="switches off hexagonal to rhombohedral conversion")
     parser.add_option('-p', '--ndecimals',  dest='ndecimals', type='int', default=3, help="precision when determining the equivalency of atoms we take nn distance with precision ndecimals. Compatible with w2k nn method.")
+    parser.add_option('-R', '--nradius',  dest='nradius', type='float', default=4.7, help="How far in AA should nearest neighbors be checked. Compatible with w2k nn method.")
     
     # Next, parse the arguments
     (options, args) = parser.parse_args()
@@ -2096,4 +2100,4 @@ if __name__ == '__main__':
     #print('fcif=', fcif)
     #print('options=', options.Nkp, options.wkp)
     Cif2Struct(fcif, Nkp=options.Nkp, writek=options.wkp, Qmagnetic=options.Qmagnetic, logfile=options.log,
-                   cmp_neighbors=options.neigh, convertH2R=not options.keepH, ndecimals=options.ndecimals)
+                   cmp_neighbors=options.neigh, convertH2R=not options.keepH, ndecimals=options.ndecimals,nradius=options.nradius)

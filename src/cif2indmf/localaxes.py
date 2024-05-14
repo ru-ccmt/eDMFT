@@ -451,8 +451,8 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.85, max_angle_varianc
     elif len(criteria)>1 and criteria[1][1]<max_bond_variance and criteria[1][2]<max_angle_variance: # If the bond variance was very bad for the first case, we go down the list
         ctype = criteria[1]
     else: # If the second is not OK, we boil out at the moment
-        #print('Could not detect the type of environment, Boiling out.')
-        return None,None
+        print('Could not detect the type of environment, Boiling out.', file=log)
+        return None,grps[0]
     print('Found the environment is {:s}  (<w-n>= {:8.3f},<phi>= {:8.3f})'.format(*ctype), file=log)
     
     if ctype[0]=='octahedra':
@@ -753,7 +753,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.85, max_angle_varianc
         R0 = [nx,ny,nz]
     else:
         print('Noy yet implemented', file=log)
-        return None,None
+        return None,grps[0]
     
     #for i in range(3): print( ('{:12.8f} '*3).format(*R0[i]))
     # Now orthogonalizing the set of vectors
@@ -761,7 +761,7 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.85, max_angle_varianc
 
     if (min(S)<0.3 or max(S)>2.):
         print('WARN: Since singular values are far from unity (S=',S, ') we decided that this polyhedron is a bad choice. Resorting to global coordinate axis.', file=log)
-        return None,None
+        return None,N
     
     R = dot(U,V)
     R = ResortToDiagonal(R)

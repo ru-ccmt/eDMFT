@@ -134,15 +134,18 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
     if R is not None:
         return R, (n_str,n_str+N)
     else:
-        return identity(3), (n_str,n_str+1)
+        if N is None:
+            return identity(3), (n_str,n_str+1)
+        else:
+            return identity(3), (n_str,n_str+N)
     
 
 def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty', onreal=False,
               fixmu=False,beta=50, QMC_M=5e6, CoulombU=None, CoulombJ=None,
-              qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log', keepH=False, ndecimals=3):
+              qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log', keepH=False, ndecimals=3,nradius=4.7):
     case = os.path.splitext(fcif)[0] # get case
 
-    (strc, lat) = Cif2Struct(fcif, Nkp, writek, Qmagnetic, logfile, cmp_neighbors=True, convertH2R=not keepH, ndecimals=ndecimals)
+    (strc, lat) = Cif2Struct(fcif, Nkp, writek, Qmagnetic, logfile, cmp_neighbors=True, convertH2R=not keepH, ndecimals=ndecimals,nradius=nradius)
 
     log = open(logfile, 'a')
 
@@ -157,6 +160,9 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
     #    matrix_w2k = possible_matrix_w2k
         
     matrix_vesta = strc.Matrix(vesta=True)
+
+    #print('aname=', strc.aname)
+    #print('len(strc.neighbrs)=', len(strc.neighbrs))
     
     indx=0
     for jatom in range(len(strc.neighbrs)):
@@ -266,7 +272,7 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
         if R is not None:
             Rv = R @ vesta_vs_w2k
             Rf = R @ to_frac
-        
+            print('# neigbors used to determine poly:', nnn, file=log)
             print('Rotation to input into case.indmfl by locrot=-1 : ', file=log)
             print(file=log)
             for i in range(3): print( ('{:12.8f} '*3).format(*R[i,:]), file=log)
@@ -436,7 +442,7 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
                      "svd_lmax"           : [30                   , "# We will use SVD basis to expand G, with this cutoff"],
                      "M"                  : [int(QMC_M)           , "# Total number of Monte Carlo steps"],
                      "mode"               : ["SH"                 , "# We will use self-energy sampling, and Hubbard I tail"],
-                     "nom"                : [200                  , "# Number of Matsubara frequency points sampled"],
+                     "nom"                : [int(5*beta)          , "# Number of Matsubara frequency points sampled"],
                      "tsample"            : [400                  , "# How often to record measurements"],
                      "GlobalFlip"         : [1000000              , "# How often to try a global flip"],
                      "warmup"             : [int(3e5)             , "# Warmup number of QMC steps"],
@@ -489,6 +495,7 @@ if __name__ == '__main__':
     parser.add_option('-m', '--magnet',  dest='Qmagnetic', action='store_true', default=False, help="should produce magnetic dft struct that allows broken symmetry from mcif")
     parser.add_option('-H', '--hexagonal',dest='keepH', action='store_true', default=False, help="switches off hexagonal to rhombohedral conversion")
     parser.add_option('-p', '--ndecimals',  dest='ndecimals', type='int', default=3, help="precision when determining the equivalency of atoms we take nn distance with precision ndecimals. Compatible with w2k nn method.")
+    parser.add_option('-R', '--nradius',  dest='nradius', type='float', default=4.7, help="How far in AA should nearest neighbors be checked. Compatible with w2k nn method.")
     
     # Next, parse the arguments
     (options, args) = parser.parse_args()
@@ -502,5 +509,5 @@ if __name__ == '__main__':
         cor = expand_intlist(options.cor)
     
     Cif2Indmf(fcif, cor, options.so, options.Qmagnetic, options.DC, options.real, options.fixmu, options.beta, options.QMC_M, options.CoulombU, options.CoulombJ,
-                  options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log, keepH=options.keepH, ndecimals=options.ndecimals)
+                  options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log, keepH=options.keepH, ndecimals=options.ndecimals,nradius=options.nradius)
 
