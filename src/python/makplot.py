@@ -18,7 +18,7 @@ mingle_names={'W':'$W$','L':'$L$','LAMBDA':'$\Lambda$','\Gamma':'$\Gamma$','GAMM
 if __name__ == '__main__':
 
     if len(sys.argv)<2:
-        intensity = 0.2
+        intensity = 0.97
     else:
         intensity = float(sys.argv[1])
 
@@ -61,6 +61,8 @@ if __name__ == '__main__':
                 legnd=line.split()[0]
                 if legnd in mingle_names:
                     legnd = mingle_names[legnd]
+                else:
+                    legnd = '$'+legnd+'$'
                 wkpoints.append(legnd)
                 wkpointi.append(il)
         print(wkpointi)
@@ -132,8 +134,18 @@ if __name__ == '__main__':
     Akom2 = array(Akom2).T
     print('shape(Akom1),shape(Akom2)=', shape(Akom1), shape(Akom2))
 
+    #vmm = [0,max(list(map(max,Akom1)))*intensity]    
+
+    ht, bin_edges = histogram(vstack((Akom1.ravel(),Akom2.ravel())),bins=5000)
+    xh = 0.5*(bin_edges[1:]+bin_edges[:-1])
+    cums = cumsum(ht)/sum(ht)
+    i = searchsorted(cums, intensity)
+    print('with intensity=', intensity, 'we determine cutoff at Ak=', xh[i])
+    vmm = [0,xh[i]]
     
-    vmm = [0,max(list(map(max,Akom1)))*intensity]    
+    #hist(Akom1.ravel(), bins='auto')
+    #show()
+    
     (ymin,ymax) = (om[0]+DY,om[-1]+DY)
     (xmin,xmax) = (0, shape(Akom1)[1]-1)
     #(xmin,xmax) = (0, nkp-1)
@@ -149,9 +161,10 @@ if __name__ == '__main__':
     # here it is progressive, but you can create whathever you want
     alphas = np.linspace(0, 0.9, cmap2.N+3)
     cmap2._lut[:,-1] = alphas
-    
-    imshow(Akom1, interpolation='bilinear', cmap=cmap1, origin='lower', vmin=vmm[0], vmax=vmm[1], extent=[xmin,xmax,ymin,ymax], aspect=(xmax-xmin)*0.8/(ymax-ymin) )
-    imshow(Akom2, interpolation='bilinear', cmap=cmap2, origin='lower', vmin=vmm[0], vmax=vmm[1], extent=[xmin,xmax,ymin,ymax], aspect=(xmax-xmin)*0.8/(ymax-ymin) )
+
+    aspect=(xmax-xmin)*0.5/(ymax-ymin)
+    imshow(Akom1, interpolation='bilinear', cmap=cmap1, origin='lower', vmin=vmm[0], vmax=vmm[1], extent=[xmin,xmax,ymin,ymax],aspect=aspect)
+    imshow(Akom2, interpolation='bilinear', cmap=cmap2, origin='lower', vmin=vmm[0], vmax=vmm[1], extent=[xmin,xmax,ymin,ymax],aspect=aspect)
 
     for i in range(len(wkpointi)):
         print('wp=', wkpointi[i])

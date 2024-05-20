@@ -7,6 +7,7 @@
 from math import gcd
 import re, sys, os
 import optparse
+from copy import deepcopy
 from numpy import *
 import numpy as np
 import numpy.linalg as linalg
@@ -138,7 +139,10 @@ class WStruct:
         print('a=', self.a, 'b=', self.b, 'c=', self.c, 'alpha=', self.alpha, 'beta=', self.beta, 'gamma=', self.gamma, file=log)
         print('sgname=', self.sgname, 'sgnum=', self.sgnum, 'lattty=', self.lattyp, 'Nsym=', nsym, file=log)
         print('Znuc=', ['Z['+spec+']='+str(self.Znuc[i]) for i,spec in enumerate(cif.w2k_coords)], file=log)
-        print('high symmetry kpath=', self.kpath, file=log)
+        if self.kpath:
+            print('high symmetry kpath=', file=log)
+            for kname in self.kpath:
+                print('{:7s}'.format(kname), self.kpath[kname].tolist(), file=log)
         print('positions found in cif file:', file=log)
         for i in range(len(cif.cname)):
             print('name='+cif.cname[i], '[', cif.cx[i], ',', cif.cy[i], ',', cif.cz[i],']', file=log)
@@ -1170,6 +1174,7 @@ class CifParser_W2k:
         #print('indx_by_element=', indx_by_element)
         print('Number of symmetry operations available=', len(self.parser.symmetry_operations), file=log)
         print('magnetic cif=', magnetic, file=log)
+
         for isym,op in enumerate(self.parser.symmetry_operations):
             timat = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
             tau = op.affine_matrix[:3,3]
@@ -1188,8 +1193,43 @@ class CifParser_W2k:
                 print(isym,':', symmetry_operations_type, file=log)
             for i in range(3):
                 print('{:2d}{:2d}{:2d} {:10.8f}'.format(*timat[i,:], tau[i]), file=log)
-        
+
+
         acoords = [site.frac_coords%1.0 for site in self.structure.sites] # all coordinates but always inside home unit cell
+        if True:
+            # This is for nonmagnetic system, where we don't need to introduce any new splitting
+            pgroups=[] # Will contain groups of equivalent sites
+            #print('indx_by_element=', indx_by_element, file=log)
+            for spec in indx_by_element:  # Next we loop through element in this structure
+                indices = indx_by_element[spec] # indices on sites of the same element
+                grp = [[indices[0]]]  # we have just one group with the first entry in coords. All entries in coords will have index in grp
+                site = self.structure.sites[indices[0]]
+                #mfinite=False
+                for ii in indices[1:]: # loop over possibly equivalent sites (of the same element)
+                    coord = acoords[ii]    # fractional coordinate of that site self.structure.sites[ii]
+                    site = self.structure.sites[ii]
+                    Qequivalent=False  # for now we thing this might not be equivalent to any other site in grp
+                    for ig,op in enumerate(self.parser.symmetry_operations): # loop over all symmetry operations
+                        ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
+                        for ty in grp:                         # if coord is equivalent to any existing group in grp, say grp[i]==ty, then one of ncoord should be equal to first entry in grp[i]
+                            coord0 = acoords[ty[0]]            # the first entry in the group grp[i][0]
+                            if sum(abs(ncoord-coord0))<1e-5:   # is it equal to current coord when a symmetry operation is applied?
+                                print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,
+                                          'gives r['+str(ty[0])+']=', coord0, file=log)
+                                Qequivalent=True               # we found which group it corresponds to
+                                ty.append(ii)                  # grp[i]=ty is extended with coord[i]
+                                break                          # loop over groups and also symmetry operations can be finished
+                        if Qequivalent:
+                            break
+                    if not Qequivalent:                        # if this site (coord) is not equivalent to any existing group in grp, than we create a new group with a single entry [i]
+                        grp.append([ii])
+                        #print('Starting anew with ii='+str(ii)+' grp=', grp, file=log)
+                    #print(spec+' grp=', grp)
+                pgroups.append(grp)  # all groups for this element
+            print('pgroups=', pgroups, file=log)
+            self.pgroups=pgroups
+            
+                
         amagmoms = [0 for site in self.structure.sites]
         min_Molap = 0.7  # We will treat magnetic moments (anti)parallel if their overlap is more than that
         if Qmagnetic:
@@ -1347,7 +1387,11 @@ class CifParser_W2k:
                     print('    R={:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][0,:]), file=log)
                     for j in range(1,3):
                         print('      {:2d},{:2d},{:2d}'.format(*self.rotation_flipped[ii][i][j,:]), file=log)
-                
+
+
+            self.original_symmetry_operations = [deepcopy(self.parser.symmetry_operations[iop])
+                                                     for iop in range(len(self.parser.symmetry_operations))]
+                        
             print('symmetry operations that need to be removed=', operations_to_remove, file=log)
             operations_to_remove = sorted(list(operations_to_remove))
             for iop in operations_to_remove[::-1]:
@@ -1413,7 +1457,7 @@ class CifParser_W2k:
                 els = [el for el in indx_by_element if mgroups[i][0][0] in indx_by_element[el]]
                 element.append(els[0])
             #element = [el for el in indx_by_element]
-            print('element=', element)
+            #print('element=', element)
             igroups=[[] for i in range(len(self.structure))]
             ele2grp={}
             for i in range(len(mgroups)):
@@ -1491,60 +1535,63 @@ class CifParser_W2k:
             groups = mgroups
             ##-----------------------------------------------------------------------------------------------------------------------------
         else:
-            groups=[] # Will contain groups of equivalent sites
-            for spec in indx_by_element:  # Next we loop through element in this structure
-                indices = indx_by_element[spec] # indices on sites of the same element
-                grp = [[indices[0]]]  # we have just one group with the first entry in coords. All entries in coords will have index in grp
-                site = self.structure.sites[indices[0]]
-                if Qmagnetic:
-                    Mi = site.properties["magmom"].moment
-                    if sum(abs(Mi))>0:
-                        mfinite=True
-                        print(site.species_string, site.frac_coords, 'Mi=', site.properties["magmom"].moment, file=log)
-                    else:
-                        mfinite=False
-                for ii in indices[1:]: # loop over possibly equivalent sites (of the same element)
-                    coord = acoords[ii]    # fractional coordinate of that site self.structure.sites[ii]
-                    site = self.structure.sites[ii]
-                    Qequivalent=False  # for now we thing this might not be equivalent to any other site in grp
-                    if Qmagnetic and mfinite:
-                        Mj = site.properties["magmom"].moment
-                        print(site.species_string, coord, 'Mj=', site.properties["magmom"].moment, file=log)
-                    for ig,op in enumerate(self.parser.symmetry_operations): # loop over all symmetry operations
-                        ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
-                        #if Qmagnetic and mfinite:
-                        #    Mjp = op.operate_magmom(Mj).moment
-                        for ty in grp:                         # if coord is equivalent to any existing group in grp, say grp[i]==ty, then one of ncoord should be equal to first entry in grp[i]
-                            coord0 = acoords[ty[0]]            # the first entry in the group grp[i][0]
-                            M0 = amagmoms[ty[0]]
-                            #print('coord0=', ty[0], coord0)
-                            if sum(abs(ncoord-coord0))<1e-5:   # is it equal to current coord when a symmetry operation is applied?
-                                if Qmagnetic and mfinite:
-                                    Molap = dot(Mj,M0)/(linalg.norm(Mj)*linalg.norm(M0))
-                                    if Molap > min_Molap: #sum(abs(Mj-M0))<=1e-5:
-                                        # Only if spin direction is the same we can say that these are truly
-                                        #print('coordinates equal M0=',M0, 'Mj=', Mj, 'ig=', ig, file=log)????
-                                        print('Group['+str(ig)+'] applied to r=',coord,'and M=', Mj,' gives r=', coord0, ' and M0=', M0, file=log)
+            groups = self.pgroups
+            if False:
+                groups=[] # Will contain groups of equivalent sites
+                for spec in indx_by_element:  # Next we loop through element in this structure
+                    indices = indx_by_element[spec] # indices on sites of the same element
+                    grp = [[indices[0]]]  # we have just one group with the first entry in coords. All entries in coords will have index in grp
+                    site = self.structure.sites[indices[0]]
+                    if Qmagnetic:
+                        Mi = site.properties["magmom"].moment
+                        if sum(abs(Mi))>0:
+                            mfinite=True
+                            print(site.species_string, site.frac_coords, 'Mi=', site.properties["magmom"].moment, file=log)
+                        else:
+                            mfinite=False
+                    for ii in indices[1:]: # loop over possibly equivalent sites (of the same element)
+                        coord = acoords[ii]    # fractional coordinate of that site self.structure.sites[ii]
+                        site = self.structure.sites[ii]
+                        Qequivalent=False  # for now we thing this might not be equivalent to any other site in grp
+                        if Qmagnetic and mfinite:
+                            Mj = site.properties["magmom"].moment
+                            print(site.species_string, coord, 'Mj=', site.properties["magmom"].moment, file=log)
+                        for ig,op in enumerate(self.parser.symmetry_operations): # loop over all symmetry operations
+                            ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
+                            #if Qmagnetic and mfinite:
+                            #    Mjp = op.operate_magmom(Mj).moment
+                            for ty in grp:                         # if coord is equivalent to any existing group in grp, say grp[i]==ty, then one of ncoord should be equal to first entry in grp[i]
+                                coord0 = acoords[ty[0]]            # the first entry in the group grp[i][0]
+                                M0 = amagmoms[ty[0]]
+                                #print('coord0=', ty[0], coord0)
+                                if sum(abs(ncoord-coord0))<1e-5:   # is it equal to current coord when a symmetry operation is applied?
+                                    if Qmagnetic and mfinite:
+                                        Molap = dot(Mj,M0)/(linalg.norm(Mj)*linalg.norm(M0))
+                                        if Molap > min_Molap: #sum(abs(Mj-M0))<=1e-5:
+                                            # Only if spin direction is the same we can say that these are truly
+                                            #print('coordinates equal M0=',M0, 'Mj=', Mj, 'ig=', ig, file=log)????
+                                            print('Group['+str(ig)+'] applied to r=',coord,'and M=', Mj,' gives r=', coord0, ' and M0=', M0, file=log)
+                                            Qequivalent=True               # we found which group it corresponds to
+                                            ty.append(ii)                  # grp[i]=ty is extended with coord[i]
+                                            #print('Since moments are equal ig=', ig, 'survives magnetic calc', file=log)
+                                            break                          # loop over groups and also symmetry operations can be finished
+                                    else:# we don't have moments, hence it is equivalent
+                                        #print(' ncoord=', ncoord, 'is equivalent to typ', ty) # yes, coord is in group ty
+                                        print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,
+                                                  'gives r['+str(ty[0])+']=', coord0, file=log)
                                         Qequivalent=True               # we found which group it corresponds to
                                         ty.append(ii)                  # grp[i]=ty is extended with coord[i]
-                                        #print('Since moments are equal ig=', ig, 'survives magnetic calc', file=log)
                                         break                          # loop over groups and also symmetry operations can be finished
-                                else:# we don't have moments, hence it is equivalent
-                                    #print(' ncoord=', ncoord, 'is equivalent to typ', ty) # yes, coord is in group ty
-                                    print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,
-                                              'gives r['+str(ty[0])+']=', coord0, file=log)
-                                    Qequivalent=True               # we found which group it corresponds to
-                                    ty.append(ii)                  # grp[i]=ty is extended with coord[i]
-                                    break                          # loop over groups and also symmetry operations can be finished
-                        if Qequivalent:
-                            break
-                    if not Qequivalent:                        # if this site (coord) is not equivalent to any existing group in grp, than we create a new group with a single entry [i]
-                        grp.append([ii])
-                        #print('Starting anew with ii='+str(ii)+' grp=', grp, file=log)
-                    #print(spec+' grp=', grp)
-                groups.append(grp)  # all groups for this element
+                            if Qequivalent:
+                                break
+                        if not Qequivalent:                        # if this site (coord) is not equivalent to any existing group in grp, than we create a new group with a single entry [i]
+                            grp.append([ii])
+                            #print('Starting anew with ii='+str(ii)+' grp=', grp, file=log)
+                        #print(spec+' grp=', grp)
+                    groups.append(grp)  # all groups for this element
             print('groups=', groups, file=log)
             
+        
         # Since groups is only index array to coord_by_element, we will rather create a dictionary self.w2k_coords={},
         # which is easier to use. The keys will be name of the site, which might need to be modified when
         # multiple inequivalent sites have the same name.

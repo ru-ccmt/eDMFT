@@ -76,32 +76,33 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
     possible=[name0]                                 # definitely all atoms of this element
     if name0 in sym_elements: possible.extend(sym_elements[name0])
 
-    #print('name0=', name0, 'possible=', possible, 'name_me=', name_me)
-    
+    print('name0=', name0, 'possible=', possible, 'name_me=', name_me, file=log)
     n=0
     for ngh in strc.neighbrs[jatom]:
+        #print('Element_name(ngh[1])=', Element_name(ngh[1]), file=log)
         if Element_name(ngh[1]) not in possible:
             break
         n+=1
     n0=n
-    #print('n=', n)
+    print('n0=', n0, file=log)
     
+    n_str=0
     if n>1:
         neighbrs = strc.neighbrs[jatom][:n]
         if n>2: # with three or more vertices I can calculate polyhedron
             neighbrs = strc.neighbrs[jatom][:n]
         else: # we need to take next shell to calculate a polyhedron
-            dst0 = strc.neighbrs[jatom][n-1][0]
+            #dst0 = strc.neighbrs[jatom][n-1][0]
             dst1 = strc.neighbrs[jatom][n][0]
             for ngh in strc.neighbrs[jatom]:
                 if ngh[0]-dst1>1e-3:
                     break
                 n+=1
             if n>6 and name0==name_me:
-                neighbrs = strc.neighbrs[jatom][n0:n]
+                neighbrs = strc.neighbrs[jatom][n0:n] # only the next shell
+                n_str=n0
             else:
                 neighbrs = strc.neighbrs[jatom][:n]
-        n_str=0
     else: # n==1
         #print('electronegativity=',strc.neighbrs[jatom][0][3])
         if strc.neighbrs[jatom][0][3]>=0:
@@ -119,17 +120,19 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
             n_str=1
         else:
             print('WARN: Only one atom appears to be valid neighbor', file=log)
-            
-            dst0 = strc.neighbrs[jatom][n-1][0]
+            #dst0 = strc.neighbrs[jatom][n-1][0]
             dst1 = strc.neighbrs[jatom][n][0]
             for ngh in strc.neighbrs[jatom]:
                 if ngh[0]-dst1>1e-3:
                     break
                 n+=1
             neighbrs = strc.neighbrs[jatom][:n]
-            n_str=0
     
     print('Analizing', strc.aname[jatom], 'at', strc.pos[first_atom[jatom]], 'with N=', n, file=log)
+    print('  with neigbrs:', file=log)
+    for i in range(len(neighbrs)):
+        print('  n['+str(i+n_str)+']=', neighbrs[i], file=log)
+        
     R, N = FindCageBasis(neighbrs, matrix_w2k, log)
     if R is not None:
         return R, (n_str,n_str+N)
@@ -161,8 +164,8 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
         
     matrix_vesta = strc.Matrix(vesta=True)
 
-    #print('aname=', strc.aname)
-    #print('len(strc.neighbrs)=', len(strc.neighbrs))
+    print('aname=', strc.aname)
+    print('len(strc.neighbrs)=', len(strc.neighbrs))
     
     indx=0
     for jatom in range(len(strc.neighbrs)):

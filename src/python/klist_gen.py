@@ -86,20 +86,36 @@ if __name__ == '__main__':
     import readline
     
     usage = """usage: %klist_gen.py [ options ]
-    Generates w2k klist along some path 
-       -n 200         -- number of points along the path
-       -p  ([0,0,0],[0.5,0,0],[0.5,0.5,0],[0,0,0])   -- special points in the path
-       -m  ["Gamma","X","M","Gamma"]
+    Generates w2k klist along some path
+       No options would start interactive mode.
+       Options would prevent interactive mode:
+        -n 200         -- number of points along the path
+        -p  ([0,0,0],[0.5,0,0],[0.5,0.5,0],[0,0,0])   -- special points in the path
+        -m  ["Gamma","X","M","Gamma"]
+        -o  output fname
     """
     inpt={}  # input from command line
     if len(sys.argv)>1:
         if sys.argv[1] in ['-h', '--help']:
             print(usage)
             sys.exit(0)
-        else:        
-            for i in range(len(sys.argv)/2):
+        else:
+            for i in range(int(len(sys.argv)/2)):
                 inpt[sys.argv[2*i+1][1:]] = sys.argv[2*i+2]
             print('given options are', inpt)
+            Nkp=200
+            path_points=[]
+            path_names=[]
+            fname = 'case.klist_band'
+            if 'n' in inpt:
+                Nkp=int(inpt['n'])
+            if 'p' in inpt:
+                V = eval(inpt['p'])
+                path_points=([array(x) for x in V])
+            if 'm' in inpt:
+                path_names=eval(inpt['m'])
+            if 'o' in inpt:
+                fname = inpt['o']
     else:
         while True:
             try:
