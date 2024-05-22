@@ -10,12 +10,22 @@ mingle_names={'W':'$W$','L':'$L$','LAMBDA':'$\Lambda$','GAMMA':'$\Gamma$','DELTA
               'R': '$R$', 'S':'$S$', 'T':'$T$', 'U':'$U$', 'Y':'$Y$'}
 
 if __name__ == '__main__':
+    fname = 'eigvals.dat'
 
     if len(sys.argv)<2:
-        intensity = 0.2
+        intensity = 0.97
+    elif len(sys.argv)<3:
+        if os.path.isfile(sys.argv[1]):
+            fname = sys.argv[1]
+        else:
+            intensity = float(sys.argv[1])
     else:
-        intensity = float(sys.argv[1])
-        
+        for i in range(2):
+            if os.path.isfile(sys.argv[i+1]):
+                fname = sys.argv[i+1]
+            else:
+                intensity = float(sys.argv[i+1])
+    
     small = 1e-5 # 0.01 # 1e-5
     #itensity = 0.2
     DY = 0 # 0.01318
@@ -31,6 +41,7 @@ if __name__ == '__main__':
     fEF = open('EF.dat', 'r')
     mu = float(fEF.read())
 
+    print('using fname=', fname)
     print('mu=', mu)
 
 
@@ -46,6 +57,8 @@ if __name__ == '__main__':
                 legnd=line.split()[0]
                 if legnd in mingle_names:
                     legnd = mingle_names[legnd]
+                else:
+                    legnd = '$'+legnd+'$'
                 wkpoints.append(legnd)
                 wkpointi.append(il)
         print(wkpointi)
@@ -53,7 +66,7 @@ if __name__ == '__main__':
 
     nkp = wkpointi[-1]+1
     print('nkp=', nkp)
-    fdat = open('eigvals.dat', 'r')
+    fdat = open(fname, 'r')
     
     if os.path.isfile('cohfactorsd.dat'):
         fcoh = open('cohfactorsd.dat', 'r')
@@ -112,8 +125,14 @@ if __name__ == '__main__':
     Akom = array(Akom).transpose()
     print('shape(Akom)=', shape(Akom))
 
+    ht, bin_edges = histogram(Akom.ravel(),bins=5000)
+    xh = 0.5*(bin_edges[1:]+bin_edges[:-1])
+    cums = cumsum(ht)/sum(ht)
+    i = searchsorted(cums, intensity)
+    print('with intensity=', intensity, 'we determine cutoff at Ak=', xh[i])
+    vmm = [0,xh[i]]
     
-    vmm = [0,max(list(map(max,Akom)))*intensity]    
+    #vmm = [0,max(list(map(max,Akom)))*intensity]
     (ymin,ymax) = (om[0]+DY,om[-1]+DY)
     (xmin,xmax) = (0, shape(Akom)[1]-1)
     #(xmin,xmax) = (0, nkp-1)

@@ -12,7 +12,7 @@ f1 = ['.in1','.in1c','.klist','.inso','.in2c']
 f2 = ['.in2','.kgen']
 fc = ['.inc','.scf2','.incup','.incdn']
 # DMFT type quantities
-d0 = ['params.dat', 'EF.dat', 'sig.inp', 'Sigma.000', 'projectorw.dat', 'Eorb_imp.dat']
+d0 = ['params.dat', 'EF.dat', 'sig.inp', 'Sigma.000', 'projectorw.dat', 'Eorb_imp.dat', 'SOlapm.dat']
 d1 = ['.indmfl','.indmfldn','.indmfi']
 dn = ['sfx.*']
 
