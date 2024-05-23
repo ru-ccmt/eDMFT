@@ -11,9 +11,9 @@ mingle_names={'W':'$W$','L':'$L$','LAMBDA':'$\Lambda$','GAMMA':'$\Gamma$','DELTA
 
 if __name__ == '__main__':
     fname = 'eigvals.dat'
-
+    intensity = 0.97
     if len(sys.argv)<2:
-        intensity = 0.97
+        pass
     elif len(sys.argv)<3:
         if os.path.isfile(sys.argv[1]):
             fname = sys.argv[1]

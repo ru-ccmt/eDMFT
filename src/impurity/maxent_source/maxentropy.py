@@ -122,20 +122,21 @@ def MaximumEntropy(p, tau, Gt):
     for itt in range(p['Nitt']):
         print(itt, 'Restarting maxent with rfac=', rfac, 'alpha=', alpha)
         iseed = random.randint(0,2**16-1)
-        
         me.maxent(Aw,rfac,alpha,temp,Ker,sxt,Gt,model,dom,p['Asteps'],iseed)
         S = me.entropy(Aw,model,dom)
         Trc = me.lambdac(alpha,Aw,omega,dom,dlda)
+        chi2 = sum(sxt*(Gt-Aw@Ker)**2)
         
         ratio = -2*S*alpha/Trc
-        print('Finished maxent with alpha=',alpha,'-2*alpha*S=',-2*alpha*S,'Trace=',Trc, 'S=', S)
+        #print('Finished maxent with chi2=', chi2, 'alpha=',alpha,'-2*alpha*S=',-2*alpha*S,'Trace=',Trc, 'S=', S)
+        print('Finished maxent with chi2={:.3f} alpha={:.5f} -2*alpha*S={:.5f} Trace={:.5f} S={:.5f}'.format(chi2,alpha,-2*alpha*S,Trc,S))
         print('   ratio=', ratio)
 
         savetxt('dos_'+str(itt), vstack((omega,Aw)).transpose())
         temp=0.001
         rfac=0.05
     
-        if abs(ratio-1)<p['min_ratio']: break
+        if abs(ratio-1)<p['min_ratio'] and chi2<sqrt(len(Gt)): break
     
         if (abs(ratio)<0.05):
             alpha *= 0.5

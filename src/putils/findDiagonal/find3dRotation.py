@@ -5,17 +5,17 @@ from numpy import linalg
 import copy
 import sys
 
-def mprint(Us):
+def mprint(Us, log=sys.stdout):
     if Us.dtype==complex:
         for i in range(shape(Us)[0]):
             for j in range(shape(Us)[1]):
-                print("%11.8f %11.8f  " % (real(Us[i,j]), imag(Us[i,j])), end=' ')
-            print()
+                print("%11.8f %11.8f  " % (real(Us[i,j]), imag(Us[i,j])), end=' ', file=log)
+            print(file=log)
     else:
         for i in range(shape(Us)[0]):
             for j in range(shape(Us)[1]):
-                print("%11.8f  " % Us[i,j], end=' ')
-            print()
+                print("%11.8f  " % Us[i,j], end=' ', file=log)
+            print(file=log)
         
 def MakeOrthogonal(a, b, ii):
     a -= (a[ii]/b[ii])*b
@@ -83,7 +83,7 @@ def ComputeUtU(T,ig):
             UtU[i,j] = conj(sum(tmt)) # finally, sum it and conjugate, to get U^T * U
     return UtU
 
-def TransformToSimilar(ig, Us, Es):
+def TransformToSimilar(ig, Us, Es, log=sys.stdout):
     """ If two or more states are degenerate, we can take a linear combination of them to obtaine more desired set of orbitals.
     This routine transform them with a unitary transformatin so that they are close to previous set of eigenvectors.
     This is useful in particular when H has small off-diagonal elements, which we would like to eliminate,
@@ -91,7 +91,7 @@ def TransformToSimilar(ig, Us, Es):
     """
     i0 = ig[0]     # this is the first index to the degenerate set of eigenvectors
     i2 = ig[-1]+1  # this is the last index to the degenerate set
-    print('Transforming with similarity transformation the degenerate eigenset: ', Es[i0:i2])
+    print('Transforming with similarity transformation the degenerate eigenset: ', Es[i0:i2], file=log)
     # Want to make this set of eigenvectors to be close to original eigenvectors, which were determined in previous iteration.
     # This is not necessary, but convenient to keep the character similar to previous iteration. This is useful
     # in particular when H has small off-diagonal elements, which we would like to eliminate, and we call this
@@ -103,7 +103,7 @@ def TransformToSimilar(ig, Us, Es):
     Usn[:,i0:i2] = dot(Us[:,i0:i2],R)
     return Usn
 
-def TransformToReal(final, ig, Es):
+def TransformToReal(final, ig, Es, log=sys.stdout):
     """
     Here we will try to make the transformation real, so that ctqmc will have minimal sign problem, even when Coulomb='Full' is used.
     
@@ -165,12 +165,12 @@ def TransformToReal(final, ig, Es):
     """
     i0 = ig[0]
     i2 = ig[-1]+1
-    print('Transforming the possibly degenerate eigenset to a real set of orbitals:', Es[i0:i2])
+    print('Transforming the possibly degenerate eigenset to a real set of orbitals:', Es[i0:i2], file=log)
     
     T = final[i0:i2,:]
     UtU = ComputeUtU(T, ig)
-    print('UtU=')
-    mprint( UtU )
+    print('UtU=', file=log)
+    mprint( UtU , log)
     
     if len(ig)==1: # one dimensional substace. Only overal phase is allowed to change.
         phase = sqrt(UtU[0,0])
@@ -178,37 +178,37 @@ def TransformToReal(final, ig, Es):
         final[i0:i2] = phase*T[:,:]
     else:
         if allclose( UtU, identity(len(ig)), rtol=1e-05, atol=1e-05):
-            print('UtU is close to identity!')
+            print('UtU is close to identity!', file=log)
         else:
             UtU = 0.5*(UtU + transpose(UtU)) # This matrix should be symmetric, but we now symmetrize it just to avoid numeric rounding
             ee = linalg.eig(UtU)
             wu = ee[0]
             Zu = ee[1]
-            print('wu=', wu)
-            print('Zu=')
+            print('wu=', wu, file=log)
+            print('Zu=', file=log)
             Zum = matrix(Zu)
-            mprint( Zum )
+            mprint( Zum , log)
             Iw = Zum.T * Zum
-            print('Should be identity:')
-            mprint( Iw )
+            print('Should be identity:', file=log)
+            mprint( Iw , log)
             swu = sqrt(wu)
-            print('e^{i*phi}=', swu)
+            print('e^{i*phi}=', swu, file=log)
             Utry = Zum * diag(swu) * Zum.T
-            print('Utry=')
-            mprint(Utry)
+            print('Utry=', file=log)
+            mprint(Utry, log)
             Iw = Utry.H * Utry
-            print('Is identity?')
-            mprint( Iw )
+            print('Is identity?', file=log)
+            mprint( Iw , log)
             (u_,s_,v_) = linalg.svd(Utry)
             Ubest = dot(u_,v_)
-            print('singular values=', s_)
-            print('Ubest=')
-            mprint(Ubest)
+            print('singular values=', s_, file=log)
+            print('Ubest=', file=log)
+            mprint(Ubest, log)
             R = Ubest * matrix(T)
             final[i0:i2,:] = R[:,:]
     return final
 
-def GiveNewT2C(Hc, T2C):
+def GiveNewT2C(Hc, T2C, log=sys.stdout):
     """ The main routine, which computes T2C that diagonalized Hc, and is close to the previous
     T2C transformation, if possible, and it makes the new orbitals Y_i = \sum_m T2C[i,m] Y_{lm} real,
     if possible.
@@ -221,19 +221,19 @@ def GiveNewT2C(Hc, T2C):
     #print 'In Eigensystem:'
     #mprint(Us.H * Hc * Us)
     # Us.H * Hc * Us  === diagonal
-    print('Eigenvalues=', Es.tolist())
+    print('Eigenvalues=', Es.tolist(), file=log)
 
     #EE = Us0.conj().T @ Hc @ Us0 == diagonal
 
     ## Hc[i,j]*Uc[j,l] = Uc[i,l]*lambda[l]
-    print('Starting with transformation in crystal harmonics')
-    print('eigenvectors=')
-    mprint(Us)
-    print()
+    print('Starting with transformation in crystal harmonics', file=log)
+    print('eigenvectors=', file=log)
+    mprint(Us, log)
+    print(file=log)
     
     # Finds if there are any degeneracies in eigenvalues.
     deg = FindDegeneracies(Es)
-    print('deg=', deg)
+    print('deg=', deg, file=log)
     
     for ig in deg:
         if len(ig)>1:
@@ -242,48 +242,52 @@ def GiveNewT2C(Hc, T2C):
             # This is not necessary, but convenient to keep the character similar to previous iteration. This is useful
             # in particular when H has small off-diagonal elements, which we would like to eliminate, and we call this
             # routine iteratively
-            Us = TransformToSimilar(ig, Us, Es)
-    print('Next, the transformation in crystal harmonics=')
+            Us = TransformToSimilar(ig, Us, Es, log)
+    print('Next, the transformation in crystal harmonics=', file=log)
 
     # Next we will sort eigenvectors so that the matrix of eigenvectors is as close as possible to unity
     N = len(Us)
     R = abs(Us)
-    mprint(R)
+    mprint(R, log)
     ind = zeros(N, dtype=int)
     for l in range(N):
         #mprint(R)
         ii = argmax(R)
         i,j = int(ii/N), ii%N  # maximum index in the matrix
-        #print(ii, int(ii/N), ii%N, R[i, j])
+        print(ii, int(ii/N), ii%N, R[i, j], file=log)
         ind[j] = i
         #print('setting ind['+str(j)+']=',i)
         R[:,j]=0
-        #print('ind=', ind)
-    print('ind to rearange eigenvectors=', ind)
+        R[i,:]=0
+        print('ind=', ind, file=log)
+    print('ind to rearange eigenvectors=', ind, file=log)
     if sum(arange(N)-array(sorted(ind)))==0:
         # means that ind is a permutation, hence its sorted version is just arange
         Usn = Us.copy()
         for j in range(N):
-            Usn[:,ind[j]] = Us[:,j]
+            Umax = Us[ind[j],j]
+            Ufact = abs(Umax)/Umax
+            print('Max value at j=', j, Umax, Ufact, file=log)
+            Usn[:,ind[j]] = Us[:,j]*Ufact
         #print('Us=')
         #mprint(Us)
         Us = Usn
         #print('Us=')
         #mprint(Us)
     
-    mprint(Us)
-    print()
+    mprint(Us, log)
+    print(file=log)
 
     #checkDiag = Us.H * Hc * Us
     #mprint(checkDiag)
     
     final = array( Us.T*T2C )
-    print('And the same transformation in spheric harmonics=')
-    mprint( final )
+    print('And the same transformation in spheric harmonics=', file=log)
+    mprint( final, log )
     
     #  Here we will try to make the transformation real, so that ctqmc will have minimal sign problem even when Full is used.
     for ig in deg:
-        final = TransformToReal(final, ig, Es)
+        final = TransformToReal(final, ig, Es, log)
 
     # finally checking if all transformations are real
     for ig in deg:
@@ -292,12 +296,12 @@ def GiveNewT2C(Hc, T2C):
         #print 'Checking the set of orbitals:', Es[i0:i2]
         UtU = ComputeUtU(final[i0:i2,:], ig)
         if allclose( UtU, identity(len(ig)),  rtol=1e-04, atol=1e-04 ):
-            print(':SUCCESS For orbital', ig, 'the final transformation is real')
+            print(':SUCCESS For orbital', ig, 'the final transformation is real', file=log)
         else:
-            print(""":WARNING: The set of rbitals """, ig, """ could not be made purely real. You should use only Coulomb='Ising' and avoid Coulomb='Full' """)
-            print('UtU=', end=' ')
-            mprint(UtU)
-    print()
+            print(""":WARNING: The set of rbitals """, ig, """ could not be made purely real. You should use only Coulomb='Ising' and avoid Coulomb='Full' """, file=log)
+            print('UtU=', end=' ', file=log)
+            mprint(UtU, log)
+    print(file=log)
     return final
 
 
@@ -337,7 +341,7 @@ if __name__ == '__main__':
     T2Crest = T2C0[len(Hc):,:]
     print('shape(T2Crest)=', shape(T2Crest))
     
-    final = GiveNewT2C(Hc, T2C)
+    final = GiveNewT2C(Hc, T2C, sys.stdout)
 
     #mprint( matrix(final) * matrix(final).H )
     
