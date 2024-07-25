@@ -274,13 +274,14 @@ class WStruct:
         # Remove atoms that don't belong into primitive unit cell, as per w2k requirement
         vol_ratio = {'B':2, 'F':4, 'CXY':2, 'CXZ':2, 'CYZ':2, 'R':3 }
         if self.lattyp in ['B', 'F', 'CXY', 'CXZ', 'CYZ'] or self.H2Rtrans:
+            ratios=[]
             i_w2k = 0
             To_correct={}
             To_correct_indx={}
             indx_kept=[]
             indx_to_remove=[]
             the_same = TheSame(self.lattyp)
-            for spec in cif.w2k_coords:
+            for ispc,spec in enumerate(cif.w2k_coords):
                 all_coords = cif.w2k_coords[spec]
                 #print('   all_coords['+spec+']=', len(all_coords), file=log)
                 #for i in range(len(all_coords)):
@@ -309,12 +310,16 @@ class WStruct:
                     _indx_kept_ = array(indx_kept)
                     indx_to_remove += _indx_kept_[ logical_and(_indx_kept_ >= i_w2k_start, _indx_kept_ < i_w2k) ].tolist()
                     print('indx_to_remove=', indx_to_remove, file=log)
-                    
+                ratios.append(ratio)    
                 for i in sorted(to_remove, reverse=True):
                     del cif.w2k_coords[spec][i]
                 #print(spec, ':', 'end up with', len(cif.w2k_coords[spec]), file=log)
             #for i in range(len(indx_kept)):
             #    print('indx_kept['+str(i)+']=', indx_kept[i], file=log)
+            if sum(abs(array(ratios)-ratios[0]))==0:
+                print('All ratios are equal to ', ratios, 'hence structure given in primitive cell. Ignore ERRORS above', file=log)
+                To_correct={}
+                
             if len(To_correct)>0:
                 #------------------------------------------------------------------------------------------------------------
                 # The algorithm below is correcting special rare cases in which not enough group operations are removed during
@@ -1263,60 +1268,67 @@ class CifParser_W2k:
                         ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
                         Mjp = op.operate_magmom(Mj).moment
                         for itg,ty in enumerate(grp):                         # if coord is equivalent to any existing group in grp, say grp[i]==ty, then one of ncoord should be equal to first entry in grp[i]
-                            i_grp_compare=grp_compare[itg]
-                            #print('grp_compare=', grp_compare, 'igrp_compare=', i_grp_compare, file=log)
-                            coord0 = acoords[ty[i_grp_compare]]            # the first entry in the group grp[i][0]
-                            M0 = amagmoms[ty[i_grp_compare]]
-                            if sum(abs(ncoord-coord0))<1e-5:   # is it equal to current coord when a symmetry operation is applied?
-                                if sum(abs(M0-Mjp))<1e-5:
-                                    print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,'and M['+str(ii)+']=', Mj.tolist(),
-                                              ' gives r['+str(ty[i_grp_compare])+']=',coord0,
-                                              ' and M['+str(ty[i_grp_compare])+']=', M0.tolist(), file=log)
-                                    m0 = linalg.norm(M0)
-                                    Molap = dot(Mj,M0)/(mj*m0) if (mj!=0 and m0!=0) else 0
-                                    if (mj==0 and m0==0): Molap = 1.0
-                                    print('Molap=', Molap, file=log)
-                                    moments_equal = sum(abs(Mj-M0))<1e-5 or (Molap>min_Molap and abs(m0-mj)<1e-5)
-                                    if not moments_equal: #sum(abs(Mj-M0))>1e-5 and Molap<min_Molap:
-                                        # If we treat up/down together, we should skip that
-                                        # But if up is treated separately from down, and spin is flipped, we have to remove such symmetry operation
-                                        # and declare that the two atoms are different
-                                        moments_opposite = sum(abs(Mj+M0))<1e-5 or (Molap<-min_Molap and abs(m0-mj)<1e-5)
-                                        if moments_opposite: #sum(abs(Mj+M0))<1e-5 or Molap < -min_Molap:
-                                            self.flipped[ii]=ty[i_grp_compare]
-                                            if ii not in self.rotation_flipped:
-                                                self.rotation_flipped[ii]=[ array(np.round(op.affine_matrix[:3,:3]),dtype=int) ]
-                                                self.timerevr_flipped[ii]=[ op.time_reversal ]
-                                            else:
-                                                self.rotation_flipped[ii].append( array(np.round(op.affine_matrix[:3,:3]),dtype=int) )
-                                                self.timerevr_flipped[ii].append( op.time_reversal )
-                                            if Molap > -0.99999:
-                                                print('WARNING Moments are only approximately antiparallel Molap=', Molap,
-                                                          'and we are treating them as intiparallel', file=log)
-                                            #if i_grp_compare<len(ty)-1:
-                                            #    i_grp_compare += 1
-                                            #    print('i_grp_compare increased to', i_grp_compare, 'because ty=', ty, file=log)
-                                        #else:
-                                        #    non_flipped[ii]=ty[i_grp_compare]
-                                        #    if ii not in rotation_non_flipped:
-                                        #        rotation_non_flipped[ii] = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
-                                        #        timerevr_non_flipped[ii] = op.time_reversal
-                                        operations_to_remove.add(ig)
-                                        print('Since moments are different ig=', ig, 'should be removed flipped=', self.flipped, file=log)
-                                    else:
-                                        # Only if spin direction is the same we can say that these are truly
-                                        # equivalent
-                                        Qequivalent=True               # we found which group it corresponds to
-                                        if ii not in ty:
-                                            ty.append(ii)                  # grp[i]=ty is extended with coord[i]
-                                        if (Molap<0.99999):
-                                            print('WARNING: Moments are only approximately equal Molap='+str(Molap),
-                                                      'and we are treating them as equal', file=log)
-                                            print('Since moments are approx. equal ig=', ig, ' is kept and '+str(ii)+' is in group with ',ty, file=log)
+                            for i_grp_compare in range(len(ty)): #@@
+                                #@@ i_grp_compare=grp_compare[itg]
+                                #print('grp_compare=', grp_compare, 'igrp_compare=', i_grp_compare, 'ic=', ty[i_grp_compare], file=log)
+                                coord0 = acoords[ty[i_grp_compare]]            # the first entry in the group grp[i][0]
+                                M0 = amagmoms[ty[i_grp_compare]]
+                                if sum(abs(ncoord-coord0))<1e-5:   # is it equal to current coord when a symmetry operation is applied?
+                                    #print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,
+                                    #              ' gives r['+str(ty[i_grp_compare])+']=',coord0, file=log)
+                                    #print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,'and M['+str(ii)+']=[{:.3f},{:.3f},{:.3f}]'.format(*Mj),
+                                    #              ' gives r['+str(ty[i_grp_compare])+']=',coord0,
+                                    #              ' and M['+str(ty[i_grp_compare])+']=[{:.3f},{:.3f},{:.3f}]'.format(*Mjp),
+                                    #              'M0=[{:.3f},{:.3f},{:.3f}]'.format(*M0), file=log)
+                                    if sum(abs(M0-Mjp))<1e-5:
+                                        print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,'and M['+str(ii)+']=', Mj.tolist(),
+                                                  ' gives r['+str(ty[i_grp_compare])+']=',coord0,
+                                                  ' and M['+str(ty[i_grp_compare])+']=', M0.tolist(), file=log)
+                                        m0 = linalg.norm(M0)
+                                        Molap = dot(Mj,M0)/(mj*m0) if (mj!=0 and m0!=0) else 0
+                                        if (mj==0 and m0==0): Molap = 1.0
+                                        print('Molap=', Molap, file=log)
+                                        moments_equal = sum(abs(Mj-M0))<1e-5 or (Molap>min_Molap and abs(m0-mj)<1e-5)
+                                        if not moments_equal: #sum(abs(Mj-M0))>1e-5 and Molap<min_Molap:
+                                            # If we treat up/down together, we should skip that
+                                            # But if up is treated separately from down, and spin is flipped, we have to remove such symmetry operation
+                                            # and declare that the two atoms are different
+                                            moments_opposite = sum(abs(Mj+M0))<1e-5 or (Molap<-min_Molap and abs(m0-mj)<1e-5)
+                                            if moments_opposite: #sum(abs(Mj+M0))<1e-5 or Molap < -min_Molap:
+                                                self.flipped[ii]=ty[i_grp_compare]
+                                                if ii not in self.rotation_flipped:
+                                                    self.rotation_flipped[ii]=[ array(np.round(op.affine_matrix[:3,:3]),dtype=int) ]
+                                                    self.timerevr_flipped[ii]=[ op.time_reversal ]
+                                                else:
+                                                    self.rotation_flipped[ii].append( array(np.round(op.affine_matrix[:3,:3]),dtype=int) )
+                                                    self.timerevr_flipped[ii].append( op.time_reversal )
+                                                if Molap > -0.99999:
+                                                    print('WARNING Moments are only approximately antiparallel Molap=', Molap,
+                                                              'and we are treating them as antiparallel', file=log)
+                                                #if i_grp_compare<len(ty)-1:
+                                                #    i_grp_compare += 1
+                                                #    print('i_grp_compare increased to', i_grp_compare, 'because ty=', ty, file=log)
+                                            #else:
+                                            #    non_flipped[ii]=ty[i_grp_compare]
+                                            #    if ii not in rotation_non_flipped:
+                                            #        rotation_non_flipped[ii] = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
+                                            #        timerevr_non_flipped[ii] = op.time_reversal
+                                            operations_to_remove.add(ig)
+                                            print('Since moments are different ig=', ig, 'should be removed flipped=', self.flipped, file=log)
                                         else:
-                                            print('Since moments are equal ig=', ig, ' is kept and '+str(ii)+' is in group with ',ty, file=log)
-                                        #print('After adding ii='+str(ii)+' grp=', grp, file=log)
-                                        break                          # loop over groups and also symmetry operations can be finished
+                                            # Only if spin direction is the same we can say that these are truly
+                                            # equivalent
+                                            Qequivalent=True               # we found which group it corresponds to
+                                            if ii not in ty:
+                                                ty.append(ii)                  # grp[i]=ty is extended with coord[i]
+                                            if (Molap<0.99999):
+                                                print('WARNING: Moments are only approximately equal Molap='+str(Molap),
+                                                          'and we are treating them as equal', file=log)
+                                                print('Since moments are approx. equal ig=', ig, ' is kept and '+str(ii)+' is in group with ',ty, file=log)
+                                            else:
+                                                print('Since moments are equal ig=', ig, ' is kept and '+str(ii)+' is in group with ',ty, file=log)
+                                            #print('After adding ii='+str(ii)+' grp=', grp, file=log)
+                                            #@@break                          # loop over groups and also symmetry operations can be finished
                     if not Qequivalent:                        # if this site (coord) is not equivalent to any existing group in grp, than we create a new group with a single entry [i]
                         grp.append([ii])
                         print('Starting anew with ii='+str(ii)+' grp=', grp, file=log)

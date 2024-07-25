@@ -90,7 +90,7 @@ if __name__ == '__main__':
        No options would start interactive mode.
        Options would prevent interactive mode:
         -n 200         -- number of points along the path
-        -p  ([0,0,0],[0.5,0,0],[0.5,0.5,0],[0,0,0])   -- special points in the path
+        -p  ([0,0,0],[0.5,0,0],[0.5,0.5,0],[0,0,0])   -- special points in the path expressed in primitive BZ!
         -m  ["Gamma","X","M","Gamma"]
         -o  output fname
     """

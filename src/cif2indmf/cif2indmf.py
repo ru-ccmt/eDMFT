@@ -34,7 +34,7 @@ cor_elements={3:["V","Cr","Mn","Fe","Co","Ni","Cu"],
               5:["Ta","W","Re","Os","Ir","Pt"],
               6:["Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu"],
               7:["Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr"]}
-Us={3: 10., 4: 8.0, 5: 7.0, 6: 6.0, 7: 5.5}
+Us={3: 8., 4: 6.0, 5: 5.5, 6: 6.0, 7: 5.5}
 Js={3: 0.8, 4: 0.8, 5: 0.8, 6: 0.7, 7: 0.7}
 
 def Element_name(name):
@@ -227,7 +227,11 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
                     
                     Found_Rotation=False
                     aRx = strc.rotation_flipped[first_atom[jatom]]
+                    aTx = strc.timerevr_flipped[first_atom[jatom]]
                     for ir,Rx in enumerate(aRx):
+                        #if aTx[ir]<0:
+                        #    print('Changing Rx from', Rx, 'to', -Rx )
+                        #    Rx *= -1
                         dRjn = dRj @ Rx.T
                         print('using rotation:',file=log)
                         for ij in range(3):
