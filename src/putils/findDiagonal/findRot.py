@@ -63,7 +63,9 @@ if __name__ == '__main__':
         print('Could not find impurity levels in', outdmft1, '. You should consider to rerun "dmft1", preferably on the real axis.')
         sys.exit(1)
 
-    cixs = list(inl.cix.keys())
+    #cixs = list(inl.cix.keys())
+    # This removes semicore states that don't have impurity levels calculated
+    cixs = [icix for icix in inl.cix if any(inl.siginds[icix]>0)]
     imax = max(cixs)
     
     inldn=None
@@ -81,9 +83,10 @@ if __name__ == '__main__':
         if not Found:
             print('Could not find impurity levels in', outdmft1+'dn', '. You should consider to rerun "dmft1 -l dn", preferably on the real axis.')
             sys.exit(1)
-
-        cixs += [ic+imax for ic in inldn.cix.keys() ]
-    print(cixs)
+        
+        cixs += [icix+imax for icix in inldn.cix if any(inldn.siginds[icix]>0)]
+        
+    #print(cixs)
     
     with open('findRot.info', 'w') as log:
         print('cixs=', cixs, 'imax=', imax, file=log)

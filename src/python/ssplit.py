@@ -5,7 +5,7 @@ import optparse
 from scipy import *
 import numpy as np
 from math import *
-from numpy import zeros,array,shape,loadtxt,savetxt,vstack
+from numpy import zeros,ones,array,shape,loadtxt,savetxt,vstack
 
 def create_log_mesh(sigdata, nom, ntail_):
     """Creates logarithmic mesh on Matsubara axis
@@ -113,7 +113,7 @@ if __name__=='__main__':
     #print('inl=', inl)
     
     # Searching for s_oo and Edc
-    (s_oo, Edc) = Find_s_oo_and_Edc(options.insig)
+    (_s_oo_, _Edc_) = Find_s_oo_and_Edc(options.insig)
     
     #fh_sig = open(options.insig, 'r')
     #m = re.search(r'(s_oo\s*=\s*\[.*\])', fh_sig.next())
@@ -129,10 +129,10 @@ if __name__=='__main__':
     if len(shape(sigdata))==1 : 
         sigdata = array([sigdata]).T
     print('shape(sigdata)=', shape(sigdata))
-    print('s_oo=', s_oo)
-    print('Edc=', Edc)
+    print('s_oo=', _s_oo_)
+    print('Edc=', _Edc_)
     
-    savetxt(options.outDC, array(Edc))
+    savetxt(options.outDC, array(_Edc_))
     
 
     if inl.matsubara:
@@ -178,19 +178,18 @@ if __name__=='__main__':
         wdata.append(sigdata[0])
         sinf = [5000.]
         
-
         if not open_core: 
             # most of the time, we have at least one self-energy entry computed by the impurity problem
             for col in colsp:
                 imiss = len([x for x in missing_columns if x<=col])  # imis== how many columns before this column do not appear in sig.inp
                 icol = col-imiss # actual column number in sig.inp
-                real_part = sigdata[2*icol-1] + s_oo[col-1]-Edc[col-1] # adding  (s_oo-Edc)
+                real_part = sigdata[2*icol-1] + _s_oo_[col-1]-_Edc_[col-1] # adding  (s_oo-Edc)
                 imag_part = sigdata[2*icol]
                 wdata.append(real_part)   # corresponds to real-part of this imp. problem
                 wdata.append(imag_part)   # corresponds to imag-part of this imp. problem
-                sinf.append(s_oo[col-1]-Edc[col-1]); sinf.append(0) # s_oo also needed in k-sum for Eimp
+                sinf.append(_s_oo_[col-1]-_Edc_[col-1]); sinf.append(0) # s_oo also needed in k-sum for Eimp
             for col in colsm:
-                sooE = s_oo[abs(col)-1]-Edc[abs(col)-1]
+                sooE = _s_oo_[abs(col)-1]-_Edc_[abs(col)-1]
                 real_part = sooE*ones(nom)
                 imag_part = zeros(nom)
                 wdata.append(real_part)

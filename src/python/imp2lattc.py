@@ -20,6 +20,7 @@ def ImpurityLatticeConnection( cols, icols, log ):
     is impurity problem defined. Local rotation should hence
     be passed to impurity, and for that we need the translator.
     """
+    #print('cols=', cols, 'icols=', icols)
     imp2latt={}
     for i in icols: # all impurity problems
         imp2latt[i]=[]
@@ -27,14 +28,16 @@ def ImpurityLatticeConnection( cols, icols, log ):
             imp_cols = set(icols[i])
             atm_cols = set(cols[j])
             dif = imp_cols-atm_cols # checks if the same indices
-            imp_contains_atm = (len(imp_cols)==len(atm_cols) and len(dif)==0) or (len(imp_cols)>len(atm_cols) and len(dif)==len(imp_cols)-len(atm_cols))
+            #print('imp_cols=', imp_cols, 'atm_cols=', atm_cols, 'dif=', dif)
+            imp_contains_atm = (len(imp_cols)==len(atm_cols) and len(dif)==0) or (len(imp_cols)>len(atm_cols) and len(atm_cols)>0 and len(dif)==len(imp_cols)-len(atm_cols))
             #print('i=', i, 'j=', j, 'dif=', dif, 'imp_contains_atm=', imp_contains_atm)
             if imp_contains_atm and len(icols[i])>0:
                 imp2latt[i].append(j)
         if len(imp2latt)==0:
             print('WARNING: in ImpurityLatticeConnection impurity['+str(i)+'] has no connection with correlated atom',file=log)
     all_atoms_in_impurities = sorted(chain(*imp2latt.values()))
-    all_atoms = sorted([j for j in cols])
+
+    all_atoms = sorted([j for j in cols if len(cols[j])>0])
     if all_atoms_in_impurities != all_atoms:
         print('ERROR: in ImpurityLatticeConnection all_atoms=',str(all_atoms), file=log)
         print(' while atoms found in impurities', all_atoms_in_impurities, 'are different', file=log)
@@ -77,8 +80,9 @@ def Connect_ImpurityProjector(imp2latt,indmfl,struct,log):
     for imp,cixs in imp2latt.items(): # imp2latt[imp]=[cix_1,cix_2,...]
         for icix in cixs:
             latt2imp[icix]=imp       # latt2imp[cix_i]=imp
-    #print('latt2imp=', latt2imp, file=log)
+    print('latt2imp=', latt2imp, file=log)
     atms = list(indmfl.atoms.keys())
+    #print('atms=', atms)
     impurity_projector=-ones(len(imp2latt),dtype=int)  # the connection between the impurity and projector.dat
     first_atom, icase = 0, 0
     for jatom in range(struct.nat):          # all atom types in structure, just like when building projector
@@ -86,22 +90,23 @@ def Connect_ImpurityProjector(imp2latt,indmfl,struct,log):
             ia = atms.index(first_atom+1)    # It appears as the ia consequitive atom in indmfl file
             for icix in indmfl.icpsa[ia]:    # all correlated indices for this atom
                 if icix>0:                   # icix>0, hence it is correlated
-                    imp = latt2imp[icix]   # and icase is the index of projector
-                    if impurity_projector[imp]<0:
-                        # impurity_projector[imp] should always be negative here
-                        # because icix should normally be connected with single
-                        # correlated atom with projector.
-                        # However, there are exceptions, which are not yet handled
-                        # correctly. For example, in Ta2NiSe5 we have a cluster between
-                        # two different atoms, Ta-Ni, and in this case one cix is
-                        # connected to both Ta and Ni, i.e., two projectors.
-                        # We can not assign a single icase to such impurity. We would
-                        # need to specify a list of icase in general. But for now we
-                        # just take the first one, with understanding that exact-DC
-                        # does not work when cluster is between two atoms of different type
-                        impurity_projector[imp]=icase # and imp is index of impurity
-                    print('ImpurityProjector: Found icix=', icix, 'jatom=', jatom, 'first_atom=', first_atom,
-                              'imp=', imp, 'icase=', icase, file=log)
+                    if icix in latt2imp:
+                        imp = latt2imp[icix]   # and icase is the index of projector
+                        if impurity_projector[imp]<0:
+                            # impurity_projector[imp] should always be negative here
+                            # because icix should normally be connected with single
+                            # correlated atom with projector.
+                            # However, there are exceptions, which are not yet handled
+                            # correctly. For example, in Ta2NiSe5 we have a cluster between
+                            # two different atoms, Ta-Ni, and in this case one cix is
+                            # connected to both Ta and Ni, i.e., two projectors.
+                            # We can not assign a single icase to such impurity. We would
+                            # need to specify a list of icase in general. But for now we
+                            # just take the first one, with understanding that exact-DC
+                            # does not work when cluster is between two atoms of different type
+                            impurity_projector[imp]=icase # and imp is index of impurity
+                            print('ImpurityProjector: Found icix=', icix, 'jatom=', jatom, 'first_atom=', first_atom,
+                                  'imp=', imp, 'icase=', icase, file=log)
                     icase += 1
         first_atom += struct.mult[jatom]
     return impurity_projector.tolist()

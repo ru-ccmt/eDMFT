@@ -143,6 +143,7 @@ if __name__=='__main__':
         for icix in inl.siginds:
             dcols_up = set(  inl.siginds[icix].ravel())-{0}
             dcols_dn = set(inldn.siginds[icix].ravel())-{0}
+            print('dcols_up=', dcols_up, 'dcols_dn=', dcols_dn)
             if len( dcols_up & cols_dn )==0:
                 cols_up.update(dcols_up)
             if len( dcols_dn & cols_up )==0:
@@ -168,9 +169,9 @@ if __name__=='__main__':
             for j in range(dim):
                 Sigi.append( list(map(int,next(fi).split()[:dim])) )
             #print 'Sigi=', Sigi
-            cols = sort(union(array(Sigi).flatten().tolist())).tolist()
-            if 0 in cols: cols.remove(0)
-            imp_cols.append(cols)
+            wcols = sort(union(array(Sigi).flatten().tolist())).tolist()
+            if 0 in wcols: wcols.remove(0)
+            imp_cols.append(wcols)
     else:
         imp_cols=[list(range(1,Nc+1))]
     #print 'imp_cols=', imp_cols
@@ -180,13 +181,13 @@ if __name__=='__main__':
         exec(compile(open('params.dat', "rb").read(), 'params.dat', 'exec'))
         for imp in range(len(imp_cols)):
             ii = str(imp)
-            cols = imp_cols[imp]
+            wcols = imp_cols[imp]
             if eval('"U" in iparams'+ii+' and "J" in iparams'+ii+' and "nf0" in iparams'+ii):
                 U =  eval('iparams'+ii+'["U"][0]')
                 J =  eval('iparams'+ii+'["J"][0]')
                 nf = eval('iparams'+ii+'["nf0"][0]')
                 edc = U*(nf-0.5)-0.5*J*(nf-1.)
-                for ic in cols:
+                for ic in wcols:
                     Edc[ic-1] = edc
     else:
         Edc = (ones(Nc)*options.Edc).tolist()
@@ -197,9 +198,18 @@ if __name__=='__main__':
     soo = Edc.copy()
 
     if options.Qmagnetic:
-        for i in cols_up: soo[i-1] -= options.B
-        for i in cols_dn: soo[i-1] += options.B
+        for i in cols_up:
+            if i>0: soo[i-1] -= options.B
+        for i in cols_dn:
+            if i>0: soo[i-1] += options.B
         
+    iminc = min(cols)
+    if iminc<0:
+        mlen = abs(iminc)
+        print('m=', mlen)
+        if len(soo)<mlen:
+            Edc += [0]*(mlen-len(Edc))
+            soo += [0]*(mlen-len(soo))
     
     print('# s_oo=', soo, file=fo)
     print('#  Edc=', Edc, file=fo)

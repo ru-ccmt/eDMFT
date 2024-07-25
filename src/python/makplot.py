@@ -30,6 +30,24 @@ if __name__ == '__main__':
         fname2 = sys.argv[3]
     print('using', fname1, fname2)
 
+    if os.path.isfile(fname1):
+        fdat1 = open(fname1, 'r')
+    elif os.path.isfile(fname1+'.gz'):
+        import gzip
+        fdat1 = gzip.open(fname1+'.gz', 'rt')
+    else:
+        print('ERROR: file', fname1, 'does not exist!')
+        sys.exit(1)
+    if os.path.isfile(fname2):
+        fdat2 = open(fname2, 'r')
+    elif os.path.isfile(fname2+'.gz'):
+        import gzip
+        fdat2 = gzip.open(fname2+'.gz', 'rt')
+    else:
+        print('ERROR: file', fname2, 'does not exist!')
+        sys.exit(1)
+
+        
     small = 1e-4 # 0.01 # 1e-5
     #itensity = 0.2
     DY = 0 # 0.01318
@@ -76,8 +94,6 @@ if __name__ == '__main__':
     else:
         fcoh = None
     
-    fdat1 = open(fname1, 'r')
-    fdat2 = open(fname2, 'r')
     ikp=0
     Akom1=[]
     Akom2=[]

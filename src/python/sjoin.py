@@ -129,7 +129,8 @@ if __name__=='__main__':
     
     # to check number of frequency points
     filename = re.sub(r'\?', str(1), options.indlt)
-    data = loadtxt( filename ).transpose()
+    print('filename=', filename)
+    data = loadtxt( filename, ndmin=2 ).transpose()
     om = data[0]
     
     # Array of all Delta's, after averaging over all columns and over all impurity problems.

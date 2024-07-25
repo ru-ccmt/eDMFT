@@ -12,6 +12,8 @@ from functools import reduce
 
 def FindLatticeNd(case, m_extn, siginds,icols_ind,fh_info, scf_name='scf2', cmplx=False):
     "Finds occupation from scf2"
+    #print('inp:', case, m_extn, siginds,icols_ind,fh_info, scf_name, cmplx)
+    
     def Read_scf2(dat,siginds,cmplx):
         nd={}
         nl={}
@@ -31,6 +33,7 @@ def FindLatticeNd(case, m_extn, siginds,icols_ind,fh_info, scf_name='scf2', cmpl
                 diag_Sigind = [x for x in [Sigind[i,i] for i in range(len(Sigind))] if x!=0] # all diagonal entries except 0
                 imin = min(abs(array(diag_Sigind)))  # index of the first entry
                 imax = max(abs(array(diag_Sigind)))  # index of the last entry
+                #print('icix=', icix, 'imin=', imin, 'imax=', imax, 'diag_Sigin=', diag_Sigind)
                 nl[icix] = zeros(imax-imin+1)  # for each cix we have compressed density matrix
                 for i in range(dim):
                     if Sigind[i,i]>0:
@@ -89,9 +92,10 @@ def FindLatticeNd(case, m_extn, siginds,icols_ind,fh_info, scf_name='scf2', cmpl
 
 if __name__ == '__main__':
      w2k = utils.W2kEnvironment()    # W2k filenames and paths
-     m_extn=''
+     m_extn='dn'
      inl = indmffile.Indmfl(w2k.case) # case.indmfl file
      inl.read()                       # case.indmfl read
-     icols_ind={0: [1,2]}
+     icols_ind={0: [2, 3]}
+     #icols_ind={0: [1,2]}
      (nl_imp, nd_imp) = FindLatticeNd(w2k.case, m_extn, inl.siginds, icols_ind, sys.stdout, 'scfdmft1', cmplx=True)
      print(nl_imp, nd_imp)

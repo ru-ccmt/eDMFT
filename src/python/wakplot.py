@@ -15,17 +15,27 @@ if __name__ == '__main__':
     if len(sys.argv)<2:
         pass
     elif len(sys.argv)<3:
-        if os.path.isfile(sys.argv[1]):
+        if os.path.isfile(sys.argv[1]) or os.path.isfile(sys.argv[1]+'.gz'):
             fname = sys.argv[1]
         else:
             intensity = float(sys.argv[1])
     else:
         for i in range(2):
-            if os.path.isfile(sys.argv[i+1]):
+            if os.path.isfile(sys.argv[i+1]) or os.path.isfile(sys.argv[i+1]+'.gz'):
                 fname = sys.argv[i+1]
             else:
                 intensity = float(sys.argv[i+1])
-    
+
+    if os.path.isfile(fname):
+        fdat = open(fname, 'r')
+    elif os.path.isfile(fname+'.gz'):
+        import gzip
+        fdat = gzip.open(fname+'.gz', 'rt')
+    else:
+        print('ERROR: file', fname, 'does not exist!')
+        sys.exit(1)
+
+                
     small = 1e-5 # 0.01 # 1e-5
     #itensity = 0.2
     DY = 0 # 0.01318
@@ -66,7 +76,7 @@ if __name__ == '__main__':
 
     nkp = wkpointi[-1]+1
     print('nkp=', nkp)
-    fdat = open(fname, 'r')
+    #fdat = open(fname, 'r')
     
     if os.path.isfile('cohfactorsd.dat'):
         fcoh = open('cohfactorsd.dat', 'r')

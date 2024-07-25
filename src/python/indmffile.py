@@ -755,24 +755,24 @@ class Indmfl(IndmfBase):
         for icp,sigind in self.siginds.items():
             legend = self.legends[icp]
             cftrans = self.cftrans[icp]
-
+            
             text2 += [
                 "%-3d %3d %3d       # %s" % (icp, len(sigind), sizes[icp], 'cix-num, dimension, num-independent-components'),
                 '#---------------- # Independent components are --------------',
                 "'%s' "*len(legend) % tuple(legend),
                 ]
-
+            
             text2.append('#---------------- # Sigind follows --------------------------')
-            max_sigfig = 1 + int(log(max(sigind.flat))/log(10))
+            max_sigfig = 1 + int(log(max(abs(sigind.ravel())))/log(10))
             format = '%' + str(max_sigfig) + 'd'
             for row in sigind:
                 text2.append(' '.join([format % elem for elem in row]))
-
+            
             # print local transform matrix (real & imag)
             text2.append('#---------------- # Transformation matrix follows -----------')
             for row in self.cftrans[icp]:
                 text2.append(' '.join(["%11.8f %11.8f  " % (elem.real, elem.imag) for elem in row]))
-
+            
         # join with first half; add \n to each line in text2
         text += [line+'\n' for line in text2]
         self.writelines(text, filename)

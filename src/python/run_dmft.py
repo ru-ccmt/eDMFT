@@ -104,8 +104,9 @@ def dmft1(fday, case, fh_info, extn, dmfe, m_extn=''):
     fday.flush()
     
     with open(':log', 'a') as fl:
-        print(time.strftime("%a %b %d %H:%M:%S %Z %Y")+'>     '+name, file=fl)
-    
+        #print(time.strftime("%a %b %d %H:%M:%S %Z %Y")+'>     '+name, file=fl)
+        print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+name, file=fl)
+        
     print('Running ---- dmft1 -----', file=fh_info)
     cmd = utime+' '+dmfe.MPI2+' '+dmfe.ROOT+'/dmft '+name+'.def >> '+name+'_info.out '
     print('#<'+name+'>: ', cmd, file=fh_info)
@@ -159,25 +160,25 @@ def lapw1(fday, case, WIEN, para, dftKS, dmfe, wopt, fh_info):
         name='lapw1'
         sname = 'lapw1'+wopt['cmplx']
         if not wopt['updn']:   # just one type of core file, so V_{KS} is not polarized
-            print('>%-10s' % sname, '( '+time.strftime("%H:%M:%S")+' )', file=fday)
+            print('>%-10s' % sname, '( '+time.strftime("%I:%M:%S %p")+' )', file=fday)
             with open(':log', 'a') as fl:
-                print(time.strftime("%a %b %d %H:%M:%S %Z %Y")+'>     '+sname, file=fl)
+                print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+sname, file=fl)
             cmd = dmfe.ROOT+'/x_dmft.py'+para+' '+pcmplx+' '+name
             print(('#<'+sname+'>: '), cmd, file=fh_info)
             fh_info.flush()
             info=subprocess.call(cmd,shell=True,stdout=fh_info)
         else:                  # V_{KS} is polarized, need to lapw1 steps
-            print('>%-10s' % (sname+' --up'), '( '+time.strftime("%H:%M:%S")+' )', file=fday)
+            print('>%-10s' % (sname+' --up'), '( '+time.strftime("%I:%M:%S %p")+' )', file=fday)
             with open(':log', 'a') as fl:
-                print(time.strftime("%a %b %d %H:%M:%S %Z %Y")+'>     '+sname+'up', file=fl)
+                print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+sname+'up', file=fl)
             cmd = dmfe.ROOT+'/x_dmft.py'+para+' '+pcmplx+' --up '+name
             print(('#<'+sname+'>: '), cmd, file=fh_info)
             fh_info.flush()
             info=subprocess.call(cmd,shell=True,stdout=fh_info)
             
-            print('>%-10s' % (sname+' --dn'), '( '+time.strftime("%H:%M:%S")+' )', file=fday)
+            print('>%-10s' % (sname+' --dn'), '( '+time.strftime("%I:%M:%S %p")+' )', file=fday)
             with open(':log', 'a') as fl:
-                print(time.strftime("%a %b %d %H:%M:%S %Z %Y")+'>     '+sname+'dn', file=fl)
+                print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+sname+'dn', file=fl)
             cmd = dmfe.ROOT+'/x_dmft.py'+para+' '+pcmplx+' --dn '+name
             print(('#<'+sname+'>: '), cmd, file=fh_info)
             fh_info.flush()
@@ -192,9 +193,9 @@ def lapw1(fday, case, WIEN, para, dftKS, dmfe, wopt, fh_info):
 def lapwso(fday, case, WIEN, para, dftKS, dmfe, fh_info):
     if dftKS:
         name='lapwso'
-        print('>%-10s' % name, '( '+time.strftime("%H:%M:%S")+' )', file=fday)
+        print('>%-10s' % name, '( '+time.strftime("%I:%M:%S %p")+' )', file=fday)
         with open(':log', 'a') as fl:
-            print(time.strftime("%a %b %d %H:%M:%S %Z %Y")+'>     '+name, file=fl)
+            print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+name, file=fl)
         cmd = dmfe.ROOT+'/x_dmft.py'+para+' '+name
         print(('#<'+name+'>: '), cmd, file=fh_info)
         fh_info.flush()
@@ -226,11 +227,11 @@ def dmft2(fday, case, fh_info, dmfe, m_extn=''):
         print('  stop error: the required input file '+name+'.def for the next step could not be found!')
         print('  stop error: the required input file '+name+'.def for the next step could not be found!', file=fday)
         
-    print('>%-10s' % name, '( '+time.strftime("%H:%M:%S")+' )', file=fday)
+    print('>%-10s' % name, '( '+time.strftime("%I:%M:%S %p")+' )', file=fday)
     fday.flush()
     
     with open(':log', 'a') as fl:
-        print(time.strftime("%a %b %d %H:%M:%S %Z %Y")+'>     '+name, file=fl)
+        print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+name, file=fl)
     
     cmd = utime+' '+dmfe.MPI2+' '+dmfe.ROOT+'/dmft2 '+name+'.def >> dmft2_info.out '
     print(('#<'+name+'>: '), cmd, file=fh_info)
@@ -296,11 +297,11 @@ def SolveImpurity(EF, asolver, iat, extn, p, UpdateAtom, nl_imp, fh_info, fh_pin
     print('Running ----- impurity solver -----', file=fh_info)
     fh_info.flush()
     
-    tim = time.strftime("%H:%M:%S")
+    tim = time.strftime("%I:%M:%S %p")
     print('>%-10s ( %s )' % ('impurity', tim), file=fday)
     fday.flush()
     with open(':log', 'a') as fl:
-        print(time.strftime("%a %b %d %H:%M:%S %Z %Y")+'>     '+'impurity', file=fl)
+        print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+'impurity', file=fl)
     
     iprms = 'iparams'+str(iat)
     ipars = deepcopy(p[iprms])
@@ -505,11 +506,11 @@ def FermiF(dmfe, w2k, p, para, wopt, fh_info, fday, matsubara):
     cmd = dmfe.ROOT+'/fermif '+scratch+'/'+w2k.case+'.bnds '+scratch+'/'+w2k.case+'.bnds'+wopt['m_extn']
     print(('#<fermif>: '), cmd, file=fh_info)
     fh_info.flush()
-    tim = time.strftime("%H:%M:%S")
+    tim = time.strftime("%I:%M:%S %p")
     print('>%-10s ( %s )' % ('fermif', tim), file=fday)
     fday.flush()
     with open(':log', 'a') as fl:
-        print(time.strftime("%a %b %d %H:%M:%S %Z %Y")+'>     '+'fermif', file=fl)
+        print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+'fermif', file=fl)
     info=subprocess.call(cmd,shell=True,stdout=fh_info,stderr=fh_info)
     if info!=0:
         print('Problems evaluating fermif!', file=fh_info)
@@ -661,6 +662,12 @@ if __name__ == '__main__':
     
     ## produce projectorw.dat if it does not yet exist.
     if inl.projector>=4 and not os.path.exists('projectorw.dat'):
+        print('WARNING: projectorw.dat does not exist, hence trying to computed it. Make sure case.vsp is available', file=fh_info)
+        fh_info.flush()
+        if not os.path.isfile(w2k.case+'.vsp'):
+            print('ERROR: projectorw.dat does not exist nor case.vsp, hence I can not compute projector. Run "init_proj.py" first.', file=fh_info)
+            print('ERROR: projectorw.dat does not exist nor case.vsp, hence I can not compute projector. Run "init_proj.py" first.')
+            sys.exit(1)
         inl.CmpProjector(log=fh_info)
     ## if the band range is not yet specified, do it now
     if inl.emin==inl.emax==0: # we did not yet determine band ranges
@@ -991,9 +998,9 @@ if __name__ == '__main__':
                         break
                 print('rho-rho_expected=', drho, file=fh_info)
                 if abs(drho)>0.1:
-                    print('WARNING: Since recomputeEF is set to 0, we expect EF in the gap.')
+                    print('WARNING/ERROR: Since recomputeEF is set to 0, we expect EF in the gap.', file=fh_info)
                     print(' But density is wrong. Have rho-rho_expected=',drho, file=fh_info )
-                    print(' You should adjust EF in EF.dat and see if EF falls into the gap')
+                    print(' You should adjust EF in EF.dat and see if EF falls into the gap', file=fh_info)
                     
             nd,Vdc = CreateEorb(w2k.case, wopt, inl.siginds, imp2latt)
 
