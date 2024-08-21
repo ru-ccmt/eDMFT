@@ -1,5 +1,6 @@
-CMP = f2py
-F2PL = 
+include ../../Makefile.in
+# CMP = f2py
+# F2PL = 
 
 all : latgen2.so
 
