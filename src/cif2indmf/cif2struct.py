@@ -72,14 +72,14 @@ class WStruct:
                           [-self.b*sin_alpha*cos_gamma,self.b*sin_alpha*sin_gamma,self.b*cos_alpha],
                           [0, 0, self.c]])
         
-    def ScanCif(self, filein, log=sys.stdout, writek=False, Qmagnetic=True, cmp_neighbors=False, convertH2R=True, ndecimals=3, nradius=4.7):
+    def ScanCif(self, filein, log=sys.stdout, writek=False, Qmagnetic=True, cmp_neighbors=False, convertH2R=True, ndecimals=3, nradius=4.7,min_Molap=0.7):
         """ Here is the majority of the algorithm to convert cif2struct.
         We start by allocating CifParser_W2k, which reads cif using paymatgen, and 
         extracts necessary information.
         Below we than arrange this information in the way W2k needs it in struct file.
         
         """
-        cif = CifParser_W2k(filein, log, Qmagnetic, cmp_neighbors, ndecimals, nradius)
+        cif = CifParser_W2k(filein, log, Qmagnetic, cmp_neighbors, ndecimals, nradius, min_Molap)
         
         nsym = len(cif.parser.symmetry_operations)
         self.timat = zeros((nsym,3,3),dtype=int)
@@ -108,7 +108,7 @@ class WStruct:
         self.Znuc   = [cif.Z_element[spec] for spec in cif.w2k_coords]
 
         if self.sgnum in [5,8,9,12,15,20,21,35,36,37,38,39,40,41,63,64,65,66,67,68] and sum(glide_plane)<2:
-            print('ERROR glide plane for group', self.sgnum,'should exist, but could not find it', file=log)
+            print('ERROR glide plane for space-group', self.sgnum,'should exist, but could not be found', file=log)
             print('All group operations are', file=log)
             for isym,op in enumerate(cif.parser.symmetry_operations):
                 timat = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
@@ -281,6 +281,8 @@ class WStruct:
             indx_kept=[]
             indx_to_remove=[]
             the_same = TheSame(self.lattyp)
+            Q_equivalent={}
+            
             for ispc,spec in enumerate(cif.w2k_coords):
                 all_coords = cif.w2k_coords[spec]
                 #print('   all_coords['+spec+']=', len(all_coords), file=log)
@@ -295,14 +297,56 @@ class WStruct:
                     for kt in kept:
                         if the_same(all_coords[i], all_coords[kt]):
                             Qunique = False
+                            Q_equivalent[i]=kt
                             break
                     if Qunique:
                         kept.append(i)
                         indx_kept.append(i_w2k)
                     i_w2k += 1
-                to_remove=set(range(len(all_coords)))-set(kept)
+                to_remove=list(set(range(len(all_coords)))-set(kept))
+
+                print('flipped=', cif.flipped, file=log)
+                print('Q_equivalent=', Q_equivalent, file=log)
+                print('kept=', [l+i_w2k_start for l in kept], file=log)
+                print('indx_kept=', indx_kept, file=log)
+                print('to_remove=', [l+i_w2k_start for l in to_remove], file=log)
+                
+                # Here we make sure that cif.flipped remains valid after we remove half of the atoms
+                # If cif.flipped contains both indx_kept[:] and i_w2k_start+i, we should not remove i(+i_w2k_start), but remove its equivalent.
+                # Because otherwise our cif.flipped will search for flipped pairs and will not find them, because partners were eliminated, while an
+                # equivalent site to the partner was kept
+                for l,i in enumerate(to_remove):
+                    exchanged=False
+                    if i_w2k_start+i in cif.flipped:
+                        print(' checking i=', i_w2k_start+i, 'j=', cif.flipped[i_w2k_start+i], ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
+                        j = cif.flipped[i_w2k_start+i]
+                        if j in indx_kept:
+                            print('  ...exchanging atom ', i+i_w2k_start, 'for', Q_equivalent[i]+i_w2k_start, 'in remove because of cif.flipped contains', (i+i_w2k_start,j), file=log)
+                            to_remove[l] = Q_equivalent[i]
+                            m = kept.index(Q_equivalent[i])
+                            kept[m] = i
+                            m = indx_kept.index(Q_equivalent[i]+i_w2k_start)
+                            indx_kept[m] = i+i_w2k_start
+                            exchanged=True
+                    if not exchanged and i_w2k_start+i in cif.flipped.values():
+                        j = list(cif.flipped.keys())[list(cif.flipped.values()).index(i_w2k_start+i)]
+                        print(' checking i=', i_w2k_start+i, 'j=', j, ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
+                        if j in indx_kept:
+                            print('  ...exchanging atom ', i+i_w2k_start, 'for', Q_equivalent[i]+i_w2k_start, 'in remove because of cif.flipped contains', (i+i_w2k_start,j), file=log)
+                            print('l=', l, 'i=', i, 'to_remove[l]=', to_remove[l], 'Q_equivalent=', Q_equivalent, file=log)
+                            to_remove[l] = Q_equivalent[i]
+                            m = kept.index(Q_equivalent[i])
+                            kept[m] = i
+                            m = indx_kept.index(Q_equivalent[i]+i_w2k_start)
+                            indx_kept[m] = i+i_w2k_start
+                            
+                print('to_remove=', [l+i_w2k_start for l in to_remove], file=log)
+                print('kept=', [l+i_w2k_start for l in kept], file=log)
+                print('indx_kept=', indx_kept, file=log)
+                
                 ratio = len(cif.w2k_coords[spec])/len(kept)
-                print(spec, ': ', 'out of ', len(cif.w2k_coords[spec]), 'atoms we keep=', len(kept),':', kept, file=log)
+                these = arange(len(cif.w2k_coords[spec]))+i_w2k_start
+                print(spec, ': ', 'out of ', len(cif.w2k_coords[spec]), 'atoms=',these.tolist(),'we keep=', len(kept),':', [l+i_w2k_start for l in kept], file=log)
                 if (fabs(ratio-vol_ratio[self.lattyp])>1e-3):
                     print('ERROR: conventional/primitive volume ratio is', vol_ratio[self.lattyp], 'while # atoms kept ratio=', ratio, file=log)
                     To_correct[spec] = copy(cif.w2k_coords[spec])
@@ -317,7 +361,7 @@ class WStruct:
             #for i in range(len(indx_kept)):
             #    print('indx_kept['+str(i)+']=', indx_kept[i], file=log)
             if sum(abs(array(ratios)-ratios[0]))==0:
-                print('All ratios are equal to ', ratios, 'hence structure given in primitive cell. Ignore ERRORS above', file=log)
+                print('All ratios are equal to ', ratios, 'hence structure given in primitive cell. Ignore possible ERRORS above', file=log)
                 To_correct={}
                 
             if len(To_correct)>0:
@@ -599,6 +643,9 @@ class WStruct:
                 self.flipped = {}
                 self.rotation_flipped = {}
                 self.timerevr_flipped = {}
+                print('cif.flipped=', cif.flipped, file=log)
+                print('in_primitive=', in_primitive, file=log)
+                
                 for ii in cif.flipped:
                     if ii in in_primitive and cif.flipped[ii] in in_primitive:
                         jj = in_primitive[ii]
@@ -1053,7 +1100,7 @@ def get_matching_coord(coord, parser, coord_to_species):
 
     
 class CifParser_W2k:
-    def __init__(self, fname, log=sys.stdout, Qmagnetic=True, cmp_neighbors=False, ndecimals=3, nradius=4.7):
+    def __init__(self, fname, log=sys.stdout, Qmagnetic=True, cmp_neighbors=False, ndecimals=3, nradius=4.7,min_Molap=0.7):
         self.log = log
         self.parser = CifParser(fname,occupancy_tolerance=3)
         cif_as_dict = self.parser.as_dict()       # get dictionary of cif information
@@ -1172,8 +1219,10 @@ class CifParser_W2k:
             self.Z_element[site.species_string]=Znuc[ii]
 
         magnetic=False
-        if hasattr(self.parser.symmetry_operations[0], 'time_reversal'):
-            magnetic=True
+        if Qmagnetic:
+            #print('self.parser.symmetry_operations=', self.parser.symmetry_operations)
+            if hasattr(self.parser.symmetry_operations[0], 'time_reversal'):
+                magnetic=True
         Qmagnetic = magnetic and Qmagnetic
         
         #print('indx_by_element=', indx_by_element)
@@ -1236,7 +1285,7 @@ class CifParser_W2k:
             
                 
         amagmoms = [0 for site in self.structure.sites]
-        min_Molap = 0.7  # We will treat magnetic moments (anti)parallel if their overlap is more than that
+        #min_Molap = 0.7  # We will treat magnetic moments (anti)parallel if their overlap is more than that
         if Qmagnetic:
             for i,site in enumerate(self.structure.sites):
                 if 'magmom' in site.properties:
@@ -1295,16 +1344,17 @@ class CifParser_W2k:
                                             # and declare that the two atoms are different
                                             moments_opposite = sum(abs(Mj+M0))<1e-5 or (Molap<-min_Molap and abs(m0-mj)<1e-5)
                                             if moments_opposite: #sum(abs(Mj+M0))<1e-5 or Molap < -min_Molap:
-                                                self.flipped[ii]=ty[i_grp_compare]
-                                                if ii not in self.rotation_flipped:
-                                                    self.rotation_flipped[ii]=[ array(np.round(op.affine_matrix[:3,:3]),dtype=int) ]
-                                                    self.timerevr_flipped[ii]=[ op.time_reversal ]
-                                                else:
-                                                    self.rotation_flipped[ii].append( array(np.round(op.affine_matrix[:3,:3]),dtype=int) )
-                                                    self.timerevr_flipped[ii].append( op.time_reversal )
-                                                if Molap > -0.99999:
-                                                    print('WARNING Moments are only approximately antiparallel Molap=', Molap,
-                                                              'and we are treating them as antiparallel', file=log)
+                                                if ii not in self.flipped:
+                                                    self.flipped[ii]=ty[i_grp_compare]
+                                                    if ii not in self.rotation_flipped:
+                                                        self.rotation_flipped[ii]=[ array(np.round(op.affine_matrix[:3,:3]),dtype=int) ]
+                                                        self.timerevr_flipped[ii]=[ op.time_reversal ]
+                                                    else:
+                                                        self.rotation_flipped[ii].append( array(np.round(op.affine_matrix[:3,:3]),dtype=int) )
+                                                        self.timerevr_flipped[ii].append( op.time_reversal )
+                                                    if Molap > -0.99999:
+                                                        print('WARNING Moments are only approximately antiparallel Molap=', Molap,
+                                                                  'and we are treating them as antiparallel', file=log)
                                                 #if i_grp_compare<len(ty)-1:
                                                 #    i_grp_compare += 1
                                                 #    print('i_grp_compare increased to', i_grp_compare, 'because ty=', ty, file=log)
@@ -1752,16 +1802,16 @@ class CifParser_W2k:
             #for site in self.structure:
             #    for specie, amt in site.species.items():
             #        print(specie, amt, (getattr(specie, "oxi_state", 0) or 0) )
-            #print('first_sites_index=', first_sites_index)
-            #print('first_sites=', first_sites)
-            center_indices, points_indices, offsets, distances = self.structure.get_neighbor_list(r=4.0, sites=first_sites, numerical_tol=1e-4)
+            #print('first_sites_index=', first_sites_index, file=log)
+            #print('first_sites=', first_sites, file=log)
+            center_indices, points_indices, offsets, distances = self.structure.get_neighbor_list(r=nradius, sites=first_sites, numerical_tol=1e-4)
             self.Rmt = zeros(len(first_sites_index))
-            print(center_indices, file=log)
-            print(points_indices, file=log)
+            print('center_indices=', center_indices, file=log)
+            print('points_indices=', points_indices, file=log)
             for jatom,i in enumerate(first_sites_index):
                 t=self.structure.sites[i]
                 coord = t.frac_coords @ self.structure.lattice.matrix
-                #print('coords=', coord)
+                #print('t=', t, 'coords=', coord, file=log)
                 if Add_oxi:
                     try:
                         oxi_st = int(getattr(t.specie, "oxi_state", 0) or 0)
@@ -1779,6 +1829,9 @@ class CifParser_W2k:
                 cmp_to_sort = Cmp2Sort(distances_,names_,self.structure.sites[i].species_string)
                 idx=sorted(range(len(distances_)), key=cmp_to_key(cmp_to_sort))# lambda i:(distances_[i],names_[i]))
                 #
+                #print('mask=', mask, file=log)
+                #print('points_indices=', points_indices_, file=log)
+                #print('offsets=', offsets_, file=log)
                 #print('names_=', names_,file=log)
                 #print('distances=', distances_,file=log)
                 #print('points_indices=',points_indices_,file=log)
@@ -2100,10 +2153,11 @@ def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, H2Rtrans=False, log=sy
         print('END', file=fk)
 
 
-def Cif2Struct(fcif, Nkp=300, writek=True, Qmagnetic=True, logfile='cif2struct.log', cmp_neighbors=False, convertH2R=True, ndecimals=3, nradius=4.7):
+def Cif2Struct(fcif, Nkp=300, writek=True, Qmagnetic=True, logfile='cif2struct.log', cmp_neighbors=False,
+                   convertH2R=True, ndecimals=3, nradius=4.7,min_Molap=0.7):
     log = open(logfile, 'w')
     strc = WStruct()           # w2k structure, for now empty
-    strc.ScanCif(fcif, log, writek, Qmagnetic, cmp_neighbors, convertH2R, ndecimals, nradius)    # here is most of the algorithm
+    strc.ScanCif(fcif, log, writek, Qmagnetic, cmp_neighbors, convertH2R, ndecimals, nradius,min_Molap)    # here is most of the algorithm
     case = os.path.splitext(fcif)[0] # get case
     strc.WriteStruct(case+'.struct', log) # writting out struct file
     lat = Latgen(strc, case, log)  # checking Bravais lattice in wien2k and its consistency.
@@ -2148,6 +2202,7 @@ if __name__ == '__main__':
     parser.add_option('-H', '--hexagonal',  dest='keepH', action='store_true', default=False, help="switches off hexagonal to rhombohedral conversion")
     parser.add_option('-p', '--ndecimals',  dest='ndecimals', type='int', default=3, help="precision when determining the equivalency of atoms we take nn distance with precision ndecimals. Compatible with w2k nn method.")
     parser.add_option('-R', '--nradius',  dest='nradius', type='float', default=4.7, help="How far in AA should nearest neighbors be checked. Compatible with w2k nn method.")
+    parser.add_option('-a', '--Molap',   dest='Molap', type='float', default=0.7, help="When checking if spin is flipped we require dot(G*S,S)<-Molap, where G*S is group operation on spin.")
     
     # Next, parse the arguments
     (options, args) = parser.parse_args()
@@ -2159,4 +2214,5 @@ if __name__ == '__main__':
     #print('fcif=', fcif)
     #print('options=', options.Nkp, options.wkp)
     Cif2Struct(fcif, Nkp=options.Nkp, writek=options.wkp, Qmagnetic=options.Qmagnetic, logfile=options.log,
-                   cmp_neighbors=options.neigh, convertH2R=not options.keepH, ndecimals=options.ndecimals,nradius=options.nradius)
+                   cmp_neighbors=options.neigh, convertH2R=not options.keepH, ndecimals=options.ndecimals,nradius=options.nradius,
+                   min_Molap=options.Molap)

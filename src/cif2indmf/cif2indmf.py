@@ -145,10 +145,10 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
 
 def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty', onreal=False,
               fixmu=False,beta=50, QMC_M=5e6, CoulombU=None, CoulombJ=None,
-              qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log', keepH=False, ndecimals=3,nradius=4.7):
+              qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log', keepH=False, ndecimals=3,nradius=4.7,min_Molap=0.7):
     case = os.path.splitext(fcif)[0] # get case
 
-    (strc, lat) = Cif2Struct(fcif, Nkp, writek, Qmagnetic, logfile, cmp_neighbors=True, convertH2R=not keepH, ndecimals=ndecimals,nradius=nradius)
+    (strc, lat) = Cif2Struct(fcif, Nkp, writek, Qmagnetic, logfile, cmp_neighbors=True, convertH2R=not keepH, ndecimals=ndecimals,nradius=nradius,min_Molap=min_Molap)
 
     log = open(logfile, 'a')
 
@@ -503,6 +503,7 @@ if __name__ == '__main__':
     parser.add_option('-H', '--hexagonal',dest='keepH', action='store_true', default=False, help="switches off hexagonal to rhombohedral conversion")
     parser.add_option('-p', '--ndecimals',  dest='ndecimals', type='int', default=3, help="precision when determining the equivalency of atoms we take nn distance with precision ndecimals. Compatible with w2k nn method.")
     parser.add_option('-R', '--nradius',  dest='nradius', type='float', default=4.7, help="How far in AA should nearest neighbors be checked. Compatible with w2k nn method.")
+    parser.add_option('-a', '--Molap',   dest='Molap', type='float', default=0.7, help="When checking if spin is flipped we require dot(G*S,S)<-Molap, where G*S is group operation on spin.")
     
     # Next, parse the arguments
     (options, args) = parser.parse_args()
@@ -516,5 +517,6 @@ if __name__ == '__main__':
         cor = expand_intlist(options.cor)
     
     Cif2Indmf(fcif, cor, options.so, options.Qmagnetic, options.DC, options.real, options.fixmu, options.beta, options.QMC_M, options.CoulombU, options.CoulombJ,
-                  options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log, keepH=options.keepH, ndecimals=options.ndecimals,nradius=options.nradius)
+                  options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log, keepH=options.keepH,
+                  ndecimals=options.ndecimals,nradius=options.nradius,min_Molap=options.Molap)
 

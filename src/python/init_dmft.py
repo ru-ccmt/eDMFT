@@ -50,7 +50,7 @@ if __name__ == '__main__':
                 print(indmffile.projector_doc)
             sys.exit(0)
         else:        
-            for i in range(len(sys.argv)/2):
+            for i in range(int((len(sys.argv)-1)/2)):
                 inpt[sys.argv[2*i+1][1:]] = sys.argv[2*i+2]
             print('given options are', inpt)
     

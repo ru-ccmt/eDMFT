@@ -98,6 +98,10 @@ if __name__ == '__main__':
             kc = array(eval(kpth))
             #kf = c2f @ array([xn[i],yn[j],0])
             kf = c2f @ kc
+
+            for l in range(3):
+                if abs(kf[l])<1e-5: kf[l]=0
+                
             ki = kf % 1.0
             kis = toStr(ki)
             #print(i, j, kis, kf.tolist())
