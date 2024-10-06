@@ -305,11 +305,11 @@ class WStruct:
                     i_w2k += 1
                 to_remove=list(set(range(len(all_coords)))-set(kept))
 
-                print('flipped=', cif.flipped, file=log)
-                print('Q_equivalent=', Q_equivalent, file=log)
-                print('kept=', [l+i_w2k_start for l in kept], file=log)
-                print('indx_kept=', indx_kept, file=log)
-                print('to_remove=', [l+i_w2k_start for l in to_remove], file=log)
+                #print('flipped=', cif.flipped, file=log)
+                #print('Q_equivalent=', Q_equivalent, file=log)
+                #print('kept=', [l+i_w2k_start for l in kept], file=log)
+                #print('indx_kept=', indx_kept, file=log)
+                #print('to_remove=', [l+i_w2k_start for l in to_remove], file=log)
                 
                 # Here we make sure that cif.flipped remains valid after we remove half of the atoms
                 # If cif.flipped contains both indx_kept[:] and i_w2k_start+i, we should not remove i(+i_w2k_start), but remove its equivalent.
@@ -318,7 +318,7 @@ class WStruct:
                 for l,i in enumerate(to_remove):
                     exchanged=False
                     if i_w2k_start+i in cif.flipped:
-                        print(' checking i=', i_w2k_start+i, 'j=', cif.flipped[i_w2k_start+i], ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
+                        #print(' checking i=', i_w2k_start+i, 'j=', cif.flipped[i_w2k_start+i], ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
                         j = cif.flipped[i_w2k_start+i]
                         if j in indx_kept:
                             print('  ...exchanging atom ', i+i_w2k_start, 'for', Q_equivalent[i]+i_w2k_start, 'in remove because of cif.flipped contains', (i+i_w2k_start,j), file=log)
@@ -330,7 +330,7 @@ class WStruct:
                             exchanged=True
                     if not exchanged and i_w2k_start+i in cif.flipped.values():
                         j = list(cif.flipped.keys())[list(cif.flipped.values()).index(i_w2k_start+i)]
-                        print(' checking i=', i_w2k_start+i, 'j=', j, ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
+                        #print(' checking i=', i_w2k_start+i, 'j=', j, ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
                         if j in indx_kept:
                             print('  ...exchanging atom ', i+i_w2k_start, 'for', Q_equivalent[i]+i_w2k_start, 'in remove because of cif.flipped contains', (i+i_w2k_start,j), file=log)
                             print('l=', l, 'i=', i, 'to_remove[l]=', to_remove[l], 'Q_equivalent=', Q_equivalent, file=log)
@@ -340,9 +340,9 @@ class WStruct:
                             m = indx_kept.index(Q_equivalent[i]+i_w2k_start)
                             indx_kept[m] = i+i_w2k_start
                             
-                print('to_remove=', [l+i_w2k_start for l in to_remove], file=log)
-                print('kept=', [l+i_w2k_start for l in kept], file=log)
-                print('indx_kept=', indx_kept, file=log)
+                #print('to_remove=', [l+i_w2k_start for l in to_remove], file=log)
+                #print('kept=', [l+i_w2k_start for l in kept], file=log)
+                #print('indx_kept=', indx_kept, file=log)
                 
                 ratio = len(cif.w2k_coords[spec])/len(kept)
                 these = arange(len(cif.w2k_coords[spec]))+i_w2k_start
