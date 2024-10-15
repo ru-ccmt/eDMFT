@@ -315,31 +315,32 @@ class WStruct:
                 # If cif.flipped contains both indx_kept[:] and i_w2k_start+i, we should not remove i(+i_w2k_start), but remove its equivalent.
                 # Because otherwise our cif.flipped will search for flipped pairs and will not find them, because partners were eliminated, while an
                 # equivalent site to the partner was kept
-                for l,i in enumerate(to_remove):
-                    exchanged=False
-                    if i_w2k_start+i in cif.flipped:
-                        #print(' checking i=', i_w2k_start+i, 'j=', cif.flipped[i_w2k_start+i], ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
-                        j = cif.flipped[i_w2k_start+i]
-                        if j in indx_kept:
-                            print('  ...exchanging atom ', i+i_w2k_start, 'for', Q_equivalent[i]+i_w2k_start, 'in remove because of cif.flipped contains', (i+i_w2k_start,j), file=log)
-                            to_remove[l] = Q_equivalent[i]
-                            m = kept.index(Q_equivalent[i])
-                            kept[m] = i
-                            m = indx_kept.index(Q_equivalent[i]+i_w2k_start)
-                            indx_kept[m] = i+i_w2k_start
-                            exchanged=True
-                    if not exchanged and i_w2k_start+i in cif.flipped.values():
-                        j = list(cif.flipped.keys())[list(cif.flipped.values()).index(i_w2k_start+i)]
-                        #print(' checking i=', i_w2k_start+i, 'j=', j, ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
-                        if j in indx_kept:
-                            print('  ...exchanging atom ', i+i_w2k_start, 'for', Q_equivalent[i]+i_w2k_start, 'in remove because of cif.flipped contains', (i+i_w2k_start,j), file=log)
-                            print('l=', l, 'i=', i, 'to_remove[l]=', to_remove[l], 'Q_equivalent=', Q_equivalent, file=log)
-                            to_remove[l] = Q_equivalent[i]
-                            m = kept.index(Q_equivalent[i])
-                            kept[m] = i
-                            m = indx_kept.index(Q_equivalent[i]+i_w2k_start)
-                            indx_kept[m] = i+i_w2k_start
-                            
+                if Qmagnetic:
+                    for l,i in enumerate(to_remove):
+                        exchanged=False
+                        if i_w2k_start+i in cif.flipped:
+                            #print(' checking i=', i_w2k_start+i, 'j=', cif.flipped[i_w2k_start+i], ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
+                            j = cif.flipped[i_w2k_start+i]
+                            if j in indx_kept:
+                                print('  ...exchanging atom ', i+i_w2k_start, 'for', Q_equivalent[i]+i_w2k_start, 'in remove because of cif.flipped contains', (i+i_w2k_start,j), file=log)
+                                to_remove[l] = Q_equivalent[i]
+                                m = kept.index(Q_equivalent[i])
+                                kept[m] = i
+                                m = indx_kept.index(Q_equivalent[i]+i_w2k_start)
+                                indx_kept[m] = i+i_w2k_start
+                                exchanged=True
+                        if not exchanged and i_w2k_start+i in cif.flipped.values():
+                            j = list(cif.flipped.keys())[list(cif.flipped.values()).index(i_w2k_start+i)]
+                            #print(' checking i=', i_w2k_start+i, 'j=', j, ' and equiv('+str(i_w2k_start+i)+')=', Q_equivalent[i]+i_w2k_start, file=log)
+                            if j in indx_kept:
+                                print('  ...exchanging atom ', i+i_w2k_start, 'for', Q_equivalent[i]+i_w2k_start, 'in remove because of cif.flipped contains', (i+i_w2k_start,j), file=log)
+                                print('l=', l, 'i=', i, 'to_remove[l]=', to_remove[l], 'Q_equivalent=', Q_equivalent, file=log)
+                                to_remove[l] = Q_equivalent[i]
+                                m = kept.index(Q_equivalent[i])
+                                kept[m] = i
+                                m = indx_kept.index(Q_equivalent[i]+i_w2k_start)
+                                indx_kept[m] = i+i_w2k_start
+                                
                 #print('to_remove=', [l+i_w2k_start for l in to_remove], file=log)
                 #print('kept=', [l+i_w2k_start for l in kept], file=log)
                 #print('indx_kept=', indx_kept, file=log)
@@ -1100,6 +1101,14 @@ def get_matching_coord(coord, parser, coord_to_species):
 
     
 class CifParser_W2k:
+
+    def Init2Cartesian(self,log):
+        self.L2C = (self.structure.lattice.matrix / np.linalg.norm(self.structure.lattice.matrix, axis=1)[:, None]).T
+        self.C2L = np.linalg.inv(self.L2C)
+        print('L2C=', self.L2C, file=log)
+    def Latt2Cart(self, op):
+        return self.L2C @ op.rotation_matrix @ self.C2L
+    
     def __init__(self, fname, log=sys.stdout, Qmagnetic=True, cmp_neighbors=False, ndecimals=3, nradius=4.7,min_Molap=0.7):
         self.log = log
         self.parser = CifParser(fname,occupancy_tolerance=3)
@@ -1170,6 +1179,7 @@ class CifParser_W2k:
             try:
                 #print('dct=', dct)
                 self.structure = self.parser._get_structure(dct,primitive=False,symmetrized=False, check_occu=True)
+                #self.structure = self.parser._get_structure(dct,primitive=False,symmetrized=False, check_occu=False)
                 if self.structure:
                     break
             except (KeyError, ValueError) as exc:
@@ -1229,6 +1239,7 @@ class CifParser_W2k:
         print('Number of symmetry operations available=', len(self.parser.symmetry_operations), file=log)
         print('magnetic cif=', magnetic, file=log)
 
+        self.Init2Cartesian(log)
         for isym,op in enumerate(self.parser.symmetry_operations):
             timat = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
             tau = op.affine_matrix[:3,3]
@@ -1245,8 +1256,10 @@ class CifParser_W2k:
                 print(isym, ':', 'Time='+str(op.time_reversal), symmetry_operations_type, file=log)
             else:
                 print(isym,':', symmetry_operations_type, file=log)
+
+            timat_cart = self.Latt2Cart(op)
             for i in range(3):
-                print('{:2d}{:2d}{:2d} {:10.8f}'.format(*timat[i,:], tau[i]), file=log)
+                print('{:2d}{:2d}{:2d} {:10.8f}   in cartesian:{:8.5f} {:8.5f} {:8.5f}'.format(*timat[i,:], tau[i],*timat_cart[i,:]), file=log)
 
 
         acoords = [site.frac_coords%1.0 for site in self.structure.sites] # all coordinates but always inside home unit cell
@@ -1287,10 +1300,23 @@ class CifParser_W2k:
         amagmoms = [0 for site in self.structure.sites]
         #min_Molap = 0.7  # We will treat magnetic moments (anti)parallel if their overlap is more than that
         if Qmagnetic:
+            #L2C_mi = (self.structure.lattice.matrix / np.linalg.norm(self.structure.lattice.matrix, axis=1)[:, None]).T
+            #C2L_mt = np.linalg.inv(L2C_mi)
             for i,site in enumerate(self.structure.sites):
                 if 'magmom' in site.properties:
                     amagmoms[i] = site.properties["magmom"].moment
-            #print('amagmoms=', amagmoms, file=log)
+                    if linalg.norm(amagmoms[i])<1e-10: continue
+                    Mm = site.properties["magmom"].get_moment_relative_to_crystal_axes(self.structure.lattice)
+                    Mn = self.C2L @ amagmoms[i]
+                    print(f"  {site.species_string} :{ site.frac_coords} ",
+                            "M_cart=[{:8.5f},{:8.5f},{:8.5f}]".format(*amagmoms[i]),
+                            "M_latt=[{:8.5f},{:8.5f},{:8.5f}]".format(*Mm), file=log)
+            # It seems pymatgen can not yet properly treat non-colinear magnetic moments.
+            # The problem is that the rotation matrix  "op.rotation_matrix"  works in lattice coordinates.
+            # However, magmoms are stored in cartesian coordinates (they are transformed to cartesian when reading mcif). 
+            # We therefore have to change lattice-rotation to cartesian rotation like that: L2C @ op.rotation_matrix @ C2L_m
+            # The total transformation of the magnetic moment is therefore
+            #   transformed_moment = (np.linalg.det(op.rotation_matrix) * op.time_reversal)  * L2C @ op.rotation_matrix @ C2L_mt @ amagmoms[i]
             operations_to_remove=set()
             self.flipped={}
             self.rotation_flipped={}
@@ -1300,6 +1326,7 @@ class CifParser_W2k:
                 indices = indx_by_element[spec] # indices on sites of the same element
                 site = self.structure.sites[indices[0]]
                 Mi = site.properties["magmom"].moment
+                #Mi = site.properties["magmom"].get_moment_relative_to_crystal_axes(self.structure.lattice)
                 amoments = [sum(abs(amagmoms[i])) for i in indices]
                 if sum(amoments)<1e-5:
                     continue
@@ -1311,11 +1338,13 @@ class CifParser_W2k:
                     site = self.structure.sites[ii]
                     Qequivalent=False  # for now we thing this might not be equivalent to any other site in grp
                     Mj = site.properties["magmom"].moment
-                    mj = linalg.norm(Mj)
-                    print(site.species_string+'['+str(ii)+']', coord, 'M['+str(ii)+']=', site.properties["magmom"].moment, file=log)
+                    #Mj = site.properties["magmom"].get_moment_relative_to_crystal_axes(self.structure.lattice)
+                    mj = linalg.norm(site.properties["magmom"].moment)
+                    print(site.species_string+'['+str(ii)+']', coord, 'M['+str(ii)+']=', Mj, file=log)
                     for ig,op in enumerate(self.parser.symmetry_operations): # loop over all symmetry operations
                         ncoord = op.operate(coord) % 1.0       # apply symmetry operation to this site, and produce ncoord
-                        Mjp = op.operate_magmom(Mj).moment
+                        #Mjp = op.operate_magmom(Mj).moment
+                        Mjp =  (np.linalg.det(op.rotation_matrix) * op.time_reversal)  * (self.Latt2Cart(op) @ Mj)
                         for itg,ty in enumerate(grp):                         # if coord is equivalent to any existing group in grp, say grp[i]==ty, then one of ncoord should be equal to first entry in grp[i]
                             for i_grp_compare in range(len(ty)): #@@
                                 #@@ i_grp_compare=grp_compare[itg]
@@ -1330,9 +1359,9 @@ class CifParser_W2k:
                                     #              ' and M['+str(ty[i_grp_compare])+']=[{:.3f},{:.3f},{:.3f}]'.format(*Mjp),
                                     #              'M0=[{:.3f},{:.3f},{:.3f}]'.format(*M0), file=log)
                                     if sum(abs(M0-Mjp))<1e-5:
-                                        print('Group['+str(ig)+'] applied to r['+str(ii)+']=',coord,'and M['+str(ii)+']=', Mj.tolist(),
-                                                  ' gives r['+str(ty[i_grp_compare])+']=',coord0,
-                                                  ' and M['+str(ty[i_grp_compare])+']=', M0.tolist(), file=log)
+                                        print('Operation['+str(ig)+'] applied to r['+str(ii)+']=[{:6.4f},{:6.4f},{:6.4f}]'.format(*coord),'and M['+str(ii)+']=[{:6.4f},{:6.4f},{:6.4f}]'.format(*Mj),
+                                                  ' gives r['+str(ty[i_grp_compare])+']=[{:6.4f},{:6.4f},{:6.4f}]'.format(*coord0),
+                                                  ' and M['+str(ty[i_grp_compare])+']=[{:6.4f},{:6.4f},{:6.4f}]'.format(*M0), file=log)
                                         m0 = linalg.norm(M0)
                                         Molap = dot(Mj,M0)/(mj*m0) if (mj!=0 and m0!=0) else 0
                                         if (mj==0 and m0==0): Molap = 1.0
@@ -1346,6 +1375,7 @@ class CifParser_W2k:
                                             if moments_opposite: #sum(abs(Mj+M0))<1e-5 or Molap < -min_Molap:
                                                 if ii not in self.flipped:
                                                     self.flipped[ii]=ty[i_grp_compare]
+                                                if True:
                                                     if ii not in self.rotation_flipped:
                                                         self.rotation_flipped[ii]=[ array(np.round(op.affine_matrix[:3,:3]),dtype=int) ]
                                                         self.timerevr_flipped[ii]=[ op.time_reversal ]

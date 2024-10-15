@@ -27,6 +27,7 @@ if __name__ == '__main__':
         EF = args.ef
 
     fi = open(args.fname,'r')
+    print('reading file', args.fname)
     k_str = '     K='
     line = next(fi)
     first_band = []
@@ -38,14 +39,14 @@ if __name__ == '__main__':
             vk = list(map(float,spl[1:4]))
             kname = ''
             if len(spl)>4: kname = spl[4]
-            #print vk,kname
+            print('k=', vk,kname)
             kpt.append( [vk,kname] )
             next(fi)
             next(fi)
             ene=[]
             for i in range(100):
                 line = next(fi)
-                m = re.search('EIGENVALUES', line)
+                m = re.search('EIGENVALUES BELOW', line)
                 if m is not None:
                     sp = line.split()
                     i_first = int(sp[0])
