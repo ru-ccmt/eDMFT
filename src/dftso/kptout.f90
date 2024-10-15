@@ -1,9 +1,9 @@
-subroutine kptout(ss,bname,weight,ikp,kv,jspin,nv,ne,must_compute)
+subroutine kptout(ss,bname,weight,ikp,kv,jspin,nv,ne,must_compute,nkp,nprocs)
   USE param, only: nmat, lomax!, nato
   USE lolog, only: nlov, nlon, nlo
   USE rlolog, only: nnrlo
   USE hmsout, only: neig, en, vect, vnorm
-  USE mpi, only: Qprint, vector_para, myrank, master, mpi_SendReceive12, mpi_SendReceive3
+  USE mpi, only: Qprint, vector_para, myrank, master, mpi_SendReceive12, mpi_SendReceive3, mpi_SendReceive4
   IMPLICIT NONE
   real*8, intent(in) :: ss(3)
   character*10, intent(in) :: bname
@@ -12,27 +12,31 @@ subroutine kptout(ss,bname,weight,ikp,kv,jspin,nv,ne,must_compute)
   integer, intent(in):: kv(3,nmat,2)
   integer, intent(in):: nv(2),ne(2)
   logical, intent(in):: must_compute
+  integer, intent(in):: nkp, nprocs
   ! locals
   integer   :: j, ie, isi, is, nv0, nv_plus_nnrlo
   integer,   allocatable :: kt(:,:)
   complex*16, allocatable:: vt(:,:)
   !
-  if (Qprint .and. must_compute) then
-     !  Write output to case.outputso and case.scfso
-     WRITE(6,"(3x,'K=',3f10.5,1x,a10,2x,'MATRIX SIZE=',i5,2x,'WEIGHT=',f5.2/,5x,'EIGENVALUES ARE:')") SS(1),SS(2),SS(3),BNAME,ne(1)+ne(2)+2*nnrlo,WEIGHT
-     if(ikp.eq.1) then
-        write(8,*)
-        write(8,*) '       SPIN-ORBIT EIGENVALUES:'
-        WRITE(8,"(3x,'K=',3f10.5,1x,a10,2x,'MATRIX SIZE=',i5,2x,'WEIGHT=',f5.2/,5x,'EIGENVALUES ARE:')") SS(1),SS(2),SS(3),BNAME,ne(1)+ne(2)+2*nnrlo,WEIGHT
-     end if
-     write(6,531) (en(ie),ie=1,neig)
-     write(6,6010) 0
-     write(6,6030)  
-     if(ikp.eq.1) then
-        write(8,530) (en(ie),ie=1,neig)
-        write(8,6030)
+  if (Qprint) then
+     if (must_compute) then
+        !  Write output to case.outputso and case.scfso
+        WRITE(6,"(5x,'K=',3f10.5,2x,a10/,6x,'MATRIX SIZE=',i5,3x,'WEIGHT=',f5.2/,5x,'EIGENVALUES ARE:')") SS(1),SS(2),SS(3),BNAME,ne(1)+ne(2)+2*nnrlo,WEIGHT
+        if(ikp.eq.1) then
+           write(8,*)
+           write(8,*) '       SPIN-ORBIT EIGENVALUES:'
+           WRITE(8,"(5x,'K=',3f10.5,2x,a10/,6x,'MATRIX SIZE=',i5,3x,'WEIGHT=',f5.2/,5x,'EIGENVALUES ARE:')") SS(1),SS(2),SS(3),BNAME,ne(1)+ne(2)+2*nnrlo,WEIGHT
+        end if
+        write(6,531) (en(ie),ie=1,neig)
+        write(6,6010) 0
+        write(6,6030)  
+        if(ikp.eq.1) then
+           write(8,530) (en(ie),ie=1,neig)
+           write(8,6030)
+        endif
      endif
   endif
+  call mpi_SendReceive4(ikp,neig,en(:neig),SS,BNAME,nprocs,nkp,ne(1)+ne(2)+2*nnrlo,WEIGHT)
   
   ! Writing to vector and energy file (case.vectorso and case.energyso) in parallel
   ! When vector_para=True, each processor just writes into its file

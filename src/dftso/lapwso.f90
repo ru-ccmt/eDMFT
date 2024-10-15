@@ -405,10 +405,12 @@ PROGRAM lapwso
         deallocate(vec)
      else
         CALL allocate_hmsout(nmat,nume2)
+        NE=0
+        NV=0
      endif
   
      call cputim(dtime0)     
-     call kptout(ss,bname,weight,ikp,kv,jspin,nv,ne,must_compute)
+     call kptout(ss,bname,weight,ikp,kv,jspin,nv,ne,must_compute,nkp,nprocs)
      call cputim(dtime1)
      cp(4)=cp(4)+dtime1-dtime0
      

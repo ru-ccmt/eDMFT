@@ -232,6 +232,80 @@ CONTAINS
        endif
     enddo
   end subroutine mpi_SendReceive3
+
+
+  SUBROUTINE mpi_SendReceive4(ikp,neig,en,SS,BNAME,nprocs,nkp,ne1ne2,WEIGHT)
+    IMPLICIT NONE
+    INTEGER, intent(in) :: ikp, neig, ne1ne2, nprocs,nkp
+    REAL*8, intent(in)  :: SS(3), en(neig), WEIGHT
+    CHARACTER*10, intent(in):: BNAME
+    ! locals
+    INTEGER :: itmp(3), ipr, iikp, ineig, ie
+    REAL*8  :: ftmp(4)
+    CHARACTER*10 :: kname
+    INTEGER :: status(MPI_STATUS_SIZE)
+    REAL*8, allocatable :: Eigval(:)  ! Eigval(NE)
+    itmp(1) = ikp
+    itmp(2) = neig
+    itmp(3) = ne1ne2
+    ftmp(1:3) = SS(1:3)
+    ftmp(4) = WEIGHT
+    kname = bname     
+    if (myrank.eq.master) allocate( Eigval(neig) )
+    do ipr=1,nprocs-1 ! Notice that all processors need to send integer data, even if they contain no data.
+       if (myrank.eq.master) then
+          !WRITE(6,*) 'master is receiving from ipr=', ipr
+          call MPI_Recv( itmp,      3, MPI_INTEGER,          ipr, 10+ipr, MPI_COMM_WORLD, status, ierr )
+          if (ierr.ne.0) WRITE(6,*) 'ERROR in MPI_Recv 0', ierr
+          iikp = itmp(1)
+          ineig = itmp(2)
+          if (iikp.le.nkp) then  ! Now even master knows that it might be empty k-point, and can skip it.
+             call MPI_Recv( ftmp,   4, MPI_DOUBLE_PRECISION, ipr, 11, MPI_COMM_WORLD, status, ierr )
+             if (ierr.ne.0) WRITE(6,*) 'ERROR in MPI_Recv 1', ierr
+             call MPI_Recv( kname, 10, MPI_CHARACTER,        ipr, 12, MPI_COMM_WORLD, status, ierr )
+             if (ierr.ne.0) WRITE(6,*) 'ERROR in MPI_Recv 2', ierr
+             if (ineig.gt.size(Eigval)) then
+                deallocate(Eigval)
+                allocate( Eigval(ineig) )
+             endif
+             call MPI_Recv( Eigval, ineig, MPI_DOUBLE_PRECISION, ipr, 13, MPI_COMM_WORLD, status, ierr )
+             if (ierr.ne.0) WRITE(6,*) 'ERROR in MPI_Recv 3', ierr
+             !  Write output to case.outputso and case.scfso
+             WRITE(6,"(5x,'K=',3f10.5,2x,a10/,6x,'MATRIX SIZE=',i5,3x,'WEIGHT=',f5.2/,5x,'EIGENVALUES ARE:')") ftmp(1),ftmp(2),ftmp(3),kname,itmp(3),ftmp(4)
+             if(iikp.eq.1) then
+                write(8,*)
+                write(8,*) '       SPIN-ORBIT EIGENVALUES:'
+                WRITE(8,"(5x,'K=',3f10.5,2x,a10/,6x,'MATRIX SIZE=',i5,3x,'WEIGHT=',f5.2/,5x,'EIGENVALUES ARE:')") ftmp(1),ftmp(2),ftmp(3),kname,itmp(3),ftmp(4)
+             end if
+             write(6,531) (Eigval(ie),ie=1,ineig)
+             write(6,6010) 0
+             write(6,6030)  
+             if(iikp.eq.1) then
+                write(8,530) (Eigval(ie),ie=1,ineig)
+                write(8,6030)
+             endif
+          endif
+       else if (myrank.eq.ipr) then
+          !WRITE(6,*) 'rank=', ipr, 'is sending to master'
+          call MPI_Send(    itmp,   3, MPI_INTEGER,          master, 10+ipr, MPI_COMM_WORLD, ierr )
+          if (ierr.ne.0) WRITE(6,*) 'ERROR in MPI_Send 0', ierr
+          if (ikp.le.nkp) then
+             call MPI_Send( ftmp,   4, MPI_DOUBLE_PRECISION, master, 11, MPI_COMM_WORLD, ierr )
+             if (ierr.ne.0) WRITE(6,*) 'ERROR in MPI_Send 1', ierr
+             call MPI_Send( BNAME, 10, MPI_CHARACTER,        master, 12, MPI_COMM_WORLD, ierr )
+             if (ierr.ne.0) WRITE(6,*) 'ERROR in MPI_Send 2', ierr
+             call MPI_Send( en,  neig, MPI_DOUBLE_PRECISION, master, 13, MPI_COMM_WORLD, ierr )
+             if (ierr.ne.0) WRITE(6,*) 'ERROR in MPI_Send 3', ierr
+          endif
+       endif
+    enddo
+    if (myrank.eq.master) deallocate( Eigval )
+530 FORMAT(8(7X,5F13.7/))
+531 FORMAT(8(2X,5F13.7/))
+6010 FORMAT(I13,' EIGENVALUES BELOW THE ENERGY ',F10.5)
+6030 FORMAT(7X,14('****'))
+  end SUBROUTINE mpi_SendReceive4
+   
   
   subroutine Scatter_Vector_data(ierr0)
     IMPLICIT NONE
@@ -390,6 +464,9 @@ CONTAINS
        close(999)
     endif
   end subroutine WriteProcesses
+
+
+
   
 #else
 
@@ -455,6 +532,14 @@ CONTAINS
     integer, intent(in) :: neig
     logical, intent(in) :: must_compute
   end subroutine mpi_SendReceive3
+  
+  SUBROUTINE mpi_SendReceive4(ikp,neig,en,SS,BNAME,nprocs,nkp,ne1ne2,WEIGHT)
+    IMPLICIT NONE
+    INTEGER, intent(in) :: ikp, neig, ne1ne2, nprocs,nkp
+    REAL*8, intent(in)  :: SS(3), en(neig), WEIGHT
+    CHARACTER*10, intent(in):: BNAME
+    ! locals
+  end SUBROUTINE mpi_SendReceive4
   
   subroutine Scatter_Vector_data(ierr)
     IMPLICIT NONE
