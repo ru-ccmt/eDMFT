@@ -241,7 +241,8 @@ def check_nspins(qsplit, nspins):
     '''Make sure user-specified nspins is compatible with qsplit.'''
     require_twospins = qsplit_table[qsplit][0]
     if require_twospins and nspins != 2:
-        raise Exception('ERROR: qsplit = %d requires spin-polarized/spin-orbit calculation.' % qsplit)
+        #raise Exception('ERROR: qsplit = %d requires spin-polarized/spin-orbit calculation.' % qsplit)
+        print('WARNING: make sure you run dft with spin-orbit included for qsplit='+str(qsplit))
 
 def offset_sigind(sigind, offset):
     sigind += where(sigind == 0, 0, offset)
