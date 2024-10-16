@@ -34,7 +34,7 @@ cor_elements={3:["V","Cr","Mn","Fe","Co","Ni","Cu"],
               5:["Ta","W","Re","Os","Ir","Pt"],
               6:["Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu"],
               7:["Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr"]}
-Us={3: 8., 4: 6.0, 5: 5.5, 6: 6.0, 7: 5.5}
+Us={3: 8., 4: 6.0, 5: 5, 6: 6.0, 7: 5.5}
 Js={3: 0.8, 4: 0.8, 5: 0.8, 6: 0.7, 7: 0.7}
 
 def Element_name(name):
@@ -269,12 +269,13 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
         iatom0 = first_atom[jatom]
         grp=[]
         for i in range(strc.mult[jatom]):
-            iatom = iatom0 + i + 1     # corrected Mar.16.2024 iatom->itaom+1
+            iatom = iatom0 + i + 1     # corrected Mar.16.2024 iatom->iatom+1
             cix[icix] = [(iatom,L,qsplit)]
             atoms[iatom] = (locrot_shift, R, [], 0)
             grp.append(icix)
             icix += 1
         cixgrp[jatom] = grp
+        #cixgrp[iatom0 + 1] = grp
         
         if R is not None:
             Rv = R @ vesta_vs_w2k
@@ -350,50 +351,108 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
         print('cix2atom=', cix2atom, file=log)
         print('remain=', remain, file=log)
 
-        # finally go our indmfl file and flip the needed siginds
-        indmfldn = indmfl.copy()
-        for iatm in strc.flipped:
-            if iatm not in remain: continue
-            remain.remove(iatm)
-            jatm = strc.flipped[iatm]
-            #print('start with iatm=', iatm, 'jatm=', jatm)
-            found=True
-            if jatm not in remain:
-                jatm_type = type_jatom[jatm]
-                found=False
-                for jat in remain:
-                    if type_jatom[jat]==jatm_type:
-                        found=True
-                        break
+        if qsplit in [-1,1,13,14]:
+            # we have spin-orbit, hence there is just one indmfl file, which requires splitting
+            print(' before indmfl.cixgrp=', indmfl.cixgrp, file=log)
+            for iatm in strc.flipped:
+                if iatm not in remain: continue
+                remain.remove(iatm)
+                jatm = strc.flipped[iatm]
+                #print('start with iatm=', iatm, 'jatm=', jatm)
+                found=True
+                if jatm not in remain:
+                    jatm_type = type_jatom[jatm]
+                    found=False
+                    for jat in remain:
+                        if type_jatom[jat]==jatm_type:
+                            found=True
+                            break
+                    if found:
+                        jatm = jat
+                #print('continue with iatm=', iatm, 'jatm=', jatm, 'found=', found)
                 if found:
-                    jatm = jat
-            #print('continue with iatm=', iatm, 'jatm=', jatm, 'found=', found)
-            if found:
-                icix1 = atom2cix[iatm+1]
-                icix2 = atom2cix[jatm+1]
-                remain.remove(jatm)
-                print('flipping[atom='+str(iatm+1)+',icix='+str(icix1)+']=atom='+str(jatm+1)+',icix='+str(icix2), file=log)
-                indmfldn.siginds[icix1], indmfldn.siginds[icix2] = indmfl.siginds[icix2], indmfl.siginds[icix1]
+                    icix1 = atom2cix[iatm+1]
+                    icix2 = atom2cix[jatm+1]
+                    remain.remove(jatm)
+                    icix1, icix2 = sorted([icix1,icix2])
+                    iatm, jatm = indmfl.cix[icix1][0][0], indmfl.cix[icix2][0][0]
+                    print('flipping[atom='+str(iatm+1)+',icix='+str(icix1)+']=atom='+str(jatm+1)+',icix='+str(icix2), file=log)
+                    (iatom,L,qsplit) = indmfl.cix[icix1][0]
+                     
+                    if qsplit in [-1,1]:
+                        #indmfldn.siginds[icix1], indmfldn.siginds[icix2] = indmfl.siginds[icix2], indmfl.siginds[icix1]
+                        reorder=ravel([[2*i+1,2*i] for i in range(2*L+1)])
+                        print('reorder=', reorder, file=log)
+                        
+                        # correcting sigind
+                        for i in range(len(reorder)):
+                            for j in range(len(reorder)):
+                                indmfl.siginds[icix2][i,j] = indmfl.siginds[icix1][reorder[i],reorder[j]]
+                    else:
+                        indmfl.siginds[icix2] = indmfl.siginds[icix1]
 
-        print('remain at the end=', remain, file=log)
-        if remain:
-            # for those atoms that are not flipped, we need to treat them as different, i.e., different impurity problem
-            last_entry_up = max([max(indmfl.siginds[icix].ravel()) for icix in indmfl.cix])
-            min_in_remain = min([list(set(indmfldn.siginds[atom2cix[iatm+1]].ravel()))[1] for iatm in remain])
-            index_shift = last_entry_up +1 - min_in_remain
-            for iatm in remain:
-                icix = atom2cix[iatm+1]
-                indmfldn.siginds[icix] = copy(indmfl.siginds[icix])
-                n = len(indmfldn.siginds[icix])
-                for i in range(n):
-                    for j in range(n):
-                        if indmfldn.siginds[icix][i,j]!=0:
-                            indmfldn.siginds[icix][i,j] += index_shift
-                #print('indmfl.siginds[icix]=  ', indmfl.siginds[icix], file=log)
-                #print('indmfldn.siginds[icix]=', indmfldn.siginds[icix], file=log)
-        indmfldn.write(filename=case+'.indmfldn')
-        indmfi = Indmfi(indmfl, indmfldn)
-        indmfi.write()
+                    # correcting indmfl.cixgrp, which contains dictonary indmfl.cixgrp={atom_sort1: [icix1,icix2,...], atom_sort2: [icix3,...]}
+                    igrps = list(indmfl.cixgrp.keys())
+                    for ir,r in enumerate(igrps):
+                        for q in igrps[ir+1:]:
+                            #print('r=', r, 'q=', q, 'iatm=', iatm, 'jatm=', jatm)
+                            if icix1 in indmfl.cixgrp[r] and icix2 in indmfl.cixgrp[q]:
+                                #print('r=', r, 'q=', q, 'indmfl.cixgrp[r]=', indmfl.cixgrp[r], 'indmfl.cixgrp[q]=', indmfl.cixgrp[q])
+                                indmfl.cixgrp[r].append(icix2)
+                                indmfl.cixgrp[q].remove(icix2)
+                            if len(indmfl.cixgrp[q])==0:
+                                del indmfl.cixgrp[q]
+                    #print('indmfl.cixgrp=', indmfl.cixgrp)
+            print(' after indmfl.cixgrp=', indmfl.cixgrp, file=log)
+                            
+            indmfl.write()
+            indmfi = Indmfi(indmfl)
+            indmfi.write()
+        else:
+            # finally go our indmfl file and flip the needed siginds
+            indmfldn = indmfl.copy()
+            for iatm in strc.flipped:
+                if iatm not in remain: continue
+                remain.remove(iatm)
+                jatm = strc.flipped[iatm]
+                #print('start with iatm=', iatm, 'jatm=', jatm)
+                found=True
+                if jatm not in remain:
+                    jatm_type = type_jatom[jatm]
+                    found=False
+                    for jat in remain:
+                        if type_jatom[jat]==jatm_type:
+                            found=True
+                            break
+                    if found:
+                        jatm = jat
+                #print('continue with iatm=', iatm, 'jatm=', jatm, 'found=', found)
+                if found:
+                    icix1 = atom2cix[iatm+1]
+                    icix2 = atom2cix[jatm+1]
+                    remain.remove(jatm)
+                    print('flipping[atom='+str(iatm+1)+',icix='+str(icix1)+']=atom='+str(jatm+1)+',icix='+str(icix2), file=log)
+                    indmfldn.siginds[icix1], indmfldn.siginds[icix2] = indmfl.siginds[icix2], indmfl.siginds[icix1]
+            
+            print('remain at the end=', remain, file=log)
+            if remain:
+                # for those atoms that are not flipped, we need to treat them as different, i.e., different impurity problem
+                last_entry_up = max([max(indmfl.siginds[icix].ravel()) for icix in indmfl.cix])
+                min_in_remain = min([list(set(indmfldn.siginds[atom2cix[iatm+1]].ravel()))[1] for iatm in remain])
+                index_shift = last_entry_up +1 - min_in_remain
+                for iatm in remain:
+                    icix = atom2cix[iatm+1]
+                    indmfldn.siginds[icix] = copy(indmfl.siginds[icix])
+                    n = len(indmfldn.siginds[icix])
+                    for i in range(n):
+                        for j in range(n):
+                            if indmfldn.siginds[icix][i,j]!=0:
+                                indmfldn.siginds[icix][i,j] += index_shift
+                    #print('indmfl.siginds[icix]=  ', indmfl.siginds[icix], file=log)
+                    #print('indmfldn.siginds[icix]=', indmfldn.siginds[icix], file=log)
+            indmfldn.write(filename=case+'.indmfldn')
+            indmfi = Indmfi(indmfl, indmfldn)
+            indmfi.write()
     else:
         indmfi = Indmfi(indmfl)
         indmfi.write()
