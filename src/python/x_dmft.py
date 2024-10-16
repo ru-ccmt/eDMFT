@@ -26,7 +26,7 @@ def getTemperature():
         fi = open('sig.inp')
         next(fi) # s_oo
         next(fi) # Edc
-        om0 = float(fi.next().split()[0])
+        om0 = float(next(fi).split()[0])
         Temperature=om0/pi
         print('Temperature set to ', Temperature)
     return Temperature
@@ -94,7 +94,7 @@ def FindChemicalPotential(case, updn):
 def CheckMatsubara(filename):
     finq =open(filename, 'r')
     next(finq)
-    (matsubara, gamma, gammac, nom_def, aom_def, bom_def) = finq.next().split()[:6]
+    (matsubara, gamma, gammac, nom_def, aom_def, bom_def) = next(finq).split()[:6]
     return int(matsubara)
 
 def PrepareDefinitionFile_dmft1(idmf, mode, case, cixs, updn, dnup, so, para, scratch, cmplx, _band='', m_ext=''):
@@ -278,10 +278,10 @@ def checkSigmas(cixs, sig='sig.inp'):
     for c in cixs:
         sigfile = sig+str(c)
         fs = open(sigfile, 'r')
-        data = fs.next().split()
+        data = next(fs).split()
         m = re.match(r'\s*#',data[0])
         if m is not None:            # We found comment in first line
-            data = fs.next().split() # Need to read next line
+            data = next(fs).split() # Need to read next line
         if len(data)<3: #1+2*SigSize[c]:
             print('ERROR: Self-energy file', sigfile, 'does not have enough columns!')
             print('ERROR: Required number of independent components is', SigSize[c], 'which requires', 1+2*SigSize[c], 'columns. Found', len(data))

@@ -191,23 +191,21 @@ if __name__=='__main__':
     if len(missing_columns)>0: # Some columns contain only s_oo and Edc (no dynamic component)
         # old-s_oo and old-Edc
         with open(options.osig,'r') as fi: # checking old s_oo and Edc from sig.inp
-            exec(fi.next()[1:].strip(), globals())
-            exec(fi.next()[1:].strip(), globals())
+            exec(next(fi)[1:].strip(), globals())
+            exec(next(fi)[1:].strip(), globals())
             
         for i in list(missing_columns.keys()):
             rs_oo[i-1] = s_oo[i-1]
             rEdc[i-1] = Edc[i-1]
-            
-
 
     if options.mix!=1.0 and os.path.isfile(options.osig) and os.path.getsize(options.osig)>0:
         print('Mixing self-energy with mix=', options.mix)
         with open(options.osig,'r') as fi: # checking old s_oo and Edc
-            exec(fi.next()[1:].strip(), globals())
-            exec(fi.next()[1:].strip(), globals())
+            exec(next(fi)[1:].strip(), globals())
+            exec(next(fi)[1:].strip(), globals())
             
         rSigma_old = loadtxt(options.osig).transpose()
-
+        
         # The number of frequencies should be the same, but sometimes some frequencies are mising in the new iteration. Than mix just existing frequencies
         nom_new = shape(rSigma)[1]
         print('shape sigma old', shape(rSigma_old))

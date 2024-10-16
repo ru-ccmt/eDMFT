@@ -25,21 +25,21 @@ def ReadKlist(fklist,nkp):
 
 def ReadBasicArrays():
     fi = open('BasicArrays.dat','r')
-    fi.next()
-    nat,iso,norbitals,ncix,natom = map(int,fi.next().split())
-    fi.next()
-    nkpt,nmat,nume = map(int,fi.next().split())
-    fi.next()
-    fi.next()
-    fi.next()
-    lmax2,maxdim2,maxdim,maxsize = map(int,fi.next().split())
-    fi.next()
-    nindo = map(int,fi.next().split())
-    fi.next()
-    cixdim = map(int,fi.next().split())
-    fi.next()
-    nl = map(int,fi.next().split())
-    fi.next()
+    next(fi)
+    nat,iso,norbitals,ncix,natom = map(int,next(fi).split())
+    next(fi)
+    nkpt,nmat,nume = map(int,next(fi).split())
+    next(fi)
+    next(fi)
+    next(fi)
+    lmax2,maxdim2,maxdim,maxsize = map(int,next(fi).split())
+    next(fi)
+    nindo = map(int,next(fi).split())
+    next(fi)
+    cixdim = map(int,next(fi).split())
+    next(fi)
+    nl = map(int,next(fi).split())
+    next(fi)
     cix_orb=zeros(norbitals,dtype=int)
     ll=[]
     iorbital=[]
@@ -51,10 +51,10 @@ def ReadBasicArrays():
         cix_=[]
         nind_=[]
         for lcase in range(nl[icase]):
-            llt = int(fi.next())
-            iorb = int(fi.next())
-            icix = int(fi.next())
-            nindt = int(fi.next())
+            llt = int(next(fi))
+            iorb = int(next(fi))
+            icix = int(next(fi))
+            nindt = int(next(fi))
             ll_.append( llt )
             iorbital_.append( iorb )
             cix_.append( icix )
@@ -88,23 +88,23 @@ if __name__ == '__main__' :
     
     fin = open(sys.argv[1], 'r')
 
-    mode=fin.next().split()[0]
-    for i in range(3): fin.next()
-    fklist = fin.next().split()[0]
-    for i in range(5): fin.next()
+    mode=next(fin).split()[0]
+    for i in range(3): next(fin)
+    fklist = next(fin).split()[0]
+    for i in range(5): next(fin)
     
     print 'mode=', mode
     print 'fklist=', fklist
 
     if mode=='g':
-        filegk = fin.next().split()[0]
-        fileglc = fin.next().split()[0]
+        filegk = next(fin).split()[0]
+        fileglc = next(fin).split()[0]
         print 'filegk=', filegk
         print 'fileglc=', fileglc
     elif mode=='e':
-        fin.next()
-        fileUR = fin.next().split()[0]
-        fileUL = fin.next().split()[0]
+        next(fin)
+        fileUR = next(fin).split()[0]
+        fileUL = next(fin).split()[0]
         print 'fileUL=', fileUR
         print 'fileUR=', fileUL
         
@@ -116,9 +116,9 @@ if __name__ == '__main__' :
         
         # Reading some basic information from G_k
         fg = open(filegk,'r')
-        first_line = fg.next()
+        first_line = next(fg)
         nkp,nsymop,nom,cixdm,norbitals = map(int,first_line.split()[1:6])  # dimensions
-        second_line = fg.next()
+        second_line = next(fg)
         R_a = array(map(float,second_line.split()[1:1+3*norbitals]))  # actual positions of atoms
         R_a = R_a.reshape(norbitals,3)
         
@@ -143,7 +143,7 @@ if __name__ == '__main__' :
             k = kps[ik][:3]/float(kps[ik][3])
             for isym in range(nsymop):
                 for iom in range(nom):
-                    gg = array(map(float,fg.next().split()))
+                    gg = array(map(float,next(fg).split()))
                     om = gg[0]
                     gkc = (gg[1::2]+gg[2::2]*1j).reshape(cixdm,cixdm)
                     gs = zeros((cdm1,cdm1),dtype=complex)
@@ -171,7 +171,7 @@ if __name__ == '__main__' :
         fn = open(fileglc+'_', 'w')
         
         for iom in range(nom):
-            gg = array(map(float,fi.next().split()))
+            gg = array(map(float,next(fi).split()))
             om = gg[0]
             glc = (gg[1::2]+gg[2::2]*1j).reshape(cixdm,cixdm)
         
@@ -206,14 +206,14 @@ if __name__ == '__main__' :
         fr = open(fileUR,'r')
         fl = open(fileUL,'r')
 
-        first_line = fr.next()
+        first_line = next(fr)
         dat = first_line.split()
         nkp,nsymop,nom,norbitals = map(int,dat[1:5])  # dimensions
         dims = map(int,dat[5:5+norbitals])
         
         print 'cix_orb=', cix_orb, 'dims=', dims
         
-        second_line = fr.next()
+        second_line = next(fr)
         R_a = array(map(float,second_line.split()[1:1+3*norbitals]))  # actual positions of atoms
         R_a = R_a.reshape(norbitals,3)
 
@@ -226,8 +226,8 @@ if __name__ == '__main__' :
         cdm1 = dims[0]
         print 'cdm1=', cdm1
         
-        fl.next()
-        fl.next()
+        next(fl)
+        next(fl)
         
         
         #cdm1 = cixdm/len(R_a) # dimension of the unfolded block
@@ -256,20 +256,20 @@ if __name__ == '__main__' :
             k = kps[ik][:3]/float(kps[ik][3])
             for isym in range(nsymop):
                 for iom in range(nom):
-                    line1 = fr.next()
+                    line1 = next(fr)
                     dat = line1.split()
                     omega = float(dat[0])
                     nbands = int(dat[1])
                     print >> frn, line1,
                     print >> fln, line1,
-                    fl.next()
+                    next(fl)
                     for ibnd in range(nbands):
-                        dat = fr.next().split()
+                        dat = next(fr).split()
                         ii = int(dat[0])
                         gr = array(map(float,dat[1:]))
                         URX = gr[::2]+gr[1::2]*1j
 
-                        dat = fl.next().split()
+                        dat = next(fl).split()
                         ii = int(dat[0])
                         gl = array(map(float,dat[1:]))
                         ULX = gl[::2]+gl[1::2]*1j

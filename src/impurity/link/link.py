@@ -63,20 +63,20 @@ def ReadOneSiteCix(fcix):
     f = open(fcix,'r')
     s0 = next(f) # CIX file for ctqmc!
     s1 = next(f) # cluster_size, number of states, number of baths, maximum_matrix_size
-    (Nc0,Ns0,Nb0,Nm0) = list(map(int,f.next().split()))
+    (Nc0,Ns0,Nb0,Nm0) = list(map(int,next(f).split()))
     if Nc0!= 1:
         print('Wrong cix file. Input cix should be for single site!')
     s2 = next(f) # baths, dimension, symmetry
     baths=zeros((Nb0,3),dtype=int)
     for ib in range(Nb0):
-        (iib,dim,ibs,ibg) = list(map(int,f.next().split()))
+        (iib,dim,ibs,ibg) = list(map(int,next(f).split()))
         if iib!=ib:
             print('Something wrong reading cix file (1)!')
         baths[ib]=(dim,ibs,ibg)
     #print baths
     s3 = next(f) # cluster energies for non-equivalent baths, eps[k]
     Nunique = max(baths[:,2])+1
-    eps = list(map(float,f.next().split()))
+    eps = list(map(float,next(f).split()))
     #print eps
     s4 = next(f) # N   K   Sz size
 
@@ -87,7 +87,7 @@ def ReadOneSiteCix(fcix):
     mEne = zeros((Ns0,Nm0),dtype=float)
     mS2 = zeros((Ns0,Nm0),dtype=float)
     for i in range(Ns0):
-        data = f.next().split()
+        data = next(f).split()
         ii = int(data[0])
         if ii!=i+1:
             print('Something wrong reading cix file (2)!')
@@ -112,7 +112,7 @@ def ReadOneSiteCix(fcix):
         
     for i in range(Ns0):
         for ib in range(Nb0):
-            data = f.next().split()
+            data = next(f).split()
             ii = int(data[0])
             if ii!=i+1:
                 print('Something wrong reading cix file (3)!')

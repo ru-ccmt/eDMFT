@@ -311,12 +311,12 @@ class IMP_OCA(object):
         fc = open(self.dir + self.sparams['cix'])
         first_line = next(fc)
         # next line of cix contains Ns and baths
-        cixdat = fc.next().split()
+        cixdat = next(fc).split()
         if cixdat[0]=='OFF-DIAGONAL':
-            Nl = int(fc.next().split()[0])
+            Nl = int(next(fc).split()[0])
             for i in range(Nl):
                 next(fc)
-            cixdat = fc.next().split()
+            cixdat = next(fc).split()
         
         baths = int(cixdat[0])
         Ns = list(map(int, cixdat[1:1+baths]))
@@ -327,7 +327,7 @@ class IMP_OCA(object):
         fA = open(self.dir + self.sparams['AlocOut'])
 
         # Aloc.imp contains nf, moment, ntot,...
-        first_line = fA.next().strip()
+        first_line = next(fA).strip()
         adat = first_line.split()
         for par in adat:
             m = re.search('[ntot|nf|moment|dFimpG|Epot]=', par)

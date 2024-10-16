@@ -60,8 +60,8 @@ if __name__ == '__main__':
     if not options.skipheader:
         # Searching for s_oo and Edc
         fh_sig = open(options.insig, 'r')
-        line1 = fh_sig.next()
-        line2 = fh_sig.next()
+        line1 = next(fh_sig)
+        line2 = next(fh_sig)
         fh_sig.close()
     
     # Read the rest of the input file
@@ -75,9 +75,9 @@ if __name__ == '__main__':
     (oml,idxl) = LinLogMeshGen(options.delta,ommax,options.Nd)
 
     fmesh = open('rmesh.dat','w')
-    print >> fmesh, options.delta, oml[-1], options.Nd, '# delta, ommax, Nd'
+    print(options.delta, oml[-1], options.Nd, '# delta, ommax, Nd', file=fmesh)
     for l in range(len(oml)):
-        print >> fmesh, l, oml[l]
+        print(l, oml[l], file=fmesh)
     fmesh.close()
 
     
@@ -91,13 +91,13 @@ if __name__ == '__main__':
 
     
     fo=open(options.outsig,'w')
-    print >> fo, line1, line2,
+    print(line1, line2, file=fo)
     for i in range(len(sigout)):
         for j in range(len(sigout[i])):
-            print >> fo, sigout[i][j],
-        print >> fo
+            print(sigout[i][j], file=fo)
+        print(file=fo)
     fo.close()
-        
+    
     
     sys.exit(0)
     
@@ -117,12 +117,12 @@ if __name__ == '__main__':
         dOm = om_idx.index(zero_ind+iOm)-izero  # om-Om in integer notation is i-dOm
         dx=float(Oml[iOm]-Oml[iOm-1])           # dx for integration
         om_idx=array(om_idx)                    #
-        print 'to_integrate:', iOm, level, Oml[iOm], dOm, dOm+izero, dx, izero, oml[om_idx[izero]]
+        print( 'to_integrate:', iOm, level, Oml[iOm], dOm, dOm+izero, dx, izero, oml[om_idx[izero]])
         for iom in range(izero,izero+dOm+1):
             
             i1 = om_idx[iom]
             i2 = om_idx[iom-dOm]
-            print iom, i1, i2, oml[i1], oml[i2]
+            print( iom, i1, i2, oml[i1], oml[i2])
     
 
 

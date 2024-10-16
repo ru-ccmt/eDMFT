@@ -32,9 +32,9 @@ def Get_BR1_DIR(case):
     if os.path.exists(file) and os.path.getsize(file)>0:
         fi = open(file,'r')
         next(fi)
-        b1 = list(map(float, fi.next().split()))
-        b2 = list(map(float, fi.next().split()))
-        b3 = list(map(float, fi.next().split()))
+        b1 = list(map(float, next(fi).split()))
+        b2 = list(map(float, next(fi).split()))
+        b3 = list(map(float, next(fi).split()))
         BR1 = vstack( (b1,b2,b3) )
         S2C = linalg.inv(BR1)*2*pi
         return S2C
@@ -42,10 +42,10 @@ def Get_BR1_DIR(case):
 def read_POSCAR(file):
     fi = open(file, 'r')
     next(fi)
-    a = float(fi.next().split()[0])
-    a1 = list(map(float, fi.next().split()))
-    a2 = list(map(float, fi.next().split()))
-    a3 = list(map(float, fi.next().split()))
+    a = float(next(fi).split()[0])
+    a1 = list(map(float, next(fi).split()))
+    a2 = list(map(float, next(fi).split()))
+    a3 = list(map(float, next(fi).split()))
     vaspbasis = vstack( (a1,a2,a3) ).transpose()
     return vaspbasis
 

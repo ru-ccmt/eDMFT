@@ -96,20 +96,20 @@ if __name__ == '__main__':
         sys.exit(1)
     fin = open(sys.argv[1], 'r')
     
-    fin.next() # case.klist
-    fQlist      = fin.next().split()[0] # case.qlist
-    #fin.next() # rmesh.dat
-    #fin.next() # G_k1r_
-    #fin.next() # G_local1r_
-    #fin.next() # chi0_real.
-    fin.next() # G_k1i_
-    fin.next() # G_local1i_
-    fvertex     = fin.next().split()[0] # tvertex.dat
+    next(fin) # case.klist
+    fQlist      = next(fin).split()[0] # case.qlist
+    #next(fin) # rmesh.dat
+    #next(fin) # G_k1r_
+    #next(fin) # G_local1r_
+    #next(fin) # chi0_real.
+    next(fin) # G_k1i_
+    next(fin) # G_local1i_
+    fvertex     = next(fin).split()[0] # tvertex.dat
     fin.close()
     
     fi=open(fvertex)
-    fi.next()  # comment # beta, Nvfl, nomv, nOm nom
-    beta = float(fi.next().split()[0])
+    next(fi)  # comment # beta, Nvfl, nomv, nOm nom
+    beta = float(next(fi).split()[0])
     fi.close()
     
     print 'beta=', beta

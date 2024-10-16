@@ -71,13 +71,13 @@ def ReshapeExtend(data1D,nk1):
 def ReadEigenvectors(ifso, first, fUL, fUR):
     fL = open(fUL, 'r')
     fR = open(fUR, 'r')
-    dat = fL.next().split()
-    fR.next()
+    dat = next(fL).split()
+    next(fR)
     
     nkp,nsymop,nom,norbitals = map(int,dat[1:5])  # dimensions
     dims = map(int,dat[5:5+norbitals])
-    fL.next()
-    fR.next()
+    next(fL)
+    next(fR)
     
     maxbnd = max(ifso)-first
     
@@ -88,14 +88,14 @@ def ReadEigenvectors(ifso, first, fUL, fUR):
     for ik in range(nkp):
         for isym in range(nsymop):
             for iom in range(nom):
-                line1 = fL.next()
-                fR.next()
+                line1 = next(fL)
+                next(fR)
                 dat = line1.split()
                 omega = float(dat[0])
                 nbands = int(dat[1])
                 for ibnd in range(nbands):
-                    datL = fL.next().split()
-                    datR = fR.next().split()
+                    datL = next(fL).split()
+                    datR = next(fR).split()
                     ii = int(datL[0])
                     if ii in ifso and iom==0:
                         gl = array(map(float,datL[1:]))
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     intensity=0.99
     
     fEF = open('EF.dat', 'r')
-    mu = float(fEF.next().split()[0])
+    mu = float(next(fEF).split()[0])
     print 'mu=', mu
     
     fdat = open(fname, 'r')
@@ -194,8 +194,8 @@ if __name__ == '__main__':
     Nmax=[]
     try:
         while True:
-            #data = fdat.next().split()
-            strn = fdat.next()
+            #data = next(fdat).split()
+            strn = next(fdat)
             data = strn[1:].split()
             if formt==None:
                 comm = strn[0]
@@ -216,7 +216,7 @@ if __name__ == '__main__':
             Nemin=[]
             Nemax=[]
             for iom in range(nomega):
-                dat = fdat.next().split()
+                dat = next(fdat).split()
                 omega = float(dat[0])
                 if formt=='dmft1':
                     data = array(map(float, dat[1:]))

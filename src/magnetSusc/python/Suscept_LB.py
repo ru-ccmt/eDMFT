@@ -161,18 +161,18 @@ def ReadGlc(fileglc, nom, cixdm):
 
 def ReadVertex(fvertex):
     fi=open(fvertex)
-    fi.next()  # comment # beta, Nvfl, nomv, nOm nom
-    data=fi.next().split()
+    next(fi)  # comment # beta, Nvfl, nomv, nOm nom
+    data=next(fi).split()
     (beta, Nvfl, nomv, nOm, nom) = [float(data[0])] + map(int,data[1:])
     
     bfl_index=zeros(Nvfl,dtype=int) # bath index 
     for ib in range(Nvfl):
-       t, bfl_index[ib] = map(int,fi.next().split())
+       t, bfl_index[ib] = map(int,next(fi).split())
        if t!=ib:
            print "Wrong format of ",fvertex
            sys.exit(1)
     
-    fi.next()  # comment # b0 b1 Om om1
+    next(fi)  # comment # b0 b1 Om om1
     VertexH=zeros((Nvfl,Nvfl,2*nOm-1,2*nomv,2*nomv),dtype=complex)
     VertexF=zeros((Nvfl,Nvfl,2*nOm-1,2*nomv,2*nomv),dtype=complex)
     for i0 in range(Nvfl):
@@ -182,7 +182,7 @@ def ReadVertex(fvertex):
              sm0 = max(0, -dOm)
              em0 = min(2*nomv, 2*nomv-dOm)
              for im0 in range(sm0,em0):
-                 data = fi.next().split()
+                 data = next(fi).split()
                  ti0,ti1,Om,om1 = map(int,data[:2]) + map(float,data[2:4])
                  if ti0!=i0 or ti1!=i1:
                      print "Wrong format of ", fvertex
@@ -190,7 +190,7 @@ def ReadVertex(fvertex):
                  sm1 = max(0,-dOm)
                  em1 = min(2*nomv,2*nomv-dOm)
                  for im1 in range(sm1,em1):
-                     data = map(float,fi.next().split())
+                     data = map(float,next(fi).split())
                      VertexH[i0,i1,iOm,im0,im1] = data[1]+data[2]*1j
                      VertexF[i0,i1,iOm,im0,im1] = data[3]+data[4]*1j
     
@@ -361,7 +361,7 @@ def CmpRealAxisBubble(filemesh, filegkr, fbubbleReal, Qlist, k_index):
     # Reading real axis mesh #
     ##########################
     fm = open(filemesh, 'r')
-    lined = fm.next().split()
+    lined = next(fm).split()
     (mdelta, mmax) = map(float,lined[:2])
     Nd = int(lined[2])
     (oml,idxl) = LinLogMesh.LinLogMeshGen(mdelta,mmax,Nd)
@@ -372,7 +372,7 @@ def CmpRealAxisBubble(filemesh, filegkr, fbubbleReal, Qlist, k_index):
     #######################################
     # Reading some basic information from G_k
     fg = open(filegkr,'r')
-    first_line = fg.next()
+    first_line = next(fg)
     nkp,nsymop,nom,cixdm,norbitals = map(int,first_line.split()[1:6])
     fg.close()
     (gkr,omr) = ReadGk(filegkr, nkp, nsymop, nom, cixdm)
@@ -429,7 +429,7 @@ def ReadRealAxisBubble0(fbubbleReal, NQlist):
     chi0r0 = []
     for iq in range(NQlist):
         fq = open(fbubbleReal+str(iq), 'r')
-        data = array(map(float, fq.next().split())[1::2])
+        data = array(map(float, next(fq).split())[1::2])
         norb = sqrt(len(data))
         chi0r0.append( data.reshape(norb,norb) )
     return array(chi0r0)
@@ -480,16 +480,16 @@ if __name__ == '__main__':
         sys.exit(1)
     fin = open(sys.argv[1], 'r')
     
-    fklist      = fin.next().split()[0] # case.klist
-    fQlist      = fin.next().split()[0] # case.qlist
-    filemesh    = fin.next().split()[0] # rmesh.dat
-    filegkr     = fin.next().split()[0] # G_k1r_
-    fileglcr    = fin.next().split()[0] # G_local1r_
-    fbubbleReal = fin.next().split()[0] # chi0_real.
-    filegk      = fin.next().split()[0] # G_k1i_
-    fileglc     = fin.next().split()[0] # G_local1i_
-    fvertex     = fin.next().split()[0] # tvertex.dat
-    beta_Sq     = float(fin.next().split()[0]) # 100
+    fklist      = next(fin).split()[0] # case.klist
+    fQlist      = next(fin).split()[0] # case.qlist
+    filemesh    = next(fin).split()[0] # rmesh.dat
+    filegkr     = next(fin).split()[0] # G_k1r_
+    fileglcr    = next(fin).split()[0] # G_local1r_
+    fbubbleReal = next(fin).split()[0] # chi0_real.
+    filegk      = next(fin).split()[0] # G_k1i_
+    fileglc     = next(fin).split()[0] # G_local1i_
+    fvertex     = next(fin).split()[0] # tvertex.dat
+    beta_Sq     = float(next(fin).split()[0]) # 100
     
     (kps, BS, BSI) = ReadKlist(fklist,True)
     Qlist = ReadKlist(fQlist,False)
@@ -512,9 +512,9 @@ if __name__ == '__main__':
     ##############################################
     # Reading some basic information from G_k
     fg = open(filegk,'r')
-    first_line = fg.next()
+    first_line = next(fg)
     nkp,nsymop,nom,cixdm,norbitals = map(int,first_line.split()[1:6])
-    second_line = fg.next()
+    second_line = next(fg)
     R_a = array(map(float,second_line.split()[1:1+3*norbitals]))
     R_a = R_a.reshape(norbitals,3)
     
