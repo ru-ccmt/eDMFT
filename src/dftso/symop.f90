@@ -4,7 +4,7 @@ SUBROUTINE symop(theta,fi)
   USE rotmat, ONLY: det, phase
   USE structure, ONLY: BR1, rotij, mult, rotloc
   USE param, ONLY: nato
-  USE mpi, ONLY: Qprint
+  USE mpi, ONLY: Qprint, myrank, master
   IMPLICIT NONE
   REAL*8, intent(in) :: theta, fi
   ! external
@@ -95,8 +95,10 @@ SUBROUTINE symop(theta,fi)
         
         det(indj)=trans(1,1)*trans(2,2)-trans(1,2)*trans(2,1)
         if (abs(1.-abs(det(indj))).gt.1.d-2) then
-           write(6,*)'WRONG SYMMETRY in spin pol. case'
-           write(6,555)indj,det(indj)
+           if (myrank.EQ.master) then
+              write(6,*)'WRONG SYMMETRY in spin pol. case'
+              write(6,555)indj,det(indj)
+           endif
         endif
 
         DD=determinant(trans)

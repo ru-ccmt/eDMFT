@@ -435,7 +435,11 @@ PROGRAM lapwso
   CALL ERRCLR(ERRFN)
 
   call stop_MPI
-  STOP 'LAPWSO END'
+  if (myrank.eq.master) then
+     STOP 'LAPWSO END'
+  else
+     STOP
+  endif
 
 920 CONTINUE
   WRITE(6,*) ' ERROR IN OPENING FILE:', TRIM(ADJUSTL(FNAME))

@@ -294,7 +294,9 @@ if __name__ == '__main__':
         if so:
             Step(rt+'/x_dmft.py lapwso', fday)
             if CheckError('lapwso'): break
-        Step(rw+'/x lapw2'+cc+' -f '+case, fday)
+            Step(rw+'/x lapw2'+cc+' -so -f '+case, fday)
+        else:
+            Step(rw+'/x lapw2'+cc+' -f '+case, fday)
         if CheckError('lapw2'): break
         Step(rw+'/x lcore -f '+case, fday)
         if CheckError('lcore'): break
