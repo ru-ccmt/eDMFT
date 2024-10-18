@@ -152,7 +152,7 @@ def MaximumEntropy(p, tau, Gt):
         
         temp=0.005
         rfac=0.005
-        iseed = random.randint(0,maxint)
+        iseed = random.randint(0,2**31-1)
         me.maxent(Aw,rfac,alpha,temp,Ker,sxt,Gt,model,dom,p['Asteps'],iseed)
         
         S = me.entropy(Aw,model,dom)
@@ -229,7 +229,7 @@ def MaximumEntropyTest(p, tau, Gt):
             temp=0.001
             rfac=0.05
         print('Restarting maxent with rfac=', rfac, 'alpha=', alpha)
-        iseed = random.randint(0,maxint)
+        iseed = random.randint(0,2**31-1)
         me.maxent(Aw,rfac,alpha,temp,Ker,sxt,Gt,model,f0,Asteps,iseed)
         S = me.entropy(Aw,model,f0)
         Trc = me.lambdac(alpha,Aw,omega,dlda)
