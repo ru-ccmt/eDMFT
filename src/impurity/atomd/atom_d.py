@@ -199,7 +199,7 @@ class operateLS(object):
         #############################################
             self.Q3d=False
             M2=[]
-            l=(self.Nband-1)/2
+            l=int((self.Nband-1)/2)
             #print 'L is here ', l
             for s in [0.5,-0.5]:
                 for m in range(-l,l+1):
