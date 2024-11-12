@@ -171,7 +171,7 @@ SUBROUTINE Print_DensityMatrix(gmloc, g_inf, g_ferm, omega, maxdim, ncix, Sigind
      deallocate(DM)
      return
   else
-     WRITE(6,*) 'From frequency estimating beta=', beta, 'Ry'! 'ifirstm=', ifirstm, 'omega()=', omega(ifirstm)
+     WRITE(6,*) 'From frequency estimating beta=', beta/Ry2eV, '[1/eV]'! 'ifirstm=', ifirstm, 'omega()=', omega(ifirstm)
   endif
   ! (2n+2)/2
   do iom=ifirstm,nomega
