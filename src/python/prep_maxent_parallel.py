@@ -21,9 +21,12 @@ if len(sys.argv)==2:
         path = path.strip()
         pth = os.path.normpath(path)
         cc = pth.split(os.sep)
+        cc = [c for c in cc if (c!='..')]
+        #print('path=', path, 'pth=', pth, 'cc=', cc)
         case = '_'.join(cc[:-1])
         ndir = sdir+'/'+case
         os.makedirs(ndir, exist_ok=True)
+        print('ndir=', ndir, 'path=', path)
         if os.path.exists(path+'/sig.inpx'):
             shutil.copy2(path+'/sig.inpx', ndir)
         else:
@@ -39,6 +42,7 @@ elif len(sys.argv)==3:
         path = path.strip()
         pth = os.path.normpath(path)
         cc = pth.split(os.sep)
+        cc = [c for c in cc if (c!='..')]
         case = '_'.join(cc[:-1])
         ndir = jobdir+'/'+sdir+'/'+case
         if not os.path.exists(ndir):

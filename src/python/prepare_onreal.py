@@ -20,6 +20,7 @@ if len(sys.argv)==2:
         path = path.strip()
         pth = os.path.normpath(path)
         cc = pth.split(os.sep)
+        cc = [c for c in cc if (c!='..')]
         case_dir = '/'.join(cc[:-1])
         case = cc[0]
         ndir = case_dir+'/'+onreal
@@ -29,7 +30,6 @@ if len(sys.argv)==2:
         with open('onohup.dat', 'w') as fh_info:    
             cmd = dbin+'/dmft_copy.py ../'
             subprocess.call(cmd,shell=True,stdout=fh_info,stderr=fh_info)
-            shutil.copy2('../../'+case+'/'+case+'.klist_band', '.')
             shutil.copy2('../maxent/Sig.out', 'sig.inp')
 
             with open(case+'.indmfl', 'r') as inl:
@@ -88,4 +88,8 @@ $WIEN_DMFT_ROOT/x_dmft.py dmftp -l dn  >& nohup.dat
 """
             with open('submit_real.scr','w') as fo:
                 fo.write(scr)
+            
+            #shutil.copy2('../../'+case+'/'+case+'.klist_band', '.')
+            shutil.copy2('../*.klist_band', '.')
+            
         os.chdir(cdir)    
