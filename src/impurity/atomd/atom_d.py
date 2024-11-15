@@ -112,7 +112,13 @@ def mprint(fh, U):
         for j in range(shape(U)[1]):
             f = U[i,j]
             if abs(f)<1e-10: f = 0
-            print("%7.4f " % f, end=' ', file=fh)
+            if isinstance(f, complex):
+                if abs(f.imag)>1e-10:
+                    print("%7.4f+%7.4f%s" % (f.real,f.imag,'i'), end=' ', file=fh)
+                else:
+                    print("%7.4f " % f.real, end=' ', file=fh)
+            else:
+                print("%7.4f " % f, end=' ', file=fh)
         print(file=fh)
     print(file=fh)
 
@@ -135,7 +141,7 @@ def CoulUsC2_slow(l, T2C):
     else:
         print("ERROR in atom_d.py: T2C has wrong shape")
         sys.exit(0)
-    
+
     T2Cp = conj(T2C.transpose())
     
     UC = zeros((l+1, nw, nw, nw, nw), dtype=complex)
@@ -465,7 +471,7 @@ class operateLS(object):
                             for k in range(1,maxk):
                                 dsum += UC[k,b,a,j,i]*FkoJ[k]
                             U1 = sign*dsum
-            
+                            #print('state=', self.occup(state), 'state1=', self.occup(state1), 'state2=', self.occup(state2), 'state3=', self.occup(state3), 'U0=', U0, 'U1=', U1, )
                             if (abs(U0)>1e-6 or abs(U1)>1e-6): sts.append([state4, [U0,U1]])
         return sts
 
@@ -1573,7 +1579,7 @@ if __name__ == '__main__':
     SO = SpinOrbitM(l,T2C) # Spin orbit matrix
 
 
-    UC = CoulUsC2(l,T2C)
+    #UC = CoulUsC2(l,T2C)
     #_UC_ = CoulUsC2_slow(l,T2C)
     #print('are close=', allclose(UC,_UC_))
     
@@ -1781,6 +1787,7 @@ if __name__ == '__main__':
         #if (cx>1e-5): cprint(Ham)
         #else:
         #print >> fh_info, 'H='
+        #print('H=', file=fh_info)
         #mprint(fh_info, Ham)
         
         if CoulombF[:4] == 'Full':
@@ -2245,16 +2252,16 @@ if __name__ == '__main__':
 
     if (HB2 and not Q3d):
         print("# UCoulomb : (m1,s1) (m2,s2) (m3,s2) (m4,s1)  Uc[m1,m2,m3,m4]", file=fcix)
-        for bs1 in bkeep:
-            for bs2 in bkeep:
-                for bs3 in bkeep:
-                    for bs4 in bkeep:
+        for ib1 in bkeep:
+            for ib2 in bkeep:
+                for ib3 in bkeep:
+                    for ib4 in bkeep:
+                        if CoulombF[:5] == 'Ising' and not ((ib1==ib4 and ib2==ib3) or (ib1==ib3 and ib2==ib4)): continue
                         Uc = 0.0
                         for k in range(0,l+1):
-                            UC += real(UC[k,bs1,bs2,bs3,bs4])*Fk[k,l]
+                            Uc += UC[k,ib1,ib2,ib3,ib4]*Fk[k,l]
                         if abs(Uc)>1e-6:
-                            print("%2d %2d %2d %2d  %12.8f" % (bs1,bs2,bs3,bs4,Uc), file=fcix)
-
+                            print("%2d %2d %2d %2d  %12.8f" % (ib1,ib2,ib3,ib4,Uc.real), file=fcix)
                 
     print('# number of operators needed', file=fcix)
     
