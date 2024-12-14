@@ -49,6 +49,7 @@ class Framework:
     def __init__(self, argv, config):
         #print "*-+-*"*16
         print("Setting up the framework")
+        self.non_interactive=False
 
         self.config = config
 
@@ -286,9 +287,10 @@ and specify missing parameters.\n""")
         """ Parse input argument to get compilers etc. from command line. """
 
         #if len(argv) == 1: print("Let's go")
+        print('pase_args:argv=', argv)
         try:
           opts, args = getopt.getopt(argv[1:], "?hvp:b:n:",
-                                         ["help", "compiler=", "prefix=", "build=",
+                                         ["non-interactive", "help", "compiler=", "prefix=", "build=",
                                           "cc=", "fc=", "cxx=", 
                                           "cflags=", "fflags=", "oflags=", "gflags=",
                                           "pcc=", "pfc=", "pcxx=", 
@@ -302,6 +304,7 @@ and specify missing parameters.\n""")
           print("for help use --help")
           sys.exit(2)
 
+        print('opts=', opts, 'args=', args)
         if len(args) > 0 :
             print('Unknown arguments : ', args)
             print("for help use --help")
@@ -368,6 +371,8 @@ and specify missing parameters.\n""")
                     self.config.mpi_define = fixpaths(a)
                 elif (o in ('-v', '--verbose')):
                     self.verbose = 1
+                elif o == '--non-interactive':
+                    self.non_interactive=True
                 else :
                     print("Unknown option : ", o)
                     sys.exit()

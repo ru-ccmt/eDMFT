@@ -122,9 +122,11 @@ PYBND = """+self.config.pybind11+"""
         print('You are ready to compile the DMFT code..... ')
         print('..... If you want to compile the code manually, enter ./src  and type "make". You can also type "make clean" to clean.')
         print('Please press enter to start compilation')
-        sys.stdout.flush()
-        input()
-
+        if self.non_interactive:
+            print('Mode is non_interactive=', self.non_interactive)
+        else:
+            input()
+        
         comm = self.make
         #(output, error, retz) = shellcmd(comm)
         #print('current dir=', rep_name, 'comm=', comm)
