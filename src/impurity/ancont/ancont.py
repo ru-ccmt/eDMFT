@@ -98,8 +98,8 @@ class lowEnergyFermiLiquid(object):
             for i in range(len(F0)):
                 datai[i] = (F0[i]-F00*subtract)/(omn**2+x0[i]**2)
                 datar[i] = F0[i]*x0[i]/(omn**2+x0[i]**2)
-            wi = -(omn*integrate.simps(datai, x0) + F00*pi*subtract)
-            wr = -integrate.simps(datar, x0)
+            wi = -(omn*integrate.simpson(datai, x0) + F00*pi*subtract)
+            wr = -integrate.simpson(datar, x0)
             F0i.append(wi)
             F0r.append(wr)
             
@@ -597,7 +597,7 @@ if __name__ == '__main__':
     # The low energy basis function
     A0 = lwe.Func(om)
 
-    print('INTEGRAL of A0 IS: ', integrate.simps(A0,om))
+    print('INTEGRAL of A0 IS: ', integrate.simpson(A0,om))
     
     # The low energy function on Matsubara axis
     (F0r, F0i, weight0) = lwe.Matsubara(iom)

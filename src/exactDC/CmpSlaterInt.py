@@ -23,7 +23,7 @@ def CmpSlaterInt(lmbda,Rx,Ag,Bg,l,Nk,prnt=False):
         for k in range(0,2*l+2,2):
             U_inside=zeros(len(r))
             for ir in range(1,len(r)):
-                U_inside[ir] = integrate.simps(ul2[:ir+1]*r[:ir+1]**k, x=r[:ir+1])
+                U_inside[ir] = integrate.simpson(ul2[:ir+1]*r[:ir+1]**k, x=r[:ir+1])
             
             U_outside=zeros(len(r))
             U_outside[1:] = 2*U_inside[1:]*ul2[1:]/r[1:]**(k+1)
@@ -40,7 +40,7 @@ def CmpSlaterInt(lmbda,Rx,Ag,Bg,l,Nk,prnt=False):
                 else:
                     y0 = 0
                 y2 = hstack( ([y0],y1) )
-                U_inside[ir] = integrate.simps(ul2[:ir+1]*y2, x=r[:ir+1])
+                U_inside[ir] = integrate.simpson(ul2[:ir+1]*y2, x=r[:ir+1])
             
             U_outside=zeros(len(r))
             y4 = special.kv(0.5+k,lmbda*r[1:])/sqrt(r[1:])

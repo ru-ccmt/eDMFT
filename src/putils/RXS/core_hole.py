@@ -126,7 +126,7 @@ if __name__ == '__main__':
             Gm[ix] = dsum
 
     Ac = -imag(Gm)/pi
-    norm = integrate.simps(Ac, xm)
+    norm = integrate.simpson(Ac, xm)
     print 'norm=', norm
 
     maxim=[]
@@ -152,7 +152,7 @@ if __name__ == '__main__':
             ib = (imax[i]+imax[i+1])/2
         else:
             ib = len(xm)
-        tweight = integrate.simps(Ac[ia:ib], xm[ia:ib])/norm
+        tweight = integrate.simpson(Ac[ia:ib], xm[ia:ib])/norm
         weight.append(tweight)
         print "peak=%7.4f  weight=%7.5f  P=%7.5f" % (maxim[i], tweight, Ps[i])
         ia = ib

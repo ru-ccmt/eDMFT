@@ -243,7 +243,7 @@ if __name__ == '__main__':
                 for t in range(len(thetas)):                    # For integration over theta and phi
                     tresxc += sum(ToIntgxc[:,t])*(2*pi)/len(phis)*tweights[t]
                 VxcI[ir]=tresxc                                 # only integration over radial points is left, (Project*Vxc)(r)
-            Vxc.append( integrate.simps(ul2[:]*VxcI[:],x=rmesh)*Ry2eV )
+            Vxc.append( integrate.simpson(ul2[:]*VxcI[:],x=rmesh)*Ry2eV )
             
         print('Vxc=', Vxc)                                       # This is projection of V_xc to correlated orbital
         
@@ -257,7 +257,7 @@ if __name__ == '__main__':
                     for t in range(len(thetas)):                # integration over angle
                         tres   += sum(ToIntg  [:,t])*(2*pi)/len(phis)*tweights[t]
                     dVxcI[ir]=tres
-                dVxc_drho.append( integrate.simps((ul2[:]**2/rmesh[:]**2)*dVxcI[:],x=rmesh)*Ry2eV )  # integration over r
+                dVxc_drho.append( integrate.simpson((ul2[:]**2/rmesh[:]**2)*dVxcI[:],x=rmesh)*Ry2eV )  # integration over r
     
         
         print('dVxc/drho=', dVxc_drho)                          # Final result of <phi,phi|dVxc/drho|phi,phi>
