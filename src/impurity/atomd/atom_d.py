@@ -13,6 +13,7 @@ from numpy import linalg
 from cubic_harmonics import Spheric2Cubic
 import dpybind
 import gaunt                
+import builtins
 
 def compress(_groups_):
     """ We are given a two dimensional list of numbers which stands for indices of groups of rows or columns of a matrix.
@@ -529,7 +530,7 @@ class operateLS(object):
             ib1 = bool(state & im1)
             ib2 = bool(state & im2)
             if ib1 and not ib2: # S^-_i gives nonzero
-                isig = self.sign(state, min(im1,im2), max(im1,im2))
+                isig = self.sign(state, builtins.min(im1,im2), builtins.max(im1,im2))
                 istate = state^im1^im2
                 for jlz in range(l2p1):
                     if (ilz==jlz): continue
@@ -538,7 +539,7 @@ class operateLS(object):
                     jb1 = bool(state & jm1)
                     jb2 = bool(state & jm2)
                     if jb1 and not jb2: # S^+_j gives nonzero
-                        jsig = self.sign(istate, min(jm1,jm2), max(jm1,jm2))
+                        jsig = self.sign(istate, builtins.min(jm1,jm2), builtins.max(jm1,jm2))
                         jstate = istate^jm1^jm2
                         sts.append([jstate, isig*jsig])
         return sts
@@ -553,7 +554,7 @@ class operateLS(object):
             ib1 = bool(state & im1)
             ib2 = bool(state & im2)
             if ib1 and not ib2: # S^-_i gives nonzero
-                isig = self.sign(state, min(im1,im2), max(im1,im2))
+                isig = self.sign(state, builtins.min(im1,im2), builtins.max(im1,im2))
                 istate = state^im1^im2
                 sts.append([istate, isig])
         return sts
@@ -713,7 +714,7 @@ def Diagonalize(Ham, small=1e-4, fh=sys.stdout):
     for i in range(ndim):
         for j in range(i+1,ndim):
             if (abs(Ham[i][j])>small):
-                commonb = min(blck[i],blck[j])
+                commonb = builtins.min(blck[i],blck[j])
                 for k in range(ndim):
                     if blck[k] in [blck[i],blck[j]]: blck[k]=commonb
         #print ('%2d'%i), 'current blck=', '%2d,'*len(blck) % tuple(blck)
@@ -2085,7 +2086,7 @@ if __name__ == '__main__':
     for ii in range(len(Enes)):
         size=0
         plowE=[]
-        for iq in range(min(len(Enes[ii]),max_M_size)):
+        for iq in range(builtins.min(len(Enes[ii]),max_M_size)):
             if Enes[ii][iq]>=Ewindow[0] and Enes[ii][iq]<Ewindow[1] and iq<Nmax:
                 plowE.append(iq)
                 size += 1
