@@ -377,7 +377,7 @@ PROGRAM DMFT2
 
   if (myrank.eq.master) then
      STOP ' DMFT2 END'
-  else:
+  else
      STOP
   endif
   !
