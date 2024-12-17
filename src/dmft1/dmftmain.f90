@@ -777,7 +777,9 @@ PROGRAM DMFTMAIN  ! Program DMFT calculates
   
   CALL stop_MPI()
 
-  STOP !'DMFT1 END'
+  if (myrank.eq.master) then
+     STOP 'DMFT1 END'
+  endif
   
   !   error handling
   !

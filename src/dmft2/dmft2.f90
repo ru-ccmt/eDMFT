@@ -374,8 +374,10 @@ PROGRAM DMFT2
   if (myrank.EQ.master) CALL ERRCLR(ERRFN)
 
   CALL stop_MPI()
-  
-  STOP !' DMFT2 END'                                                 
+
+  if (myrank.eq.master) then
+     STOP ' DMFT2 END'
+  endif
   !
   !        error handling
   !

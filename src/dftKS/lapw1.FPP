@@ -229,8 +229,10 @@ PROGRAM LAPW1
   CALL ERRCLR(ERRFN)
 
   CALL stop_MPI()
-  
-  STOP !' LAPW1 END'
+
+  if (myrank.eq.master) then
+     STOP ' LAPW1 END'
+  end if
   
 999 CONTINUE
   call stop_MPI

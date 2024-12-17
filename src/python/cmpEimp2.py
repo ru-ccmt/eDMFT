@@ -3,6 +3,7 @@
 from numpy import *
 import sys,os,re
 from scipy import interpolate
+import builtins
 
 # All variables set through exec call need to be global for Python3 to set them. Hence we are forced to work with global variables.
 cix='actqmc.cix'
@@ -180,7 +181,7 @@ def fTrDeltaG(om, omD, Dlta, Gfc, Deg, EimpS, beta, fout):
         Dr = interpolate.UnivariateSpline(omD, Delta.real, s=0,k=3)
         Di = interpolate.UnivariateSpline(omD, Delta.imag, s=0,k=3)
         return (Dr, Di)
-    lngh = min(len(Dlta),len(Gfc),len(Deg))
+    lngh = builtins.min(len(Dlta),len(Gfc),len(Deg))
     GDf=0.0
     for i in range(lngh):
         if len(omD)!=len(om):
@@ -231,7 +232,7 @@ def CmpImpurityCorrection2(om, omD, Dlt, Gfc, Deg, EimpS, beta, fout):
         Delta_inf.append( [Dlt[b,-1].real*omD[-1]**2, Dlt[b,-1].imag*omD[-1] ] )
     
     cxx = 0.0
-    lngh = min(len(Dlt),len(Gfc),len(Deg))
+    lngh = builtins.min(len(Dlt),len(Gfc),len(Deg))
     
     oms = om
     Gfs = Gfc
@@ -277,7 +278,7 @@ def GiveImpFunctional(dire, fparams, Vdc, fout=sys.stdout):
     s_oo = Sigc[:,-1].real
     print('s_oo=', s_oo, file=fout)
     
-    lengh = min(len(Eks),len(s_oo))
+    lengh = builtins.min(len(Eks),len(s_oo))
     EimpS = Eks[:lengh]-mu_qmc+s_oo[:lengh]
     # Tr(log(-Gimp))
     lnGimp = LogGimp(om,Gfc,EimpS,beta,Deg,fout) 
