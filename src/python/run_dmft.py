@@ -16,7 +16,7 @@ import force_stop_conditon as fstc
 import utils
 import indmffile
 import convert_processes
-import oca, ctqmc
+import ctqmc#, oca
 from imp2lattc import ImpurityLatticeConnection, SimplifySiginds, iSigindDropNegative, ConvertFromLatticeToImp, Connect_ImpurityProjector
 
 utime = '/usr/bin/time'  # This time function is compatible with w2k timing
