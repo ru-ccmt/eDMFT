@@ -554,6 +554,7 @@ if __name__ == '__main__':
     parser.add_option('-c', '--cor',     dest='cor', type='str', default='all', help="which atom types are correlated. all or 3,4 or 3-5 or 6-7 (default all)")
     parser.add_option('-d', '--dc',      dest='DC',  type='str', default='exacty', help="The type of double-counting: exact, exacty, exactd, nominal (default exacty)")
     parser.add_option('-U', '--U',       dest='CoulombU', type=float, default=None, help="Coulomb U if we want to set it through input (default None, set inside for each type)")
+    parser.add_option('-T', '--T',       dest='Temp', type=float, default=None, help="Temperature in Kelvins (default eV/50)")
     parser.add_option('-J', '--J',       dest='CoulombJ', type=float, default=None, help="Coulomb J if we want to set it through input (default None, set inside for each type)")
     parser.add_option('-b', '--beta',    dest='beta',  type=float, default=50, help="inverse temperature (default 50/eV->232K)")
     parser.add_option('-M', '--QMC_M',   dest='QMC_M', type=float, default=5e6, help="Number of MC steps per core (default = 5M)")
@@ -574,8 +575,10 @@ if __name__ == '__main__':
         cor=[3,4,5,6,7]
     else:
         cor = expand_intlist(options.cor)
-    
-    Cif2Indmf(fcif, cor, options.so, options.Qmagnetic, options.DC, options.real, options.fixmu, options.beta, options.QMC_M, options.CoulombU, options.CoulombJ,
+    beta=options.beta
+    if options.Temp is not None:
+        beta = 1160.45/options.Temp
+    Cif2Indmf(fcif, cor, options.so, options.Qmagnetic, options.DC, options.real, options.fixmu, beta, options.QMC_M, options.CoulombU, options.CoulombJ,
                   options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log, keepH=options.keepH,
                   ndecimals=options.ndecimals,nradius=options.nradius,min_Molap=options.Molap)
 

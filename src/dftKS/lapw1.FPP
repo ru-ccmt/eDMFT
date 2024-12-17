@@ -232,7 +232,9 @@ PROGRAM LAPW1
 
   if (myrank.eq.master) then
      STOP ' LAPW1 END'
-  end if
+  else
+     STOP
+  endif
   
 999 CONTINUE
   call stop_MPI

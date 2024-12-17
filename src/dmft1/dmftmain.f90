@@ -779,6 +779,8 @@ PROGRAM DMFTMAIN  ! Program DMFT calculates
 
   if (myrank.eq.master) then
      STOP 'DMFT1 END'
+  else
+     STOP
   endif
   
   !   error handling
