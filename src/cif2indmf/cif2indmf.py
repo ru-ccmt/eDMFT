@@ -577,7 +577,7 @@ if __name__ == '__main__':
         cor = expand_intlist(options.cor)
     beta=options.beta
     if options.Temp is not None:
-        beta = 1160.45/options.Temp
+        beta = 11604.5/options.Temp
     Cif2Indmf(fcif, cor, options.so, options.Qmagnetic, options.DC, options.real, options.fixmu, beta, options.QMC_M, options.CoulombU, options.CoulombJ,
                   options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log, keepH=options.keepH,
                   ndecimals=options.ndecimals,nradius=options.nradius,min_Molap=options.Molap)
