@@ -17,6 +17,7 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from fractions import Fraction
 from localaxes import *
 from functools import cmp_to_key
+import builtins
 
 __author__ = "Kristan Haule"
 __copyright__ = "Copyright 2024, eDMFT"
@@ -2123,7 +2124,7 @@ def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, H2Rtrans=False, log=sy
     """
     def common_denom(i1,i2):
         if ( 2*abs(i1-i2)/(i1+i2) < 0.05 ):  # this is approximation. If i1 and i2 are very close, we do not want to take the product, but approximate
-            return max(i1,i2)
+            return builtins.max(i1,i2)
         else:
             return int(i1*i2/gcd(i1,i2))
     if H2Rtrans:
@@ -2144,7 +2145,7 @@ def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, H2Rtrans=False, log=sy
                   'k-conBZ=[{:6.4g},{:6.4g},{:6.4g}]'.format(*(k2icartes@Ks[i])), file=log) # primitive and conventional BZ
         kc_p = kc[:]
     # Nkp is number of k-points in each interval
-    Nkp = [round(Nt*(dst[ii]-dst[ii-1])/dst[-1]) for ii in range(1,len(dst))]
+    Nkp = [int(round(Nt*(dst[ii]-dst[ii-1])/dst[-1])) for ii in range(1,len(dst))]
     # 
     print('suggested and actual number of momentum points:', Nt, sum(Nkp), Nkp, file=log)
 
@@ -2157,6 +2158,8 @@ def W2k_klist_band(fname, Nt, kpath, k2icartes, k2cartes, H2Rtrans=False, log=sy
             k2 = k2icartes @ Ks[i+1]     # k2 is next point in conventional, as required by w2k
             frk1 = [Fraction(str(k1[j])).limit_denominator(10) for j in range(3)] # fractions for in representation
             r2 = (k2-k1)/Nkp[i]          # we will need k1 + r2*i
+            #print('fraction r2=: ', str(r2[0]), str(r2[1]), str(r2[2]))
+            #print('limit denominator=', Nkp[i]*10)
             frk2 = [Fraction(str(r2[j])).limit_denominator(Nkp[i]*10) for j in range(3)] # fraction representation
             f1 = common_denom(common_denom(frk1[0].denominator,frk1[1].denominator),frk1[2].denominator) # common-gcd
             f2 = common_denom(common_denom(frk2[0].denominator,frk2[1].denominator),frk2[2].denominator) # common-gcd
