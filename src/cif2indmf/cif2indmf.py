@@ -164,8 +164,8 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
         
     matrix_vesta = strc.Matrix(vesta=True)
 
-    print('aname=', strc.aname)
-    print('len(strc.neighbrs)=', len(strc.neighbrs))
+    #print('aname=', strc.aname)
+    #print('len(strc.neighbrs)=', len(strc.neighbrs))
     
     indx=0
     for jatom in range(len(strc.neighbrs)):

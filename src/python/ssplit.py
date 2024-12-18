@@ -2,7 +2,7 @@
 # @Copyright 2007 Kristjan Haule
 import utils,indmffile,sys,re,os
 import optparse
-from scipy import *
+#from scipy import *
 import numpy as np
 from math import *
 from numpy import zeros,ones,array,shape,loadtxt,savetxt,vstack

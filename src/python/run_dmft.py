@@ -18,6 +18,7 @@ import indmffile
 import convert_processes
 import ctqmc#, oca
 from imp2lattc import ImpurityLatticeConnection, SimplifySiginds, iSigindDropNegative, ConvertFromLatticeToImp, Connect_ImpurityProjector
+import builtins
 
 utime = '/usr/bin/time'  # This time function is compatible with w2k timing
 
@@ -108,10 +109,11 @@ def dmft1(fday, case, fh_info, extn, dmfe, m_extn=''):
         print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+name, file=fl)
         
     print('Running ---- dmft1 -----', file=fh_info)
-    cmd = utime+' '+dmfe.MPI2+' '+dmfe.ROOT+'/dmft '+name+'.def >> '+name+'_info.out '
+    #cmd = utime+' '+dmfe.MPI2+' '+dmfe.ROOT+'/dmft '+name+'.def >> '+name+'_info.out '
+    cmd = dmfe.MPI2+' '+dmfe.ROOT+'/dmft '+name+'.def >> '+name+'_info.out '
     print('#<'+name+'>: ', cmd, file=fh_info)
     fh_info.flush()
-    subprocess.call(cmd,shell=True,stdout=fh_info,stderr=fh_info)
+    subprocess.call(cmd,shell=True,stdout=fh_info,stderr=sys.stderr)
     
     for fe in glob.glob('dmft1.error*'):
         if getsize(fe) !=0:
@@ -233,11 +235,12 @@ def dmft2(fday, case, fh_info, dmfe, m_extn=''):
     with open(':log', 'a') as fl:
         print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+name, file=fl)
     
-    cmd = utime+' '+dmfe.MPI2+' '+dmfe.ROOT+'/dmft2 '+name+'.def >> dmft2_info.out '
+    #cmd = utime+' '+dmfe.MPI2+' '+dmfe.ROOT+'/dmft2 '+name+'.def >> dmft2_info.out '
+    cmd = dmfe.MPI2+' '+dmfe.ROOT+'/dmft2 '+name+'.def >> dmft2_info.out '
     print(('#<'+name+'>: '), cmd, file=fh_info)
     fh_info.flush()
     
-    info=subprocess.call(cmd,shell=True,stdout=fh_info,stderr=fh_info)
+    info=subprocess.call(cmd,shell=True,stdout=fh_info,stderr=sys.stderr)
     
     for fe in glob.glob(name+'.error*'):
         if getsize(fe) !=0:
@@ -260,7 +263,7 @@ def scf1(fday, case, WIEN):
             shutil.copy2(name, name+'_old')		#save last cycle
             
         
-def Diff(fday, case, dEF):
+def Diff(fday, case, dEF, diff_nimp, ddiff_nimp):
     #
     with open(case+'.scf', 'r') as fs:
         dat = fs.readlines()
@@ -286,6 +289,12 @@ def Diff(fday, case, dEF):
     print(':ENERGY convergence: '+str(dene), file=fday)
     print(':CHARGE convergence: '+str(drho), file=fday)
     print(':EF     convergence: '+str(dEF),  file=fday)
+    
+    print(':ENERGY convergence: '+str(dene))
+    print(':CHARGE convergence: '+str(drho))
+    print(':EF     convergence: '+str(dEF))
+    print(':NIMP   convergence: '+str(ddiff_nimp))
+    print(':NIMP   difference : '+str(diff_nimp))
     return (drho, dene)
 
 
@@ -537,8 +546,7 @@ if __name__ == '__main__':
               'sleeptime'     : 2,         # If broyden file are present at the submit time, user has some time to kill the job
               'cc'            : 1e-5,      # the charge density precision to stop the LDA+DMFT run
               'ec'            : 1e-5,      # the energy precision to stop the LDA+DMFT run
-              #'so'            : False,     # spin-orbit coupling
-              #'c'             : False,     # non-centrosymmetric
+              'nc'            : 5e-4,      # the impurity difference to stop LDA+DMFT run
               'rCF'           : None,      # Reduction of the crystal field splitting, if necessary
               'recomputeEF'   : 1,         # Recompute EF in dmft2 step. If recomputeEF=2, it tries to find an insulating gap.
               'mixEF'         : 1.0,       # Chemical potential can be mixed with mixEF<1.0
@@ -848,6 +856,7 @@ if __name__ == '__main__':
     icycle = nimp = 0
     istep0=0
     nl_imp = None
+    diff_nimp,ddiff_nimp,pdiff_nimp=1,1,0
     (RelaxingStructure, mix_method) = fstc.AreWeRelaxingStructure2(w2k.case)
     print('Relaxing Structure=', RelaxingStructure, file=fh_info)
     
@@ -913,7 +922,7 @@ if __name__ == '__main__':
                 for iat in list(iSigind.keys()):   # Over all inequivalent impurity problems
                     ni=SolveImpurity(EF, solver[iat], iat, extn, p, UpdateAtom, nl_imp[iat], fh_info, fh_pinfo, fday)
                     n_imp[iat] += ni
-                    
+                    print('STOP  IMPURITY_'+str(iat), file=sys.stderr)
                 SGather(dmfe.ROOT, fh_info, p, wopt['m_extn'])
                 
                 IEorb = 0.0
@@ -953,7 +962,7 @@ if __name__ == '__main__':
         
         if int(len(sigmas)*p['saver'])>1 :
             sigmas.reverse()
-            sigmas = sigmas[0:max(1,int(len(sigmas)*p['saver']))]
+            sigmas = sigmas[0:builtins.max(1,int(len(sigmas)*p['saver']))]
             print('Averaging over the following self-energies', sigmas, file=fh_info)
             cmd = 'saverage.py -o sig.inp ' + (' '.join(sigmas))
             print('#<saverage>: ', cmd, file=fh_info)
@@ -967,7 +976,7 @@ if __name__ == '__main__':
             print(' changing TOT to FOR in case.in2 files', file=fh_info)
             print(' increasing max_lda_iterations to ', p['max_lda_iterations'], file=fh_info)
         
-
+        diff_nimp=1
         for ita in range(p['max_lda_iterations']):
             if ita%2 == 1 : p.refresh()
 
@@ -1011,13 +1020,14 @@ if __name__ == '__main__':
             scf1 (fday,w2k.case,w2k.WIENROOT);
             mixer(fday,w2k.case,w2k.WIENROOT,fh_info);       fday.flush()
             scfm (fday,w2k.case,w2k.WIENROOT);               fday.flush()
-            drho, dene = Diff(fday, w2k.case, dEF);          fday.flush()
+            drho, dene = Diff(fday, w2k.case, dEF, diff_nimp, ddiff_nimp);fday.flush()
             
             # Writting to info.iterate file
             if os.path.isfile('EF.dat'): EF = float(open('EF.dat').read())
             (ETOT,SUM,XSUM,YSUM,ZSUM,EORB,XEORB,ZEORB) = FindEtot(w2k.case,wopt)
             
             fh_pinfo.write( '%3d %3s.%4s %12.6f %12.6f %15.6f %15.6f %15.6f ' % (istep0, icycle, ita, EF, Vdc, ETOT, ETOT-SUM+ZSUM-EORB+ZEORB, ETOT-SUM+YSUM-EORB+XEORB) )
+            diff_nimp=0
             for iat in list(iSigind.keys()):   # Over all inequivalent impurity problems
                 if os.path.exists('imp.'+str(iat)+'/Eimp.inp'):
                     fEimp = open('imp.'+str(iat)+'/Eimp.inp', 'r')
@@ -1025,6 +1035,7 @@ if __name__ == '__main__':
                 else: # If runGF=False, this is not available
                     Eimp=array([0,0])
                 fh_pinfo.write( '%12.6f %12.6f %12.6f %12.6f ' % (nc[iat], n_imp[iat], Eimp[0], Eimp[-1]) )
+                diff_nimp += n_imp[iat]-nc[iat]
             fh_pinfo.write('\n')
             fh_pinfo.flush()
             istep0 += 1
@@ -1057,6 +1068,11 @@ if __name__ == '__main__':
                 for f in glob.glob('*.broyd*'): 
                     os.remove(f)
 
+        ddiff_nimp = abs(pdiff_nimp-diff_nimp)
+        pdiff_nimp = diff_nimp
+        
+        drho, dene = Diff(fday, w2k.case, dEF, diff_nimp, ddiff_nimp);fday.flush()
+        
         icycle += 1   # END CHARGE LOOP
         if RelaxingStructure: # When dmft/impurity loop restarts, we should relax again
             fstc.RelaxAgain(w2k.case, mix_method)
@@ -1065,6 +1081,10 @@ if __name__ == '__main__':
         if (p['max_lda_iterations']>=10): 
             toclean = glob.glob('*.broyd*')
             for f in toclean: os.remove(f)
+        
+        if not RelaxingStructure and ddiff_nimp<p['nc'] and drho<2*p['cc'] and dene<2*p['ec']:
+            # impurity occupation is not changing much anymore, and charge and energy is converged, hence we can safely stop if structure is not relaxing.
+            break
         
     toclean = glob.glob('dmft[1|2].error*')+glob.glob('*.broyd*')+glob.glob('dmft')+glob.glob('dmft2')+glob.glob('_processes*')+glob.glob('*.klist_*')+glob.glob('*.output1_*')+glob.glob('*.vector_*')+glob.glob('*.scf1_*')+glob.glob('lapw1_*.[def|error]')
     for f in toclean: os.remove(f)

@@ -2,6 +2,7 @@
 # @Copyright 2007 Kristjan Haule
 from numpy import *
 import re, sys
+import builtins
 
 def FindNCpu(Nk,Ncpu_max):
     for Ncpu in range(Ncpu_max,1,-1):
@@ -98,7 +99,7 @@ if __name__ == '__main__':
 
         if OMP<=1:
             OMP = 1
-            Nn = min(Nkp,Ncpu)
+            Nn = builtins.min(Nkp,Ncpu)
             mpin = re.sub(r'(-n[p]?)\s*(\d+)', r'\1 '+str(Nn), mpi_prefix)
         else:
             # creates a new machinefile (wmachines) with fraction of cores in the list
@@ -119,7 +120,7 @@ if __name__ == '__main__':
         if m is not None:
             Ncpu = int(m.group(1))
             # we can not fine tune
-            Nn = min(Nkp,Ncpu)
+            Nn = builtins.min(Nkp,Ncpu)
             mpin = re.sub(r'(-n[p]?\s*)(\d+)', r'\1 '+str(Nn), mpi_prefix)
     
 

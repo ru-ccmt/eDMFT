@@ -3,7 +3,7 @@
 from numpy import *
 import sys,os,re
 from scipy import interpolate
-
+import builtins
 cix='actqmc.cix'
 Delta='Delta.inp'
 Gf='Gf.out'
@@ -178,7 +178,7 @@ def CmpImpurityCorrection2(om, omD, Dlt, Gfc, Deg, EimpS, beta, fout):
         return dDeltaw
 
     cxx = 0.0
-    lngh = min(len(Dlt),len(Gfc))
+    lngh = builtins.min(len(Dlt),len(Gfc))
     
     #print 'sum(abs(omD-om))=', sum(abs(omD-om))/len(omD)
     if len(omD)!=len(om) or sum(abs(omD-om))>1e-5*len(omD):
@@ -226,7 +226,7 @@ def GiveImpFunctional(dire, fparams, Vdc, fout=sys.stdout):
     s_oo = Sigc[:,-1].real
     print('s_oo=', s_oo, file=fout)
     
-    lengh = min(len(Eks),len(s_oo))
+    lengh = builtins.min(len(Eks),len(s_oo))
     EimpS = Eks[:lengh]-mu_qmc+s_oo[:lengh]
     # Tr(log(-Gimp))
     lnGimp = LogGimp(om,Gfc,EimpS,beta,Deg,fout) 
