@@ -37,7 +37,7 @@ def Broad(width, om, fw):
         eps = sorted(hstack((x1, x2)))
         x3 = om[im]-eps
         gs = exp(-x3**2/(2*w**2))/(sqrt(2*pi)*w)
-        yn = integrate.trapz(fwi(eps) * gs, x=eps)
+        yn = integrate.trapezoid(fwi(eps) * gs, x=eps)
         fwn.append(yn)
     return array(fwn)
 
@@ -77,7 +77,7 @@ def MaximumEntropy(p, tau, Gt):
         normalization = Gt[0]+Gt[-1]
         Ker = me.initker_fermion(omega,dom,beta,tau)        
     elif p['statistics']=='bose':
-        normalization = integrate.trapz(Gt,x=tau)
+        normalization = integrate.trapezoid(Gt,x=tau)
         Ker = me.initker_boson(omega,dom,beta,tau)
     
     print('beta=', beta)
@@ -252,7 +252,7 @@ def MaximumEntropyTest(p, tau, Gt):
         normalization = Gt[0]+Gt[-1]
         Ker = me.initker_fermion(omega,beta,tau)        
     elif p['statistics']=='bose':
-        normalization = integrate.trapz(Gt,x=tau)
+        normalization = integrate.trapezoid(Gt,x=tau)
         dom = array([0.5*(omega[1]-omega[0])]+[0.5*(omega[i+1]-omega[i-1]) for i in range(1,len(omega)-1)]+[0.5*(omega[-1]-omega[-2])])
         Ker = me.initker_boson(omega,dom,beta,tau)
     
@@ -498,7 +498,7 @@ def test5(filename, Norder, L=6.):
     for im in range(Norder):
         omi = 2*im*pi/beta
         om.append(omi)
-        Gm.append( integrate.trapz( fGt2*cos(tau2*omi), x=tau2 ) + 0j )
+        Gm.append( integrate.trapezoid( fGt2*cos(tau2*omi), x=tau2 ) + 0j )
     Gm = array(Gm)
     om = array(om)
 
@@ -536,7 +536,7 @@ def test5b(filename, Norder, L=6.):
     for im in range(Norder*3):
         omi = 2*im*pi/beta
         om.append(omi)
-        Gm.append( integrate.trapz( fGt2*cos(tau2*omi), x=tau2 ) + 0j )
+        Gm.append( integrate.trapezoid( fGt2*cos(tau2*omi), x=tau2 ) + 0j )
     Gm = array(Gm)
     om = array(om)
 
