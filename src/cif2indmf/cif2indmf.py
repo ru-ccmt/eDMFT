@@ -266,6 +266,11 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
         
         L = 2 if cor_type[el]<6 else 3
         #qsplit=2 # for now hard-code this qsplit withouth SO
+        if qsplit==2 and strc.sgnum>=195:
+            # this is cubic system
+            qsplit=7
+            print('# detected cubic system hence set qplit to',qsplit, file=log)
+        
         iatom0 = first_atom[jatom]
         grp=[]
         for i in range(strc.mult[jatom]):
