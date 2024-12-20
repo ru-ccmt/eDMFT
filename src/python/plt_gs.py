@@ -19,7 +19,7 @@ if __name__=='__main__':
     parser.add_argument('-l', type=str, default=None, help='lattice lcols to show in the form of dic like {0:[1,2,3], 1:[1,2,3]}')
     parser.add_argument('-n', type=str, default=None, help='lattice lcols_dn to show in the form of dic like {0:[1,2,3], 1:[1,2,3]}')
     parser.add_argument('-g', default=False, action='store_true', help='grid')
-    parser.add_argument('-a', default='3', type=str, help='average over how many impurity steps')
+    parser.add_argument('-a', default='1', type=str, help='how many impurity steps displayed. Default one.')
     args = parser.parse_args()
     
     xrng = [None,None]
@@ -38,6 +38,11 @@ if __name__=='__main__':
     #print('lastn=', lastn)
 
     env = utils.W2kEnvironment()
+    if args.fname=='gc':
+        fnames = [env.case+'.gc', 'Gf.out', 'G']
+    else:
+        fnames = ['sig.inp', 'Sig.out','$\Sigma$']
+        
     inl = Indmfl(env.case)
     inl.read()
     iSiginds = ParsIndmfi(env.case)
@@ -48,14 +53,7 @@ if __name__=='__main__':
         inldn = Indmfl(env.case, 'indmfldn')
         inldn.read()
         _lcols_dn = SimplifySiginds(inl.siginds)
-    
-    if args.fname=='gc':
-        fnames = [env.case+'.gc', 'Gf.out', 'G']
-    else:
-        fnames = ['sig.inp', 'Sig.out','$\Sigma$']
-        
     imp2latt = ImpurityLatticeConnection(_lcols, _icols, sys.stdout)
-    
     # these are columns we can fill in with our impurity problems
     print('_icols=', _icols)
     print('_lcols=',_lcols)
@@ -104,10 +102,8 @@ if __name__=='__main__':
             print(' lcols_dn=', lcols_dn)
         
     fig, axs = plt.subplots(2, len(imp2latt), sharex=True)
-    #axs = np.atleast_2d(axs) # make sure it does not become 1D array when len(imp2latt)=1
     if len(imp2latt) == 1:
         axs = axs.reshape(2, 1)
-    print('shape(axs)=', shape(axs))
     # Below plotting impurity quantity
     for ii in imp2latt:
         il=0
@@ -122,31 +118,29 @@ if __name__=='__main__':
             # sorts them in descending order
             itrs = sorted(itrs, key=lambda x:-x[0]-x[1]/1000.)
             its = itrs[:lastn]
-            fname = dr+'/'+fnames[1]+'.'+str(its[0][0])+'.'+str(its[0][1])
-            print('reading', fname, 'cols=', icols[icix])
-            dat = loadtxt(fname).T
-            om = dat[0]
-            #Gimp = array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
-            Gimp = dat[1::2]+dat[2::2]*1j
-            # averaging over last few iterations, if needed
-            for it in its[1:]:
+            # repeating for the last few iterations, if needed
+            for it in its:
                 fname = dr+'/'+fnames[1]+'.'+str(it[0])+'.'+str(it[1])
                 print('reading', fname, 'cols=', icols[icix])
                 dat = loadtxt(fname).T
-                #Gimp += array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
-                Gimp += dat[1::2]+dat[2::2]*1j
-            Gimp /= len(its)
-            for i,j in enumerate(icols[icix]):
-                axs[0][ii].plot(om,Gimp[j].imag, 'C'+str(il%10), label='imp['+str(j)+']')
-                axs[1][ii].plot(om,Gimp[j].real, 'C'+str(il%10), label='imp['+str(j)+']')
-                il+=1
+                om = dat[0]
+                Gimp = dat[1::2]+dat[2::2]*1j
+                for i,j in enumerate(icols[icix]):
+                    axs[0][ii].plot(om,Gimp[j].imag, 'C'+str(il%10), label='imp['+str(it[0])+','+str(j)+']')
+                    axs[1][ii].plot(om,Gimp[j].real, 'C'+str(il%10), label='imp['+str(it[0])+','+str(j)+']')
+                    il+=1
         
         # Below plotting lattice quantity
         il=0
+        foundOneYet,foundOneYetdn=False,False
         for icix in imp2latt[ii]: #lcols:
-            if icix in lcols:
-                cls = array(lcols[icix])#-min_lcols[icix]
+            if icix in lcols and not foundOneYet:
                 fname = fnames[0]+str(icix)
+                if not os.path.exists(fname):
+                    continue
+                else:
+                    foundOneYet=True
+                cls = array(lcols[icix])
                 print('reading', fname, 'cols=', cls)
                 dat = loadtxt(fname).T
                 w = dat[0]
@@ -156,9 +150,13 @@ if __name__=='__main__':
                     axs[1][ii].plot(w,Glat[i].real, 'C'+str(il%10)+'.', label='lat['+str(icix)+',$'+inl.legends[icix][j]+'$]')
                     il+=1
                 
-                if lcols_dn is not None:
-                    cls = array(lcols_dn[icix])#-min_lcolsdn[icix]
+            if lcols_dn is not None and icix in lcols_dn and foundOneYetdn:
                     fname = fnames[0]+str(icix)+'dn'
+                    if not os.path.exists(fname):
+                        continue
+                    else:
+                        foundOneYetdn=True
+                    cls = array(lcols_dn[icix])
                     print('reading', fname, 'cols=', cls)
                     dat = loadtxt(fname).T
                     w = dat[0]

@@ -48,6 +48,7 @@ if __name__ == '__main__':
     print('Ftot+T*Simp=', (cdat[:,7]*Ry2eV).tolist())
     
     ax3.legend(loc='best')
+    ax3.set_ylabel('E[eV]')
     plt.tight_layout()
     plt.show()
     
