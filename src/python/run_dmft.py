@@ -816,6 +816,20 @@ if __name__ == '__main__':
         if not os.path.isfile(w2k.case+'.clmup') or os.path.getsize(w2k.case+'.clmup')==0:
             print('ERROR: Missing '+w2k.case+'.clmup /clmdn files, which are needed when '+w2k.case+'.incup /incdn files are present', file=fh_info)
             sys.exit(1)
+
+    if p['recomputeEF']==0:
+        # W2k now changed mixer, so that it does not normalize charge. If we have recomputeEF=0, it will result in error. Hence we need to change case.inm
+        fname = w2k.case+'.inm'
+        if os.path.exists(fname):
+            with open(fname, "r") as fi:
+                content = fi.read()
+            m = re.match(r"^(\w+\s+\d+(\.\d+)?\s+)YES", content, flags=re.MULTILINE)
+            if m is not None:
+                content = re.sub(r"^(\w+\s+\d+(\.\d+)?\s+)YES", r"\1NO", content, flags=re.MULTILINE)
+                print('since recomputeEF=0 we need to allow unrenormalized charge in mixer. Changing case.inm to', file=fh_info)
+                print(content, file=fh_info)
+                with open(fname, "w") as fi:
+                    fi.write(content)
             
     Prepare_dmft1(dmfe, p, para, wopt, fh_info)
     Prepare_dmft2(dmfe, p, para, wopt, fh_info, p['recomputeEF'])
