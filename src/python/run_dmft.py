@@ -830,7 +830,18 @@ if __name__ == '__main__':
                 print(content, file=fh_info)
                 with open(fname, "w") as fi:
                     fi.write(content)
-            
+        if os.path.exists(w2k.case+'.scf2') and not os.path.exists('EF.dat'):
+            ef = None
+            with open(w2k.case+'.scf2', 'r') as fi:
+                lines = fi.readlines()
+                for line in lines[::-1]:
+                    if line[:4]==':FER':
+                        ef = float(line.split()[-1])
+                        break
+            if ef is not None:
+                with open('EF.dat', 'w') as fo:
+                    print(ef*Ry2eV, file=fo)
+
     Prepare_dmft1(dmfe, p, para, wopt, fh_info)
     Prepare_dmft2(dmfe, p, para, wopt, fh_info, p['recomputeEF'])
     
