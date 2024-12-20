@@ -5,12 +5,44 @@ import optparse
 from scipy import *
 from numpy import *
 
-#import numpy
-#nv = list(map(int,numpy.__version__.split('.')))
-#if (nv[0],nv[1]) < (1,6):
-#    loadtxt = io.read_array
-#    def savetxt(filename, data):
-#        io.write_array(filename, data, precision=16)  
+def saverage_sig(fnames, osig, stdev=False, nexecute=False):
+    print('files to average over:', fnames)
+    print('output: ', osig)
+    ws_oo=[]
+    wEdc=[]
+    wdata=[]
+    for f in fnames:
+        data = loadtxt(f)
+        wdata.append(data)
+        with open(f,'r') as fi:
+            for i in range(2):
+                line = fi.readline()
+                m = re.search('#(.*)',line)
+                if m is not None:
+                    if not nexecute:
+                        exec(m.group(1).strip(), globals())
+                
+            if 's_oo' in globals(): ws_oo.append(s_oo)
+            if 'Edc' in globals(): wEdc.append(Edc)
+    
+    with open(osig, 'w') as fout:
+        if len(ws_oo):
+            as_oo = sum(array(ws_oo),axis=0)/len(ws_oo)
+            print('s_oo=', as_oo)
+            print('# s_oo=', as_oo.tolist(), file=fout)
+        
+        if len(wEdc):
+            aEdc = sum(array(wEdc),axis=0)/len(wEdc)
+            print('Edc=', aEdc)
+            print('# Edc=', aEdc.tolist(), file=fout)
+
+        wres = sum(array(wdata), axis=0)/len(wdata)
+        
+        if stdev:
+            wstd = sqrt(abs(sum(array(wdata)**2, axis=0)/len(wdata) - wres**2))
+            wres = hstack( (wres, wstd[:,1:]) )
+            
+        savetxt(fout,wres)
 
 if __name__=='__main__':
     """ Takes several self-energy files and produces an average over these self-energy files
@@ -32,58 +64,4 @@ if __name__=='__main__':
     # Next, parse the arguments
     (options, args) = parser.parse_args()
 
-    print('files to average over:', args)
-    print('output: ', options.osig)
-    ws_oo=[]
-    wEdc=[]
-    wdata=[]
-    for f in args:
-        dat = open(f,'r').readlines()
-        s_oo = None
-        Edc = None
-        data=[]
-        for line in dat:
-            m = re.search('#(.*)',line)
-            if m is not None: 
-                if not options.nexecute: exec(m.group(1).strip())
-            else:
-                data.append( list(map(float, line.split() )) )
-
-        if s_oo is not None: ws_oo.append(s_oo)
-        if Edc is not None: wEdc.append(Edc)
-        wdata.append(data)    
-    
-    fout = open(options.osig, 'w')
-    
-    if len(ws_oo):
-        ws_oo = array(ws_oo)
-        as_oo=[]
-        for i in range(shape(ws_oo)[1]):  as_oo.append( sum(ws_oo[:,i])/len(ws_oo) )
-        print('s_oo=', as_oo)
-        print('# s_oo=', as_oo, file=fout)
-
-    if len(wEdc):
-        wEdc = array(wEdc)
-        aEdc=[]
-        for i in range(shape(wEdc)[1]):  aEdc.append( sum(wEdc[:,i])/len(wEdc) )
-        print('Edc=', aEdc)
-        print('# Edc=', aEdc, file=fout)
-
-    wdata = array(wdata)
-    wres = zeros(shape(wdata)[1:], dtype=float)
-    for i in range(len(wdata)): wres[:,:] += wdata[i,:,:]
-    wres *= 1./len(wdata)
-    
-    if options.stdev:
-        sw = shape(wdata)
-        wstd = zeros((sw[1],sw[2]-1), dtype=float) # no frequency
-        for i in range(len(wdata)): wstd[:,:] += wdata[i,:,1:]**2
-        wstd *= 1./len(wdata)
-        wstd[:,:] = sqrt(wstd[:,:] - wres[:,1:]**2)
-        
-        wres = hstack( (wres, wstd) )
-        
-    savetxt(fout,wres)
-    
-    
-    
+    saverage_sig(args, options.osig, options.stdev, options.nexecute)
