@@ -145,7 +145,7 @@ def SelectNeighGetPoly(jatom, strc, first_atom, matrix_w2k, log):
 
 def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty', onreal=False,
               fixmu=False,beta=50, QMC_M=5e6, CoulombU=None, CoulombJ=None,
-              qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log', keepH=False, ndecimals=3,nradius=4.7,min_Molap=0.7):
+              qsplit=2, Nkp=300, writek=True, logfile='cif2struct.log', keepH=False, ndecimals=3,nradius=4.7,min_Molap=0.7,finish=50):
     case = os.path.splitext(fcif)[0] # get case
 
     (strc, lat) = Cif2Struct(fcif, Nkp, writek, Qmagnetic, logfile, cmp_neighbors=True, convertH2R=not keepH, ndecimals=ndecimals,nradius=nradius,min_Molap=min_Molap)
@@ -469,7 +469,7 @@ def Cif2Indmf(fcif, input_cor=[3,4,5,6,7], so=False, Qmagnetic=False, DC='exacty
     params['DCs']= (DC, '# double counting scheme')
     params['max_dmft_iterations'] = (1,   '# number of iteration of the dmft-loop only')
     params['max_lda_iterations']  = (100, '# number of iteration of the LDA-loop only')
-    params['finish']              = (50,  '# number of iterations of full charge loop (1 = no charge self-consistency')
+    params['finish']              = (finish,  '# number of iterations of full charge loop (1 = no charge self-consistency')
     params['ntail']               = (300, '# on imaginary axis, number of points in the tail of the logarithmic mesh')
     params['cc']                  = (1e-5,'# the charge density precision to stop the LDA+DMFT run')
     params['ec']                  = (1e-5,'# the energy precision to stop the LDA+DMFT run')
@@ -555,6 +555,7 @@ if __name__ == '__main__':
     parser.add_option('-f', '--fix',     dest='fixmu',action='store_true', default=False, help="fix the chemical potential for Mott insulators (default False)")
     
     parser.add_option('-N', '--Nkp',     dest='Nkp', type='int', default=300, help="number of k-points along the high symmetry path (default 300)")
+    parser.add_option('-F', '--finish',  dest='finish', type='int', default=50, help="maximum number of outside loop for dft+dmft iterations")
     parser.add_option('-l', '--log',     dest='log', type='str', default='cif2struct.log', help="info file (default cif2struct.log)")
     parser.add_option('-c', '--cor',     dest='cor', type='str', default='all', help="which atom types are correlated. all or 3,4 or 3-5 or 6-7 (default all)")
     parser.add_option('-d', '--dc',      dest='DC',  type='str', default='exacty', help="The type of double-counting: exact, exacty, exactd, nominal (default exacty)")
@@ -585,5 +586,5 @@ if __name__ == '__main__':
         beta = 11604.5/options.Temp
     Cif2Indmf(fcif, cor, options.so, options.Qmagnetic, options.DC, options.real, options.fixmu, beta, options.QMC_M, options.CoulombU, options.CoulombJ,
                   options.qsplit, Nkp=options.Nkp, writek=options.wkp, logfile=options.log, keepH=options.keepH,
-                  ndecimals=options.ndecimals,nradius=options.nradius,min_Molap=options.Molap)
+                  ndecimals=options.ndecimals,nradius=options.nradius,min_Molap=options.Molap,finish=options.finish)
 
