@@ -1111,5 +1111,10 @@ if __name__ == '__main__':
             # impurity occupation is not changing much anymore, and charge and energy is converged, hence we can safely stop if structure is not relaxing.
             break
         
-    toclean = glob.glob('dmft[1|2].error*')+glob.glob('*.broyd*')+glob.glob('dmft')+glob.glob('dmft2')+glob.glob('_processes*')+glob.glob('*.klist_*')+glob.glob('*.output1_*')+glob.glob('*.vector_*')+glob.glob('*.scf1_*')+glob.glob('lapw1_*.[def|error]')
+    toclean = glob.glob('dmft[1|2].error*')+glob.glob('*.broyd*')+glob.glob('dmft')+glob.glob('dmft2')+glob.glob('_processes*')+glob.glob('lapw1')+glob.glob('*.output1_*')+glob.glob('*.vector_*')+glob.glob('*.scf1_*')+glob.glob('lapw1_*.[def|error]')
     for f in toclean: os.remove(f)
+
+    allFiles=glob.glob("*")
+    for filename in allFiles:
+        if os.stat(filename).st_size==0:
+            os.remove(filename)
