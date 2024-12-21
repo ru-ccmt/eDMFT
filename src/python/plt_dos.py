@@ -9,6 +9,36 @@ from indmffile import Indmfl, ParsIndmfi
 from imp2lattc import ImpurityLatticeConnection, SimplifySiginds
 from wstruct import Struct
 
+class InteractiveLegend:
+    def __init__(self,lines,leg,fig):
+        self.map_legend_to_ax = {}  # Will map legend lines to original lines.
+        pickradius = 5  # Points (Pt). How close the click needs to be to trigger an event.
+        for legend_line, ax_line in zip(leg.get_lines(), lines):
+            legend_line.set_picker(pickradius)  # Enable picking on the legend line.
+            self.map_legend_to_ax[legend_line] = ax_line
+        # Works even if the legend is draggable. This is independent from picking legend lines.
+        self.leg = leg
+        self.leg.set_loc('best')
+        self.leg.set_draggable(True)
+        self.fig = fig
+        
+    def __call__(self, event):
+        # On the pick event, find the original line corresponding to the legend
+        # proxy line, and toggle its visibility.
+        legend_line = event.artist
+    
+        # Do nothing if the source of the event is not a legend line.
+        if legend_line not in self.map_legend_to_ax:
+            return
+        
+        ax_line = self.map_legend_to_ax[legend_line]
+        visible = not ax_line.get_visible()
+        ax_line.set_visible(visible)
+        # Change the alpha on the line in the legend, so we can see what lines
+        # have been toggled.
+        legend_line.set_alpha(1.0 if visible else 0.2)
+        self.fig.canvas.draw()
+
 if __name__=='__main__':
     usage = 'Plots Green\'s function or self-energy by reading imp.?/Gf.out.* and case.gc? files'
     parser = argparse.ArgumentParser(description=usage)
@@ -39,13 +69,16 @@ if __name__=='__main__':
         leg = re.findall(r"total|a=\s*\d+\s+L=\s*\d+", line) # legends parsing
         #print(leg)
 
+
+    lines=[]
     # printing case.dos
     fig, axs = plt.subplots(1,1)
     om = dat[0]
     DOS = dat[1:,:]
     il=0
     for l in range(len(DOS)):
-        axs.plot(om,DOS[l,:], 'C'+str(il%10), label=leg[l])
+        linei,= axs.plot(om,DOS[l,:], 'C'+str(il%10), label=leg[l])
+        lines.append(linei)
         il+=1
     
     inl = Indmfl(env.case)
@@ -142,7 +175,8 @@ if __name__=='__main__':
                 w = dat[0]
                 dos = array([-dat[2+2*j]*degs[icix][j]*nspin*len(imp2latt[ii])/pi for j in cls])
                 for i,j in enumerate(cls):
-                    axs.plot(w,dos[i], 'C'+str(il%10)+':', label=atm+'['+str(icix)+',$'+inl.legends[icix][j]+'$]')
+                    linei,= axs.plot(w,dos[i], 'C'+str(il%10)+':', label=atm+'['+str(icix)+',$'+inl.legends[icix][j]+'$]')
+                    lines.append(linei)
                     il+=1
             if lcols_dn is not None and icix in lcols_dn and not foundOneYetdn:
                 fname = env.case+'.gc'+str(icix)+'dn'
@@ -156,7 +190,8 @@ if __name__=='__main__':
                 w = dat[0]
                 Glat = array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
                 for i,j in enumerate(cls):
-                    axs.plot(w,-Glat[i].imag/pi, 'C'+str(il%10)+':', label='glat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
+                    linei,=axs.plot(w,-Glat[i].imag/pi, 'C'+str(il%10)+':', label='glat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
+                    lines.append(linei)
                     il+=1
             
     if xrng[0]!=None and xrng[1]!=None:
@@ -173,8 +208,10 @@ if __name__=='__main__':
     elif yrng[0]==None and yrng[1]!=None:
         axs.set_ylim(top=yrng[1])
     
-        
-    axs.legend(loc='best')
-    if args.g: axs.grid()
+    int_leg = InteractiveLegend(lines,axs.legend(),fig)
+    fig.canvas.mpl_connect('pick_event', int_leg)
+    
+    #axs.legend(loc='best')
+    #if args.g: axs.grid()
     
     show()

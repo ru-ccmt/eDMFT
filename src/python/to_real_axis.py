@@ -18,7 +18,7 @@ def ChangeMatsubaraFlag(fname, matsubara, x_range=None, nfrq=None):
             dat[4],dat[5] = str(x_range[0]),str(x_range[1])
         if nfrq is not None:
             dat[3] = str(nfrq)
-        lines[1] = ' '.join(dat)
+        lines[1] = ' '.join(dat)+'\n'
     # Write the updated content back to the file
     with open(fname, 'w') as fi:
         fi.writelines(lines)
