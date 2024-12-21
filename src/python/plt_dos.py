@@ -101,7 +101,8 @@ if __name__=='__main__':
         _lcols_dn = SimplifySiginds(inl.siginds)
 
     so_present = (os.path.isfile(env.case+'.inso') and os.path.getsize(env.case+'.inso')>0)
-    nspin=2
+    #nspin=2
+    nspin=1
     if _lcols_dn is not None or so_present:
         nspin=1
         

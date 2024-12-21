@@ -24,6 +24,9 @@ if __name__ == '__main__':
     ax1.plot(dat[istr:,0],dat[istr:,8], 'o-', label='nlat')
     ax1.plot(dat[istr:,0],dat[istr:,9], 'o-', label='nimp')
     ax1.legend(loc='best')
+    ax1.set_xlabel('dft+dmft iterations')
+    ax1.xaxis.set_label_position('top')
+    ax1.xaxis.tick_top()
     
     cdat = np.array([dat[j] for j in ind])
     itt = np.array(cdat[:,1],dtype=int)
@@ -49,6 +52,8 @@ if __name__ == '__main__':
     
     ax3.legend(loc='best')
     ax3.set_ylabel('E[eV]')
+    ax3.set_xlabel('dmft_iterations')
     plt.tight_layout()
+    plt.subplots_adjust(wspace=0, hspace=0.02)
     plt.show()
     

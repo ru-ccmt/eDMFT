@@ -49,7 +49,7 @@ if __name__ == '__main__':
     lastn = int(args.a)
     
     w2k = utils.W2kEnvironment() 
-    ChangeMatsubaraFlag(onreal_dir+'/'+w2k.case+'.indmfl', 0, xrng, args.n)
+    # ChangeMatsubaraFlag(onreal_dir+'/'+w2k.case+'.indmfl', 0, xrng, args.n)
     
     fsigs = glob.glob('sig.inp.*.*')
     itrs = [list(map(int,fg.split('.')[-2::])) for fg in fsigs]
