@@ -123,16 +123,9 @@ class WStruct:
             sga = SpacegroupAnalyzer(cif.structure)
             primitive = sga.get_primitive_standard_structure()
             kpath = HighSymmKpath(primitive)
-            #
-            #strc1 = cif.structure.copy()
-            #print('strc1=', strc1)
-            #strc1.remove_site_property("magmom")
-            #print('strc2=', strc1)
-            #primitive = strc1.to_primitive()
-            #print('strc1=', primitive)
-            #kpath = HighSymmKpath(primitive)
-            #
             self.kpath = kpath._kpath['kpoints']
+            if self.sgnum==194: # I am adding some extra path for CrSb... a dirty hack, because I want to show AM splitting
+                if 'A' in self.kpath: self.kpath['A_1'] = self.kpath['A']
             
         for i,spec in enumerate(cif.w2k_coords):
             print(i, spec, cif.w2k_coords[spec], file=log)
