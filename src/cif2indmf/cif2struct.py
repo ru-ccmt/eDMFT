@@ -1747,18 +1747,25 @@ class CifParser_W2k:
             #print('groups_resort=', groups_resort)
             
             first_sites_index=[]
+            atom_sort = zeros(len(self.structure.sites),dtype=int)
             self.w2k_coords={}
             for ii,group in enumerate(groups_resort):
                 if len(group)==0: continue
                 psite = self.structure.sites[group[0]]
                 self.w2k_coords[cname[ii]] = [self.structure.sites[j].frac_coords for j in group]
+                jatom = len(first_sites_index)
                 first_sites_index.append( group[0] )
+                for j in group:
+                    atom_sort[j] = jatom
                 #print('ii=', ii, 'group=', group)
                 #all_sites_order.extend( group )
                 #print(cname[ii], coords, psite.label, self.cname[ii], psite.species, psite.species_string)
                 #self.Z_element[cname[ii]] = psite.specie.Z
             #print('w2k_coord=', self.w2k_coords)
-            #print('all_sites_order=', all_sites_order)
+            #print('all_sites_order=', all_sites_order, file.log)
+            print('atom_sort=', atom_sort.tolist(), file=log)
+            print('first_sites_index=', first_sites_index, file=log)
+            
             
         if not ResortToCif:
             self.w2k_coords={}
