@@ -1786,17 +1786,21 @@ class CifParser_W2k:
 
             first_sites_index=[]
             all_sites_order=[]
+            atom_sort = zeros(len(self.structure.sites),dtype=int)
             for grp in groups:
                 for gr in grp:
                     jatom = len(first_sites_index)
                     first_sites_index.append(gr[0])
                     all_sites_order.extend(gr)
+                    for j in gr:
+                        atom_sort[j] = jatom
             all_sites_index=zeros(len(all_sites_order),dtype=int)
             for i in range(len(all_sites_order)):
                 all_sites_index[all_sites_order[i]]=i
             print('all_sites_order=', all_sites_order,file=log)
-            #print('all_sites_index=', all_sites_index.tolist(), file=log)
-
+            print('all_sites_index=', all_sites_index.tolist(), file=log)
+            print('atom_sort=', atom_sort.tolist(), file=log)
+            print('first_sites_index=', first_sites_index, file=log)
         if Qmagnetic:
             # We need to resort the index used in flipped to current order in self.w2k_coords
             _flipped_={}
@@ -1839,6 +1843,7 @@ class CifParser_W2k:
             self.Rmt = zeros(len(first_sites_index))
             print('center_indices=', center_indices, file=log)
             print('points_indices=', points_indices, file=log)
+            
             for jatom,i in enumerate(first_sites_index):
                 t=self.structure.sites[i]
                 coord = t.frac_coords @ self.structure.lattice.matrix
@@ -1870,14 +1875,48 @@ class CifParser_W2k:
                 #print('idx=', idx, file=log)
                 #
                 ni = idx[0]
+                i_nn=0
                 if distances_[ni]<1e-6:
                     ni = idx[1]
+                    i_nn=1
                 nn = points_indices_[ni]
                 #print('ni=', ni, 'nn=', nn)
                 nn_distance = distances_[ni]
                 Z1, Z2 = Znuc[i], Znuc[nn]
                 rmt_r = RMT_ratios(Z1, Z2)
                 self.Rmt[jatom] = rmt_r[0]*nn_distance
+
+                # Now checking distances and Rmts of all atoms where Rmt was already set
+                # The algorithm is such that we could have a case that the sum of two Rmt's is larger than their distance.
+                # This is because the size of Rmt is not half distance, but some other ratio.
+                # So, we take the smallest of two possible values
+                for ij in range(i_nn,len(idx)): # over all neigbors
+                    nnp = points_indices_[idx[ij]]     # index of the neigbor
+                    nnp_distance = distances_[idx[ij]] # distance to that neighbor
+                    if nnp<i:  # Rmt already set for this nnp-atom, hence check that it is ok
+                        sum_of_Rmt_ = self.Rmt[jatom] + self.Rmt[atom_sort[nnp]]
+                        if sum_of_Rmt_ >= nnp_distance:
+                            rmt_r_ = RMT_ratios(Znuc[i], Znuc[nnp])
+                            if rmt_r_[0]*nnp_distance < self.Rmt[jatom]:
+                                self.Rmt[jatom] = rmt_r_[0]*nnp_distance
+                            if rmt_r_[1]*nnp_distance < self.Rmt[atom_sort[nnp]]:
+                                self.Rmt[atom_sort[nnp]] = rmt_r_[1]*nnp_distance
+                            print('WARN1 distance['+str(i)+'-'+str(nnp)+']=', nnp_distance, 'old(Rmt1+Rmt2)=', sum_of_Rmt_,
+                                      'corrected(Rmt1+Rmt2)=', self.Rmt[jatom]+self.Rmt[atom_sort[nnp]], file=log)
+                
+                #if nn<i: # The algorithm is such that we could have a case that the sum of two Rmt's is larger than their distance.
+                #    # This is because the size of Rmt is not half distance, but some other ratio. So, we take the smallest of two possible values
+                #    sum_of_Rmt = self.Rmt[jatom] + self.Rmt[atom_sort[nn]]
+                #    if sum_of_Rmt >= nn_distance:
+                #        Rmt2 = rmt_r[1]*nn_distance
+                #        if Rmt2<self.Rmt[atom_sort[nn]]: self.Rmt[atom_sort[nn]]=Rmt2
+                #        sum_of_Rmt_corrected = self.Rmt[jatom] + self.Rmt[atom_sort[nn]]
+                #        print('WARN1 nn_distance=', nn_distance, 'new(Rmt1+Rmt2)=', sum_of_Rmt_corrected, 'while old(Rmt1+Rmt2)=', sum_of_Rmt, file=log)
+                #        # But there might be several atoms at the same distance. Need to correct the rest as well
+                #                    
+                #        if sum_of_Rmt_corrected>=nn_distance:
+                #            print('ERROR nn_distance=', nn_distance, 'while (Rmt1+Rmt2)=', sum_of_Rmt_corrected, 'old(Rmt1+Rmt2)=', sum_of_Rmt, file=log)
+                        
                 print('nn_distance=', nn_distance, 'Rmt['+str(jatom)+']=', self.Rmt[jatom], file=log)
                 _neighbrs_=[]
                 for j in idx:
@@ -1901,7 +1940,10 @@ class CifParser_W2k:
                         #r.specie.symbol,r.species_string
                         #print('    d={:8.5f} d={:8.5f}'.format(distances_[j],dst), r.species, 'off=',offsets_[j], 'dR=', dR)
                         #print('pi=', nn, 'r=', r, 'r+o=', Rj_fract, file=log)
-                        print('  ATOM:{:3d} {:5s} AT {:9.5f} {:9.5f} {:9.5f}={:9.5f} {:9.5f} {:9.5f} IS AWAY {:13.6f} {:13.6f} ANG'.format(nn,r.species_string,*dR,*dRj_fract, distances_[j],dst), file=log)
+                        #print('  ATOM:{:3d} {:5s} AT {:9.5f} {:9.5f} {:9.5f}={:9.5f} {:9.5f} {:9.5f} IS AWAY {:13.6f} {:13.6f} ANG'.format(nn,r.species_string,*dR,*dRj_fract, distances_[j],dst), file=log)
+                        #_neighbrs_.append([distances_[j],r.species_string,dRj_fract,oxidation])
+                        print(f'  ATOM:{nn:3d} {r.species_string:5s} AT {dR[0]:9.5f} {dR[1]:9.5f} {dR[2]:9.5f}=',end='',file=log)
+                        print(f'{dRj_fract[0]:9.5f} {dRj_fract[1]:9.5f} {dRj_fract[2]:9.5f} IS AWAY {distances_[j]:13.6f} {dst:13.6f} ANG', file=log)
                         _neighbrs_.append([distances_[j],r.species_string,dRj_fract,oxidation])
                 self.neighbrs.append(_neighbrs_)
 

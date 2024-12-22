@@ -16,7 +16,8 @@ import sys
 from numpy import linalg
 import numpy as np
 import heapq
-    
+import builtins
+
 def FindCageBasis(neighs, matrix, log, max_bond_variance=0.85, max_angle_variance=1.0):
     """Find the best directions for the local coordinate system, which is non-orthogonal.
     """
@@ -358,8 +359,8 @@ def FindCageBasis(neighs, matrix, log, max_bond_variance=0.85, max_angle_varianc
         # We accept trigonal prism with triangle which is not necessary equilateral, but can have
         # two sides with equal length, hence only two angles are equal. We find the minimal
         # difference in angles, and add this is penalty.
-        chi3 = min(abs(phi[0,j1]-phi[0,j2]),abs(phi[0,j1]-phi[j1,j2]),abs(phi[0,j2]-phi[j1,j2]))
-        chi3 +=min(abs(phi[j3,j4]-phi[j3,j5]),abs(phi[j3,j4]-phi[j4,j5]),abs(phi[j3,j5]-phi[j4,j5]))
+        chi3 = builtins.min(abs(phi[0,j1]-phi[0,j2]),abs(phi[0,j1]-phi[j1,j2]),abs(phi[0,j2]-phi[j1,j2]))
+        chi3 +=builtins.min(abs(phi[j3,j4]-phi[j3,j5]),abs(phi[j3,j4]-phi[j4,j5]),abs(phi[j3,j5]-phi[j4,j5]))
         chi3 *= 2*pi
         #print('chi2=', chi2, 'chi3=', chi3, 'chi2r=', chi2r, file=log)
         chi2 += chi2r
