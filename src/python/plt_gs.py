@@ -9,6 +9,37 @@ import re, os
 import argparse
 from imp2lattc import ImpurityLatticeConnection, SimplifySiginds
 
+class InteractiveLegend:
+    def __init__(self,lines,leg,fig):
+        self.map_legend_to_ax = {}  # Will map legend lines to original lines.
+        pickradius = 5  # Points (Pt). How close the click needs to be to trigger an event.
+        for legend_line, ax_line in zip(leg.get_lines(), lines):
+            legend_line.set_picker(pickradius)  # Enable picking on the legend line.
+            self.map_legend_to_ax[legend_line] = ax_line
+        # Works even if the legend is draggable. This is independent from picking legend lines.
+        self.leg = leg
+        self.leg.set_loc('best')
+        self.leg.set_draggable(True)
+        self.fig = fig
+        
+    def __call__(self, event):
+        # On the pick event, find the original line corresponding to the legend
+        # proxy line, and toggle its visibility.
+        legend_line = event.artist
+    
+        # Do nothing if the source of the event is not a legend line.
+        if legend_line not in self.map_legend_to_ax:
+            return
+        
+        ax_line = self.map_legend_to_ax[legend_line]
+        visible = not ax_line.get_visible()
+        ax_line.set_visible(visible)
+        # Change the alpha on the line in the legend, so we can see what lines
+        # have been toggled.
+        legend_line.set_alpha(1.0 if visible else 0.2)
+        self.fig.canvas.draw()
+
+
 if __name__=='__main__':
     usage = 'Plots Green\'s function or self-energy by reading imp.?/Gf.out.* and case.gc? files'
     parser = argparse.ArgumentParser(description=usage)
@@ -102,6 +133,8 @@ if __name__=='__main__':
             print(' lcols_dn=', lcols_dn)
         
     fig, axs = plt.subplots(2, len(imp2latt), sharex=True)
+    # remember lines for all axis in the plot. This is needed for interactive legend.
+    lines = [[[] for i in range(len(imp2latt))] for j in range(2)] 
     if len(imp2latt) == 1:
         axs = axs.reshape(2, 1)
     # Below plotting impurity quantity
@@ -126,8 +159,10 @@ if __name__=='__main__':
                 om = dat[0]
                 Gimp = dat[1::2]+dat[2::2]*1j
                 for i,j in enumerate(icols[icix]):
-                    axs[0][ii].plot(om,Gimp[j].imag, 'C'+str(il%10), label='imp['+str(it[0])+','+str(j)+']')
-                    axs[1][ii].plot(om,Gimp[j].real, 'C'+str(il%10), label='imp['+str(it[0])+','+str(j)+']')
+                    line1,=axs[0][ii].plot(om,Gimp[j].imag, 'C'+str(il%10), label='imp['+str(it[0])+','+str(j)+']')
+                    line2,=axs[1][ii].plot(om,Gimp[j].real, 'C'+str(il%10), label='imp['+str(it[0])+','+str(j)+']')
+                    lines[0][ii].append(line1)
+                    lines[1][ii].append(line2)
                     il+=1
         
         # Below plotting lattice quantity
@@ -146,25 +181,30 @@ if __name__=='__main__':
                 w = dat[0]
                 Glat = array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
                 for i,j in enumerate(cls):
-                    axs[0][ii].plot(w,Glat[i].imag, 'C'+str(il%10)+'.', label='lat['+str(icix)+',$'+inl.legends[icix][j]+'$]')
-                    axs[1][ii].plot(w,Glat[i].real, 'C'+str(il%10)+'.', label='lat['+str(icix)+',$'+inl.legends[icix][j]+'$]')
+                    line1,=axs[0][ii].plot(w,Glat[i].imag, 'C'+str(il%10)+'.', label='lat['+str(icix)+',$'+inl.legends[icix][j]+'$]')
+                    line2,=axs[1][ii].plot(w,Glat[i].real, 'C'+str(il%10)+'.', label='lat['+str(icix)+',$'+inl.legends[icix][j]+'$]')
+                    lines[0][ii].append(line1)
+                    lines[1][ii].append(line2)
                     il+=1
-                
-            if lcols_dn is not None and icix in lcols_dn and foundOneYetdn:
-                    fname = fnames[0]+str(icix)+'dn'
-                    if not os.path.exists(fname):
-                        continue
-                    else:
-                        foundOneYetdn=True
-                    cls = array(lcols_dn[icix])
-                    print('reading', fname, 'cols=', cls)
-                    dat = loadtxt(fname).T
-                    w = dat[0]
-                    Glat = array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
-                    for i,j in enumerate(cls):
-                        axs[0][ii].plot(w,Glat[i].imag, 'C'+str(il%10)+'.', label='lat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
-                        axs[1][ii].plot(w,Glat[i].real, 'C'+str(il%10)+'.', label='lat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
-                        il+=1
+            
+            if lcols_dn is not None and icix in lcols_dn and not foundOneYetdn:
+                fname = fnames[0]+str(icix)+'dn'
+                print('trying ', fname)
+                if not os.path.exists(fname):
+                    continue
+                else:
+                    foundOneYetdn=True
+                cls = array(lcols_dn[icix])
+                print('reading', fname, 'cols=', cls)
+                dat = loadtxt(fname).T
+                w = dat[0]
+                Glat = array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
+                for i,j in enumerate(cls):
+                    line1,=axs[0][ii].plot(w,Glat[i].imag, 'C'+str(il%10)+'.', label='lat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
+                    line2,=axs[1][ii].plot(w,Glat[i].real, 'C'+str(il%10)+'.', label='lat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
+                    lines[0][ii].append(line1)
+                    lines[1][ii].append(line2)
+                    il+=1
                 
         if xrng[0]!=None and xrng[1]!=None:
             axs[0][ii].set_xlim(xrng)
@@ -183,10 +223,15 @@ if __name__=='__main__':
             axs[0][ii].set_ylim(top=yrng[1])
             axs[1][ii].set_ylim(top=yrng[1])
         
-        axs[0][ii].legend(loc='best', fontsize='small')
-        #axs[1].legend(loc='best', fontsize='small')
         axs[1][ii].set_xlabel('Energy[eV]')
         axs[0][ii].set_title('imp.'+str(ii))
+        
+        #axs[0][ii].legend(loc='best', fontsize='small')
+        #axs[1][ii].legend(loc='best', fontsize='small')
+        for l in range(2):
+            int_leg = InteractiveLegend(lines[l][ii],axs[l][ii].legend(loc='best', fontsize='small'),fig)
+            fig.canvas.mpl_connect('pick_event', int_leg)
+
     axs[1][0].set_ylabel('Re '+fnames[2])
     axs[0][0].set_ylabel('Im '+fnames[2])
     
