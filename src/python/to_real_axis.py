@@ -118,7 +118,12 @@ if __name__ == '__main__':
     cmd = 'cd '+onreal_dir+'; '+dmfe.ROOT+'/x_dmft.py dmft1'
     print('executing...', cmd)
     info=subprocess.call(cmd,shell=True,stdout=sys.stdout,stderr=sys.stderr)
-
+    if os.path.isfile(w2k.case+'.indmfldn'):
+        cmd = 'cd '+onreal_dir+'; '+dmfe.ROOT+'/x_dmft.py dmft1 -l dn'
+        print('executing...', cmd)
+        info=subprocess.call(cmd,shell=True,stdout=sys.stdout,stderr=sys.stderr)
+        
+        
     if os.path.exists(w2k.case+'.klist_band'):
         shutil.copyfile(w2k.case+'.klist_band', onreal_dir+'/'+w2k.case+'.klist_band')
         cmd = 'cd '+onreal_dir+'; '+dmfe.ROOT+'/x_dmft.py lapw1 --band'
@@ -127,4 +132,8 @@ if __name__ == '__main__':
         cmd = 'cd '+onreal_dir+'; '+dmfe.ROOT+'/x_dmft.py dmftp'
         print('executing...', cmd)
         info=subprocess.call(cmd,shell=True,stdout=sys.stdout,stderr=sys.stderr)
-    
+        if os.path.isfile(w2k.case+'.indmfldn'):
+            cmd = 'cd '+onreal_dir+'; '+dmfe.ROOT+'/x_dmft.py dmftp -l dn'
+            print('executing...', cmd)
+            info=subprocess.call(cmd,shell=True,stdout=sys.stdout,stderr=sys.stderr)
+            
