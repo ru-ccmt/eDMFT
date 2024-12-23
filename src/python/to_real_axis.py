@@ -119,6 +119,7 @@ if __name__ == '__main__':
     print('executing...', cmd)
     info=subprocess.call(cmd,shell=True,stdout=sys.stdout,stderr=sys.stderr)
     if os.path.isfile(w2k.case+'.indmfldn'):
+        ChangeMatsubaraFlag(onreal_dir+'/'+w2k.case+'.indmfldn', 0, xrng, args.n)
         cmd = 'cd '+onreal_dir+'; '+dmfe.ROOT+'/x_dmft.py dmft1 -l dn'
         print('executing...', cmd)
         info=subprocess.call(cmd,shell=True,stdout=sys.stdout,stderr=sys.stderr)
