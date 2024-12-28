@@ -17,10 +17,11 @@ from utils import W2kEnvironment
 
 from wlatgen import Latgen
 from wstruct import Struct
+import builtins
 
 def common_denom(i1,i2):
     if ( 2*abs(i1-i2)/(i1+i2) < 0.05 ):  # this is approximation. If i1 and i2 are very close, we do not want to take the product, but approximate
-        return max(i1,i2)
+        return builtins.max(i1,i2)
     else:
         return int(i1*i2/gcd(i1,i2))
 

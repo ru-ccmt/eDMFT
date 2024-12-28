@@ -18,7 +18,8 @@ from utils import W2kEnvironment
 
 from wlatgen import Latgen
 from wstruct import Struct
-    
+import builtins
+
 def W2k_klist_band(fname, Nt, labels, Ks, k2icartes, k2cartes, log=sys.stdout):
     """
     fname     -- filename, should be case.klist_band
@@ -43,7 +44,7 @@ def W2k_klist_band(fname, Nt, labels, Ks, k2icartes, k2cartes, log=sys.stdout):
                   'k-conBZ=[{:6.4g},{:6.4g},{:6.4g}]'.format(*(k2icartes@Ks[i])), file=log) # primitive and conventional BZ
         kc_p = kc[:]
     # Nkp is number of k-points in each interval
-    Nkp = [round(Nt*(dst[ii]-dst[ii-1])/dst[-1]) for ii in range(1,len(dst))]
+    Nkp = [builtins.round(Nt*(dst[ii]-dst[ii-1])/dst[-1]) for ii in range(1,len(dst))]
     # 
     print('suggested and actual number of momentum points:', Nt, sum(Nkp), Nkp, file=log)
 
