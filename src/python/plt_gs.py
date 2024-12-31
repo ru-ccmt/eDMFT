@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 from pylab import *
 import numpy as np
-import glob
-import utils
-from indmffile import Indmfl, ParsIndmfi
+import glob, re, os
 from functools import reduce
-import re, os
 import argparse
-from imp2lattc import ImpurityLatticeConnection, SimplifySiginds
+import plt_auxiliary as au
 
 class InteractiveLegend:
     def __init__(self,lines,leg,fig):
@@ -68,23 +65,24 @@ if __name__=='__main__':
     #print('yrng=', yrng)
     #print('lastn=', lastn)
 
-    env = utils.W2kEnvironment()
+    #env = utils.W2kEnvironment()
+    case = au.get_case()
     if args.fname=='gc':
-        fnames = [env.case+'.gc', 'Gf.out', 'G']
+        fnames = [case+'.gc', 'Gf.out', 'G']
     else:
         fnames = ['sig.inp', 'Sig.out','$\Sigma$']
         
-    inl = Indmfl(env.case)
+    inl = au.Indmfl(case)
     inl.read()
-    iSiginds = ParsIndmfi(env.case)
-    _icols = SimplifySiginds(iSiginds)
-    _lcols = SimplifySiginds(inl.siginds)
+    iSiginds = au.ParsIndmfi(case)
+    _icols = au.SimplifySiginds(iSiginds)
+    _lcols = au.SimplifySiginds(inl.siginds)
     _lcols_dn=None
-    if os.path.isfile(env.case+'.indmfldn'):
-        inldn = Indmfl(env.case, 'indmfldn')
+    if os.path.isfile(case+'.indmfldn'):
+        inldn = au.Indmfl(case, 'indmfldn')
         inldn.read()
-        _lcols_dn = SimplifySiginds(inl.siginds)
-    imp2latt = ImpurityLatticeConnection(_lcols, _icols, sys.stdout)
+        _lcols_dn = au.SimplifySiginds(inl.siginds)
+    imp2latt = au.ImpurityLatticeConnection(_lcols, _icols, sys.stdout)
     # these are columns we can fill in with our impurity problems
     print('_icols=', _icols)
     print('_lcols=',_lcols)

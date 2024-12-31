@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-
-from scipy import *
+#from scipy import *
 from pylab import *
 import re, os, sys
 import glob
 import argparse
+import numpy as np
 
 Ry2eV = 13.60569193
 
@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', default=False, action='store_true', help='grid')
     parser.add_argument('-ef', type=float, default=None, help='Fermi energy in eV')
     parser.add_argument('-Ry', default=False, action='store_true', help='display in Rydberg units')
+    parser.add_argument('-w', type=str, default='-', help='symbol for plotting, Default "-" ')
     args = parser.parse_args()
 
     if (args.fname==None):
@@ -79,14 +80,14 @@ if __name__ == '__main__':
     i_last = min(last)
     nbands = i_last-i_first
 
-    enek = zeros((nkp,nbands))
+    enek = np.zeros((nkp,nbands))
     for ik in range(nkp):
         i_start = i_first-first_band[ik]
         i_end = i_start + nbands
         if args.Ry:
-            enek[ik,:] = array(kene[ik][i_start:i_end])
+            enek[ik,:] = np.array(kene[ik][i_start:i_end])
         else:
-            enek[ik,:] = array(kene[ik][i_start:i_end])*Ry2eV-EF
+            enek[ik,:] = np.array(kene[ik][i_start:i_end])*Ry2eV-EF
     xtcks=[]
     xlabels=[]
     for ik in range(nkp):
@@ -96,7 +97,7 @@ if __name__ == '__main__':
 
     ax = subplot()
     for ib in range(nbands):
-        plot(enek[:,ib], '-')
+        plot(enek[:,ib], args.w)
     
     xlim([0,nkp])
     

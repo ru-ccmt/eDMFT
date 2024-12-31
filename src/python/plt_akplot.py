@@ -3,12 +3,13 @@
 import numpy as np
 from pylab import *
 import glob, os, sys
-import scipy
 import argparse
+import plt_auxiliary as au
 
 mingle_names={'W':'$W$','L':'$L$','LAMBDA':'$\Lambda$','GAMMA':'$\Gamma$','DELTA':'$\Delta$','X':'$X$','Z':'$Z$','W':'$W$','K':'$K$',
               'R': '$R$', 'S':'$S$', 'T':'$T$', 'U':'$U$', 'Y':'$Y$'}
 
+    
 if __name__ == '__main__':
     usage = 'Plots the spectral furnction after dmftp step has been executed'
     parser = argparse.ArgumentParser(description=usage)
@@ -27,9 +28,8 @@ if __name__ == '__main__':
     DY = args.d
     _cmap_ = eval(args.c)
     _col_ = args.l
-    
-    with open('EF.dat', 'r') as fEF:
-        mu = float(fEF.read())
+
+    mu = au.FindEF()
     
     print('using fname=', fname, 'and chemical potential', mu)
 

@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 from pylab import *
 import numpy as np
-import re, os
+import re, os, sys
 import glob
 import argparse
-import utils
-from indmffile import Indmfl, ParsIndmfi
-from imp2lattc import ImpurityLatticeConnection, SimplifySiginds
-from wstruct import Struct
+import plt_auxiliary as au
 
 class InteractiveLegend:
     def __init__(self,lines,leg,fig):
@@ -61,10 +58,11 @@ if __name__=='__main__':
         yrng = [float(w[i]) if w[i]!='' else None for i in range(2)]
     lastn = int(args.a)
 
-    env = utils.W2kEnvironment()
-
-    dat = loadtxt(env.case+'.cdos').T
-    with open(env.case+'.cdos') as fi:
+    #env = utils.W2kEnvironment()
+    case = au.get_case()
+    
+    dat = loadtxt(case+'.cdos').T
+    with open(case+'.cdos') as fi:
         line = fi.readline()
         leg = re.findall(r"total|a=\s*\d+\s+L=\s*\d+", line) # legends parsing
         #print(leg)
@@ -81,32 +79,32 @@ if __name__=='__main__':
         lines.append(linei)
         il+=1
     
-    inl = Indmfl(env.case)
+    inl = au.Indmfl(case)
     inl.read()
 
     # below is Green's function plotting, to extract partial dos in MT-spheres
-    struct = Struct()
-    struct.ReadStruct(env.case+'.struct')
+    struct = au.Struct()
+    struct.ReadStruct(case+'.struct')
     atom_names0 = [[struct.aname[iat]]*struct.mult[iat] for iat in range(struct.nat)]
     atom_names = [item for sublist in atom_names0 for item in sublist]
     print('atom_names=', atom_names)
     
-    iSiginds = ParsIndmfi(env.case)
-    _icols = SimplifySiginds(iSiginds)
-    _lcols = SimplifySiginds(inl.siginds)
+    iSiginds = au.ParsIndmfi(case)
+    _icols = au.SimplifySiginds(iSiginds)
+    _lcols = au.SimplifySiginds(inl.siginds)
     _lcols_dn=None
-    if os.path.isfile(env.case+'.indmfldn'):
-        inldn = Indmfl(env.case, 'indmfldn')
+    if os.path.isfile(case+'.indmfldn'):
+        inldn = Indmfl(case, 'indmfldn')
         inldn.read()
-        _lcols_dn = SimplifySiginds(inl.siginds)
+        _lcols_dn = au.SimplifySiginds(inl.siginds)
 
-    so_present = (os.path.isfile(env.case+'.inso') and os.path.getsize(env.case+'.inso')>0)
+    so_present = (os.path.isfile(case+'.inso') and os.path.getsize(case+'.inso')>0)
     #nspin=2
     nspin=1
     if _lcols_dn is not None or so_present:
         nspin=1
         
-    imp2latt = ImpurityLatticeConnection(_lcols, _icols, sys.stdout)
+    imp2latt = au.ImpurityLatticeConnection(_lcols, _icols, sys.stdout)
     # these are columns we can fill in with our impurity problems
     print('_icols=', _icols)
     print('_lcols=',_lcols)
@@ -117,7 +115,7 @@ if __name__=='__main__':
     lcols={}
     degs={}
     for icix in _lcols:
-        lcols[icix] = (array(_lcols[icix])-min(_lcols[icix])).tolist()
+        lcols[icix] = (np.array(_lcols[icix])-min(_lcols[icix])).tolist()
         # degeneracies of each column
         degs[icix]  = [np.count_nonzero(inl.siginds[icix] == ic) for ic in _lcols[icix]]
     lcols_dn=None
@@ -125,7 +123,7 @@ if __name__=='__main__':
     if _lcols_dn is not None:
         lcols_dn={}
         for icix in _lcols_dn:
-            lcols_dn[icix] = (array(_lcols_dn[icix])-min(_lcols_dn[icix])).tolist()
+            lcols_dn[icix] = (np.array(_lcols_dn[icix])-min(_lcols_dn[icix])).tolist()
             degsdn[icix]  = [np.count_nonzero(inldn.siginds[icix] == ic) for ic in _lcols_dn[icix]]
     
     print('imp2lattice connection=', imp2latt)
@@ -133,9 +131,9 @@ if __name__=='__main__':
         print(' imp.'+str(ii)+'/Gf.out icols['+str(ii+1)+']=', icols[ii+1])
         print(' connected to ')
         for icix in imp2latt[ii]:
-            print('  gc'+str(icix)+'   lcols['+str(icix)+']=',array(lcols[icix]))
+            print('  gc'+str(icix)+'   lcols['+str(icix)+']=',np.array(lcols[icix]))
             if lcols_dn is not None:
-                print('  gc'+str(icix)+'dn lcols['+str(icix)+']=',array(lcols_dn[icix]))
+                print('  gc'+str(icix)+'dn lcols['+str(icix)+']=',np.array(lcols_dn[icix]))
                 
         
     print('All available columns:')
@@ -162,7 +160,7 @@ if __name__=='__main__':
         foundOneYet,foundOneYetdn=False,False
         for icix in imp2latt[ii]:
             if icix in lcols and not foundOneYet:
-                fname = env.case+'.gc'+str(icix)
+                fname = case+'.gc'+str(icix)
                 if not os.path.exists(fname):
                     continue
                 else:
@@ -170,26 +168,26 @@ if __name__=='__main__':
                 iatm = inl.cix[icix][0][0]
                 atm = atom_names[iatm-1]
                 print('atm=', atm)
-                cls = array(lcols[icix])
+                cls = np.array(lcols[icix])
                 print('reading', fname, 'cols=', cls)
                 dat = loadtxt(fname).T
                 w = dat[0]
-                dos = array([-dat[2+2*j]*degs[icix][j]*nspin*len(imp2latt[ii])/pi for j in cls])
+                dos = np.array([-dat[2+2*j]*degs[icix][j]*nspin*len(imp2latt[ii])/pi for j in cls])
                 for i,j in enumerate(cls):
                     linei,= axs.plot(w,dos[i], 'C'+str(il%10)+':', label=atm+'['+str(icix)+',$'+inl.legends[icix][j]+'$]')
                     lines.append(linei)
                     il+=1
             if lcols_dn is not None and icix in lcols_dn and not foundOneYetdn:
-                fname = env.case+'.gc'+str(icix)+'dn'
+                fname = case+'.gc'+str(icix)+'dn'
                 if not os.path.exists(fname):
                     continue
                 else:
                    foundOneYetdn=True
-                cls = array(lcols_dn[icix])
+                cls = np.array(lcols_dn[icix])
                 print('reading', fname, 'cols=', cls)
                 dat = loadtxt(fname).T
                 w = dat[0]
-                Glat = array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
+                Glat = np.array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
                 for i,j in enumerate(cls):
                     linei,=axs.plot(w,-Glat[i].imag/pi, 'C'+str(il%10)+':', label='glat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
                     lines.append(linei)

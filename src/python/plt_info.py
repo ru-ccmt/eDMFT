@@ -2,7 +2,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import glob
-import utils
 Ry2eV = 13.60569193
 
 if __name__ == '__main__':

@@ -3,13 +3,12 @@
 import numpy as np
 from pylab import *
 import glob, os, sys
-import scipy
 import argparse
-
 from matplotlib.colors import colorConverter
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
+import plt_auxiliary as au
 
 mingle_names={'W':'$W$','L':'$L$','LAMBDA':'$\Lambda$','GAMMA':'$\Gamma$','DELTA':'$\Delta$','X':'$X$','Z':'$Z$','W':'$W$','K':'$K$',
               'R': '$R$', 'S':'$S$', 'T':'$T$', 'U':'$U$', 'Y':'$Y$'}
@@ -35,8 +34,8 @@ if __name__ == '__main__':
     _cmap_ = eval(args.c)
     _col_ = args.l
     
-    with open('EF.dat', 'r') as fEF:
-        mu = float(fEF.read())
+    mu = au.FindEF()
+    
     fnames = [fname1,fname2]
     print('using fnames=',fnames, 'and chemical potential', mu)
     #print('cmap=', args.c, 'color=', args.l, 'intensity=', args.i, 'small=', args.b, 'DY=', args.d)
