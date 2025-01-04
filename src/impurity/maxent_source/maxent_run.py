@@ -17,9 +17,9 @@ if len(sys.argv)<2:
     sys.exit(0)
 
 Sfile = sys.argv[1]
-fi = open(Sfile, 'r')
-firstlines = [next(fi),next(fi)]
-fi.close()
+
+with open(Sfile, 'r') as fi:
+    firstlines = [next(fi),next(fi)]
 
 Sdata = loadtxt(Sfile).transpose()
 # number of baths
@@ -32,19 +32,47 @@ for i in range(1,len(Sdata)):
         nz2 +=1
 nb = int(nb2/2)
 nz = int(nz2/2)
-print('nb=',nb, 'nz=',nz)
 
+s_oo_present=True
+if not firstlines[0].lstrip().startswith('#') or not firstlines[1].lstrip().startswith('#'):
+    s_oo_present=False
+    s_oo = [Sdata[1+2*b,-1] for b in range(nb)]
+    for b in range(nb):
+        Sdata[1+2*b,:] -= s_oo[b]
+    
 
 # path to skrams executable
 exepath = os.environ.get('WIEN_DMFT_ROOT')
 # need 'maxent_params.dat'
+if not os.path.exists('maxent_params.dat'):
+    mparams="""params={'statistics': 'fermi', # fermi/bose
+    'Ntau'      : 400,     # Number of time points
+    'L'         : 30.0,    # cutoff frequency on real axis
+    'x0'        : 0.01,   # low energy cut-off
+    'bwdth'     : 0.004,    # smoothing width
+    'Nw'        : 450,     # number of frequency points on real axis
+    'gwidth'    : 2*15.0,  # width of gaussian
+    'idg'       : 1,       # error scheme: idg=1 -> sigma=deltag ; idg=0 -> sigma=deltag*G(tau)
+    'deltag'    : 0.01,   # error
+    'Asteps'    : 4000,    # anealing steps
+    'alpha0'    : 1000,    # starting alpha
+    'min_ratio' : 0.001,    # condition to finish, what should be the ratio
+    'iflat'     : 1,       # iflat=0 : constant model, iflat=1 : gaussian of width gwidth, iflat=2 : input using file model.dat
+    'Nitt'      : 500,     # maximum number of outside iterations, 1000 can take too much time
+    'Nr'        : 0,       # number of smoothing runs
+    'Nf'        : 40,      # to perform inverse Fourier, high frequency limit is computed from the last Nf points
+    }"""
+    with open('maxent_params.dat', 'w') as fo:
+        fo.write(mparams)
+
+    
 exec(compile(open('maxent_params.dat', "rb").read(), 'maxent_params.dat', 'exec'))
 
 iom = Sdata[0]
 beta = pi/iom[0]
 tau = linspace(0,beta,params['Ntau']+1)
 
-print('beta=', beta)
+print('nb=',nb, 'nz=',nz, 'beta=', beta, 's_oo_present=', s_oo_present)
 Sigt=[]
 for b in range(nb):
     Gm = 1/(iom*1j-Sdata[1+2*b]-Sdata[2+2*b]*1j)
@@ -85,10 +113,15 @@ for z in range(nz):
     Sigt.append( zeros(len(Sigt[0])) )
 
 Sigt = array(Sigt).transpose()
-fo = open('Sig.out', 'w')
-print(firstlines[0].strip(), file=fo)
-print(firstlines[1].strip(), file=fo)
-for sg in Sigt:
-    for b in sg:
-        print(b, end=' ', file=fo)
-    print(file=fo)
+with open('Sig.out', 'w') as fo:
+    if s_oo_present:
+        print(firstlines[0].strip(), file=fo)
+        print(firstlines[1].strip(), file=fo)
+    else:
+        for b in range(nb):
+            Sigt[:,1+2*b] += s_oo[b]
+    
+    for sg in Sigt:
+        for b in sg:
+            print(b, end=' ', file=fo)
+        print(file=fo)
