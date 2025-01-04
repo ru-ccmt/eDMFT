@@ -3,16 +3,38 @@
 import numpy as np
 from pylab import *
 import glob, os, sys
+import scipy
 import argparse
+
 from matplotlib.colors import colorConverter
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
-import plt_auxiliary as au
 
 mingle_names={'W':'$W$','L':'$L$','LAMBDA':'$\Lambda$','GAMMA':'$\Gamma$','DELTA':'$\Delta$','X':'$X$','Z':'$Z$','W':'$W$','K':'$K$',
               'R': '$R$', 'S':'$S$', 'T':'$T$', 'U':'$U$', 'Y':'$Y$'}
 
+def ReadDataFile(fname):
+    try:
+        ekw = np.loadtxt(fname)
+    except ValueError:
+        # Fallback: parse line by line
+        data_list = []
+        with open(fname, "r") as f:
+            for line in f:
+                # Strip whitespace and skip empty or comment lines if needed
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                # Split and convert each field to float
+                fields = line.split()
+                row = [float(x) for x in fields]
+                data_list.append(row)
+        min_columns = np.min([len(line) for line in data_list])
+        data_list = [line[:min_columns] for line in data_list]
+        eks = np.array(data_list)
+    return eks
+    
 if __name__ == '__main__':
     usage = 'Plots the spectral furnction after dmftp step has been executed'
     parser = argparse.ArgumentParser(description=usage)
@@ -34,8 +56,8 @@ if __name__ == '__main__':
     _cmap_ = eval(args.c)
     _col_ = args.l
     
-    mu = au.FindEF()
-    
+    with open('EF.dat', 'r') as fEF:
+        mu = float(fEF.read())
     fnames = [fname1,fname2]
     print('using fnames=',fnames, 'and chemical potential', mu)
     #print('cmap=', args.c, 'color=', args.l, 'intensity=', args.i, 'small=', args.b, 'DY=', args.d)
@@ -63,7 +85,7 @@ if __name__ == '__main__':
 
     Akw=[]
     for spin in [0,1]:
-        ekw = loadtxt(fnames[spin])
+        ekw = ReadDataFile(fnames[spin])
         nom = int(len(ekw)/nkp)
         if nkp*nom != len(ekw):
             print('ERROR data length in', fname1, 'seems to be incompatible with case.klist_band. We have nkp=', nkp, 'and num lines=', len(ekw), 'which is incomensurate with number of k-points')
