@@ -391,7 +391,36 @@ def FindEF():
                 EF = float(line[38:])*Ry2eV
                 break
     return EF
+
+class InteractiveLegend:
+    def __init__(self,lines,axs,fig,fontsize='medium'):
+        self.map_legend_to_ax = {}  # Will map legend lines to original lines.
+        pickradius = 5  # Points (Pt). How close the click needs to be to trigger an event.
+        self.leg = axs.legend(loc='best',fontsize=fontsize)
+        self.leg.set_draggable(True)
+        for legend_line, ax_line in zip(self.leg.get_lines(), lines):
+            legend_line.set_picker(pickradius)  # Enable picking on the legend line.
+            self.map_legend_to_ax[legend_line] = ax_line
+        # Works even if the legend is draggable. This is independent from picking legend lines.
+        self.fig = fig
+        
+    def __call__(self, event):
+        # On the pick event, find the original line corresponding to the legend
+        # proxy line, and toggle its visibility.
+        legend_line = event.artist
     
+        # Do nothing if the source of the event is not a legend line.
+        if legend_line not in self.map_legend_to_ax:
+            return
+        
+        ax_line = self.map_legend_to_ax[legend_line]
+        visible = not ax_line.get_visible()
+        ax_line.set_visible(visible)
+        # Change the alpha on the line in the legend, so we can see what lines
+        # have been toggled.
+        legend_line.set_alpha(1.0 if visible else 0.2)
+        self.fig.canvas.draw()
+
 if __name__ == '__main__':
     
     case = get_case()
