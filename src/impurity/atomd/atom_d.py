@@ -130,14 +130,13 @@ def CoulUsC2_slow(l, T2C):
     gck = gaunt.cmp_all_gaunt()
     #save('gck.npy', gck)
     #save('T2C.npy', T2C)
-    
     #print 'Gaunt coefficients precomputed - shape(gck)', shape(gck)
-    mw = 2*l+1
-    if len(T2C) == mw:
-        nw = mw
+    Nls = int(2*l+1)
+    if len(T2C) == Nls:
+        nw = Nls
         ns = 1
-    elif len(T2C) == 2*mw:
-        nw = 2*(2*l+1)
+    elif len(T2C) == 2*Nls:
+        nw = int(2*(2*l+1))
         ns = 2
     else:
         print("ERROR in atom_d.py: T2C has wrong shape")
@@ -147,7 +146,7 @@ def CoulUsC2_slow(l, T2C):
     
     UC = zeros((l+1, nw, nw, nw, nw), dtype=complex)
     shft = 3-l
-    shft2 = 2*l+1
+    shft2 = int(2*l+1)
     Sum1 = zeros((nw,nw,shft2*2),dtype=complex)
     Sum2 = zeros((nw,nw,shft2*2),dtype=complex)
     
@@ -155,17 +154,17 @@ def CoulUsC2_slow(l, T2C):
         Sum1[:,:,:]=0
         for i4 in range(nw):
             for i1 in range(nw):
-                for m4 in range(mw):
-                    for m1 in range(mw):
+                for m4 in range(Nls):
+                    for m1 in range(Nls):
                         for s in range(ns):
-                            Sum1[i4,i1,m1-m4+shft2] += T2Cp[i4,m4+s*mw]*gck[l,shft+m4,shft+m1,k]*T2C[m1+s*mw,i1]
+                            Sum1[i4,i1,m1-m4+shft2] += T2Cp[i4,m4+s*Nls]*gck[l,shft+m4,shft+m1,k]*T2C[m1+s*Nls,i1]
         Sum2[:,:,:]=0
         for i3 in range(nw):
             for i2 in range(nw):
-                for m3 in range(mw):
-                    for m2 in range(mw):
+                for m3 in range(Nls):
+                    for m2 in range(Nls):
                         for s in range(ns):
-                            Sum2[i3,i2,m3-m2+shft2] += T2Cp[i3,m3+s*mw]*gck[l,shft+m2,shft+m3,k]*T2C[m2+s*mw,i2]
+                            Sum2[i3,i2,m3-m2+shft2] += T2Cp[i3,m3+s*Nls]*gck[l,shft+m2,shft+m3,k]*T2C[m2+s*Nls,i2]
         for i4 in range(nw):
             for i3 in range(nw):
                 for i2 in range(nw):
@@ -183,8 +182,11 @@ def CoulUsC2(l, T2C):
     gck = array(gck, order='C')   # This is essential for pybind11 code to work with fortran gck
     T2C = array(T2C, order='C')
     nw = len(T2C)
-    UC = zeros((l+1, nw, nw, nw, nw), dtype=complex)
-    dpybind.FromSlaterToMatrixU(UC, gck, l, T2C)
+    UC = zeros((int(l+1), nw, nw, nw, nw), dtype=complex)
+    if l%1==0:
+        dpybind.FromSlaterToMatrixU(UC, gck, l, T2C)
+    else: # half-integer l
+        dpybind.FromSlaterToMatrixUd(UC, gck, l, T2C)
     return UC
 
 
@@ -310,7 +312,7 @@ class operateLS(object):
     def CoulombU(self, state, UC, FkoJ, Ising=False):
         sts=[]
         ni=-1
-        maxk=l+1
+        maxk=int(l+1)
         if (self.Q3d):
             ### will evaluate  again <sts| U(b,a,j,i) psi^+_b psi^+_a psi_j psi_i | state>, but
             ### this time U is defined in (m4,m3,m2,m1) basis only, and is missing the spin component.
@@ -649,6 +651,9 @@ def comp(x, y):
         else: return 1
 
 def SpinOrbitM(l,T2C):
+    if l%1!=0: # for non-integer l we did not work it out yet
+        return zeros(shape(T2C))
+    
     # one electron |l,m,s> base
     ms_base=[]
     for s in [1/2.,-1/2.]:
@@ -1010,12 +1015,13 @@ def Check_T2C_Real(T2C, l, fh_info, small):
           Rp[m,i] = Real( T2C[m,i] + (-1)**m * T2C[-m,i] )
           Qm[m,i] = Imag(-T2C[m,i] + (-1)**m * T2C[-m,i] )
     """
-    
-    for i in range(2*l+1):
+    if l%1 !=0 : return # This is not worked out for half-integer l
+    Nls = int(2*l+1)
+    for i in range(Nls):
         ctg=None
         indexm = list(range(l+1))
         indexm = sorted(indexm, key=lambda m: abs(T2C[m+l,i])+abs(T2C[-m+l,i]), reverse=True)
-
+        
         print('sorted by magnitude', file=fh_info)
         for m in indexm:
             print(m, T2C[m+l,i],T2C[-m+l,i], file=fh_info)
@@ -1025,7 +1031,8 @@ def Check_T2C_Real(T2C, l, fh_info, small):
             Rm = T2C[m+l,i].real - (-1)**m * T2C[-m+l,i].real
             Rp = T2C[m+l,i].real + (-1)**m * T2C[-m+l,i].real
             Qm =-T2C[m+l,i].imag + (-1)**m * T2C[-m+l,i].imag
-            #print 'Qp=', Qp, 'Rm=', Rm
+            #print (m, l, 'Qp=', Qp, 'Rm=', Rm, 'Rp=', Rp, 'Qm=', Qm)
+            
             if abs(Qp) > small or abs(Rm) > small:
                 if abs(Qp) > small :
                     ctg = -Rp/Qp
@@ -1046,7 +1053,7 @@ def Check_T2C_Real(T2C, l, fh_info, small):
             print('T2C^T after correction:', file=fh_info)
             cprint2(fh_info, T2C.transpose())
             
-            for m in range(0,l+1):
+            for m in range(l+1):
                 Rm = T2C[m+l,i].real - (-1)**m * T2C[-m+l,i].real
                 Qp = T2C[m+l,i].imag + (-1)**m * T2C[-m+l,i].imag
                 #Rp = T2C[m+l,i].real + (-1)**m * T2C[-m+l,i].real
@@ -1086,7 +1093,7 @@ def FastIsing(Nrange,UC):
 
     print('Br:', 'Stage00: Fast Ising Computations')
     print('Stage00: Fast Ising Computation', file=fh_info)
-    Eimpc = zeros( 2*(2*l+1) )
+    Eimpc = zeros( int(2*(2*l+1)) )
     for ic in range(len(Sigind)):
         Eimpc[ic] = Eimp[Sigind[ic,ic]-1]
     print('Eimpc=', Eimpc, file=fh_info)
@@ -1116,7 +1123,7 @@ def FastIsing(Nrange,UC):
     wNrange = Nrange[:]
     if Nrange[0]!=0:
         wNrange = [Nrange[0]-1]+wNrange
-    if Nrange[-1]!=(2*l+1)*2:
+    if Nrange[-1]!=int((2*l+1)*2):
         wNrange = wNrange+[Nrange[-1]+1]
     print('START: wNrange=', wNrange, file=fh_info)
 
@@ -1404,27 +1411,29 @@ if __name__ == '__main__':
     print('max_M_size=', max_M_size, file=fh_info)
     #print('para=', para, file=fh_info)
     print('ORB=', ORB, file=fh_info)
+
+    Nls = int(2*l+1)
     
     ftrans='Trans.dat'
     #if (len(glob.glob(ftrans))!=0):
     if os.path.exists(ftrans):
         print('Reading file', ftrans, file=fh_info)
         (Sigind, CF) = ReadTrans(ftrans, fh_info)
-        if len(Sigind)==(2*l+1):
-            dn = 2*l+1
+        if len(Sigind)==Nls:
+            dn = Nls
             SigindN = zeros((2*dn, 2*dn), dtype=int)
             SigindN[:dn,:dn] = Sigind
             SigindN[dn:,dn:] = Sigind
             Sigind=SigindN
         
-        if (len(Sigind)!= 2*(2*l+1)):
+        if (len(Sigind)!= int(2*(2*l+1))):
             print('ERROR: Sigind from file', ftrans, 'does not have correct dimension!')
             sys.exit(1)
 
-        if len(CF)==2*l+1:
+        if len(CF)==Nls:
             if Q3d==None: Q3d=True # this must be 3d orbital
-        elif len(CF)==2*(2*l+1):
-            dn=2*l+1
+        elif len(CF)==2*Nls:
+            dn=Nls
             off_diag = CF[dn:,:dn]
             off = sum(sum(abs(off_diag)))
             print(off)
@@ -1452,9 +1461,10 @@ if __name__ == '__main__':
         #   - m runs over complex harmonics (-2, -1, 0, 1, 2)
         # The matrix in Trans.dat, read into CF, is the transpose of
         # what we want in T2C, hence the T2C = transpose(CF) statement
+        #Nls = int(2*l+1)
         if Q3d:
             ##### change 2013
-            T2C = transpose(CF[:(2*l+1),:(2*l+1)])
+            T2C = transpose(CF[:Nls,:Nls])
             Check_T2C_Real(T2C, l, fh_info, small_t2c)
         else:
             #CFN = zeros(shape(CF),dtype=complex)
@@ -1471,17 +1481,17 @@ if __name__ == '__main__':
         print(ftrans, 'file not found; generating Sigind & complex-to-real spherical harmonics transformation inside atom_d.')
         T2C = transpose(Spheric2Cubic(l))
         if Q3d==None: Q3d=True
-
-        Sigind = zeros((2*(2*l+1),2*(2*l+1)), dtype=int)
+        #Nls = int(2*l+1)
+        Sigind = zeros((2*Nls,2*Nls), dtype=int)
         if Q3d:
-            for i in range(2*l+1):
+            for i in range(Nls):
                 Sigind[i,i] = i+1
-                Sigind[i+(2*l+1),i+(2*l+1)] = i+1
+                Sigind[i+Nls,i+Nls] = i+1
         else:
-            zr = zeros(2*l+1)
+            zr = zeros(Nls)
             CF = transpose(T2C)
             CFn=[]
-            for i in range(2*l+1):
+            for i in range(Nls):
                 CFn.append( CF[i].tolist()+zr.tolist()  )
                 CFn.append( zr.tolist()+CF[i].tolist()  )
                 Sigind[2*i,2*i] = i+1
@@ -1490,10 +1500,10 @@ if __name__ == '__main__':
             T2C = transpose(CFn)
             
     if Q3d:
-        global_flip = list(range(2*l+1)) + list(range(2*l+1))
+        global_flip = list(range(Nls)) + list(range(Nls))
     else:
         global_flip=[]
-        for i in range(2*l+1):
+        for i in range(Nls):
             global_flip += [i,i]
             
     print('Sigind=', Sigind, file=fh_info)
@@ -1523,12 +1533,12 @@ if __name__ == '__main__':
     #Fk = gaunt.slaterf(1., Jc)
     U0=1.
     Fk = SlaterF(U0, Jc, l)
-    print('Slater integrals F^k are ', Fk[:,l], file=fh_info)
+    print('Slater integrals F^k are ', Fk[:,int(l)], file=fh_info)
 
     # one electron base
     baths=[]
     for s in [1,-1]:
-        for b in range(2*l+1):
+        for b in range(Nls):
             baths.append([b,s])
     bathi=[Sigind[b,b]-1 for b in range(len(Sigind))]
     
@@ -1569,7 +1579,7 @@ if __name__ == '__main__':
     
     Ntot = 2**(len(baths)) # size of the direct base
     
-    op = operateLS(2*(2*l+1), T2C, Q3d) # operators class
+    op = operateLS(2*Nls, T2C, Q3d) # operators class
     
     if op.Q3d:
         print('baths bi=', op.bi, file=fh_info)
@@ -1592,20 +1602,22 @@ if __name__ == '__main__':
     if CoulombF in ['Full','Ising','FullS', 'IsingS']:      # Slater parametrization
         UC = CoulUsC2(l,T2C)              # Coulomb repulsion matrix
         Ucn = zeros(shape(UC),dtype=complex)
+        n0 = shape(Ucn)[0]
         if CoulombF in ['Full', 'IsingS']:  # We keep matrix elements which give no sign problem
-            for i in range(2*l+1):
-                for j in range(2*l+1):
+            for i in range(Nls):
+                for j in range(Nls):
                     Ucn[0,i,j,j,i] = 1.0
                     Ucn[1,i,j,j,i] = UC[1,i,j,j,i]
-                    Ucn[2,i,j,j,i] = UC[2,i,j,j,i]
+                    if n0>2 : Ucn[2,i,j,j,i] = UC[2,i,j,j,i]
                     if i!=j:
                         Ucn[1,i,j,i,j] = UC[1,i,j,i,j]
                         Ucn[1,i,i,j,j] = UC[1,i,i,j,j]
-                        Ucn[2,i,j,i,j] = UC[2,i,j,i,j]
-                        Ucn[2,i,i,j,j] = UC[2,i,i,j,j]
+                        if n0>2:
+                            Ucn[2,i,j,i,j] = UC[2,i,j,i,j]
+                            Ucn[2,i,i,j,j] = UC[2,i,i,j,j]
             UC = Ucn
     elif CoulombF in ['FullK','IsingK']:  # Kanamori parametrization
-        UC = zeros((l+1, 2*l+1, 2*l+1, 2*l+1, 2*l+1), dtype=complex)
+        UC = zeros((l+1, Nls, Nls, Nls, Nls), dtype=complex)
         for i in range(5):
             for j in range(5):
                 if i==j: 
@@ -1635,15 +1647,15 @@ if __name__ == '__main__':
         UC[0,:,:,:,:]=0.0
         
     if Q3d:
-        nw=2*l+1
+        nw=Nls
     else:
-        nw=2*(2*l+1)
+        nw=2*Nls
     
     if Nrange:
         FastIsing(Nrange)
         sys.exit(0)
     else:
-        Nrange = list(range((2*l+1)*2+1))
+        Nrange = list(range(Nls*2+1))
         
     # some properties of integers which will serve a direct base - partial occupancy and Sz
     prop=[]
@@ -1654,7 +1666,7 @@ if __name__ == '__main__':
     # creates direct base from integers having correct properties
     # wstates contains [N, Sz, [all direct states with this N and Sz]]
 
-    if not Nrange: Nrange = list(range((2*l+1)*2+1))
+    if not Nrange: Nrange = list(range(Nls*2+1))
     wstates = baseN(Nrange,prop,op.Q3d)
     
     indx={}
@@ -1672,7 +1684,7 @@ if __name__ == '__main__':
         print('ERROR: The dimension of the Eimp should be equal to the maximum index of Sigind->',mxs)
         sys.exit(1)
         
-    Eimpc = zeros((2*(2*l+1), 2*(2*l+1)), dtype=complex)
+    Eimpc = zeros((2*Nls, 2*Nls), dtype=complex)
     for ic in range(len(Sigind)):
         Eimpc[ic,ic] = Eimp[Sigind[ic,ic]-1]
 
@@ -1751,7 +1763,7 @@ if __name__ == '__main__':
             
             if CoulombF[:4] == 'Full':
                 ## Coulomb interaction including F2 and F4
-                cst = op.CoulombU(st, UC, Fk[:,l])
+                cst = op.CoulombU(st, UC, Fk[:,int(l)])
                 for cs in cst:
                     ii = cs[0]
                     U0 = cs[1][0]
@@ -1806,16 +1818,17 @@ if __name__ == '__main__':
 
         if CoulombF[:4]=='Full' and op.Q3d:
             # Here we compute matrix of S^2 in eigenbase. Should be diagonal if no spin-orbit coupling
-            S2e = matrix(conj(Tx.transpose())) * S2 * matrix(Tx)
-            
+            #S2e = matrix(conj(Tx.transpose())) * S2 * matrix(Tx)
+            S2e = Tx.T.conj() @ S2 @ Tx
             printS=False
             trouble=[]
-            for i0 in range(shape(S2e)[0]):
-                for i1 in range(shape(S2e)[1]):
-                    if i0!=i1 and abs(S2e[i0,i1])>1e-6 :
-                        print('WARNING: Troubles->', i0, i1, S2e[i0,i1])
-                        printS=True
-                        trouble.append(i0)
+            if l%1==0:
+                for i0 in range(shape(S2e)[0]):
+                    for i1 in range(shape(S2e)[1]):
+                        if i0!=i1 and abs(S2e[i0,i1])>1e-6 :
+                            print('WARNING: Troubles->', i0, i1, S2e[i0,i1])
+                            printS=True
+                            trouble.append(i0)
             
             printS=False # BRISISSS
             if printS:
@@ -2246,8 +2259,8 @@ if __name__ == '__main__':
                         Uc = 0.0
                         if CoulombF[:5] == 'Ising' and not ((i1==i4 and i2==i3) or (i1==i3 and i2==i4)):
                             continue
-                        for k in range(0,l+1):
-                            Uc += real(UC[k,m1,m2,m3,m4])*Fk[k,l]
+                        for k in range(0,int(l+1)):
+                            Uc += real(UC[k,m1,m2,m3,m4])*Fk[k,int(l)]
                         if abs(Uc)>1e-6:
                             print("%2d %2d %2d %2d  %12.8f" % (iind[i1],iind[i2],iind[i3],iind[i4],Uc), file=fcix)
 
