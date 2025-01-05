@@ -41,7 +41,14 @@
 10)
   >mkdir maxent
   >cd maxent
-  >saverage.py -n ../imp.0/Sig.inp.4[5-9]
+  >saverage.py -n ../imp.0/Sigma.inp.4[5-9]
+  >maxent_run.py sig.inpx
+
+  because scales are somewhat smaller we will set in "maxent_params.dat"
+   params["L"]=10
+   params["x0"]=0.002
+  and than rerun:
+  
   >maxent_run.py sig.inpx
   >cp Sig.out ../imp.0/Sigma.inp_real
   >cd ../
