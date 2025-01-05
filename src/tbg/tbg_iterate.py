@@ -6,7 +6,7 @@ from numpy import *
 
 
 if __name__ == '__main__':
-    exec(open("params.py").read())
+    exec(open("tbg_params.py").read())
     dirs = par['dirs']
     log = open('info.iterate','w')
 
@@ -15,7 +15,7 @@ if __name__ == '__main__':
     ROOT = os.environ['WIEN_DMFT_ROOT']
     
     for itt in range(par['Nitt']):
-        exec(open("params.py").read())  # updating parameters if changed
+        exec(open("tbg_params.py").read())  # updating parameters if changed
         Nc = par['Nc']
         #n0 = Nc-16
         #dch = par['dch']

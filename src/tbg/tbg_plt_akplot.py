@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
 
 
-    exec(open("params.py").read())
+    exec(open("tbg_params.py").read())
     unit = par_bs['unit']
     band = '_band'
     path = par_bs['path']

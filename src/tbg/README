@@ -4,7 +4,7 @@
    export PYTHONPATH=$PYTHONPATH:$TBG_ROOT
 
   
-3) cp params.py to this directory.
+3) cp tbg_params.py to this directory.
   set par_bs['PlotBands'] = True
   execute:
   >$TBG_ROOT/tbg_dft.py
@@ -30,7 +30,7 @@
    >$TBG_ROOT/tbg_plt_dos.py -x-15:15
 
 8) par['axis']='imag'  # for imaginary axis eDMFT
-   set Nf=4 or any other number between 0 and 8 for occupancy in params.py
+   set Nf=4 or any other number between 0 and 8 for occupancy in tbg_params.py
    execute:
    >$TBG_ROOT/tbg_dmft_scc.py
 
@@ -46,7 +46,7 @@
   >cp Sig.out ../imp.0/Sigma.inp_real
   >cd ../
     
-  change params.py:
+  change tbg_params.py:
   par['axis']='real'
   par['Sigma']='Sigma.inp_real'
 

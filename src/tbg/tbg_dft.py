@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import os
 from numpy import linalg
 from pylab import *
 from tbg_diophantine import solve, lllhermite
@@ -430,8 +431,86 @@ def BuildIterlayerH_faster(Hk, ks_lattice, n_pk_index, n_pk_value,
 
 
 if __name__ == '__main__':
+    if not os.path.exists('tbg_params.py'):
+        mparams=r"""U0 = 3.0
+beta0=100
+Nf=4
+Sigind0 = {0: [1,1,1,1], 1: [1,1,2,2]}
+par_bs={
+   'itheta'    : 31,    # which magic angle to consider (31 ~ 1.05)
+   'w0_w1'     : 0.75,  # AA->AA versus AA->AB hopping, as defined by Vismanah
+   'unit'      : 50,    # our unit for output is not 1meV, but 50meV
+    'Nkpt'      :1024, #2048,  # Number of k-points 1024
+   'Ecutoff'   : 1000., # Energy cutoff in meV for band structure to compute
+   'npr'       : 10,    # number of bands/2 around the Fermi level to save for further processing
+   'PlotBands' : True, # Either PltBands or save all-k points for computing projector and the Green's function later
+   'shift_mesh': 1./3., # twisted boundary condition, mesh-shift
+   'path'      : [(2/3.,1/3.),(1/2.,1/2.),(1/3.,2/3.),(0,0),(1/2.,1/2.)], # path, relevant only when plotting 
+   'path_legend':["K","M","K'","\Gamma","M"]
+}
+
+par_pr={
+   'optimal_r' : 5.4,  # width of gaussian is exp(- (5/|Rs| * |r|)^2 ), which is determined to obtain the strongest overlap with the low-energy band structure
+   'how_many'  : 1,   # how many shells of emergent lattice to keep in the calculation 
+   'Nr'        : 200, # how many real space points. They will be in the interval [-Nr/2..Nr/2]*Rm for one sheet of graphene, and [-Nr/2..Nr/2]*Rp for the other sheet.
+   'Ndivide'   : 4,   # how many points inside single unit cell of original graphene, (used just for plotting)
+   'wbroad'    : 0.1, # small broadening for plotting
+   'Lpl'       : 5.,  # real space mesh cutoff for plotting
+   'Npl'       : 5000,# number of points to plot G and Delta
+}
+
+par={
+    'axis'       : 'real', # real or imag axis
+    'Nc'         : 20-4+Nf,# desired occupancy (we keep 10 band hence half-filling is 10 electrons
+    'Sigma'      : 'Sigma.inp_real',# input filename or Sigma.inp_real
+    'mu'         : 0.,     # current chemical potential
+    'beta'       : beta0,  # inverse temperature
+    'U0'         : U0,     # Coulomb repulsion 97meV/50meV=1.94
+    'U_exchange' : 0.023,  # strength of the exchange Coulomb part
+    'wmax'       : 5,      # energy cutof for number of matsubara frequencies to be treated exactly (om_{nom}==wmax)
+    'nmax_nom'   : 50,     # the largest matsubara point will be at nom * nmax_nom
+    'ntail'      : 300,    # number of matsubara points in the tail
+    'x0'         : 0.001,  # smallest mesh point on the real axis
+    'Nmax'       : 2000,   # number of frequency points on the real axis
+    'wbroad'     : 0.05,    # broadening
+    'rotateb'    : [False,True], # whether to diagonalize Eimp for the two sites AA and AB
+    'rotateU'    :  False, # Should we rotate Coulomb U
+    'dirs'       : ['imp.0', 'imp.1'], # directories for impurity calculation
+    'Nitt'       : 50,
+    'recomputeEF': True,
+    'minSigind'  : 1e-3,
+    'dch'        : 0.5,  # DC = U*(n0-dch)
+    'plt_w'      : [-2.2,2.2,300], # real axis mesh for plotting spectra  
+}
+
+import os
+mpi_prefix = open('mpi_prefix.dat').readline().strip('\n') if os.path.exists('mpi_prefix.dat') else ''
+
+iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F0)"],
+          "beta"               : [beta0                , "# Inverse temperature "],
+          "svd_lmax"           : [30                   , "# We will use SVD basis to expand G, with this cutoff"],
+          "M"                  : [10e6                 , "# Total number of Monte Carlo steps"],
+          "mode"               : ["SH"                 , "# We will use self-energy sampling, and Hubbard I tail"],
+          "nom"                : [150                  , "# Number of Matsubara frequency points sampled"],
+          "tsample"            : [50                   , "# How often to record measurements"],
+          "GlobalFlip"         : [200000               , "# How often to try a global flip"],
+          "warmup"             : [1e5                  , "# Warmup number of QMC steps"],
+          "nf0"                : [Nf                  , "# Nominal occupancy nd for double-counting"],
+          "svd_L"              : [5.0                  , "# Real space L cutoff"],
+          "svd_x0"             : [0.001                , "# svd low energy cutoff"],
+          "Delta"              : ["Delta.inp"          , "# Name for Delta"],
+          "cix"                : ["actqmc.cix"         , "# Name for the cix file"],
+          "Sig"                : ["Sig.out"            , "# Output self-energy"],
+          "minM"               : [1e-9                 , ""],
+          "minF"               : [1e-9                 , ""],
+}
+        """
+        with open('tbg_params.py', 'w') as fo:
+            fo.write(mparams)
+        
+    
     # This allows user to change parameters by executing params.py
-    exec(open("params.py").read())
+    exec(open("tbg_params.py").read())
     # this uses only par_bs
     for p in list(par_bs.keys()):
         ss = p + '=' + str(par_bs[p])

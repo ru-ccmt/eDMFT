@@ -619,7 +619,7 @@ def GiveTanMesh(x0,L,Nw):
 if __name__ == '__main__':
     
     par={'minSigind': 1e-4}
-    exec(open("params.py").read())
+    exec(open("tbg_params.py").read())
     unit = par_bs['unit']
     plot_bands = par_bs['PlotBands']
     wbroad = par['wbroad']

@@ -70,7 +70,7 @@ if __name__ == '__main__':
       #how_many = 1  # how many shells of emergent lattice to keep in the plot
       #optimal_r = 5.  # width of gaussian is exp(- (5/|Rs| * |r|)^2 )
       BA_region_needed = True
-      exec(open("params.py").read())
+      exec(open("tbg_params.py").read())
       for p in list(par_pr.keys()):
         ss = p + '=' + str(par_pr[p])
         print(ss)
