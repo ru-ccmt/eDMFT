@@ -462,7 +462,7 @@ par_pr={
 par={
     'axis'       : 'real', # real or imag axis
     'Nc'         : 20-4+Nf,# desired occupancy (we keep 10 band hence half-filling is 10 electrons
-    'Sigma'      : 'Sigma.inp_real',# input filename or Sigma.inp_real
+    'Sigma'      : 'Sigma.inp',# input filename or Sigma.inp_real
     'mu'         : 0.,     # current chemical potential
     'beta'       : beta0,  # inverse temperature
     'U0'         : U0,     # Coulomb repulsion 97meV/50meV=1.94
