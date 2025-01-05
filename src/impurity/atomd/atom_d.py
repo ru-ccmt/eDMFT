@@ -1032,7 +1032,6 @@ def Check_T2C_Real(T2C, l, fh_info, small):
             Rp = T2C[m+l,i].real + (-1)**m * T2C[-m+l,i].real
             Qm =-T2C[m+l,i].imag + (-1)**m * T2C[-m+l,i].imag
             #print (m, l, 'Qp=', Qp, 'Rm=', Rm, 'Rp=', Rp, 'Qm=', Qm)
-            
             if abs(Qp) > small or abs(Rm) > small:
                 if abs(Qp) > small :
                     ctg = -Rp/Qp
@@ -1589,63 +1588,98 @@ if __name__ == '__main__':
     
     SO = SpinOrbitM(l,T2C) # Spin orbit matrix
 
+    U_set_from_file = False
+    if os.path.isfile('Uc.dat') and os.path.getsize('Uc.dat')>0:
+        UC = zeros((int(l+1),Nls,Nls,Nls,Nls), dtype=complex)
+        print('Coulomb repulsion read from file Uc.dat', file=fh_info)
+        fUc = loadtxt('Uc.dat')
+        arr_ii = fUc[:,:4].astype(int)  # shape (N, 4)
+        arr_val = fUc[:, 4]             # shape (N,)
 
-    #UC = CoulUsC2(l,T2C)
-    #_UC_ = CoulUsC2_slow(l,T2C)
-    #print('are close=', allclose(UC,_UC_))
-    
-    # These are possible values for CoulombF:
-    #   'Ising'  : density-density interaction of Slater type
-    #   'Full'   : Fully rotationally invariant interaction of Slater type, but with SU(N) symmetry [like in Kanamori]
-    #   'FullS'  : Fully rotationally invariant interaction of Slater type, but with SU(3) symmetry [usual Slater interaction]
-    #   'FullK'  : Kanamori type interaction, but U and J are computed so that within t2g block the interaction has the same form as Slater interaction
-    if CoulombF in ['Full','Ising','FullS', 'IsingS']:      # Slater parametrization
-        UC = CoulUsC2(l,T2C)              # Coulomb repulsion matrix
-        Ucn = zeros(shape(UC),dtype=complex)
-        n0 = shape(Ucn)[0]
-        if CoulombF in ['Full', 'IsingS']:  # We keep matrix elements which give no sign problem
+        U0_average=0
+        how_many=0
+        for i in range(len(fUc)):
+            ii=arr_ii[i]
+            if ii[0]==ii[3] and ii[1]==ii[2]:
+                U0_average += arr_val[i]
+                ik=0
+                how_many += 1
+            else:
+                ik=1
+            UC[ik, ii[0],ii[1],ii[2],ii[3]]=arr_val[i]
+        U0_average *= 1/how_many
+        Fk[:int(l+1),int(l)]=1.0
+        # subtracting U0, which should be given through params.dat
+        for i in range(Nls):
+            for j in range(Nls):
+                UC[0,i,j,j,i] -= U0_average
+        
+        U_set_from_file = True
+    else:
+        # These are possible values for CoulombF:
+        #   'Ising'  : density-density interaction of Slater type
+        #   'Full'   : Fully rotationally invariant interaction of Slater type, but with SU(N) symmetry [like in Kanamori]
+        #   'FullS'  : Fully rotationally invariant interaction of Slater type, but with SU(3) symmetry [usual Slater interaction]
+        #   'FullK'  : Kanamori type interaction, but U and J are computed so that within t2g block the interaction has the same form as Slater interaction
+        if CoulombF in ['Full','Ising','FullS', 'IsingS']:      # Slater parametrization
+            UC = CoulUsC2(l,T2C)              # Coulomb repulsion matrix
+            Ucn = zeros(shape(UC),dtype=complex)
+            n0 = shape(Ucn)[0]
+            if CoulombF in ['Full', 'IsingS']:  # We keep matrix elements which give no sign problem
+                for i in range(Nls):
+                    for j in range(Nls):
+                        Ucn[0,i,j,j,i] = 1.0
+                        Ucn[1,i,j,j,i] = UC[1,i,j,j,i]
+                        if n0>2 : Ucn[2,i,j,j,i] = UC[2,i,j,j,i]
+                        if i!=j:
+                            Ucn[1,i,j,i,j] = UC[1,i,j,i,j]
+                            Ucn[1,i,i,j,j] = UC[1,i,i,j,j]
+                            if n0>2:
+                                Ucn[2,i,j,i,j] = UC[2,i,j,i,j]
+                                Ucn[2,i,i,j,j] = UC[2,i,i,j,j]
+                UC = Ucn
+        elif CoulombF in ['FullK','IsingK']:  # Kanamori parametrization
+            UC = zeros((l+1, Nls, Nls, Nls, Nls), dtype=complex)
             for i in range(Nls):
                 for j in range(Nls):
-                    Ucn[0,i,j,j,i] = 1.0
-                    Ucn[1,i,j,j,i] = UC[1,i,j,j,i]
-                    if n0>2 : Ucn[2,i,j,j,i] = UC[2,i,j,j,i]
-                    if i!=j:
-                        Ucn[1,i,j,i,j] = UC[1,i,j,i,j]
-                        Ucn[1,i,i,j,j] = UC[1,i,i,j,j]
-                        if n0>2:
-                            Ucn[2,i,j,i,j] = UC[2,i,j,i,j]
-                            Ucn[2,i,i,j,j] = UC[2,i,i,j,j]
-            UC = Ucn
-    elif CoulombF in ['FullK','IsingK']:  # Kanamori parametrization
-        UC = zeros((l+1, Nls, Nls, Nls, Nls), dtype=complex)
-        for i in range(5):
-            for j in range(5):
-                if i==j: 
-                    UC[0,i,j,j,i]=1.
-                    UC[1,i,j,j,i]=4./49.
-                    UC[2,i,j,j,i]=4./49.
-                else:
-                    UC[0,i,j,j,i]=1.      # F0 
-                    UC[1,i,j,j,i]=-2./49. # F2 exact for t2g's
-                    UC[2,i,j,j,i]=-4./441.# F4 exact for t2g's
-                    UC[1,i,j,i,j]= 3./49. # F2 exact for t2g's
-                    UC[2,i,j,i,j]=20./441.# F4 exact for t2g's
-                    UC[1,i,i,j,j]= 3./49. # F2 exact for t2g's
-                    UC[2,i,i,j,j]=20./441.# F4 exact for t2g's
-    else:
-        print('ERROR: CoulombF form ', CoulombF, ' not yet implemented!')
-        sys.exit(0)
+                    if i==j: 
+                        UC[0,i,j,j,i]=1.
+                        UC[1,i,j,j,i]=4./49.
+                        UC[2,i,j,j,i]=4./49.
+                    else:
+                        UC[0,i,j,j,i]=1.      # F0 
+                        UC[1,i,j,j,i]=-2./49. # F2 exact for t2g's
+                        UC[2,i,j,j,i]=-4./441.# F4 exact for t2g's
+                        UC[1,i,j,i,j]= 3./49. # F2 exact for t2g's
+                        UC[2,i,j,i,j]=20./441.# F4 exact for t2g's
+                        UC[1,i,i,j,j]= 3./49. # F2 exact for t2g's
+                        UC[2,i,i,j,j]=20./441.# F4 exact for t2g's
+        else:
+            print('ERROR: CoulombF form ', CoulombF, ' not yet implemented!')
+            sys.exit(0)
     
-    if os.path.isfile('../Uc.dat') and os.path.getsize('../Uc.dat')>0:
-        Uc = loadtxt('../Uc.dat')
-        for m1 in range(5):
-            for m2 in range(5):
-                UC[0,m1,m2,m2,m1] = Uc[m1,m2]
-                #if abs(UC[0,m1,m2,m2,m1])>1e-3:
-                #    print "%2d %2d %2d %2d  %5.2f " % (m1, m2, m2, m1, UC[0,m1,m2,m2,m1])
-    else:
+        # We will add F0 later through params.dat in the impurity solver
         UC[0,:,:,:,:]=0.0
         
+    #if os.path.isfile('../Uc.dat') and os.path.getsize('../Uc.dat')>0:
+    #    Uc = loadtxt('../Uc.dat')
+    #    print('Coulomb repulsion read from file Uc.dat', file=fh_info)
+    #    for m1 in range(Nls):
+    #        for m2 in range(Nls):
+    #            UC[0,m1,m2,m2,m1] = Uc[m1,m2]
+    #            #if abs(UC[0,m1,m2,m2,m1])>1e-3:
+    #            #    print "%2d %2d %2d %2d  %5.2f " % (m1, m2, m2, m1, UC[0,m1,m2,m2,m1])
+    #else:
+
+
+
+    #for m1 in range(Nls):
+    #    for m2 in range(Nls):
+    #        for m3 in range(Nls):
+    #            for m4 in range(Nls):
+    #                if sum(UC[:,m1,m2,m3,m4])!=0:
+    #                    print(m1,m2,m3,m4,UC[:,m1,m2,m3,m4])
+    
     if Q3d:
         nw=Nls
     else:
@@ -1771,7 +1805,7 @@ if __name__ == '__main__':
                     iu = states.index(ii)
                     Ham[js,iu] +=  0.5*U1 # adding only F2,F4,... but not F0
                     Ham[js,iu] +=  0.5*U0 # adding only F2,F4,... but not F0
-                    
+                    #print('Adding Ham['+str(js)+','+str(iu)+']=',0.5*(U0+U1))
             elif CoulombF[:5] == 'Ising':
                 ## Coulomb interaction including F2 and F4
                 cst = op.CoulombUIsing(st, UC, Fk[:,l])
