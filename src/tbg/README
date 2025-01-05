@@ -1,0 +1,60 @@
+
+1) Compile with make, so that fortran & C++ codes are compiled to Python modules
+2) ensure that TBG_ROOT is set to this directory, and
+   export PYTHONPATH=$PYTHONPATH:$TBG_ROOT
+
+  
+3) cp params.py to this directory.
+  set par_bs['PlotBands'] = True
+  execute:
+  >$TBG_ROOT/tbg_dft.py
+  >$TBG_ROOT/tbg_projector.py
+
+4) set:
+       par['axis']='real'    # for real axis plotting
+       par['plt_w']=[-2.2,2.2,300]  # for frequency range -2.2*unit,2.2*unit, 300 points
+  execute:
+  >$TBG_ROOT/tbg_dmft_scc.py
+
+5) plot bands with with fat bands:
+  >$TBG_ROOT/tbg_plt_akplot.py
+  or
+  >$TBG_ROOT/tbg_plt_akplot.py -b 0.0001 -i 0.97 -a 0.6
+
+6) set par_bs['PlotBands'] = False
+  execute:
+  >$TBG_ROOT/tbg_dft.py
+  >$TBG_ROOT/tbg_projector.py
+
+7) Plot dos with
+   >$TBG_ROOT/tbg_plt_dos.py -x-15:15
+
+8) par['axis']='imag'  # for imaginary axis eDMFT
+   set Nf=4 or any other number between 0 and 8 for occupancy in params.py
+   execute:
+   >$TBG_ROOT/tbg_dmft_scc.py
+
+9) set mpi_prefix.dat
+  execute:
+  >$TBG_ROOT/tbg_iterate.py
+
+10)
+  >mkdir maxent
+  >cd maxent
+  >saverage.py -n ../imp.0/Sig.inp.4[5-9]
+  >maxent_run.py sig.inpx
+  >cp Sig.out ../imp.0/Sigma.inp_real
+  >cd ../
+    
+  change params.py:
+  par['axis']='real'
+  par['Sigma']='Sigma.inp_real'
+
+  >$TBG_ROOT/tbg_dmft_scc.py
+  >$TBG_ROOT/tbg_plt_dos.py -x-200:200
+
+11) set:
+    pars_bs['PlotBands']=True
+   execute
+   >$TBG_ROOT/tbg_dmft_scc.py
+   
