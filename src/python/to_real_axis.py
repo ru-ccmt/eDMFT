@@ -81,7 +81,7 @@ if __name__ == '__main__':
         'alpha0'    : 1000,    # starting alpha
         'min_ratio' : 0.001,    # condition to finish, what should be the ratio
         'iflat'     : 1,       # iflat=0 : constant model, iflat=1 : gaussian of width gwidth, iflat=2 : input using file model.dat
-        'Nitt'      : 500,     # maximum number of outside iterations, 1000 can take too much time
+        'Nitt'      : 100,     # maximum number of outside iterations, 1000 can take too much time
         'Nr'        : 0,       # number of smoothing runs
         'Nf'        : 40,      # to perform inverse Fourier, high frequency limit is computed from the last Nf points
         }"""
