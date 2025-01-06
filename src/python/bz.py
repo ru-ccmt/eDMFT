@@ -5,7 +5,7 @@ import mpl_toolkits.mplot3d.art3d as art3d
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.proj3d import proj_transform
-import sys
+import sys, os
 from numpy import *
 
 from utils import W2kEnvironment
@@ -193,16 +193,21 @@ if __name__ == '__main__':
     #z0=latgen.pia[2]*1.5
     #p = Rectangle([-x0,-y0], 2*x0, 2*y0, alpha=0.5)
     #print([-x0,-y0], 2*x0, 2*y0)
+    kpth=None
     kpth2=None
     kpth3=None
-    exec(compile(open('2D_params.py', 'rb').read(), '2D_params.py', 'exec'))
-    print('kpth=', kpth)
+    if os.path.exists('2D_params.py'):
+        exec(compile(open('2D_params.py', 'rb').read(), '2D_params.py', 'exec'))
+    else:
+        print('WARNING: expecting file 2D_params.py with kpth = "[x*sqrt(1/3.),0,0.5*y]" or similar.')
     corners = [[-1,-1],[1,-1],[1,1],[-1,1],[-1,-1]]
-    kc = [array(eval(kpth))*latgen.pia for x,y in corners]
-    kc = array(kc)
-    ax.plot(kc[:,0],kc[:,1],kc[:,2], color='b', lw=1)
-    XYZ = [array([ [kc[0,d],kc[1,d]],[kc[3,d],kc[2,d]] ]) for d in range(3)]
-    ax.plot_surface(XYZ[0],XYZ[1],XYZ[2],alpha=0.5)
+    if kpth is not None:
+        print('kpth=', kpth)
+        kc = [array(eval(kpth))*latgen.pia for x,y in corners]
+        kc = array(kc)
+        ax.plot(kc[:,0],kc[:,1],kc[:,2], color='b', lw=1)
+        XYZ = [array([ [kc[0,d],kc[1,d]],[kc[3,d],kc[2,d]] ]) for d in range(3)]
+        ax.plot_surface(XYZ[0],XYZ[1],XYZ[2],alpha=0.5)
 
     if kpth2 is not None:
         print('kpth2=', kpth2)
