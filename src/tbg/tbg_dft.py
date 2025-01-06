@@ -7,6 +7,7 @@ from sympy import Matrix
 from itertools import chain, product
 from timeit import default_timer as timer
 from numba import njit, jit
+import numpy as npy
 
 def tn_sin_cos(itheta):
     " angles for commensurate rotations"
@@ -17,7 +18,7 @@ def tn_sin_cos(itheta):
 
 def RM(t):
     " 2D rotation "
-    return array([[cos(t), -sin(t)], [sin(t), cos(t)]])
+    return npy.array([[cos(t), -sin(t)], [sin(t), cos(t)]])
 
 
 class TwistGraphene:
@@ -38,10 +39,10 @@ class TwistGraphene:
         self.pM = self.mR                   # i.e., active versus passive rotation.
         # Choice for the cartesian coordinates follows A. McDonnald, i.e., one graphene is rotated for +theta/2 and the other for -theta/2 compared to the cartesian coordinates
         # self.b0 is reciprocal unit vector for the fake unrotated unit cell (between the two graphene sheets)
-        self.b0 =   [array([ 1.0,1.0/sqrt(3.)])*2*pi, array([-1.0,1.0/sqrt(3.)])*2*pi] # reciprocal unit vectors prior to rotation
+        self.b0 =   [npy.array([ 1.0,1.0/sqrt(3.)])*2*pi, npy.array([-1.0,1.0/sqrt(3.)])*2*pi] # reciprocal unit vectors prior to rotation
         self.R0 = linalg.inv(transpose(self.b0))*(2*pi)  # direct vectors
         # reciprocal unit vector for small emergent unit cell at comensurate angle. It is rotated for 30 degrees compared to fake large BZ (convince yourself that this is indeed correct).
-        _bs_ = [array([2.0/sqrt(3.),0])*2*pi, array([-1.0/sqrt(3.),1.0])*2*pi] 
+        _bs_ = [npy.array([2.0/sqrt(3.),0])*2*pi, npy.array([-1.0/sqrt(3.),1.0])*2*pi] 
         # reciprocal and direct unit vectors for the two sheets
         self.bm = [dot( self.mR, self.b0[0] ), dot( self.mR, self.b0[1] ) ] # left sheet reciprocal : rotated counter-clocwise for theta/2
         self.Rm = linalg.inv(transpose(self.bm))*(2*pi)                     # left sheet direct vectors
@@ -51,10 +52,10 @@ class TwistGraphene:
         self.bs = [_bs_[0]*2*sn, _bs_[1]*2*sn]                              # reciprocal vectors of the emergent unit cell
         self.Rs = linalg.inv(transpose(self.bs))*(2*pi)                     # real space vectors of the emergent unit cell
         # nearest neighbors on each graphene sheet, properly taking into account rotation of both sheets
-        self.Rnnm = array([(self.Rm[0] + self.Rm[1])/3., (self.Rm[1]-2*self.Rm[0])/3., (self.Rm[0]-2*self.Rm[1])/3.]) # nearest neighbors on left sheet
-        self.Rnnp = array([(self.Rp[0] + self.Rp[1])/3., (self.Rp[1]-2*self.Rp[0])/3., (self.Rp[0]-2*self.Rp[1])/3.]) # nearest neighbors on right sheet
+        self.Rnnm = npy.array([(self.Rm[0] + self.Rm[1])/3., (self.Rm[1]-2*self.Rm[0])/3., (self.Rm[0]-2*self.Rm[1])/3.]) # nearest neighbors on left sheet
+        self.Rnnp = npy.array([(self.Rp[0] + self.Rp[1])/3., (self.Rp[1]-2*self.Rp[0])/3., (self.Rp[0]-2*self.Rp[1])/3.]) # nearest neighbors on right sheet
         # positions of special points K==K1 and K'==K2 on the unrotated (K1, & K2) and the two rotated layers (K1m & K2m, K1p & K2p)
-        self.K0 = zeros((3,2))
+        self.K0 = npy.zeros((3,2))
         self.K0[0,:] =  (2*self.b0[1]+self.b0[0])/3.
         self.K0[1,:] =  (2*self.b0[0]+self.b0[1])/3.
         self.K0[2,:] =  (self.K0[1]-self.b0[0])
@@ -86,11 +87,11 @@ class TwistGraphene:
     def H0m(self, k):
         "H0(-theta/2,k)"
         z_tk = self.t * sum(exp(dot(self.Rnnm,k)*1j))
-        return array([[0.,z_tk],[conj(z_tk),0.]])
+        return npy.array([[0.,z_tk],[conj(z_tk),0.]])
     def H0p(self, k):
         "H0(+theta/2,k)"
         z_tk = self.t * sum(exp(dot(self.Rnnp,k)*1j))
-        return array([[0.,z_tk],[conj(z_tk),0.]])
+        return npy.array([[0.,z_tk],[conj(z_tk),0.]])
 
     def Vkp(self, k, G1, p, G2):
         k_Gk = dot(k + G1, self.bs)
@@ -100,7 +101,7 @@ class TwistGraphene:
         phase_p = dot(G2, self.r_BAp)
         exp_m = exp(2*pi*1j*phase_m)
         exp_p = exp(2*pi*1j*phase_p)
-        return array([[tw0, tw1*conj(exp_p)],[tw1*exp_m, tw0*exp_m*conj(exp_p)]])
+        return npy.array([[tw0, tw1*conj(exp_p)],[tw1*exp_m, tw0*exp_m*conj(exp_p)]])
     
     def n0_max(self):
         return int(1/(2*sin(self.theta/2))+1)
@@ -109,8 +110,8 @@ class TwistGraphene:
         """ reciprocal vectors of both sheets (bm, bp) can be expanded in terms of reciprocal vectors of the emergent BZ (bz). 
         At the commensurate angle, the expansion has to have integer coefficients. This routine gives such integer coefficients
         """
-        Nm = zeros((2,2),dtype=int)
-        Np = zeros((2,2),dtype=int)
+        Nm = npy.zeros((2,2),dtype=int)
+        Np = npy.zeros((2,2),dtype=int)
         for i in range(2):
             for j in range(2):
                 nm = dot(self.bm[i],self.Rs[j])/(2*pi)
@@ -119,11 +120,11 @@ class TwistGraphene:
                     print('ERROR : It seems the angle is not commensurate and reciprocal vectors of the rotated layer are not included in the emergent BZ')
                     print('nm=', nm)
                 Nm[i,j] = round(nm)
-                np = dot(self.bp[i],self.Rs[j])/(2*pi)
-                rnp = round(np)
-                if sum(abs(rnp-np))>1e-6:
+                _np_ = dot(self.bp[i],self.Rs[j])/(2*pi)
+                rnp = npy.round(_np_)
+                if sum(abs(rnp-_np_))>1e-6:
                     print('ERROR : It seems the angle is not commensurate and reciprocal vectors of the rotated layer are not included in the emergent BZ')
-                    print('np=', np)
+                    print('np=', _np_)
                 Np[i,j] = rnp
         return (Nm, Np)
     
@@ -160,8 +161,8 @@ class TwistGraphene:
             Ek.append( abs(self.zkm(kc)) )
         # and also compute such energies for the other sheet
         Ep=[]
-        for np in n_p:
-            pc = dot(np,self.bs)
+        for _np_ in n_p:
+            pc = dot(_np_,self.bs)
             Ep.append( abs(self.zkp(pc)) )
         # Now sort such k-points by energy
         indk = sorted(list(range(len(Ek))),key= lambda i: Ek[i])
@@ -173,9 +174,9 @@ class TwistGraphene:
             ik = indk[ii]
             ip = indp[ii]
             if Ek[ik] < cutoffk:
-                n_k_2.append( array(n_k[ik], dtype=int) )
+                n_k_2.append( npy.array(n_k[ik], dtype=int) )
             if Ep[ip] < cutoffk:
-                n_p_2.append( array(n_p[ip], dtype=int) )
+                n_p_2.append( npy.array(n_p[ip], dtype=int) )
             #print ii, Ek[ik], Ep[ip], n_k[ik], n_p[ip], norm(dot(n_k[ik],self.bs))/kd, norm(dot(n_p[ip],self.bs))/kd
             
         if (len(n_k_2)<100): # for small number of k-points, we want to optimize further the mesh
@@ -191,9 +192,9 @@ class TwistGraphene:
                 if (p not in nks) and (k in n_k):
                     nk_extra.append(p)
                     
-            n_k_2 += [array(k,dtype=int) for k in nk_extra]
-            n_p_2 += [array(p,dtype=int) for p in np_extra]
-        return (array(n_k_2, dtype=int), array(n_p_2, dtype=int))  # notice of change
+            n_k_2 += [npy.array(k,dtype=int) for k in nk_extra]
+            n_p_2 += [npy.array(p,dtype=int) for p in np_extra]
+        return (npy.array(n_k_2, dtype=int), npy.array(n_p_2, dtype=int))  # notice of change
     
     def Find_G1_G2_vectors(self, n_pk, Nm, Np, how_far=[-1,0,1]):
         """Finding possible reciprocal vectors G1,G2 which connect arbitrary k and p momentum points.
@@ -223,13 +224,13 @@ class TwistGraphene:
            than form a solution of the problem.
         """
         # Construct a sympy matrix, which can be used to compute Hermite-Normal-Form of the same matrix
-        Gn = zeros((4,2),dtype=int)
+        Gn = npy.zeros((4,2),dtype=int)
         Gn[:2,:] = Nm
         Gn[2:,:] = Np
         Gn = Matrix(Gn)
         # Now we call routine to compute Hermite-Normal-Form of matrix [Nm,Np], and get pivotal matrix P. The rows of this matrix are solutions.
         hnf, P, rank = lllhermite(Gn)
-        Pm = array(P).astype(np.int64) # transforming it back to faster numpy form
+        Pm = npy.array(P).astype(npy.int64) # transforming it back to faster numpy form
 
         if hnf[0,1]!=0 or hnf[0,0]!=1 or hnf[1,1]!=1:
             print('ERROR for your angle, Hermite-Normal-Form is not diagonal. You will need to implement more complete Diophantine algorithm')
@@ -238,7 +239,7 @@ class TwistGraphene:
         for npk in list(n_pk.keys()):
             GpG = npk[0]*Pm[0,:] + npk[1]*Pm[1,:] # one solution
             # The last two rows can be added with an arbitrary integer coefficient. Trying to add [-1,0,1] of each row.
-            other_forms = array([GpG + Pm[2,:]*i + Pm[3,:]*j for (i,j) in product(how_far,how_far)])
+            other_forms = npy.array([GpG + Pm[2,:]*i + Pm[3,:]*j for (i,j) in product(how_far,how_far)])
             # now checking that these values indeed solve the equation
             check = [ sum(abs(dot(gpg[:2],Nm) + dot(gpg[2:],Np) - npk)) for gpg in other_forms]
             if (sum(check)!=0):
@@ -256,11 +257,11 @@ class TwistGraphene:
         """
         small=1e-6
         Nm_inv = linalg.inv(Nm)
-        n_k_reciprocal = zeros((len(n_k),2),dtype=int) 
+        n_k_reciprocal = npy.zeros((len(n_k),2),dtype=int) 
         for ik in range(len(n_k)):
             nk = ks_lattice + n_k[ik]
             km = dot(nk,Nm_inv) # k expressed in terms of reciprocal vectors bm.
-            dk = zeros(2, dtype=int)
+            dk = npy.zeros(2, dtype=int)
             for l in range(2):
                 if km[l]>1+small:
                     dk[l]=-1
@@ -282,7 +283,7 @@ class TwistGraphene:
         _keys_ = n_pk.keys()
         k0=sorted(set([k[0] for k in _keys_]))
         k1=sorted(set([k[1] for k in _keys_]))
-        self.n_pk_index = zeros((k0[-1]-k0[0]+1,k1[-1]-k1[0]+1),dtype=int)
+        self.n_pk_index = npy.zeros((k0[-1]-k0[0]+1,k1[-1]-k1[0]+1),dtype=int)
         self.n_pk_value = [[] for ii in range(len(n_pk))]
         for ii,_k_ in enumerate(n_pk):
             self.n_pk_index[_k_[0],_k_[1]]=ii
@@ -333,8 +334,8 @@ class TwistGraphene:
                             str_w0 = 'tw0=%-6.2f' % (tw0,)
                             print('nk=', n_k[ik], 'np=', n_p[ip], str_Gk, str_Gp, str_kGk, str_pGp, str_w0, str_phase, 'Vkp=', Vkp.tolist())
         else:  # maximally optimized code, but equivalent to above
-            self_bs = array(self.bs, dtype=float64)
-            self_r_BAm = array(self.r_BAm, dtype=float64)
+            self_bs = npy.array(self.bs, dtype=float64)
+            self_r_BAm = npy.array(self.r_BAm, dtype=float64)
             BuildIterlayerH_faster(Hk, ks_lattice, self.n_pk_index, self.n_pk_value,
                                        n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np,
                                        self_bs, self.tq0, self.tq1, self.al_di_gm, self_r_BAm, self.r_BAp)
@@ -364,21 +365,21 @@ def PrintH(A):
 def Give_k_Path(path, Nkp, bs):
     lng=[]
     for l in range(len(path)-1):
-        k0 = array(path[l])
-        k1 = array(path[l+1])
+        k0 = npy.array(path[l])
+        k1 = npy.array(path[l+1])
         lng.append( norm(dot(k1-k0,bs)) )
-    lng = array(lng)*(Nkp-1)/sum(lng)
-    Npth = array(round_(lng),dtype=int)
+    lng = npy.array(lng)*(Nkp-1)/sum(lng)
+    Npth = npy.array(npy.round(lng),dtype=int)
     kpath=[]
     for l in range(len(path)-1):
-        k0 = array(path[l])
-        k1 = array(path[l+1])
+        k0 = npy.array(path[l])
+        k1 = npy.array(path[l+1])
         nn = Npth[l]
         if (l==len(path)-2): nn += 1
         for i in range(nn):
             k = k0 + (k1-k0)*i/(Npth[l]-0.0)
             kpath.append(k)
-    kpath = array(kpath)
+    kpath = npy.array(kpath)
     return (kpath, Npth)
 
 @jit(nopython=True)
@@ -412,7 +413,7 @@ def BuildIterlayerH_faster(Hk, ks_lattice, n_pk_index, n_pk_value,
                     phase_p = (G2 + 0.0) @ self_r_BAp
                     exp_m = exp(2*pi*1j*phase_m)
                     exp_p = exp(2*pi*1j*phase_p)
-                    Vkp = array([[tw0, tw1*conj(exp_p)],[tw1*exp_m, tw0*exp_m*conj(exp_p)]])
+                    Vkp = npy.array([[tw0, tw1*conj(exp_p)],[tw1*exp_m, tw0*exp_m*conj(exp_p)]])
                     
                     Hk[2*ik:2*(ik+1),2*(dim_k+ip):2*(dim_k+ip+1)] += Vkp
                     Hk[2*(dim_k+ip):2*(dim_k+ip+1),2*ik:2*(ik+1)] += Vkp.conj().T
@@ -532,7 +533,7 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
         else:
             for i,j in product(range(N1),range(N1)):
                 kpath.append( [i/(N1+0.0), j/(N1+0.0)] )
-        kpath = array(kpath)
+        kpath = npy.array(kpath)
         
         
     
@@ -578,7 +579,7 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
         n_k_reciprocal = tw.Find_If_Out_of_BZ(ks_lattice, n_k, Nm, False)
         n_p_reciprocal = tw.Find_If_Out_of_BZ(ks_lattice, n_p, Np, False)
         
-        Hk = zeros(( (dim_k+dim_p)*2, (dim_k+dim_p)*2 ), dtype=complex)
+        Hk = npy.zeros(( (dim_k+dim_p)*2, (dim_k+dim_p)*2 ), dtype=complex)
         
         print(iik, 'H-size=', len(Hk))
 
@@ -637,9 +638,9 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
     e0 = (e0m+e0p)/2.
     print('e0=', e0)
     
-    k_basis = array(k_basis)
-    Psis = array(Psis)
-    Eks = array(Eks)
+    k_basis = npy.array(k_basis)
+    Psis = npy.array(Psis)
+    Eks = npy.array(Eks)
     
     if PlotBands:
         fout = open('res1.dat', 'w')

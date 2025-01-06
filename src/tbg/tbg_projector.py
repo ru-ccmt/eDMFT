@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 from pylab import *
 from numpy import *
+import numpy as npy
 from scipy import linalg
 from itertools import chain, product
 from timeit import default_timer as timer
 import sys
+import builtins
 
 def PrintM(A):
     for i in range(A.shape[0]):
@@ -213,10 +215,10 @@ if __name__ == '__main__':
       
       # now find minimum and maximum coordinate of all those arrays
       all_arrays = concatenate((rmA, rmB, rpA, rpB), axis=0)
-      rmin = np.min(all_arrays, axis=0)
-      rmax = np.max(all_arrays, axis=0)
+      rmin = npy.min(all_arrays, axis=0)
+      rmax = npy.max(all_arrays, axis=0)
       L = rmax-rmin
-      Nxy = array(round_(L)*Ndivide,dtype=int)
+      Nxy = array(npy.round(L)*Ndivide,dtype=int)
       print('min(r)=', rmin, 'max(r)=', rmax, 'L=', L, 'Nxy=', Nxy)
       
       r_range = optimal_r/norm(Rs)
@@ -417,7 +419,7 @@ if __name__ == '__main__':
 
       # Renormalizing the projector
       OlpAA = zeros((Nfunc,Nfunc),dtype=complex)
-      Nfunc=min(8,N_loc_func)  # Now we rearange them and orhogonalize them
+      Nfunc=builtins.min(8,N_loc_func)  # Now we rearange them and orhogonalize them
       UAA_new = zeros((Nfunc,Niik,Nband),dtype=complex)
       for iik in range(Niik):
           UAA_new[:,iik,:] = OrthogonalizeDiag2(UAA[iik,:Nfunc,:],'AA',False)
@@ -441,10 +443,10 @@ if __name__ == '__main__':
       for iik in range(Niik):
           cc += UAA_new[:,iik,:]@UAA_new[:,iik,:].T.conj()   # cc[ifc1,ifc2]=\sum_{iband} UAA_new[ifc1,iik,iband]*UAA_new.T[iband,iik,ifc2]^*
           # need reasonable broadening even when we have many k-points
-          broad_values = np.minimum(wbroad*np.abs(w), 1.0/unit)
+          broad_values = npy.minimum(wbroad*npy.abs(w), 1.0/unit)
           om = w + broad_values*1j
           ek = Eks[iik,:]
-          denom0 = 1.0/(om[np.newaxis, :] - ek[:,np.newaxis]) # denom0[iband,om] = 1/(om-ek)
+          denom0 = 1.0/(om[npy.newaxis, :] - ek[:,npy.newaxis]) # denom0[iband,om] = 1/(om-ek)
           denom1 = -1./pi * denom0.imag  # denom1[iband,om] = -1/pi*im( 1/(om-ek) )
           DOS[0,:] += sum(denom1,axis=0)
           
@@ -452,12 +454,12 @@ if __name__ == '__main__':
           # Gc[ifb,ifc,iw] = sum_ibnd UAA_new[ifb,ik,ibnd] * denom[ibnd,iw] * UAA_new[ifc,ik,ibnd]^* = \sum_ibnd UU2[ifb,ifc,ibnd]*denom[ibnd,iw]
           #for ibnd in range(Nband):
           #    UU2[:,:,ibnd] = tensordot(UAA_new[:,iik,ibnd], UAA_new[:,iik,ibnd].conj(), axes=0)
-          UU2 = np.einsum('ib,jb->ijb', UAA_new[:,iik,:], UAA_new[:, iik, :].conj() )
+          UU2 = npy.einsum('ib,jb->ijb', UAA_new[:,iik,:], UAA_new[:, iik, :].conj() )
           Gc[0,:,:,:] += UU2 @ denom0
           if BA_region_needed:
               #for ibnd in range(Nband):
               #    UU2[:,:,ibnd] = tensordot(UAB_new[:,iik,ibnd], UAB_new[:,iik,ibnd].conj(), axes=0)
-              UU2 = np.einsum('ib,jb->ijb', UAB_new[:,iik,:],UAB_new[:,iik,:].conj() )
+              UU2 = npy.einsum('ib,jb->ijb', UAB_new[:,iik,:],UAB_new[:,iik,:].conj() )
               Gc[1,:,:,:] += dot(UU2, denom0)
           
           # UU[ifb,ifc,ibnd] = A[ifb,ibnd] * A[ifc,ibnd]

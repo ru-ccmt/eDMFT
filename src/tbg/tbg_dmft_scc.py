@@ -10,6 +10,7 @@ from itertools import chain, product
 from timeit import default_timer as timer
 #from tanmesh import *
 from timeit import default_timer as timer
+import builtins
 if Fortran:
     import tbg_scc as scc
 
@@ -241,7 +242,7 @@ class EmbeddOrbitals:
             mu += dmu
             n2 = n_mu(mu)
             if n1*n2 < 0: # zero bracketed
-                mu = optimize.brentq(n_mu, min(mu_old,mu), max(mu_old,mu), xtol=1e-12, rtol=1e-12)
+                mu = optimize.brentq(n_mu, builtins.min(mu_old,mu), builtins.max(mu_old,mu), xtol=1e-12, rtol=1e-12)
                 return mu
         
     def FermiLevel(self, n_desired, Sigmas, mu0=0, dmu=0.2):
@@ -300,7 +301,7 @@ class EmbeddOrbitals:
             mu += dmu
             n2 = n_mu(mu)
             if n1*n2 < 0: # zero bracketed
-                mu = optimize.brentq(n_mu, min(mu_old,mu), max(mu_old,mu), xtol=1e-12, rtol=1e-12)
+                mu = optimize.brentq(n_mu, builtins.min(mu_old,mu), builtins.max(mu_old,mu), xtol=1e-12, rtol=1e-12)
                 return mu
         
     def PrintpDOS(self, filename, DOS, pDOS):
@@ -535,8 +536,8 @@ def create_log_mesh(nom, nmax, ntail_, beta):
            som          -- smaller mesh created from big om mesh
            ind_om       -- index array which conatins index to kept Matsubara points
     """
-    istart = min(nom, nmax)
-    ntail = min(ntail_, nmax-istart)
+    istart = builtins.min(nom, nmax)
+    ntail = builtins.min(ntail_, nmax-istart)
     
     ind_om=[]
     alpha = log((nmax-1.)/istart)/(ntail-1.)
