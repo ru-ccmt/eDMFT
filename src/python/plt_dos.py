@@ -64,7 +64,7 @@ if __name__=='__main__':
     _lcols = au.SimplifySiginds(inl.siginds)
     _lcols_dn=None
     if os.path.isfile(case+'.indmfldn'):
-        inldn = Indmfl(case, 'indmfldn')
+        inldn = au.Indmfl(case, 'indmfldn')
         inldn.read()
         _lcols_dn = au.SimplifySiginds(inl.siginds)
 
