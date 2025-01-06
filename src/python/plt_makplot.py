@@ -32,8 +32,8 @@ def ReadDataFile(fname):
                 data_list.append(row)
         min_columns = np.min([len(line) for line in data_list])
         data_list = [line[:min_columns] for line in data_list]
-        eks = np.array(data_list)
-    return eks
+        ekw = np.array(data_list)
+    return ekw
     
 if __name__ == '__main__':
     usage = 'Plots the spectral furnction after dmftp step has been executed'
