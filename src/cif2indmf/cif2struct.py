@@ -25,6 +25,9 @@ __version__ = "1.0"
 __status__ = "Production"
 __date__ = "March 6, 2024"
 
+# Lattice type conventional/primitive volume expected ratio.
+#vol_ratio = {'B':2, 'F':4, 'CXY':2, 'CXZ':2, 'CYZ':2, 'R':3 }
+
 class WStruct:
     def __init__(self, inAngs=True):
         self.tobohr = 1/0.5291772083
@@ -108,6 +111,20 @@ class WStruct:
         self.a, self.b, self.c, self.alpha, self.beta, self.gamma = cif.ca, cif.cb, cif.cc, cif.calpha, cif.cbeta, cif.cgamma
         self.Znuc   = [cif.Z_element[spec] for spec in cif.w2k_coords]
 
+        if Qmagnetic and self.lattyp in ['B', 'F', 'CXY', 'CXZ', 'CYZ']:
+            Tt = {'B': [1,1,1], 'F': [1,0,0], 'CXY': [1,1,0], 'CXZ': [1,0,1], 'CYZ':[0,1,1]}
+            
+            for iop in cif.magnetic_remove:
+                op = cif.original_symmetry_operations[iop]
+                timat = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
+                if array_equal(timat,identity(3,dtype=int)):
+                    tau_2 = array(np.round(2*op.affine_matrix[:3,3]),dtype=int)
+                    #print('We removed operation tau=', tau_2, file=log)
+                    if array_equal(tau_2, Tt[self.lattyp]):
+                        print('The bravais lattice in magnetic state changed from', self.lattyp, 'to P, because corresponding translation has been removed and is not symmetry of the single spin', file=log)
+                        self.lattyp='P'
+                        
+        
         if self.sgnum in [5,8,9,12,15,20,21,35,36,37,38,39,40,41,63,64,65,66,67,68] and sum(glide_plane)<2:
             print('ERROR glide plane for space-group', self.sgnum,'should exist, but could not be found', file=log)
             print('All group operations are', file=log)
@@ -1093,6 +1110,12 @@ def get_matching_coord(coord, parser, coord_to_species):
             return keys[indices[0]]
     return False
 
+def first_value_in(data, keys):
+    """Return the first value found in data corresponding to the keys, searching in reverse order."""
+    for key in reversed(keys):
+        if key in data:
+            return data[key]
+    return None
     
 class CifParser_W2k:
 
@@ -1126,27 +1149,51 @@ class CifParser_W2k:
                 self.calpha = str2float(data['_cell_angle_alpha'])
                 self.cbeta = str2float(data['_cell_angle_beta'])
                 self.cgamma = str2float(data['_cell_angle_gamma'])
+
+
+                sgname_options=['_symmetry_space_group_name_H-M','_space_group_name_H-M_alt',
+                                '_parent_space_group.name_H-M','_parent_space_group.name_H-M_alt']
                 
-                self.ssetting, self.sgname, self.sgnum = None, None, None
-                if '_symmetry_cell_setting' in data:
-                    self.ssetting = data['_symmetry_cell_setting']
-                if '_symmetry_space_group_name_H-M' in data:
-                    self.sgname = data['_symmetry_space_group_name_H-M']
-                elif '_space_group_name_H-M_alt' in data:
-                    self.sgname = data['_space_group_name_H-M_alt']
-                elif '_parent_space_group.name_H-M' in data:
-                    self.sgname = data['_parent_space_group.name_H-M']
-                elif '_parent_space_group.name_H-M_alt' in data:
-                    self.sgname = data['_parent_space_group.name_H-M_alt']
-                if '_symmetry_Int_Tables_number' in data:
-                    self.sgnum = data['_symmetry_Int_Tables_number']
-                elif '_symmetry_space_group_IT_number' in data:
-                    self.sgnum = data['_symmetry_space_group_IT_number']
-                elif '_space_group_IT_number' in data:
-                    self.sgnum = data['_space_group_IT_number']
-                elif '_parent_space_group.IT_number' in data:
-                    self.sgnum = data['_parent_space_group.IT_number']
+                sgnum_options =['_symmetry_Int_Tables_number','_symmetry_space_group_IT_number',
+                                '_space_group_IT_number','_parent_space_group.IT_number',
+                                '_symmetry_Int_Tables_Number']
+                
                     
+                self.sgname= first_value_in(data, sgname_options)
+                self.sgnum = first_value_in(data, sgnum_options)
+                self.ssetting = first_value_in(data, ['_symmetry_cell_setting'])
+                
+                #self.ssetting, self.sgname, self.sgnum = None, None, None
+                #for sn in reversed(sgname_names):
+                #    if sn in data:
+                #        self.sgname=data[sn]
+                #        break
+                #for sn in reversed(sgnum_names):
+                #    if sn in data:
+                #        self.sgnum = data[sn]
+                #        break
+                #if '_symmetry_cell_setting' in data:
+                #    self.ssetting = data['_symmetry_cell_setting']
+                #if '_symmetry_space_group_name_H-M' in data:
+                #    self.sgname = data['_symmetry_space_group_name_H-M']
+                #elif '_space_group_name_H-M_alt' in data:
+                #    self.sgname = data['_space_group_name_H-M_alt']
+                #elif '_parent_space_group.name_H-M' in data:
+                #    self.sgname = data['_parent_space_group.name_H-M']
+                #elif '_parent_space_group.name_H-M_alt' in data:
+                #    self.sgname = data['_parent_space_group.name_H-M_alt']
+                #    
+                #if '_symmetry_Int_Tables_number' in data:
+                #    self.sgnum = data['_symmetry_Int_Tables_number']
+                #elif '_symmetry_space_group_IT_number' in data:
+                #    self.sgnum = data['_symmetry_space_group_IT_number']
+                #elif '_space_group_IT_number' in data:
+                #    self.sgnum = data['_space_group_IT_number']
+                #elif '_parent_space_group.IT_number' in data:
+                #    self.sgnum = data['_parent_space_group.IT_number']
+                #elif '_symmetry_Int_Tables_Number' in data:
+                #    self.sgnum = data['_symmetry_Int_Tables_Number']
+                
                 print('Information directly extracted from cif file:', file=log)
                 for k2, v2 in data.items():
                     print('key=', k+':'+k2,' value=', v2, file=log)
@@ -1477,8 +1524,19 @@ class CifParser_W2k:
 
             self.original_symmetry_operations = [deepcopy(self.parser.symmetry_operations[iop])
                                                      for iop in range(len(self.parser.symmetry_operations))]
-                        
+
             print('symmetry operations that need to be removed=', operations_to_remove, file=log)
+            self.magnetic_remove = operations_to_remove
+
+            #?????
+            #for iop in self.magnetic_remove:
+            #    op = self.original_symmetry_operations[iop]
+            #    #for isym,op in enumerate(self.parser.symmetry_operations):
+            #    timat = array(np.round(op.affine_matrix[:3,:3]),dtype=int)
+            #    tau = op.affine_matrix[:3,3]
+            #    print('Removing timat=', timat, 'and tau=', tau)
+            #?????
+                
             operations_to_remove = sorted(list(operations_to_remove))
             for iop in operations_to_remove[::-1]:
                 del self.parser.symmetry_operations[iop]

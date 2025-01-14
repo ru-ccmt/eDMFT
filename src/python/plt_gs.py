@@ -98,7 +98,8 @@ if __name__=='__main__':
         print(' lcols=', lcols)
         if lcols_dn is not None:
             print(' lcols_dn=', lcols_dn)
-        
+    
+    imp_exists=False
     fig, axs = plt.subplots(2, len(imp2latt), sharex=True)
     # remember lines for all axis in the plot. This is needed for interactive legend.
     lines = [[[] for i in range(len(imp2latt))] for j in range(2)] 
@@ -108,7 +109,6 @@ if __name__=='__main__':
     for ii in imp2latt:
         il=0
         if ii+1 in icols and os.path.exists('imp.'+str(ii)):
-            #for icix in icols:
             icix = ii+1
             dr = 'imp.'+str(ii)
             # finds all imp.?/Gf.out.?.? for all iterations
@@ -131,8 +131,9 @@ if __name__=='__main__':
                     lines[0][ii].append(line1)
                     lines[1][ii].append(line2)
                     il+=1
-        
+            imp_exists=True
         # Below plotting lattice quantity
+        plt_symbl = '.' if imp_exists else '-'
         il=0
         foundOneYet,foundOneYetdn=False,False
         for icix in imp2latt[ii]: #lcols:
@@ -148,8 +149,8 @@ if __name__=='__main__':
                 w = dat[0]
                 Glat = array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
                 for i,j in enumerate(cls):
-                    line1,=axs[0][ii].plot(w,Glat[i].imag, 'C'+str(il%10)+'.', label='lat['+str(icix)+',$'+inl.legends[icix][j]+'$]')
-                    line2,=axs[1][ii].plot(w,Glat[i].real, 'C'+str(il%10)+'.', label='lat['+str(icix)+',$'+inl.legends[icix][j]+'$]')
+                    line1,=axs[0][ii].plot(w,Glat[i].imag, 'C'+str(il%10)+plt_symbl, label='lat['+str(icix)+',$'+inl.legends[icix][j]+'$]')
+                    line2,=axs[1][ii].plot(w,Glat[i].real, 'C'+str(il%10)+plt_symbl, label='lat['+str(icix)+',$'+inl.legends[icix][j]+'$]')
                     lines[0][ii].append(line1)
                     lines[1][ii].append(line2)
                     il+=1
@@ -167,8 +168,8 @@ if __name__=='__main__':
                 w = dat[0]
                 Glat = array([dat[1+2*j]+dat[2+2*j]*1j for j in cls])
                 for i,j in enumerate(cls):
-                    line1,=axs[0][ii].plot(w,Glat[i].imag, 'C'+str(il%10)+'.', label='lat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
-                    line2,=axs[1][ii].plot(w,Glat[i].real, 'C'+str(il%10)+'.', label='lat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
+                    line1,=axs[0][ii].plot(w,Glat[i].imag, 'C'+str(il%10)+plt_symbl, label='lat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
+                    line2,=axs[1][ii].plot(w,Glat[i].real, 'C'+str(il%10)+plt_symbl, label='lat['+str(icix)+'dn,$'+inl.legends[icix][j]+'$]')
                     lines[0][ii].append(line1)
                     lines[1][ii].append(line2)
                     il+=1
