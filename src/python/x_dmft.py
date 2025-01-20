@@ -609,7 +609,7 @@ if __name__=='__main__':
         fsigmas = ' '.join(['sig.inp'+str(c)+options.m_ext+k_band for c in cixs])
         #### real or imaginary
         matsubara = CheckMatsubara(w2k.case+'.indmfl')
-        cut_extra_energy_range = 1.0
+        cut_extra_energy_range = 1.5
         
         inpstr=mode+"""                   # mode [g/e]: compute [Gk(om) / eigenvalues & eigenvectors]
 """+str(matsubara)+"""                   # matsubara
