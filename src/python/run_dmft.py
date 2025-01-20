@@ -546,7 +546,7 @@ if __name__ == '__main__':
               'sleeptime'     : 2,         # If broyden file are present at the submit time, user has some time to kill the job
               'cc'            : 1e-5,      # the charge density precision to stop the LDA+DMFT run
               'ec'            : 1e-5,      # the energy precision to stop the LDA+DMFT run
-              'nc'            : 5e-4,      # the impurity difference to stop LDA+DMFT run
+              'nc'            : 1e-10,     # the impurity difference to stop LDA+DMFT run
               'rCF'           : None,      # Reduction of the crystal field splitting, if necessary
               'recomputeEF'   : 1,         # Recompute EF in dmft2 step. If recomputeEF=2, it tries to find an insulating gap.
               'mixEF'         : 1.0,       # Chemical potential can be mixed with mixEF<1.0
