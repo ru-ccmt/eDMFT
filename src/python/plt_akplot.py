@@ -10,6 +10,7 @@ mingle_names={'W':'$W$','L':'$L$','LAMBDA':'$\Lambda$','GAMMA':'$\Gamma$','DELTA
               'R': '$R$', 'S':'$S$', 'T':'$T$', 'U':'$U$', 'Y':'$Y$'}
 
 def ReadDataFile(fname):
+    large_number = 1e6
     try:
         ekw = np.loadtxt(fname)
     except ValueError:
@@ -19,14 +20,13 @@ def ReadDataFile(fname):
             for line in f:
                 # Strip whitespace and skip empty or comment lines if needed
                 line = line.strip()
-                if not line or line.startswith('#'):
+                if not line or line.startswith(('#','!')):
                     continue
                 # Split and convert each field to float
-                fields = line.split()
-                row = [float(x) for x in fields]
-                data_list.append(row)
-        min_columns = np.min([len(line) for line in data_list])
-        data_list = [line[:min_columns] for line in data_list]
+                data_list.append(np.fromstring(line, sep=' '))
+        max_columns = np.max([len(line) for line in data_list])
+        # some data has less bands, but we are not allowed to cut them. We rather increase the bands where they are missing
+        data_list = [hstack( (line, ones(max_columns-len(line))*large_number) ) for line in data_list]
         ekw = np.array(data_list)
     return ekw
     

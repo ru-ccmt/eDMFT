@@ -9,7 +9,8 @@ import argparse
 mingle_names={'W':'$W$','L':'$L$','LAMBDA':'$\Lambda$','GAMMA':'$\Gamma$','DELTA':'$\Delta$','X':'$X$','Z':'$Z$','W':'$W$','K':'$K$',
               'R': '$R$', 'S':'$S$', 'T':'$T$', 'U':'$U$', 'Y':'$Y$'}
 
-def ReadDataFile(fname):
+def ReadDataFile(fname, nkp):
+    large_number = 1e6
     try:
         ekw = np.loadtxt(fname)
     except ValueError:
@@ -22,15 +23,13 @@ def ReadDataFile(fname):
                 if not line or line.startswith(('#','!')):
                     continue
                 # Split and convert each field to float
-                #fields = line.split()
-                #row = [float(x) for x in fields]
-                #data_list.append(row)
                 data_list.append(np.fromstring(line, sep=' '))
-                
-        min_columns = np.min([len(line) for line in data_list])
-        data_list = [line[:min_columns] for line in data_list]
-        eks = np.array(data_list)
-    return eks
+        max_columns = np.max([len(line) for line in data_list])
+        #print('Fallback max_columns=', max_columns, [len(line) for line in data_list])
+        # some data has less bands, but we are not allowed to cut them. We rather increase the bands where they are missing
+        data_list = [hstack( (line, ones(max_columns-len(line))*large_number) ) for line in data_list]
+        ekw = np.array(data_list)
+    return ekw
     
 if __name__ == '__main__':
     usage = 'Plots the spectral furnction after dmftp step has been executed'
@@ -44,7 +43,8 @@ if __name__ == '__main__':
     parser.add_argument('-g', default=False, action='store_true', help='add color bar')
     parser.add_argument('-o', type=str, default=None, help='orb_plot list for colors, such as [0,0,1,2,3] for 0==R,1==G,2==B,3==alpha,4=None')
     parser.add_argument('-a', type=float, default=0.8, help='aspect ratio of the plot, default 0.8')
-    
+    parser.add_argument('-f', default=True, action='store_false', help='ignore coherence factors')
+    parser.add_argument('-r', type=str, default=None, help='color_intensity default=[1,1,1] for [R,G,B]. Can be increased/decreased.')
     args = parser.parse_args()
     
     fname = args.fname
@@ -53,6 +53,9 @@ if __name__ == '__main__':
     DY = args.d
     _cmap_ = eval(args.c)
     _col_ = args.l
+    color_intensity = [1,1,1]
+    if args.r is not None:
+        color_intensity = eval(args.r)
     
     with open('EF.dat', 'r') as fEF:
         mu = float(fEF.read())
@@ -78,11 +81,11 @@ if __name__ == '__main__':
         print('high-symmetry points found', [(wkpointi[i],wkpoints[i]) for i in range(len(wkpoints))] )
     
     nkp = wkpointi[-1]+1
-    print('nkp=', nkp)
+    print('nkp=', nkp, 'args.f=', args.f)
     
     #print('cmap=', args.c, 'color=', args.l, 'intensity=', args.i, 'small=', args.b, 'DY=', args.d)
     COHERENCE=False
-    if os.path.isfile('UL.dat_') and os.path.getsize('UL.dat_')>0 and os.path.isfile('UR.dat_') and os.path.getsize('UR.dat_')>0:
+    if args.f and os.path.isfile('UL.dat_') and os.path.getsize('UL.dat_')>0 and os.path.isfile('UR.dat_') and os.path.getsize('UR.dat_')>0:
         COHERENCE=True
         print('Using coherence factors')
         fL = open('UL.dat_', 'r')
@@ -113,9 +116,9 @@ if __name__ == '__main__':
         if len(orb_plot)>n_all_orbitals:
             orb_plot = orb_plot[:n_all_orbitals]
         for i,x in enumerate(orb_plot):
-            if x not in [0,1,2,3]:
-                orb_plot[i]=3
-        print('orb_plot=', orb_plot)
+            if x not in [0,1,2]:
+                orb_plot[i]=4
+        print('orb_plot=', orb_plot, 'and color_intensity=', color_intensity)
         
     with open(fname, 'r') as fi:
         first_line = fi.readline()
@@ -128,7 +131,7 @@ if __name__ == '__main__':
         sys.exit(0)
         
         
-    ekw = ReadDataFile(fname)
+    ekw = ReadDataFile(fname,nkp)
     nom = int(len(ekw)/nkp)
     if nkp*nom != len(ekw):
         print('ERROR data length in', fname, 'seems to be incompatible with case.klist_band. We have nkp=', nkp, 'and num lines=', len(ekw), 'which is incomensurate with number of k-points')
@@ -141,20 +144,19 @@ if __name__ == '__main__':
     
     nbnd = shape(zekw)[1]
     zekw = reshape(zekw, (nkp,nom,nbnd))
-    #print('nom=', nom, 'om=', om, 'shape(zekw)=', shape(zekw))
     
+    print('nom=', nom, 'shape(zekw)=', shape(zekw),'=(nkp,nom,nbnd)')
     # ensure causality
     zekw = np.where(zekw.imag < -small, zekw, zekw.real - small * 1j)
-
-
+    
     if COHERENCE:
-        alpha_set=False
-        if 3 in orb_plot: alpha_set=True
+        #alpha_set=False
+        #if 3 in orb_plot: alpha_set=True
         orb_plot = array(orb_plot)
         Akom = zeros((nkp,nom,4))
         for ik in range(nkp):
             cohi = zeros((nom,nbnd,4),dtype=float)
-            if not alpha_set: cohi[:,:,3] = 1.0
+            cohi[:,:,3] = 1.0  # transparency is always set to 1/(om-ek)
             for iw in range(nom):
                 dat = fL.readline().split()
                 omega2 = float(dat[0])
@@ -175,6 +177,11 @@ if __name__ == '__main__':
                         #for iorb in range(len(coh)):
                         #    cohi[orb_plot[iorb],ibnd] += coh[iorb]
                         np.add.at(cohi, (iw, ibnd, orb_plot), coh)
+            # Here we normalize weight for each color, because some colors are used for multiple bands.
+            for icolor in range(3):
+                how_many = np.count_nonzero(orb_plot == icolor)
+                if how_many>0:
+                    cohi[:,:,icolor] *= color_intensity[icolor]/how_many
             #print('cohi=', cohi)
             Akom[ik,:,:] = np.sum( (cohi[:,:,:]/(om[:,None,None] + mu - zekw[ik,:,:,None])).imag, axis=1)*(-1/pi)
 
@@ -183,12 +190,13 @@ if __name__ == '__main__':
             
             if ik%10==9:
                 print('reading k-pnt', ik+1)
+        A_for_h = Akom[:,:,3]
     else:
-        # Akom[ikp,iom]
+        # Akom[nkp,nom]
         Akom = np.sum( (1.0/(om[np.newaxis,:,np.newaxis] + mu - zekw)).imag, axis=2)*(-1/pi)
-    
+        A_for_h = Akom
     # finds how to scale the image, and what is the maximum value for density plot
-    ht, bin_edges = histogram(Akom.ravel(),bins=5000)
+    ht, bin_edges = histogram(A_for_h.ravel(),bins=5000)
     xh = 0.5*(bin_edges[1:]+bin_edges[:-1])
     cums = cumsum(ht)/sum(ht)
     i = searchsorted(cums, intensity)
@@ -207,6 +215,8 @@ if __name__ == '__main__':
     if COHERENCE:
         Akom = np.transpose(Akom, axes=(1, 0, 2))
         imshow(Akom, interpolation='bilinear', origin='lower', vmin=vmm[0], vmax=vmm[1], extent=[xmin,xmax,ymin,ymax], aspect=(xmax-xmin)*args.a/(ymax-ymin) )
+        save('Akom', Akom)
+        save('rest', hstack( (vmm,[xmin,xmax,ymin,ymax]) ) )
     else:
         imshow(Akom.T, interpolation='bilinear', cmap=_cmap_, origin='lower', vmin=vmm[0], vmax=vmm[1], extent=[xmin,xmax,ymin,ymax], aspect=(xmax-xmin)*args.a/(ymax-ymin) )
     
