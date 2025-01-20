@@ -268,7 +268,7 @@ SUBROUTINE PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feig
   if (mode.EQ.'g') then
      allocate( gmk(maxdim,maxdim,ncix) )
      allocate( gmloc(maxdim,maxdim,ncix,nom) )
-
+     gmloc(:,:,:,:) = 0
      if (myrank.eq.master) then
         DO icix=1,ncix
            cixdm = cixdim(icix)
@@ -312,9 +312,11 @@ SUBROUTINE PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feig
   !WRITE(6,'(A,1x,A,I3,1x,A,I3,1x,A,I3)') cpuID,'pr_proc=', pr_proc, 'pr_procr=', pr_procr, 'tot-k=', nkpt
 
   ! Reading band energies from energy fileneed for those k-points that are skept on this processor
-  do ik_before=1,myrank*pr_proc
-     CALL ReadEnergiesK(fh_ene, Ek, kp, wg, NE, nume)
-  enddo
+  if (pr_procr.gt.0) then ! if pr_procr==0, it means myrank*pr_proc>nkp and it would coredump.
+     do ik_before=1,myrank*pr_proc
+        CALL ReadEnergiesK(fh_ene, Ek, kp, wg, NE, nume)
+     enddo
+  endif
   do iikp=1,pr_procr  ! only over k-points that are computed on this processor
      ikp = iikp + myrank*pr_proc  ! should be real index of k-point
      ! Reading band energies from energy file
