@@ -85,11 +85,11 @@ if __name__ == '__main__':
     
     #print('cmap=', args.c, 'color=', args.l, 'intensity=', args.i, 'small=', args.b, 'DY=', args.d)
     COHERENCE=False
-    if args.f and os.path.isfile('UL.dat_') and os.path.getsize('UL.dat_')>0 and os.path.isfile('UR.dat_') and os.path.getsize('UR.dat_')>0:
+    if args.f and os.path.isfile('UL.dat') and os.path.getsize('UL.dat')>0 and os.path.isfile('UR.dat') and os.path.getsize('UR.dat')>0:
         COHERENCE=True
         print('Using coherence factors')
-        fL = open('UL.dat_', 'r')
-        fR = open('UR.dat_', 'r')
+        fL = open('UL.dat', 'r')
+        fR = open('UR.dat', 'r')
         dat = fL.readline().split()
         fR.readline()
         nkp2,nsymop,nom,norbitals = list(map(int,dat[1:5]))  # dimensions
@@ -98,13 +98,13 @@ if __name__ == '__main__':
         fL.readline()
         fR.readline()
         if nkp!=nkp2:
-            print('ERROR: UL.dat_ does not have the same number of k-points as '+fname)
+            print('ERROR: UL.dat does not have the same number of k-points as '+fname)
             sys.exit(1)
         if nsymop>1:
             print('ERROR: More than one group operation. We do not want to symmetrize over group operations when plotting spectra!')
             sys.exit(1)
         if args.o==None:
-            prompt = "Coherence factors from UL.dat_ used. Give a list with "+str(n_all_orbitals)+" entries with 0=R,1=G,2=B,3=None > "
+            prompt = "Coherence factors from UL.dat used. Give a list with "+str(n_all_orbitals)+" entries with 0=R,1=G,2=B,3=None > "
             userin = input(prompt).lower().strip()
             orb_plot=eval(userin)
         else:
@@ -161,10 +161,10 @@ if __name__ == '__main__':
                 dat = fL.readline().split()
                 omega2 = float(dat[0])
                 if abs(omega2-om[iw])>1e-5:
-                    print('WARNING: Frequency in UL.dat_ '+str(omega2)+' and in '+fname+' '+str(om[iw])+' are not equal!')
+                    print('WARNING: Frequency in UL.dat '+str(omega2)+' and in '+fname+' '+str(om[iw])+' are not equal!')
                 nbands2 = int(dat[1])
                 #if nbands!=nbands2:
-                #    print('ERROR: Number of bands in UL.dat_ and '+fname+' is not consistent')
+                #    print('ERROR: Number of bands in UL.dat and '+fname+' is not consistent')
                 fR.readline()
                 
                 for ibnd in range(nbands2):

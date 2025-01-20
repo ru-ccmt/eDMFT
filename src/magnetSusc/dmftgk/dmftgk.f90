@@ -197,7 +197,10 @@ SUBROUTINE PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feig
   INTEGER :: maxdim_, norbitals_, iikp, ik_before, pr_proc, pr_procr
   COMPLEX*16 :: xomega, ww, csum, ex
   CHARACTER*3:: cpuID_
-  CHARACTER*1000 :: single_line
+  CHARACTER*200 :: single_short_line
+  CHARACTER*2000 :: single_line
+  REAL*8  :: omega_,z_re,z_im
+  INTEGER :: nbnd, first_bnd
   REAL*8,     ALLOCATABLE :: omega(:)
   COMPLEX*16, ALLOCATABLE :: STrans(:,:,:,:), DMFTU(:,:,:), gc(:)
   COMPLEX*16, ALLOCATABLE :: sigma(:,:,:), gij(:,:)
@@ -287,27 +290,9 @@ SUBROUTINE PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feig
         ENDDO
      endif
   else if (mode.EQ.'e') then
-     if (myrank.eq.master) then
-        open(fh_ee,   file=TRIM(feigvals), status='unknown')
-        open(fh_ee+1, file=TRIM(fUL), status='unknown')
-        open(fh_ee+2, file=TRIM(fUR), status='unknown')
-        do j=1,2
-           WRITE(fh_ee+j, '(A,I7,1x,I3,1x,I6,1x,I3,3x)',advance='no') '#', nkpt, nsymop, nom, norbitals
-           DO iorb1=1,norbitals
-              WRITE(fh_ee+j, '(I3,1x)',advance='no') nindo(iorb1)
-           ENDDO
-           WRITE(fh_ee+j, '(A)') ' # nkpt, nsymop, nom, norbitals, size(iorb1),...'
-           WRITE(fh_ee+j, '(A)',advance='no') '#'
-           do iorb=1,norbitals
-              WRITE(fh_ee+j, '(3F9.5,2x)',advance='no') (POSC(i,iorb),i=1,3)
-           enddo
-           WRITE(fh_ee+j,'(A)') '  # actual position of correlated atoms in the unit cell'
-        enddo
-     else
-        open(fh_ee,   file=TRIM(feigvals)//'.'//ADJUSTL(TRIM(cpuID)), status='unknown')
-        open(fh_ee+1, file=TRIM(fUL)//'.'//ADJUSTL(TRIM(cpuID)), status='unknown')
-        open(fh_ee+2, file=TRIM(fUR)//'.'//ADJUSTL(TRIM(cpuID)), status='unknown')
-     endif
+     open(fh_ee,   file=TRIM(feigvals)//'.'//ADJUSTL(TRIM(cpuID)), status='unknown',form='unformatted')
+     open(fh_ee+1, file=TRIM(fUL)//'.'//ADJUSTL(TRIM(cpuID)), status='unknown',form='unformatted')
+     open(fh_ee+2, file=TRIM(fUR)//'.'//ADJUSTL(TRIM(cpuID)), status='unknown',form='unformatted')
   endif
 
   ! Kohn-Sham eigenvalues from the file
@@ -403,7 +388,9 @@ SUBROUTINE PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feig
 
            enddo
         else if (mode.EQ.'e') then
-           WRITE(fh_ee,'(A,5I5,2x,F23.20,2x,A)') '!', ikp, isym, nbands, nemin, nom, wgh(ikp)/(nsymop*tweight), ': ikp, isym, nbands nemin, nomega, kweight'
+           !WRITE(fh_ee,'(A,5I5,2x,F23.20,2x,A)') '!', ikp, isym, nbands, nemin, nom, wgh(ikp)/(nsymop*tweight), ': ikp, isym, nbands nemin, nomega, kweight'
+           WRITE(single_short_line,'(A,5I5,2x,F23.20,2x,A)') '!', ikp, isym, nbands, nemin, nom, wgh(ikp)/(nsymop*tweight), ': ikp, isym, nbands nemin, nomega, kweight'
+           write(fh_ee) single_short_line
            do iom=1,nom
               gij=0
               DO i=1,nbands
@@ -427,24 +414,30 @@ SUBROUTINE PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feig
               enddo
               if (nxmin<nbands .and. (dreal(zek(ibnd))-EF < emin)) nxmin=nxmin+1
               !
-              WRITE(fh_ee+0,'(F19.14,2x,2I5,1x)',advance='no') omega(iom), nxmax-nxmin+1, nxmin+nemin-1
-              WRITE(fh_ee+1,'(F19.14,2x,I5,1x)') omega(iom), nxmax-nxmin+1
-              WRITE(fh_ee+2,'(F19.14,2x,I5,1x)') omega(iom), nxmax-nxmin+1
+              !WRITE(fh_ee+0,'(F19.14,2x,2I5,1x)',advance='no') omega(iom), nxmax-nxmin+1, nxmin+nemin-1
+              !WRITE(fh_ee+1,'(F19.14,2x,I5,1x)') omega(iom), nxmax-nxmin+1
+              !WRITE(fh_ee+2,'(F19.14,2x,I5,1x)') omega(iom), nxmax-nxmin+1
+              WRITE(fh_ee+0) omega(iom), nxmax-nxmin+1, nxmin+nemin-1
               do ibnd=nxmin,nxmax
-                 WRITE(fh_ee+0,'(2E24.16,1x)',advance='no') zek(ibnd)!-EF
-                 WRITE(fh_ee+1,'(I4,1x)',advance='no') ibnd+nemin-1
-                 WRITE(fh_ee+2,'(I4,1x)',advance='no') ibnd+nemin-1
+                 !WRITE(fh_ee+0,'(2E24.16,1x)',advance='no') zek(ibnd)
+                 !WRITE(fh_ee+1,'(I4,1x)',advance='no') ibnd+nemin-1
+                 !WRITE(fh_ee+2,'(I4,1x)',advance='no') ibnd+nemin-1
+                 WRITE(fh_ee+0) zek(ibnd)
+                 WRITE(fh_ee+1) ibnd+nemin-1
+                 WRITE(fh_ee+2) ibnd+nemin-1
                  DO iorb1=1,norbitals
                     nind1 = nindo(iorb1)
                     do ind1=1,nind1
-                       WRITE(fh_ee+1,'(F12.5,1x,F12.5,3x)',advance='no') UAl(ibnd,ind1,iorb1)
-                       WRITE(fh_ee+2,'(F12.5,1x,F12.5,3x)',advance='no') UAr(ind1,ibnd,iorb1)
+                       !WRITE(fh_ee+1,'(F12.5,1x,F12.5,3x)',advance='no') UAl(ibnd,ind1,iorb1)
+                       !WRITE(fh_ee+2,'(F12.5,1x,F12.5,3x)',advance='no') UAr(ind1,ibnd,iorb1)
+                       WRITE(fh_ee+1) UAl(ibnd,ind1,iorb1)
+                       WRITE(fh_ee+2) UAr(ind1,ibnd,iorb1)
                     enddo
                  ENDDO
-                 WRITE(fh_ee+1,*)
-                 WRITE(fh_ee+2,*)
+                 !WRITE(fh_ee+1,*)
+                 !WRITE(fh_ee+2,*)
               enddo
-              WRITE(fh_ee+0,*)
+              !WRITE(fh_ee+0,*)
            enddo
         endif
 
@@ -587,8 +580,7 @@ SUBROUTINE PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feig
 
   DEALLOCATE( sigma, omega )
 
-
-  if (mode.eq.'e' .and. nprocs>1) then
+  if (mode.eq.'e') then
      ! Here we combine all eigenvalues.dat, UL.dat, UR.dat together.
      ! Before each processor printed into its own file. But now we need to create one output file.
      call Barrier() ! some processors might not close the file above, and copying would not have all the data.
@@ -598,33 +590,110 @@ SUBROUTINE PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feig
      fnames(3) = fUR
      if (myrank.eq.master) then
         do ip=1,3
-           open(fh_ee+ip, file=TRIM(fnames(ip)), status='old', position='append', action='write', iostat=ierr)
+           open(fh_ee+ip-1, file=TRIM(fnames(ip)), status='unknown', action='write', iostat=ierr)
            if (ierr /= 0) then
-              print *, 'Error opening ', TRIM(fnames(ip)), ' in append mode.'
+              print *, 'Error opening ', TRIM(fnames(ip)), ' in write mode.'
               stop 'ERROR in dmftgk'
            endif
-           do slave=1,nprocs-1
-              write(cpuID_,'(I3)') slave
+        enddo
+        
+        do ip=1,2
+           write(fh_ee+ip, '(A,I7,1x,I3,1x,I6,1x,I3,3x)',advance='no') '#', nkpt, nsymop, nom, norbitals
+           DO iorb1=1,norbitals
+              write(fh_ee+ip, '(I3,1x)',advance='no') nindo(iorb1)
+           ENDDO
+           write(fh_ee+ip, '(A)') ' # nkpt, nsymop, nom, norbitals, size(iorb1),...'
+           write(fh_ee+ip, '(A)',advance='no') '#'
+           do iorb=1,norbitals
+              write(fh_ee+ip, '(3F9.5,2x)',advance='no') (POSC(i,iorb),i=1,3)
+           enddo
+           write(fh_ee+ip,'(A)') '  # actual position of correlated atoms in the unit cell'
+        enddo
+        
+        do slave=0,nprocs-1
+           write(cpuID_,'(I3)') slave
+           do ip=1,3
               filename = TRIM(fnames(ip))//'.'//ADJUSTL(TRIM(cpuID_))
-              open(fh_ene+ip, file=filename, status='old',iostat=ierr)
+              open(fh_ene+ip-1, file=filename, status='old',form='unformatted',iostat=ierr)
               if (ierr /= 0) then
                  print *, 'Error opening ', filename, ' in read mode.'
                  stop 'ERROR in dmftgk'
               endif
-              do
-                 read(fh_ene+ip, '(A)', iostat=ierr) single_line
-                 if (ierr /= 0) exit  ! end of file or error
-                 if (single_line(1:1).eq.'!') then
-                    write(fh_ee+ip, '(A)') trim(single_line)
-                 else
-                    write(fh_ee+ip, '(A)') trim(single_line)//' ' ! It turns out fortran adds a space when printing numbers
-                 endif
-              end do
-              close(fh_ene+ip)
+           enddo
+           do
+              read(fh_ene, iostat=ierr) single_short_line ! line with comment
+              !print*, 'line=', TRIM(single_short_line), 'ierr=', ierr
+              if (ierr /= 0) exit  ! end of file or error
+              write(fh_ee, '(A)') trim(single_short_line)
+              do iom=1,nom
+                 read(fh_ene) omega_, nbnd, first_bnd
+                 write(fh_ee,'(F19.14,2x,2I5,1x)',advance='no') omega_, nbnd, first_bnd
+                 write(fh_ee+1,'(F19.14,2x,I5,1x)') omega_, nbnd
+                 write(fh_ee+2,'(F19.14,2x,I5,1x)') omega_, nbnd
+                 !
+                 do ibnd=1,nbnd
+                    read(fh_ene) z_re,z_im
+                    write(fh_ee,'(2E24.16,1x)',advance='no') z_re,z_im
+                    !
+                    read(fh_ene+1) first_bnd
+                    write(fh_ee+1,'(I4,1x)',advance='no') first_bnd
+                    !
+                    read(fh_ene+2) first_bnd
+                    write(fh_ee+2,'(I4,1x)',advance='no') first_bnd
+                    !
+                    DO iorb1=1,norbitals
+                       nind1 = nindo(iorb1)
+                       do ind1=1,nind1
+                          read(fh_ene+1) z_re,z_im
+                          write(fh_ee+1,'(F12.5,1x,F12.5,3x)',advance='no') z_re,z_im
+                          read(fh_ene+2) z_re,z_im
+                          write(fh_ee+2,'(F12.5,1x,F12.5,3x)',advance='no') z_re,z_im
+                       enddo
+                    ENDDO
+                    write(fh_ee+1,*)
+                    write(fh_ee+2,*)
+                 enddo
+                 write(fh_ee,*)
+              enddo
+           end do
+           do ip=1,3
+              close(fh_ene+ip-1)
+              filename = TRIM(fnames(ip))//'.'//ADJUSTL(TRIM(cpuID_))
               call execute_command_line('rm -f '//trim(filename))
            enddo
+        enddo
+        do ip=0,2
            close(fh_ee+ip)
         enddo
+!!!     much easier implementation, but it has major issue: we dont know how long is a single line, and can cut it when reading string
+        !do ip=1,3
+        !   open(fh_ee+ip, file=TRIM(fnames(ip)), status='old', position='append', action='write', iostat=ierr)
+        !   if (ierr /= 0) then
+        !      print *, 'Error opening ', TRIM(fnames(ip)), ' in append mode.'
+        !      stop 'ERROR in dmftgk'
+        !   endif
+        !   do slave=1,nprocs-1
+        !      write(cpuID_,'(I3)') slave
+        !      filename = TRIM(fnames(ip))//'.'//ADJUSTL(TRIM(cpuID_))
+        !      open(fh_ene+ip, file=filename, status='old',iostat=ierr)
+        !      if (ierr /= 0) then
+        !         print *, 'Error opening ', filename, ' in read mode.'
+        !         stop 'ERROR in dmftgk'
+        !      endif
+        !      do
+        !         read(fh_ene+ip, '(A)', iostat=ierr) single_line
+        !         if (ierr /= 0) exit  ! end of file or error
+        !         if (single_line(1:1).eq.'!') then
+        !            write(fh_ee+ip, '(A)') trim(single_line)
+        !         else
+        !            write(fh_ee+ip, '(A)') trim(single_line)//' ' ! It turns out fortran adds a space when printing numbers
+        !         endif
+        !      end do
+        !      close(fh_ene+ip)
+        !      call execute_command_line('rm -f '//trim(filename))
+        !   enddo
+        !   close(fh_ee+ip)
+        !enddo
      endif
   endif
 
