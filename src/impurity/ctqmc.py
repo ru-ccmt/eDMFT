@@ -9,6 +9,7 @@ from cmpEimp2 import GiveImpFunctional
 import brod  # should be replaced by system call
 import subprocess
 import dmft_DC
+import builtins
 
 Default_CoulombF = 'Ising'
 mom=0       # We need those variables to be global in order to use python exect
@@ -183,6 +184,9 @@ class IMP_CTQMC:
             self.spr['J']=Jh
             self.J = Jh
 
+        if self.l==3 and ('n' not in self.spr):
+            self.spr['n']= list(range(builtins.max(0,params['nf0'][0]-2),builtins.min(params['nf0'][0]+3,2*(2*self.l+1))))
+        
         # extra off-diagonal spin-orbit
         self.cx = 0 if 'cx' not in self.spr else self.spr['cx']
         print('At ctqmc.__init__ self.spr=', self.spr, file=self.fh_info)
