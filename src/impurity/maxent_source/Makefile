@@ -3,7 +3,7 @@ include ../../Makefile.in
 #CMPLIBS = --opt='-fast' --link-lapack_opt
 #CMPLIBS2 = --f90flags='-openmp ' --opt='-fast' --link-lapack_opt
 
-all : maxent_routines.so maxent_routines_OMP.so
+all : maxent_routines.so # maxent_routines_OMP.so
 
 maxent_routines.so : maxent_routines.f90
 	$(CMP) -c maxent_routines.f90 -m maxent_routines $(CMPLIBS)

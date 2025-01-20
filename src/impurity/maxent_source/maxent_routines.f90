@@ -100,10 +100,10 @@ SUBROUTINE MAXENT(a,rfac,alpha,temp,ker,sxt,axt,mm,dw,nt,nw,steps,iseed)
         am = maxval(a)
         da(:) = (0.1*a(:)+0.01*am)*rfac
         
-        IF (MOD(i,steps/10).EQ.0) THEN
-           WRITE(*,'(A,I7,2x,A,f12.5,2x,A,I7,2x,A,I9,2x,A,f7.4)') 'ann-step=', i,'chi2=', x1, 'accepted=', acc, &
-                'tried=', try, 'new stepsize=', rfac
-        ENDIF
+        !IF (MOD(i,steps/10).EQ.0) THEN
+        !   WRITE(*,'(A,I7,2x,A,f12.5,2x,A,I7,2x,A,I9,2x,A,f7.4)') 'ann-step=', i,'chi2=', x1, 'accepted=', acc, &
+        !        'tried=', try, 'new stepsize=', rfac
+        !ENDIF
 
         temp=temp/1.5
         acc=0
