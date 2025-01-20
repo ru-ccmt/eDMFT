@@ -66,6 +66,7 @@ CONTAINS
   END SUBROUTINE start_MPI
 
   SUBROUTINE stop_MPI
+    deallocate(argv)
     CALL MPI_FINALIZE(ierr)
   ENDSUBROUTINE stop_MPI
 
@@ -320,7 +321,16 @@ CONTAINS
     call stop_MPI
     STOP 'DMFT - Error'
   end subroutine Scatter_Vector_data
-  
+
+  subroutine Barrier()
+    INTEGER :: ierr
+    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+    if (ierr.NE.0) then
+       WRITE(6,*) 'ERROR in MPI_Barrier'
+       call stop_MPI
+       STOP 'MPI ERROR 2'
+    endif
+  end subroutine Barrier
 #else
 
 ! What needs to be done for serial job
@@ -343,6 +353,7 @@ CONTAINS
   END SUBROUTINE start_MPI
 
   SUBROUTINE stop_MPI
+    deallocate(argv)
   ENDSUBROUTINE stop_MPI
 
   SUBROUTINE FilenameMPI(infout)
@@ -418,6 +429,8 @@ CONTAINS
   subroutine Scatter_Vector_data()
   end subroutine Scatter_Vector_data
   
+  subroutine Barrier()
+  end subroutine Barrier
 #endif
 
 END MODULE com_mpi

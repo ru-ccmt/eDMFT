@@ -32,7 +32,7 @@ PROGRAM DMFTMAIN  ! Program DMFT calculates
   INTEGER      :: projector
   INTEGER      :: strlen, locrot, shift, latom, wfirst, iat, im, wat, minsigind_p, maxsigind_p, minsigind_m, lngth
   INTEGER      :: ivector, nkpt, inkp, ik_start, il
-  INTEGER      :: identity3(3,3), diff, ig
+  INTEGER      :: identity3(3,3), diff, ig, slen
   interface
      REAL*8 FUNCTION detx(a)
        IMPLICIT NONE
@@ -44,9 +44,13 @@ PROGRAM DMFTMAIN  ! Program DMFT calculates
   DATA SO /.false./, Qcomplex /.false./, IMAG/(0.0D0,1.0D0)/, Ry2eV/13.60569193/
   DATA strlen/200/
   !------------------------------------------------------------------     
-
+  ! For mode=='u' we have the following convention:
+  ! if dmftu.def contains line:
+  !   501, 'Udmft' or any other name that does not end with 0, Udmft_parallel=False, and only one projector is printed.
+  !   501, 'Udmft.0', with name that ends with 0, Udmft_parallel=True, and each processor prints its own projector.
   fUdmft = 'Udmft.'
-
+  Udmft_parallel = .True.
+  
   CALL start_MPI()
   
   call cputim(time0)
@@ -108,12 +112,24 @@ PROGRAM DMFTMAIN  ! Program DMFT calculates
 12      continue
      end if
      if(iunit.eq.501) then
-        do i=strlen,2,-1
-           if(fname(i:i).ne.' ') then
-              fUdmft = fname(:i-1)
-              exit
+        slen = len_trim(fname)
+        if (fname(slen:slen)=='0') then
+           fUdmft = fname(:slen-1)
+           Udmft_parallel = .True.
+        else
+           Udmft_parallel = .False.
+           if (fname(slen:slen)=='.') then
+              fUdmft = fname(:slen)
+           else
+              fUdmft = fname(:slen)//'.'
            endif
-        enddo
+        endif
+        !do i=strlen,2,-1
+        !   if(fname(i:i).ne.' ') then
+        !      fUdmft = fname(:i-1)
+        !      exit
+        !   endif
+        !enddo
         if (myrank.eq.master) close(501) ! Will reopen later
      endif
      if(iunit.eq.9) then

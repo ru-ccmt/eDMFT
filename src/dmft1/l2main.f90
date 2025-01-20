@@ -8,7 +8,7 @@ SUBROUTINE L2MAIN(Qcomplex,nsymop,mode,projector,Qrenormalize,fUdmft)
   !--        'e' -> eigenvalues are printed
   !--        'u' -> printing transformation
   !--        'x' -> computes xqtl2, just for debugging
-  USE param,    ONLY: LMAX2, LOMAX, NRAD, nloat, nrf, nmat, nume, gamma, gammac, aom_default, bom_default, nom_default, IBLOCK, matsubara, Cohfacts, ComputeLogGloc, maxbands, nemin0, nemax0, max_nl, cmp_partial_dos, Hrm, lmaxr
+  USE param,    ONLY: LMAX2, LOMAX, NRAD, nloat, nrf, nmat, nume, gamma, gammac, aom_default, bom_default, nom_default, IBLOCK, matsubara, Cohfacts, ComputeLogGloc, maxbands, nemin0, nemax0, max_nl, cmp_partial_dos, Hrm, lmaxr, Udmft_parallel
   USE structure,ONLY: VOL, RMT, iord, iz, nat, mult, pos, tau, rotij, tauij, jri, BR1, rot_spin_quantization
   USE case,     ONLY: cf, csize, maxsize, nl, cix, ll, Sigind, iatom, legend, maxdim, natom, ncix, shft, isort, crotloc, ifirst
   USE sym2,     ONLY: tmat, idet, iz_cartesian
@@ -17,7 +17,7 @@ SUBROUTINE L2MAIN(Qcomplex,nsymop,mode,projector,Qrenormalize,fUdmft)
   USE kpts,     ONLY: mweight, tweight
   USE w_atpar,  ONLY: w_alo, w_nlo, w_nlov, w_nlon, w_ilo, w_lapw, w_ri_mat, w_P, w_DP, w_jatom, w_FJ, w_DFJ, w_allocate, w_deallocate, w_rfk, w_allocate_rfk, w_deallocate_rfk, nnlo, el_store, elo_store
   USE p_project,ONLY: p_allocate, p_deallocate, p_cmp_rixmat, P_rfi, n_al_ucase, max_lcase, al_ucase, al_ucase_, l_al_ucase, j_al_ucase, nl_case, kNri, rix, dri, al_interstitial
-  USE com_mpi,  ONLY: nprocs, myrank, master, cpuID, vectors, vector_para, VECFN, fvectors, FilenameMPI, FilenameMPI2, Gather_MPI, Reduce_MPI, FindMax_MPI, Gather_procs, nvector, Reduce_DM_MPI, Qprint
+  USE com_mpi,  ONLY: nprocs, myrank, master, cpuID, vectors, vector_para, VECFN, fvectors, FilenameMPI, FilenameMPI2, Gather_MPI, Reduce_MPI, Barrier, FindMax_MPI, Gather_procs, nvector, Reduce_DM_MPI, Qprint
   USE kpts,     only: numkpt
   USE matpar,   only: atpar, alo, nlo, nlov, nlon, ilo, lapw, RI_MAT, P, DP, RF1, RF2
   use DMFTProjector, only : CmpDMFTrans
@@ -142,10 +142,10 @@ SUBROUTINE L2MAIN(Qcomplex,nsymop,mode,projector,Qrenormalize,fUdmft)
   !ALLOCATE( Rspin(2,2,norbitals) )
   !CALL GetSpinRotation(Rspin,rotij,crotloc,BR1,norbitals,natom,natm,iso,lmax2,iatom,nl,cix,ll,iorbital)
 
-
-  filename = 'BasicArrays.dat'
-  if (mode.EQ.'u') CALL PrintSomeArrays(filename, nat, iso, norbitals, ncix, natom, numkpt, nmat, nume, Qcomplex, lmax2, maxdim2, maxdim, maxsize, nindo, cixdim, nl, ll, cix, iorbital, csize, iSx, Sigind, EF, VOL)
-
+  if (myrank.eq.master) then
+     filename = 'BasicArrays.dat'
+     if (mode.EQ.'u') CALL PrintSomeArrays(filename, nat, iso, norbitals, ncix, natom, numkpt, nmat, nume, Qcomplex, lmax2, maxdim2, maxdim, maxsize, nindo, cixdim, nl, ll, cix, iorbital, csize, iSx, Sigind, EF, VOL)
+  endif
   if (abs(projector).ge.5) then
      filename='projectorw.dat'
      call p_allocate(filename, maxucase,csort)
@@ -420,8 +420,6 @@ SUBROUTINE L2MAIN(Qcomplex,nsymop,mode,projector,Qrenormalize,fUdmft)
      else 
         open(fh_p,file=TRIM(filename),status='unknown', form='unformatted')
      endif
-
-
      if (pform) then
         WRITE(fh_p,*) pr_procr, nsymop, norbitals
         WRITE(fh_p,*) (nindo(iorb), iorb=1,norbitals)
@@ -1189,7 +1187,7 @@ SUBROUTINE L2MAIN(Qcomplex,nsymop,mode,projector,Qrenormalize,fUdmft)
 
   DEALLOCATE( sigma, omega, s_oo)
   deallocate( noccur )
-  deallocate( cixdim, iSx, nindo, cix_orb, cfX )
+  deallocate( cixdim, iSx, cix_orb, cfX )
   deallocate( csort )
 
   if (mode.EQ.'g') then
@@ -1203,6 +1201,15 @@ SUBROUTINE L2MAIN(Qcomplex,nsymop,mode,projector,Qrenormalize,fUdmft)
   if (Qrenormalize .and. abs(projector).le.5) deallocate( Olapm0, SOlapm )
   !------ Deallocation of memory ---------------
 
+  close(fh_p)
+  
+  call Barrier()
+  !print*, 'mode=', mode, 'myrank=', myrank, 'nprocs=', nprocs
+  if ((.not.Udmft_parallel) .and. mode.EQ.'u' .and. myrank.EQ.master .and. nprocs.gt.1) then
+     call Combine_DMFTU(fh_p,fUdmft,pform,nkp,nsymop,norbitals,nbands,nprocs,nindo)
+  endif
+  deallocate(nindo)
+  
   if (Qprint) then
      write(6,'(//,3X,"=====>>> CPU TIME SUMMARY",/)')
      write(6,*)
@@ -1249,6 +1256,94 @@ SUBROUTINE Debug_Print_Projector(DMFTU,nindo,norbitals,nbands,maxdim2)
   close(988)
 END SUBROUTINE Debug_Print_Projector
          
-
+SUBROUTINE Combine_DMFTU(fh_p,fUdmft,pform,nkp,nsymop,norbitals,nbands,nprocs,nindo)
+  IMPLICIT NONE
+  INTEGER, intent(in) :: fh_p,nkp,nsymop,norbitals,nbands,nprocs,nindo(norbitals)
+  CHARACTER*200, intent(in):: fUdmft
+  LOGICAL, intent(in) :: pform
+  !
+  INTEGER :: fh_q, slave, pr_procr, nsymop2, norbitals2, nindo2(norbitals)
+  CHARACTER*3   :: cpuID_
+  INTEGER :: ikp,maxdim2,norbitals3,nemin,igi,isym,isym2,nbands2,iks,iorb,ind,i,len
+  COMPLEX*16 :: dmftu(nbands)
+  REAL*8 :: real_part, imag_part
+  CHARACTER(len=200) :: filename
+  len = len_trim(fUdmft)
+  filename = fUdmft(:len-1)
+  print*, 'Combining ', TRIM(filename)
+  fh_q = 502
+  if (pform) then
+     open(fh_p,file=TRIM(filename),status='unknown', form='formatted')
+  else 
+     open(fh_p,file=TRIM(filename),status='unknown', form='unformatted')
+  endif
+  if (pform) then
+     WRITE(fh_p,*) nkp, nsymop, norbitals
+     WRITE(fh_p,*) (nindo(iorb), iorb=1,norbitals)
+  else
+     WRITE(fh_p) nkp, nsymop, norbitals
+     WRITE(fh_p) (nindo(iorb), iorb=1,norbitals)
+  endif
+  
+  do slave=0,nprocs-1
+     write(cpuID_,'(I3)') slave
+     !print *, 'cpuID=', cpuID_
+     filename = TRIM(fUdmft)//ADJUSTL(TRIM(cpuID_))  ! fUdmft comes from def file
+     if (pform) then
+        open(fh_q,file=TRIM(filename),status='old', form='formatted')
+     else 
+        open(fh_q,file=TRIM(filename),status='old', form='unformatted')
+     endif
+     if (pform) then
+        READ(fh_q,*) pr_procr, nsymop2, norbitals2
+        READ(fh_q,*) (nindo2(iorb), iorb=1,norbitals)
+     else
+        READ(fh_q) pr_procr, nsymop2, norbitals2
+        READ(fh_q) (nindo2(iorb), iorb=1,norbitals)
+     endif
+     !print*, 'pr_procr=', pr_procr, 'for cpu=', cpuID_
+     DO iks=1,pr_procr   !------ k-points read
+        if (pform) then
+           READ (fh_q,*) ikp,nbands2,maxdim2,norbitals3,nemin
+           WRITE(fh_p,*) ikp,nbands2,maxdim2,norbitals3,nemin
+        else
+           READ (fh_q) ikp,nbands2,maxdim2,norbitals3,nemin
+           WRITE(fh_p) ikp,nbands2,maxdim2,norbitals3,nemin
+        endif
+        !print*, 'ikp=', ikp, 'iks=', iks, 'nsymop2=', nsymop2, 'for cpu=', cpuID_
+        DO isym=1,nsymop2
+           if (pform) then
+              READ(fh_q,*) isym2
+              WRITE(fh_p,*) isym
+           else
+              READ(fh_q) isym2
+              WRITE(fh_p) isym
+           endif
+           DO iorb=1,norbitals
+              DO ind=1,nindo(iorb)
+                 if (pform) then
+                    do i=1,nbands2
+                       read (fh_q,'(f16.9,1x,f16.9,3x)',advance='no') real_part, imag_part
+                       dmftu(i) = CMPLX(real_part, imag_part)
+                    enddo
+                    read(fh_q,*)
+                    do i=1,nbands2
+                       write(fh_p,'(f16.9,1x,f16.9,3x)',advance='no') dble(dmftu(i)), aimag(dmftu(i))
+                    enddo
+                    write(fh_p,*)
+                 else
+                    read(fh_q)  (dmftu(i),i=1,nbands2)
+                    write(fh_p) (dmftu(i),i=1,nbands2)
+                 endif
+              ENDDO
+           ENDDO
+        ENDDO
+     ENDDO
+     close(fh_q)
+     call execute_command_line('rm -f '//trim(filename))
+  enddo
+  close(fh_p)
+end SUBROUTINE Combine_DMFTU
+              
               
 
