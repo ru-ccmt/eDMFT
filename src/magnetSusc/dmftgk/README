@@ -1,11 +1,22 @@
+This unitility can now be used with
+x_dmft.py dmftgk         # for e mode computing eigenvalues/eigenvectors
+x_dmft.py dmftgk -u g    # for g mode computing Green's function
+
+In this case, "dmftgk.in" is prepared automatically by x_dmft.py script. It also
+automatically prints projector, and it can execute in parallel when mpi_prefix.dat is present.
+
+------------------------------
+previous explanation:
 This utility prints momentum dependent Green's function 
-and local green's function using DMFT projector, which 
-must be prepared on the disc.
+and local green's function or eigenvalues and eigenvectors
+using DMFT projector, which  must be prepared on the disc.
 It needs file "dmftgk.in". Example provided:
 
-BasicArrays.dat     # filename for projector
-1                   # matsubara
-BFA.energy          # LDA-energy-file, case.energy(so)(updn)
+g                   # mode
+[0|1]               # matsubara
+case.energy         # LDA-energy-file, case.energy(so)(updn)
+case.klist          # k-list
+case.rotlm          #
 Udmft.0             # filename for projector
 0.025               # gamma for non-correlated
 0.025               # gammac
@@ -13,3 +24,20 @@ sig.inp1 sig.inp2   # self-energy name, sig.inp(x)
 G_k1 G_k2           # name of the output gk
 G_local1 G_local2   # name of the output glocal
 g_local1 g_local2   # name of the output glocal-diagonal
+
+-----------------------------------------------------
+e                   # mode
+[0|1]               # matsubara
+case.energy         # LDA-energy-file, case.energy(so)(updn)
+case.klist          # k-list
+case.rotlm          #
+Udmft.0             # filename for projector
+0.025               # gamma for non-correlated
+0.025               # gammac
+sig.inp1 sig.inp2   # self-energy name, sig.inp(x)
+eigenvalues.dat     # filename with output frequency dependent eigenvalues
+UR.dat              # right eigenvector of non-hermitian DMFT problem
+UL.dat              # left eigenvector of non-hermitian DMFT problem
+-2.0                # lower cutoff for output energies measured from EF
+ 2.0                # upper cutoff for output energies measured from EF
+ 

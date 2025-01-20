@@ -1,56 +1,65 @@
 ! @Copyright 2007 Kristjan Haule
 program print_gk
+  USE com_mpi, ONLY: myrank, master, nprocs, start_MPI, stop_MPI, nargs, argv, Qprint, cpuID, fUdmft
   IMPLICIT NONE
   ! functions
   INTEGER :: CountSelfenergy
   ! variables
-  CHARACTER*100 :: case, fUdmft, fenergy, fbasicArrays, fklist, frotlm
+  CHARACTER*100 :: case, fenergy, fbasicArrays, fklist, frotlm
   CHARACTER*2   :: updn, so
   CHARACTER*1   :: mode
   INTEGER :: fhb, fhi
-  CHARACTER*100 :: STR, feigenvals, fUR,fUL
+  CHARACTER*100 :: STR, feigenvals, fUR,fUL, filename
   INTEGER :: nom, nk, iso, nat, norbitals, ncix, natom, nkpt, nmat, nume, lmax2, maxdim2, maxdim, maxsize, icix
   LOGICAL :: Qcomplex, matsubara
   REAL*8  :: gamma, gammac, BRX(3,3), emin, emax
-  INTEGER :: i, j, l, imatsubara, nargs
+  INTEGER :: i, j, l, imatsubara, slen, ierr!, nargs
   REAL*8, PARAMETER      :: Ry2eV = 13.60569193
   CHARACTER*100, allocatable :: fsigname(:), fgkout(:), fglocout(:), fgloc(:)
-  CHARACTER*100, allocatable :: argv(:) ! Command-line arguments
   ! Functions
   CHARACTER*100 :: ReadWord
-  
-  nargs = iargc()
+  CALL start_MPI()
   if (nargs.LT.1) then
-     print *, 'Missing the input file to proceed. Create input file with the following lines'
-     print *, 'g/e             # mode'
-     print *, 'BasicArrays.dat # filename for projector'
-     print *, 'int             # mastubara or not'
-     print *, 'case.energy     # wien2k energy file'
-     print *, 'case.klist      # wien2k klist'
-     print *, 'case.rotlm      # wien2k rotlm file'
-     print *, 'Udmft.0         # dmft projector'
-     print *, 'real            # broadening for non-correlated states'
-     print *, 'real            # broadening for correlated states'
-     print *, 'sig.inp1        # input self-energy'
-     print *, 'G_k1            # output greens function'
-     print *, 'G_local1        # output local greens function'
-     print *, 'g_local1        # output diagonal local greens function'
-     call exit(1)
+     CALL stop_MPI()
+     if (Qprint) then
+        print *, 'Missing the input file to proceed. Create input file with the following lines'
+        print *, 'g/e              # mode'
+        !print *, 'BasicArrays.dat  # filename for projector'
+        print *, '0/1              # mastubara or not'
+        print *, 'case.energy      # wien2k energy file case.energy[so]'
+        print *, 'case.klist[_band]# wien2k klist compatible with Udmft.proc'
+        print *, 'case.rotlm       # wien2k rotlm file'
+        print *, 'Udmft.0         # dmft projector'
+        print *, 'float            # broadening for non-correlated states from case.indmfl'
+        print *, 'float            # broadening for correlated states from case.indmfl'
+        print *, 'sig.inp1         # input self-energies, could be several'
+        print *, '------- for mode==e ----------------'
+        print *, 'eigenvalues.dat  # filename with output frequency dependent eigenvalues'
+        print *, 'UR.dat           # right eigenvector of non-hermitian DMFT problem'
+        print *, 'UL.dat           # left eigenvector of non-hermitian DMFT problem'
+        print *, '-float           # lower cutoff for output energies measured from EF'
+        print *, ' float           # upper cutoff for output energies measured from EF'
+        print *, '------- for mode==g ----------------'
+        print *, 'G_k1             # output greens function'
+        print *, 'G_local1         # output local greens function'
+        print *, 'g_local1         # output diagonal local greens function'
+     endif
+     STOP 'ERROR dmftgk: missing arguments'
   endif
-  ALLOCATE (argv(nargs))                                 ! wouldn't like to parse
-  WRITE(*,'(A,I2)') 'nargs=', nargs
-  DO j=1,nargs
-     CALL getarg(j, argv(j))
-     WRITE(*,'(A,A)') 'argi=', TRIM(argv(j))
-  ENDDO
 
+!!! Eventually I should read this on master only, and Bcast
   fhi = 995
   open(fhi, file=argv(1), status='old', ERR=900, form='formatted')
   READ(fhi,*) mode
   WRITE(*,'(A,A)') 'mode=', mode
-  READ(fhi, *) fbasicArrays
-  WRITE(*,'(A,A)') 'fbasicArrays=', fbasicArrays
-  READ(fhi, *) imatsubara
+  fbasicArrays = 'BasicArrays.dat'
+  !READ(fhi, *) fbasicArrays
+  !WRITE(*,'(A,A)') 'fbasicArrays=', fbasicArrays
+  READ(fhi, *, iostat=ierr) imatsubara
+  if (ierr /= 0) then
+     print *, 'ERROR with input file. We eliminated BasicArrays.dat line and this line should contain matsubara'
+     STOP 'ERROR dmftgk'
+  endif
   WRITE(*,'(A,I2)') 'imatsubara=', imatsubara
   READ(fhi, *) fenergy
   WRITE(*,'(A,A)') 'fenergy=', fenergy
@@ -59,14 +68,17 @@ program print_gk
   READ(fhi, *) frotlm
   WRITE(*,'(A,A)') 'frotlm=', frotlm
   READ(fhi, *) fUdmft
+  slen = len_trim(fUdmft)
+  if (fUdmft(slen:slen)=='0') then
+     fUdmft = fUdmft(:slen-1)
+  endif
   WRITE(*, '(A,A)') 'fUdmft=', fUdmft
   READ(fhi, *) gamma
-  WRITE(*, '(A,F10.4)') 'gamma=', gamma
+  WRITE(*, '(A,F10.4)') 'gamma= ', gamma
   READ(fhi, *) gammac
   WRITE(*, '(A,F10.4)') 'gammac=', gammac
-
-  !fbasicArrays = 'BasicArrays.dat'
-  !!! Reading the first part of the header file of BasicArrays.dat to get dimensions
+!!! Eventually I should read this on master only, and Bcast
+!!! Reading the first part of the header file of BasicArrays.dat to get dimensions
   fhb=996
   open(fhb,file=fbasicArrays,status='old', ERR=901, form='formatted')
   READ(fhb, *) STR ! 'nat, iso, norbitals, ncix, natom'
@@ -77,7 +89,7 @@ program print_gk
   READ(fhb, *) Qcomplex
   READ(fhb, *) STR ! 'lmax2, maxdim2, maxdim, maxsize'
   READ(fhb, *) lmax2, maxdim2, maxdim, maxsize
-  
+
   allocate( fsigname(ncix), fgkout(ncix), fglocout(ncix), fgloc(ncix) )
   WRITE(*,'(A,I3)') 'ncix=', ncix
   do icix=1,ncix
@@ -86,7 +98,7 @@ program print_gk
   enddo
   READ(fhi,*)
   WRITE(*,*)
-  
+
   if (mode.EQ.'g') then
      do icix=1,ncix
         fgkout(icix) = ReadWord(fhi)
@@ -119,46 +131,50 @@ program print_gk
      WRITE(*,'(A,F10.3)') 'emax=', emax
   else
      print *, 'ERROR: Mode is not one of "e" or "g". Bailling out!  mode=', mode
-     CALL EXIT(1)
+     call stop_MPI()
+     STOP 'ERROR dmftgk: mode not recognized. Need to be e or g'
   endif
-  
+
   if (imatsubara.EQ.0) then
      matsubara = .FALSE.
   else
      matsubara = .TRUE.
   endif
   gamma = gamma/Ry2eV   ! In dmft1 we use so small broadening !
-  
-  !if (mode.EQ.'g') then
-  !   print *, 'Mode is g!'
-  !endif
-  
+
 !!! Counting the number of frequency points in self-energy
   !print *, 'fsigname=', fsigname(1)
   open(81, file=fsigname(1), status='old', ERR=902, form='formatted')
   nom = CountSelfenergy(81, 1) !--- How many frequency point exists in the input file? ---!
   close(81)
-  print *, 'nom=', nom
+  if (Qprint) WRITE(6,'(A,I4)') 'nom=', nom
 
   CALL ReadBR(frotlm, BRX)
-  
-  CALL PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feigenvals, fUR, fUL, mode, emin, emax, &
-       gammac, gamma, nom, nat, iso, norbitals, ncix, natom, nkpt, nmat, nume, Qcomplex, matsubara, lmax2, maxdim2, maxdim, maxsize, BRX)
-  
-  deallocate( fsigname, fgkout, fglocout, fgloc )
 
-  deallocate( argv )
-  
-  STOP
+  CALL PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feigenvals, fUR, fUL, mode, emin, emax, &
+       gammac, gamma, nom, nat, iso, norbitals, ncix, natom, nkpt, nmat, nume, Qcomplex, matsubara, lmax2, maxdim2, maxdim, maxsize, BRX)
+
+  deallocate( fsigname, fgkout, fglocout, fgloc )
+  !deallocate( argv )
+  CALL stop_MPI()
+  if (myrank.eq.master) then
+     STOP 'dmftgk'
+  else
+     close(6)
+     filename = 'nohup.'//trim(ADJUSTL(cpuID))
+     call execute_command_line('rm -f '//trim(filename))
+     STOP
+  endif
 900 print *, 'ERROR opening ',TRIM(argv(1)),' file'
 901 print *, 'ERROR opening ',TRIM(fbasicArrays), ' file'
 902 print *, 'ERROR opening ',TRIM(fsigname(1)), ' file'
 end program print_gk
 
 
-SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feigvals, fUR, fUL, mode, emin, emax, gammac, gamma, nom, nat, iso, norbitals, ncix, natom, nkpt, nmat, nume, Qcomplex, matsubara, lmax2, maxdim2, maxdim, maxsize, BRX)
+SUBROUTINE PrintGk(fenergy, fsigname, fgkout, fglocout, fgloc, fklist, fhb, feigvals, fUR, fUL, mode, emin, emax, gammac, gamma, nom, nat, iso, norbitals, ncix, natom, nkpt, nmat, nume, Qcomplex, matsubara, lmax2, maxdim2, maxdim, maxsize, BRX)
+  USE com_mpi, ONLY: myrank, master, nprocs, Qprint, Reduce_MPI, cpuID, fUdmft, stop_MPI, Barrier
   IMPLICIT NONE
-  CHARACTER*100, intent(in) :: fenergy, fUdmft, fklist, feigvals, fUR, fUL
+  CHARACTER*100, intent(in) :: fenergy, fklist, feigvals, fUR, fUL
   CHARACTER*100, intent(in) :: fsigname(ncix), fgkout(ncix), fglocout(ncix), fgloc(ncix)
   CHARACTER*1, intent(in)   :: mode
   REAL*8, intent(in)  :: emin, emax, gammac, gamma, BRX(3,3)
@@ -167,7 +183,7 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
   INTEGER, intent(in) :: lmax2, maxdim2, maxdim, maxsize
   ! locals
   CHARACTER*10:: skii
-  CHARACTER*100:: FNAME
+  CHARACTER*100:: filename
   LOGICAL :: pform
   INTEGER :: ios
   INTEGER :: itape, i, j, k, l, is, N, nemin, nemax, ikp, ip, iq, NE, nb_min, nb_max, dir, n_min, n_max
@@ -175,39 +191,49 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
   INTEGER :: kvec(4,nkpt)
   integer :: fh_p, fh_gc, fh_gl, fh_gk, fh_ene, fh_ee
   integer :: numk, nsymop, nbands, isym, ddi, iw, istart, ix, iw_p, iw_m, Nd, ibnd, ibnd1, ibnd2, ind1, nxmin, nxmax
-  integer :: iorb, wkii, wkis, iom, iband, nord, icix, tnorbitals
+  integer :: iorb, wkii, wkis, iom, iband, nord, icix, tnorbitals, slave, ierr
   integer :: nindo(norbitals), csize(ncix), tnindo(norbitals), cixdim(ncix), nl(natom), ll(natom,4), cixdm, cixdms
   INTEGER :: cix(natom,4), iorbital(natom,4), nind(natom,4), iSx(maxdim2,norbitals), Sigind(maxdim,maxdim,ncix), iorb1, iorb2, nind1, nind2
+  INTEGER :: maxdim_, norbitals_, iikp, ik_before, pr_proc, pr_procr
   COMPLEX*16 :: xomega, ww, csum, ex
+  CHARACTER*3:: cpuID_
+  CHARACTER*1000 :: single_line
   REAL*8,     ALLOCATABLE :: omega(:)
   COMPLEX*16, ALLOCATABLE :: STrans(:,:,:,:), DMFTU(:,:,:), gc(:)
   COMPLEX*16, ALLOCATABLE :: sigma(:,:,:), gij(:,:)
   COMPLEX*16, ALLOCATABLE :: gmk(:,:,:), gmloc(:,:,:,:), Glc(:,:,:)
   !COMPLEX*16, ALLOCATABLE :: olp(:,:,:,:)
   INTEGER,    ALLOCATABLE  :: cini(:), Sigini(:,:)
-  COMPLEX*16, ALLOCATABLE :: Al(:,:), Ar(:,:), zek(:), UAl(:,:,:), UAr(:,:,:), CC(:,:)
+  COMPLEX*16, ALLOCATABLE :: Al(:,:), Ar(:,:), zek(:), UAl(:,:,:), UAr(:,:,:)
   ! constants
   REAL*8, PARAMETER      :: Ry2eV = 13.60569193
   REAL*8, PARAMETER      :: PI = 3.14159265358979
   COMPLEX*16, PARAMETER  :: IMAG = (0.0D0,1.0D0)
+  character(len=100), dimension(3) :: fnames
 
   fh_p = 399   ! file for DMFT transformation UDMFT
   fh_gc  = 180 ! file for local green's function
-  fh_gl = 280
-  fh_gk = 1000
-  fh_ene = 59
-  fh_ee = 480
-  
+  fh_gl = 280  ! vector form of the local Greens function
+  fh_gk = 1000 ! k-dependent Green's function is fh_hk+icix
+  fh_ene = 59  ! eigenvalues from case.energy[so] file
+  fh_ee = 480  ! k-dependent eigenvalues, 481 left and 482 right eigenvectors
+
   CALL ReadKlist(fklist, nkpt, kvec, wgh)
   tweight = sum(wgh)
-  
+
   ! Many index arrays are imported from DMFT
   CALL Read_The_Rest_Basic_Arrays(fhb, nindo, cixdim, nl, ll, iorbital, cix, nind, csize, iSx, Sigind, EF, VOL, posc, norbitals, ncix, natom, maxdim, maxdim2)
-
-  print *, 'csize=', csize
+  
+  if (Qprint) then
+     WRITE(6,'(A)', advance='no') 'csize=['
+     do icix=1,ncix
+        WRITE(6,'(I3,A)',advance='no') csize(icix),','
+     enddo
+     WRITE(6,'(A)') ']'
+  endif
   
   EF = EF * Ry2eV
-  
+
   ! Reading the self-energy for all orbitals
   ALLOCATE( sigma(nom,maxsize,ncix), omega(nom)  )
   do icix=1,ncix
@@ -215,64 +241,75 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
      open(itape, file=TRIM(fsigname(icix)), status='old', ERR=903, form='formatted')
      CALL ReadSelfenergy(itape, sigma(:,:,icix), omega, gammac, csize(icix), nom, maxsize)
   enddo
-  
-  pform = .false.
-  if (pform) then
-     open(fh_p, file=TRIM(fUdmft), status='old', ERR=904, form='formatted')
-  else
-     open(fh_p, file=TRIM(fUdmft), status='old', ERR=904, form='unformatted')
-  endif
 
+  ! Each processor reads its own Udmft.proc file
+  pform = .false.  ! Should be compatible with dmft1/dmftu code. For debugging we might want to swtich pform=.true.
+  filename = TRIM(fUdmft)//ADJUSTL(TRIM(cpuID))  ! fUdmft comes from def file
   if (pform) then
-     READ(fh_p,*) numk, nsymop, tnorbitals
+     open(fh_p, file=TRIM(filename), status='old', ERR=904, form='formatted')
+  else
+     open(fh_p, file=TRIM(filename), status='old', ERR=904, form='unformatted')
+  endif
+  
+  if (pform) then
+     READ(fh_p,*) pr_procr, nsymop, tnorbitals     ! real number of k-points in this processor
      READ(fh_p,*) (tnindo(iorb), iorb=1,norbitals)
   else
-     READ(fh_p) numk, nsymop, tnorbitals
+     READ(fh_p) pr_procr, nsymop, tnorbitals
      READ(fh_p) (tnindo(iorb), iorb=1,norbitals)
   endif
-
-  WRITE(6,'(A,I6,2x)') 'tot-k=', nkpt
   
-  wkii=0
+  WRITE(6,'(A,I6,2x,A,I4)') 'tot-k=', nkpt, 'pr_procr=', pr_procr
 
+  wkii=0
   if (mode.EQ.'g') then
      allocate( gmk(maxdim,maxdim,ncix) )
      allocate( gmloc(maxdim,maxdim,ncix,nom) )
-     
-     DO icix=1,ncix
-        cixdm = cixdim(icix)
-        allocate( Sigini(cixdm,cixdm), cini(cixdm) )
-        CALL GetSiginiCini(Sigini, cini, cixdms, Sigind(:,:,icix), cixdm, maxdim )
-        deallocate( Sigini, cini)
 
-        open(fh_gk+icix, file=TRIM(fgkout(icix)), status='unknown')
-        !
-        WRITE(fh_gk+icix, '(A,I6,1x,I3,1x,I6,1x,I3,1x,I3,1x,A)') '#', nkpt, nsymop, nom, cixdms, norbitals, ' # nkpt, nsymop, nom, cixdms norbitals'
-        WRITE(fh_gk+icix, '(A)',advance='no') '#'
-        do iorb=1,norbitals
-           WRITE(fh_gk+icix, '(3F9.5,2x)',advance='no') (POSC(i,iorb),i=1,3)
-        enddo
-        WRITE(fh_gk+icix,'(A)') '  # actual position of correlated atoms in the unit cell'
-     ENDDO
-  else if (mode.EQ.'e') then
-     open(fh_ee,   file=TRIM(feigvals), status='unknown')
-     open(fh_ee+1, file=TRIM(fUL), status='unknown')
-     open(fh_ee+2, file=TRIM(fUR), status='unknown')
-     do j=1,2
-        WRITE(fh_ee+j, '(A,I7,1x,I3,1x,I6,1x,I3,3x)',advance='no') '#', nkpt, nsymop, nom, norbitals
-        DO iorb1=1,norbitals
-           WRITE(fh_ee+j, '(I3,1x)',advance='no') nindo(iorb1)
+     if (myrank.eq.master) then
+        DO icix=1,ncix
+           cixdm = cixdim(icix)
+           allocate( Sigini(cixdm,cixdm), cini(cixdm) )
+           CALL GetSiginiCini(Sigini, cini, cixdms, Sigind(:,:,icix), cixdm, maxdim )
+           deallocate( Sigini, cini)
+           open(fh_gk+icix, file=TRIM(fgkout(icix)), status='unknown')
+           !
+           WRITE(fh_gk+icix, '(A,I6,1x,I3,1x,I6,1x,I3,1x,I3,1x,A)') '#', nkpt, nsymop, nom, cixdms, norbitals, ' # nkpt, nsymop, nom, cixdms norbitals'
+           WRITE(fh_gk+icix, '(A)',advance='no') '#'
+           do iorb=1,norbitals
+              WRITE(fh_gk+icix, '(3F9.5,2x)',advance='no') (POSC(i,iorb),i=1,3)
+           enddo
+           WRITE(fh_gk+icix,'(A)') '  # actual position of correlated atoms in the unit cell'
         ENDDO
-        WRITE(fh_ee+j, '(A)') ' # nkpt, nsymop, nom, norbitals, size(iorb1),...'
-        
-        WRITE(fh_ee+j, '(A)',advance='no') '#'
-        do iorb=1,norbitals
-           WRITE(fh_ee+j, '(3F9.5,2x)',advance='no') (POSC(i,iorb),i=1,3)
+     else
+        DO icix=1,ncix
+           open(fh_gk+icix, file=TRIM(fgkout(icix))//'.'//ADJUSTL(TRIM(cpuID)) , status='unknown')
+        ENDDO
+     endif
+  else if (mode.EQ.'e') then
+     if (myrank.eq.master) then
+        open(fh_ee,   file=TRIM(feigvals), status='unknown')
+        open(fh_ee+1, file=TRIM(fUL), status='unknown')
+        open(fh_ee+2, file=TRIM(fUR), status='unknown')
+        do j=1,2
+           WRITE(fh_ee+j, '(A,I7,1x,I3,1x,I6,1x,I3,3x)',advance='no') '#', nkpt, nsymop, nom, norbitals
+           DO iorb1=1,norbitals
+              WRITE(fh_ee+j, '(I3,1x)',advance='no') nindo(iorb1)
+           ENDDO
+           WRITE(fh_ee+j, '(A)') ' # nkpt, nsymop, nom, norbitals, size(iorb1),...'
+           WRITE(fh_ee+j, '(A)',advance='no') '#'
+           do iorb=1,norbitals
+              WRITE(fh_ee+j, '(3F9.5,2x)',advance='no') (POSC(i,iorb),i=1,3)
+           enddo
+           WRITE(fh_ee+j,'(A)') '  # actual position of correlated atoms in the unit cell'
         enddo
-        WRITE(fh_ee+j,'(A)') '  # actual position of correlated atoms in the unit cell'
-     enddo
+     else
+        open(fh_ee,   file=TRIM(feigvals)//'.'//ADJUSTL(TRIM(cpuID)), status='unknown')
+        open(fh_ee+1, file=TRIM(fUL)//'.'//ADJUSTL(TRIM(cpuID)), status='unknown')
+        open(fh_ee+2, file=TRIM(fUR)//'.'//ADJUSTL(TRIM(cpuID)), status='unknown')
+     endif
   endif
-  
+
   ! Kohn-Sham eigenvalues from the file
   open (fh_ene, file=fenergy, status='old', ERR=905, form='formatted')
   !! Reading linearization energies in Energy file
@@ -280,42 +317,53 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
      READ(fh_ene, fmt='(f9.5)') EMIST !---- At the beginninge we have linearization energies --!
      READ(fh_ene, fmt='(f9.5)') EMIST !---- We just skip them ---------------------------------!
   enddo
-  
+
   !allocate( olp(maxdim2,maxdim2,norbitals,norbitals) )
   !olp=0.0
-  
-  
-  DO ikp=1,nkpt   ! over all irreducible k-points
-     ! Reading band energies from energy file
+
+  pr_proc  = floor(nkpt/DBLE(nprocs)+0.999)  ! The maximum number of points calculated per processor     
+  ! correcting pr_proc is the number of k-points is not dividable
+  !if (Qprint)
+  !WRITE(6,'(A,1x,A,I3,1x,A,I3,1x,A,I3)') cpuID,'pr_proc=', pr_proc, 'pr_procr=', pr_procr, 'tot-k=', nkpt
+
+  ! Reading band energies from energy fileneed for those k-points that are skept on this processor
+  do ik_before=1,myrank*pr_proc
      CALL ReadEnergiesK(fh_ene, Ek, kp, wg, NE, nume)
-     
+  enddo
+  do iikp=1,pr_procr  ! only over k-points that are computed on this processor
+     ikp = iikp + myrank*pr_proc  ! should be real index of k-point
+     ! Reading band energies from energy file
+     CALL ReadEnergiesK(fh_ene, Ek, kp, wg, NE, nume) ! k-points that is calculated here.
+
      if (abs(wgh(ikp)- wg).gt.1e-5) print *, 'ERROR: weight in case.klist and case.energy are not equal', wg, wgh(ikp)
      ! Ek was in Ry -> transform to eV
      Ek = Ek * Ry2eV
-     
-     ! Start reading DMFT transformation
-     CALL ReadDMFT_TransK_Outside(nbands, nemin, wkii, fh_p, pform, ikp)
-     
+
+     ! Start reading DMFT transformation, which needs to be in separate files for each processor Udmft.proc
+     CALL ReadDMFT_TransK_Outside(nbands, nemin, maxdim_, norbitals_, wkii, fh_p, pform, ikp)
+     if (maxdim_.ne.maxdim2) print*, 'ERROR maxim=', maxdim_, 'maxdim2=', maxdim2
+     if (norbitals.ne.norbitals_) print*, 'ERROR norbitals_=', norbitals_, 'norbitals=', norbitals
+
      nemax = nemin+nbands-1
-     
-     ALLOCATE( DMFTU(nbands,maxdim2,norbitals) )
+
+     ALLOCATE( DMFTU(nbands,maxdim_,norbitals_) )
      ALLOCATE( STrans(maxsize,ncix,nbands,nbands) )
      allocate( gij(nbands,nbands) )
 
-     
      if (mode.EQ.'e') then
         ALLOCATE( Al(nbands,nbands), Ar(nbands,nbands), zek(nbands) )
-        allocate(  UAl(nbands,maxdim2,norbitals), UAr(maxdim2,nbands,norbitals) )
-        allocate( CC(nbands,nbands) )
+        allocate( UAl(nbands,maxdim_,norbitals_), UAr(maxdim_,nbands,norbitals_) )
      endif
-     
+
      DO isym=1, nsymop
-        print *, 'ikp,isym=', ikp, isym
+        !if (Qprint)
+        WRITE(6,'(A,1x,A,I3,1x,A,I2)') cpuID,'ikp=', ikp, 'isym=', isym
+        call flush(6)
         ! Continuing reading DMFT transformation
-        CALL ReadDMFT_TransK_Inside(DMFTU, fh_p, pform, isym, nindo, nbands, norbitals, maxdim2)
+        CALL ReadDMFT_TransK_Inside(DMFTU, fh_p, pform, isym, nindo, nbands, norbitals_, maxdim_)
         ! For more efficient transformation of self-energy, we create special array of transformation STrans
         CALL CompressSigmaTransformation2(STrans, DMFTU, Sigind, iSx, cix, csize, iorbital, ll, nl, natom, iso, ncix, maxdim, maxdim2, lmax2, norbitals, nbands, maxsize)
-        
+
         if (mode.EQ.'g') then
            do iom=1,nom
               gij=0
@@ -328,16 +376,16 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
                  gij(i,i) = xomega+EF-Ek(i+nemin-1)  !-----  g^-1 of the LDA part in band representation ----!
               ENDDO
               CALL AddSigma_optimized2(gij, sigma(iom,:,:), STrans, csize, -1, nbands, ncix, maxsize)           
-              
+
               DO i=1,nbands               !-------- adding minimum broadening for all bands -------------------!
                  gij(i,i) = gij(i,i) + (0.d0, 1.d0)*gamma
               ENDDO
-              
+
               CALL zinv(gij,nbands)    !-------- inversion of matrix to get g -------------------------------!
-              
+
               CALL CmpGkc2(gmk, gij, DMFTU, iSx, iorbital, ll, nl, cix, natom, iso, ncix, maxdim, maxdim2, lmax2, norbitals, nbands, maxsize)
               gmloc(:,:,:,iom) = gmloc(:,:,:,iom) + gmk(:,:,:)*(wgh(ikp)/(nsymop*tweight))
-           
+
               DO icix=1,ncix
                  cixdm = cixdim(icix)
                  allocate( Sigini(cixdm,cixdm), cini(cixdm) )
@@ -352,6 +400,7 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
                  WRITE(fh_gk+icix,*)
                  deallocate( Sigini, cini )
               ENDDO
+
            enddo
         else if (mode.EQ.'e') then
            WRITE(fh_ee,'(A,5I5,2x,F23.20,2x,A)') '!', ikp, isym, nbands, nemin, nom, wgh(ikp)/(nsymop*tweight), ': ikp, isym, nbands nemin, nomega, kweight'
@@ -369,7 +418,7 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
                  call zgemm('N','N', nbands,  nind1,  nbands, (1.d0,0.d0), Al, nbands, DMFTU(:,:,iorb1), nbands, (0.d0,0.d0), UAl(:,:,iorb1), nbands)
                  call zgemm('C','N', nind1,  nbands,  nbands, (1.d0,0.d0), DMFTU(:,:,iorb1), nbands, Ar, nbands, (0.d0,0.d0), UAr(:,:,iorb1), maxdim2)
               ENDDO
-              
+
               nxmin=1
               nxmax=1
               do ibnd=1,nbands
@@ -377,7 +426,7 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
                  if ( dreal(zek(ibnd))-EF <= emax ) nxmax=ibnd
               enddo
               if (nxmin<nbands .and. (dreal(zek(ibnd))-EF < emin)) nxmin=nxmin+1
-              
+              !
               WRITE(fh_ee+0,'(F19.14,2x,2I5,1x)',advance='no') omega(iom), nxmax-nxmin+1, nxmin+nemin-1
               WRITE(fh_ee+1,'(F19.14,2x,I5,1x)') omega(iom), nxmax-nxmin+1
               WRITE(fh_ee+2,'(F19.14,2x,I5,1x)') omega(iom), nxmax-nxmin+1
@@ -398,7 +447,7 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
               WRITE(fh_ee+0,*)
            enddo
         endif
-        
+
         !DO iorb1=1,norbitals
         !   nind1 = nindo(iorb1)
         !   DO iorb2=1,norbitals
@@ -423,7 +472,7 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
         !      
         !   ENDDO
         !ENDDO
-        
+
      ENDDO
      DEALLOCATE( DMFTU )
      DEALLOCATE( gij )
@@ -431,59 +480,94 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
      if (mode.EQ.'e') then
         DEALLOCATE( Al, Ar, zek)
         deallocate(  UAl, UAr )
-        deallocate( CC )
      endif
   ENDDO
   close(fh_ene)
   close(fh_p)
-  
+
+
   if (mode.EQ.'g') then
-     
+     call Reduce_MPI(gmloc, norbitals, nom, maxdim, ncix)
+
      do icix=1,ncix
         close(fh_gk+icix)
      enddo
      deallocate( gmk )
-     
-     do icix=1,ncix
-        cixdm = cixdim(icix)
-        allocate( Sigini(cixdm,cixdm), cini(cixdm) )
-        CALL GetSiginiCini(Sigini, cini, cixdms, Sigind(:,:,icix), cixdm, maxdim )
-        !
-        open(fh_gc+icix,FILE=fglocout(icix),STATUS='unknown')
-        do iom=1,nom
-           WRITE(fh_gc+icix,'(f14.8,2x)',advance='no') omega(iom)
-           DO ip=1,cixdms
-              do iq=1,cixdms
-                 WRITE(fh_gc+icix, '(f14.8,1x,f14.8,2x)',advance='no') gmloc(cini(ip),cini(iq),icix,iom)
-              enddo
-           ENDDO
-           WRITE(fh_gc+icix,*)
-        enddo
-        close(fh_gc+icix)
-        deallocate( Sigini, cini )
-     enddo
-     
-     ALLOCATE( Glc(maxsize, ncix, nom) )
-     CALL GtoVectorForm(Glc, gmloc, Sigind, csize, cixdim, ncix, maxsize, maxdim, nom )
 
-     do icix=1,ncix
-        open(fh_gl+icix,FILE=fgloc(icix),STATUS='unknown')
-     enddo
-  
-     CALL PrintGloc(fh_gl, Glc, omega, csize, ncix, nom, maxsize)
-     DEALLOCATE( Glc )
+     ! Writing out gloc to fh_gc+icix and its vector form to fh_gl+icix
+     if (myrank.eq.master) then
+        do icix=1,ncix
+           cixdm = cixdim(icix)
+           allocate( Sigini(cixdm,cixdm), cini(cixdm) )
+           CALL GetSiginiCini(Sigini, cini, cixdms, Sigind(:,:,icix), cixdm, maxdim )
+           !
+           open(fh_gc+icix,FILE=fglocout(icix),STATUS='unknown')
+           do iom=1,nom
+              WRITE(fh_gc+icix,'(f14.8,2x)',advance='no') omega(iom)
+              DO ip=1,cixdms
+                 do iq=1,cixdms
+                    WRITE(fh_gc+icix, '(f14.8,1x,f14.8,2x)',advance='no') gmloc(cini(ip),cini(iq),icix,iom)
+                 enddo
+              ENDDO
+              WRITE(fh_gc+icix,*)
+           enddo
+           close(fh_gc+icix)
+           deallocate( Sigini, cini )
+        enddo
+
+        ALLOCATE( Glc(maxsize, ncix, nom) )
+        CALL GtoVectorForm(Glc, gmloc, Sigind, csize, cixdim, ncix, maxsize, maxdim, nom )
+
+        do icix=1,ncix
+           open(fh_gl+icix,FILE=fgloc(icix),STATUS='unknown')
+        enddo
+        CALL PrintGloc(fh_gl, Glc, omega, csize, ncix, nom, maxsize)
+        DEALLOCATE( Glc )
+        do icix=1,ncix
+           close(fh_gl+icix)
+        enddo
+     endif
      deallocate( gmloc )
-     
-     do icix=1,ncix
-        close(fh_gl+icix)
-     enddo
-     
+
+     call Barrier() ! some processors might not close the file above, and copying would not have all the data.
+     ! Here we combine all g_k(omega) into single file per cix.
+     ! Before each processor printed into its own file. But now we need to create one output file.
+     if (myrank.eq.master) then
+        DO icix=1,ncix
+           open(fh_gk+icix, file=TRIM(fgkout(icix)), status='old', position='append', action='write', iostat=ierr)
+           if (ierr /= 0) then
+              print *, 'Error opening ', TRIM(fgkout(icix)), ' in append mode.'
+              stop 'ERROR in dmftgk'
+           endif
+           do slave=1,nprocs-1
+              write(cpuID_,'(I3)') slave
+              filename = TRIM(fgkout(icix))//'.'//ADJUSTL(TRIM(cpuID_))
+              open(fh_ene+icix, file=filename, status='old',iostat=ierr)
+              if (ierr /= 0) then
+                 print *, 'Error opening ', filename, ' in read mode.'
+                 stop 'ERROR in dmftgk'
+              endif
+              do
+                 read(fh_ene+icix, '(A)', iostat=ierr) single_line
+                 if (ierr /= 0) exit  ! end of file or error
+                 !if (single_line(1:1).eq.'!') then
+                 !write(fh_gk+icix, '(A)') trim(single_line)
+                 !else
+                 write(fh_gk+icix, '(A)') trim(single_line)//' ' ! It turns out fortran adds a space when printing numbers
+                 !endif
+              end do
+              close(fh_ene+icix)
+              call execute_command_line('rm -f '//trim(filename))
+           enddo
+           close(fh_gk+icix)
+        ENDDO
+     endif
   else if (mode.EQ.'e') then
      close( fh_ee )
      close( fh_ee+1 )
      close( fh_ee+2 )
   endif
-  
+
   !DO iorb1=1,norbitals
   !   nind1 = nindo(iorb1)
   !   DO iorb2=1,norbitals
@@ -501,16 +585,57 @@ SUBROUTINE PrintGk(fenergy, fUdmft, fsigname, fgkout, fglocout, fgloc, fklist, f
   !ENDDO
   !deallocate( olp )
 
-
-
   DEALLOCATE( sigma, omega )
-  
+
+
+  if (mode.eq.'e' .and. nprocs>1) then
+     ! Here we combine all eigenvalues.dat, UL.dat, UR.dat together.
+     ! Before each processor printed into its own file. But now we need to create one output file.
+     call Barrier() ! some processors might not close the file above, and copying would not have all the data.
+     ! Now combine all files into one output file
+     fnames(1) = feigvals
+     fnames(2) = fUL
+     fnames(3) = fUR
+     if (myrank.eq.master) then
+        do ip=1,3
+           open(fh_ee+ip, file=TRIM(fnames(ip)), status='old', position='append', action='write', iostat=ierr)
+           if (ierr /= 0) then
+              print *, 'Error opening ', TRIM(fnames(ip)), ' in append mode.'
+              stop 'ERROR in dmftgk'
+           endif
+           do slave=1,nprocs-1
+              write(cpuID_,'(I3)') slave
+              filename = TRIM(fnames(ip))//'.'//ADJUSTL(TRIM(cpuID_))
+              open(fh_ene+ip, file=filename, status='old',iostat=ierr)
+              if (ierr /= 0) then
+                 print *, 'Error opening ', filename, ' in read mode.'
+                 stop 'ERROR in dmftgk'
+              endif
+              do
+                 read(fh_ene+ip, '(A)', iostat=ierr) single_line
+                 if (ierr /= 0) exit  ! end of file or error
+                 if (single_line(1:1).eq.'!') then
+                    write(fh_ee+ip, '(A)') trim(single_line)
+                 else
+                    write(fh_ee+ip, '(A)') trim(single_line)//' ' ! It turns out fortran adds a space when printing numbers
+                 endif
+              end do
+              close(fh_ene+ip)
+              call execute_command_line('rm -f '//trim(filename))
+           enddo
+           close(fh_ee+ip)
+        enddo
+     endif
+  endif
+
+
+
   return
 9010 FORMAT(/,2X,' KP:',I6,' NEMIN NEMAX : ',2I5, ' dE:',2f5.2,' K:',a10 /)
 9040 FORMAT(3X,2I4,6E13.6,F13.8)
-903  print *, 'ERROR opening ', TRIM(fsigname(icix)), ' file'
-904  print *, 'ERROR opening ', TRIM(fUdmft), ' file'
-905  print *, 'ERROR opening ', TRIM(fenergy), ' file'
+903 print *, 'ERROR opening ', TRIM(fsigname(icix)), ' file'
+904 print *, 'ERROR opening ', TRIM(filename), ' file'
+905 print *, 'ERROR opening ', TRIM(fenergy), ' file'
 END SUBROUTINE PrintGk
 
 
@@ -521,13 +646,27 @@ SUBROUTINE ReadKlist(fklist, nkpt, kvec, wgh)
   REAL*8, intent(out)       :: wgh(nkpt)
   INTEGER, intent(out)      :: kvec(4,nkpt)
   ! locals
+  logical      :: newform
   INTEGER      :: numkpt, ik, ios
   CHARACTER*10 :: KNAME
-  
+  CHARACTER*161:: line
+  open(14,file=fklist,status='old',form='formatted')
+  newform = .TRUE.
+  read(14, '(A20)', IOSTAT=ios) line
+  IF (line(15:16) .NE. ' ') THEN
+     newform=.FALSE.
+  ENDIF
+  close(14)
+  ! reopen
   open(14,file=fklist,status='old',form='formatted')
   DO ik=1,nkpt
-     READ (14,'(A10,4I5,3F5.2,A3)',IOSTAT=ios) KNAME, kvec(1,ik), kvec(2,ik), kvec(3,ik), kvec(4,ik), wgh(ik)
-     !print *, 'KNAME=', KNAME, 'kv=', kvec(1,ik), kvec(2,ik), kvec(3,ik), kvec(4,ik)
+     !READ (14,'(A10,4I5,3F5.2,A3)',IOSTAT=ios) KNAME, kvec(1,ik), kvec(2,ik), kvec(3,ik), kvec(4,ik), wgh(ik)
+     IF(newform) THEN
+        READ (14,'(A10,4I10,F5.2)',IOSTAT=ios) KNAME, kvec(1,ik), kvec(2,ik), kvec(3,ik), kvec(4,ik), wgh(ik) 
+     ELSE
+        READ (14,'(A10,4I5,F5.2)',IOSTAT=ios) KNAME, kvec(1,ik), kvec(2,ik), kvec(3,ik), kvec(4,ik), wgh(ik)
+     ENDIF
+     !print *, 'KNAME=', KNAME, 'kv=', kvec(1,ik), kvec(2,ik), kvec(3,ik), kvec(4,ik), wgh(ik)
      IF (KNAME .EQ. 'END       ' .OR. ios.ne.0) then
         print *, 'ERROR in reading ', TRIM(fklist)
         EXIT
@@ -610,22 +749,30 @@ SUBROUTINE ReadEnergiesK(fh_ene, Ek, kp, wg, NE, nume)
 END SUBROUTINE ReadEnergiesK
   
 
-SUBROUTINE ReadDMFT_TransK_Outside(nbands, nemin, wkii, fh_p, pform, ikp)  
+SUBROUTINE ReadDMFT_TransK_Outside(nbands, nemin, maxdim2, norbitals, wkii, fh_p, pform, ikp)
+  USE com_mpi, ONLY: cpuID, stop_MPI, fUdmft
 !!! Start reading DMFT transformation
   IMPLICIT NONE
-  INTEGER, intent(out)   :: nbands, nemin
+  INTEGER, intent(out)   :: nbands, nemin, maxdim2, norbitals
   INTEGER, intent(inout) :: wkii
   INTEGER, intent(in)    :: fh_p, ikp
   LOGICAL, intent(in)    :: pform
   ! locals
   CHARACTER*10 :: skii
-  INTEGER :: tnorbitals, iikp, tmaxdim2
+  CHARACTER*100:: filename
+  INTEGER :: iikp
   if (pform) then
-     READ(fh_p,*) iikp, nbands, tmaxdim2, tnorbitals, nemin
+     READ(fh_p,*) iikp, nbands, maxdim2, norbitals, nemin
   else
-     READ(fh_p) iikp, nbands, tmaxdim2, tnorbitals, nemin
+     READ(fh_p) iikp, nbands, maxdim2, norbitals, nemin
   endif
-  if (iikp.NE.ikp) print *, 'ERROR: ikp and iikp=', ikp, iikp
+  if (iikp.NE.ikp) then
+     filename = TRIM(fUdmft)//ADJUSTL(TRIM(cpuID))
+     WRITE(6,'(A,I3,A,A,A,I3)') 'ERROR ikp=', ikp, 'but ikp from ',filename,' is', iikp
+     call flush(6)
+     call stop_MPI()
+     STOP 'ERROR dmftgk'
+  endif
   wkii = wkii + 1
 END SUBROUTINE ReadDMFT_TransK_Outside
 

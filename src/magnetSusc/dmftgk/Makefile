@@ -1,13 +1,12 @@
 include ../../Makefile.in
 
 EXEC = dmftgk
-OBJS = dmftgk.o eigsys.o selfenergy.o zinv.o
+OBJS = mod_mpi.o dmftgk.o eigsys.o selfenergy.o zinv.o
 
 all : $(EXEC)
 
 $(EXEC): $(OBJS)
-	$(PF90) $(FFLAGS) -o $(EXEC) $(OBJS) $(WLIBS)
-
+	$(PF90) $(WFOPT) -o $(EXEC) $(OBJS) $(WLDFLAGS) $(WLIBS) 
 
 clean :
 	rm -f $(OBJS) $(EXEC) *.mod
@@ -16,20 +15,17 @@ clean :
 #
 #  define inference rules to generate object files from source files
 #
-.f.o:
-	$(PF90) $(FFLAGS) $(debug) -c $<
-.c.o:
-	$(CC)  -c $<
+%.o : %.f90
+	$(PF90) $(WFOPT) -c $< -o $@
 
+%.o : %.F90
+	$(PF90) $(WFOPT) -c $< -o $@
 
-.SUFFIXES : .f90
-.f90.o:
-	$(PF90) $(FFLAGS) $(debug) -c $<
+%.o : %.FPP
+	$(PF90) $(Fmpi_define) $(WFOPT) -c $< -o $@
 
-.SUFFIXES : .F
-.F.o:
-	$(preproc) -P  -C -traditional $(Fmpi_define) $< $*.f90
-	$(PF90) $(FFLAGS) $(debug) -c $*.f90
-	rm $*.f90
+%.o : %.c
+	$(CC) -c $< -o $@
 
-
+%.so : %.f90
+	$(CMP) -c $< -m $*

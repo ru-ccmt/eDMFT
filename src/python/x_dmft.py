@@ -7,6 +7,8 @@ import copy,optparse
 # custom imports
 import utils,indmffile
 import chemicalP as c_p
+import gwienfile as gw
+import builtins
 
 def getTemperature():
     if os.path.exists('params.dat'):
@@ -310,6 +312,22 @@ def runExternal(widmf, ROOT, MPI, nom, ntail, dmft_exe='dmft', m_ext='',performS
     print(name_exe.upper(),'..... running:', cmd)
     subprocess.call(cmd, bufsize = 1, shell=True)  # line-buffered
 
+
+def prepSigs(nom,aom,bom,ROOT,m_ext,band):
+        cmd = ROOT+'/ssplit.py '
+        if len(m_ext)>0: cmd += ' -l '+m_ext
+        print('..... running:', cmd)
+        subprocess.call(cmd, bufsize = 1, shell=True) 
+        if band:
+            # Interpolates sigmas on equidistant mesh!
+            eq_om = linspace(aom, bom, nom)  # Equidistant mesh
+            for c in cixs:
+                fname = 'sig.inp'+str(c)+m_ext
+                data = loadtxt(fname).T
+                data1 = [eq_om] + [interpolate.UnivariateSpline(data[0], data[i], s=0)(eq_om) for i in range(1,len(data))]
+                savetxt(fname+'_band', array(data1).T )
+            
+            
 if __name__=='__main__':
     gammamu = 1e-14     # cmall broadening for chemical potential
     sdmu=0.1            # steps when looking for the chemical potential
@@ -329,26 +347,26 @@ if __name__=='__main__':
     """
     
     parser = optparse.OptionParser(usage)
-    parser.add_option("--so", dest="so", action='store_true', default=False, help="switches on spin-orbit coupling")
-    parser.add_option("--up", dest="up", action='store_true', default=False, help="magnetic LDA calculation with vector-up first")
-    parser.add_option("--dn", dest="dn", action='store_true', default=False, help="magnetic LDA calculation with vector-dn first")
-    parser.add_option("-p", dest="para", action='store_true', default=False, help="turns on parallel mode")
-    parser.add_option("-c",  dest="c",  action='store_true', default=False, help="complex version")
-    parser.add_option("-m",  dest="recomputeEF",  type="int", default=1, help="Recompute EF in dmft2 step [0|1|2]")
-    parser.add_option("-d", dest="def_only", action='store_true', default=False, help="prepared only def and input files, but do not run")
-    parser.add_option("-n", "--nom",  dest="nom",    type="int", default=100, help="Number of matsubara points in log mesh before the tail")
-    parser.add_option("-t", "--tail", dest="ntail",  type="int", default=30,  help="Number of matsubara points in the tail of the log mesh")
-    parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False, help="print verbose messages to stdout")
-    parser.add_option("-l", "--lext", dest="m_ext",  default='',  help="For magnetic calculation, it can be 'dn'.")
-    parser.add_option("-x", "--mixEF", dest="mixEF",  default=1.0,  help="Chemical potential can be mixed with mixEF<1.0")
-    parser.add_option("-w", "--WL", dest="WL",  default=1.0,  help="If recomputeEF=2, pole is searched in the interval [-WL,WL]")
-    parser.add_option("-b", "--band", action="store_true", dest="_band", default=False, help="use case.klist_band instead of case.klist")
-    parser.add_option("-g", "--no_group", action="store_true", dest="_no_group", default=False, help="use case.klist_band instead of case.klist")
-    parser.add_option("-q", "--q_etot",  dest="Q_ETOT",  type="int", default=1, help="Compute total energy of free energy in dmft2 [0|1]")
-    parser.add_option("-u", "--mode", dest="mode",  default='c',  help="Mode of calculation for dmft2. Can be 'c' for charge and 'm' for calculating EF only")
-    parser.add_option("--hermitian", action="store_true", dest="herm", default=False, help="make Hamiltonian matrix hermitian, i.e., like neglecting scattering rate")
-    parser.add_option("--hermitianw", action="store_true", dest="hermw", default=False, help="make Hamiltonian matrix hermitian and create a new vector file for irreps")
-    
+    parser.add_option("--so",             dest="so",       action='store_true', default=False, help="switches on spin-orbit coupling")
+    parser.add_option("--up",             dest="up",       action='store_true', default=False, help="magnetic LDA calculation with vector-up first")
+    parser.add_option("--dn",             dest="dn",       action='store_true', default=False, help="magnetic LDA calculation with vector-dn first")
+    parser.add_option("-p",               dest="para",     action='store_true', default=False, help="turns on parallel mode")
+    parser.add_option("-c",               dest="c",        action='store_true', default=False, help="complex version")
+    parser.add_option("-d",               dest="def_only", action='store_true', default=False, help="prepared only def and input files, but do not run")
+    parser.add_option("-b", "--band",     dest="_band",    action="store_true", default=False, help="use case.klist_band instead of case.klist")
+    parser.add_option("-g", "--no_group", dest="_no_group",action="store_true", default=False, help="not use symmetry operations nsymop when writing out projector.")
+    parser.add_option("-m",               dest="recomputeEF", type="int", default=1, help="Recompute EF in dmft2 step [0|1|2]")
+    parser.add_option("-n", "--nom",      dest="nom",      type="int", default=100, help="Number of matsubara points in log mesh before the tail")
+    parser.add_option("-t", "--tail",     dest="ntail",    type="int", default=30,  help="Number of matsubara points in the tail of the log mesh")
+    parser.add_option("-v", "--verbose",  dest="verbose",  action="store_true", default=False, help="print verbose messages to stdout")
+    parser.add_option("-l", "--lext",     dest="m_ext",    default='',   help="For magnetic calculation, it can be 'dn'.")
+    parser.add_option("-x", "--mixEF",    dest="mixEF",    default=1.0,  help="Chemical potential can be mixed with mixEF<1.0")
+    parser.add_option("-w", "--WL",       dest="WL",       default=1.0,  help="If recomputeEF=2, pole is searched in the interval [-WL,WL]")
+    parser.add_option("-u", "--mode",     dest="mode",     default='c',  help="Mode for dmft2 or dmftgk. For dmft2: {'c':charge} or {'m':Ef only} for dmftgk {'e':eigenvalues} or {'g':greens func}")
+    parser.add_option("-q", "--q_etot",   dest="Q_ETOT",   type="int", default=1, help="Compute total energy of free energy in dmft2 [0|1]")
+    parser.add_option("--hermitian",      dest="herm",     action="store_true", default=False, help="make Hamiltonian matrix hermitian, i.e., like neglecting scattering rate")
+    parser.add_option("--hermitianw",     dest="hermw",    action="store_true", default=False, help="make Hamiltonian matrix hermitian and create a new vector file for irreps")
+    parser.add_option("--broad",          dest="broad",    default=0.0025, help="broadening for dmftgk. default 0.0025/13.6058")
     # Next, parse the arguments
     (options, args) = parser.parse_args()
     
@@ -567,8 +585,65 @@ if __name__=='__main__':
         if not options.def_only:
             runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft',options.m_ext,False)
 
-
         ####
+    elif args[0] == 'dmftgk':
+        energy_file = w2k.case+".energy"+so+options.m_ext
+        k_band = ''
+        if os.path.isfile(w2k.case+'.klist_band'):
+            nat = gw.get_nat(w2k.case)
+            (klist, wgh, hsrws) = gw.Read_energy_file(energy_file, nat, sys.stdout, give_kname=False, give_bands=False, Extended=False)
+            with open(w2k.case+'.klist_band', 'r') as fi:
+                num_lines = builtins.sum(1 for line in fi)
+            nkp = num_lines-1 # number of k-points in klist_band
+            if nkp==len(klist): # if klist contains the same numnber of k-points as energy file, likely band calculation
+                k_band = '_band'
+
+        mode= 'e' if (options.mode=='c' or options.mode=='e') else 'g'
+        nsymop=1 if (mode=='e' or options._band or options._no_group) else 0
+        #### dmftu
+        PrepareDefinitionFile_dmft1('u', 'u', w2k.case, cixs, updn, dnup, so, para, w2k.SCRATCH, cmplx, k_band)
+        PrepareInFile('u', 'u', w2k.case, updn, nsymop)
+        runExternal('dmftu', dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft')
+        #### prepare sigmas
+        prepSigs(inl.om_npts, inl.om_emin, inl.om_emax, dmfe.ROOT, options.m_ext, k_band)
+        fsigmas = ' '.join(['sig.inp'+str(c)+options.m_ext+k_band for c in cixs])
+        #### real or imaginary
+        matsubara = CheckMatsubara(w2k.case+'.indmfl')
+        cut_extra_energy_range = 1.0
         
+        inpstr=mode+"""                   # mode [g/e]: compute [Gk(om) / eigenvalues & eigenvectors]
+"""+str(matsubara)+"""                   # matsubara
+"""+energy_file+"""         # LDA-energy-file, case.energy(so)(updn)
+"""+w2k.case+""".klist"""+k_band+"""     # k-list
+"""+w2k.case+""".rotlm          # for reciprocal vectors
+Udmft.0             # filename for projector
+"""+str(options.broad)+"""              # gamma for non-correlated
+"""+str(options.broad)+"""              # gammac for correlated
+"""+fsigmas+"""  # self-energy name, sig.inp(x)
+"""
+        if mode=='e':
+            inpstr+="""eigenvalues.dat     # eigenvalues
+UR.dat              # right eigenvector in orbital basis
+UL.dat              # left eigenvector in orbital basis
+"""+str(inl.om_emin-cut_extra_energy_range)+"""                # emin for printed eigenvalues
+"""+str(inl.om_emax+cut_extra_energy_range)+"""                 # emax for printed eigenvalues
+"""
+        else:
+            fGk = ' '.join(['G_k'+str(c)+options.m_ext for c in cixs])
+            fGl = ' '.join(['G_loc'+str(c)+options.m_ext for c in cixs])
+            fgl = ' '.join(['gloc'+str(c)+options.m_ext for c in cixs])
+            inpstr+=fGk+""" # output greens function
+"""+fGl+"""    # output local greens function 
+"""+fgl+"""    # # output diagonal local greens function
+"""
+        
+        infile='dmftgke.in'
+        with open(infile, 'w') as fi:
+            print(inpstr, file=fi)
+        name_exe='dmftgk'
+        cmd = dmfe.MPI2+' '+dmfe.ROOT+'/'+name_exe+' '+infile
+        print(name_exe.upper(),'..... running:', cmd)
+
+        subprocess.call(cmd, bufsize = 1, shell=True)  # line-buffered
     else:
         print('not yet implemented!')
