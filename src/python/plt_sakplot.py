@@ -44,7 +44,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', type=str, default=None, help='orb_plot list for colors, such as [0,0,1,2,3] for 0==R,1==G,2==B,3==alpha,4=None')
     parser.add_argument('-a', type=float, default=0.8, help='aspect ratio of the plot, default 0.8')
     parser.add_argument('-f', default=True, action='store_false', help='ignore coherence factors')
-    parser.add_argument('-r', type=str, default=None, help='color_intensity default=[1,1,1] for [R,G,B]. Can be increased/decreased.')
+    parser.add_argument('-r', type=str, default=None, help='color_intensity default=[1,1,1,1] for [R,G,B,A]. Can be increased/decreased.')
     args = parser.parse_args()
     
     fname = args.fname
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     DY = args.d
     _cmap_ = eval(args.c)
     _col_ = args.l
-    color_intensity = [1,1,1]
+    color_intensity = [1,1,1,1]
     if args.r is not None:
         color_intensity = eval(args.r)
     
@@ -178,10 +178,12 @@ if __name__ == '__main__':
                         #    cohi[orb_plot[iorb],ibnd] += coh[iorb]
                         np.add.at(cohi, (iw, ibnd, orb_plot), coh)
             # Here we normalize weight for each color, because some colors are used for multiple bands.
-            for icolor in range(3):
-                how_many = np.count_nonzero(orb_plot == icolor)
-                if how_many>0:
-                    cohi[:,:,icolor] *= color_intensity[icolor]/how_many
+            #for icolor in range(3):
+            #    how_many = np.count_nonzero(orb_plot == icolor)
+            #    if how_many>0:
+            #        cohi[:,:,icolor] *= color_intensity[icolor]/how_many
+            for icolor in range(4):
+                cohi[:,:,icolor] *= color_intensity[icolor]
             #print('cohi=', cohi)
             Akom[ik,:,:] = np.sum( (cohi[:,:,:]/(om[:,None,None] + mu - zekw[ik,:,:,None])).imag, axis=1)*(-1/pi)
 
