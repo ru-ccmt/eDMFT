@@ -37,8 +37,8 @@ if __name__ == '__main__':
     parser.add_argument('-i', type=float, default=0.97, help='color intensity, a number slightly smaller than 1.(default 0.97). Percentage of points being used to find maximum value.')
     parser.add_argument('-b', type=float, default=1e-5, help='small broadening in calculating A(k,w), default 1e-5')
     parser.add_argument('-d', type=float, default=0, help='shift of zero in y axis when there is a gap and fermi level can be moved away from zero')
-    parser.add_argument('-c', type=str, default='cm.hot', help='color map, default is cm.hot but could be changed to cm.Purples or any other matplotlib color map')
-    parser.add_argument('-l', type=str, default='w', help='color of the lines.default w for white')
+    parser.add_argument('-c', type=str, default='cm.coolwarm', help='color map, default is cm.hot but could be changed to cm.Purples or any other matplotlib color map')
+    parser.add_argument('-l', type=str, default='k', help='color of the lines.default w for white')
     parser.add_argument('-g', default=False, action='store_true', help='add color bar')
     args = parser.parse_args()
     
@@ -108,19 +108,19 @@ if __name__ == '__main__':
     
     #print('xmin,xmax,ymin,ymax=', xmin, xmax, ymin, ymax)
     
-    imshow(Akom.T, interpolation='bilinear', cmap=_cmap_, origin='lower', vmin=vmm[0], vmax=vmm[1], extent=[xmin,xmax,ymin,ymax], aspect=(xmax-xmin)*0.8/(ymax-ymin) )
+    imshow(Akom.T, interpolation='bilinear', cmap=_cmap_, origin='lower', vmin=vmm[0], vmax=vmm[1], extent=[xmin,xmax,ymin,ymax], aspect=(xmax-xmin)*0.8/(ymax-ymin), zorder=2)
     
     for i in range(len(wkpointi)):
-        plot([wkpointi[i],wkpointi[i]], [ymin,ymax], _col_+'-')
+        plot([wkpointi[i],wkpointi[i]], [ymin,ymax], _col_+':', lw=1,zorder=3)
         
-    plot([xmin,xmax],[0,0], _col_+':')
+    plot([xmin,xmax],[0,0], _col_+'-',lw=1,zorder=3)
 
     dytck=0.005
     Ntck=5
     for j in range(len(wkpointi)-1):
         for ix in range(1,Ntck):
             x = wkpointi[j]+(wkpointi[j+1]-wkpointi[j])*ix/float(Ntck)
-            plot([x,x],[-dytck,dytck], _col_+'-')
+            plot([x,x],[-dytck,dytck], _col_+'-',lw=1,zorder=3)
         
     axis([xmin,xmax,ymin,ymax])
     xticks( wkpointi, wkpoints, fontsize='x-large' )
