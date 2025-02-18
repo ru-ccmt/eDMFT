@@ -394,3 +394,32 @@ SUBROUTINE heigsys(ham, ek, ndim)
   deallocate( rwork )
   deallocate( work, iwork )
 END SUBROUTINE heigsys
+
+SUBROUTINE zsvd(UF, Ssvd, Usvd, Vsvd, nbands, norbs)
+  IMPLICIT NONE
+  COMPLEX*16, intent(inout) :: UF(nbands,norbs)
+  INTEGER, intent(in)       :: nbands, norbs
+  REAL*8, intent(out)       :: Ssvd(norbs)
+  COMPLEX*16, intent(out)   :: Usvd(nbands, nbands), Vsvd(norbs,norbs)
+  integer :: lwork, info
+  complex*16 :: work_query
+  double precision, allocatable :: rwork(:)
+  complex*16, allocatable       :: svdwork(:)
+  allocate(rwork(5*norbs))
+  call zgesvd('A', 'A', nbands,norbs, UF,nbands, Ssvd, Usvd,nbands, Vsvd,norbs, work_query, -1, rwork, info)
+  if (info /= 0) then
+     print *, 'ERROR in zsvd: Error during workspace query. INFO =', info
+     stop
+  end if
+  ! Allocate workspace of optimal size (returned in work_query)
+  lwork = int( real(work_query) )
+  !print *, "lwork=", lwork, "norbs=", norbs, "nbands=", nbands
+  allocate(svdwork(lwork))
+  ! Compute the SVD: UF(nbands,norbs) = Usvd(nbands,nbands)*S(norbs)*Vh(norbs,norbs)
+  call zgesvd('A', 'A', nbands,norbs, UF,nbands, Ssvd, Usvd,nbands, Vsvd,norbs, svdwork, lwork, rwork, info)
+  if (info /= 0) then
+     print *, "ERROR in zsvd: Error computing SVD with zgesvd. INFO =", info
+     stop
+  end if
+  deallocate(svdwork, rwork)
+END SUBROUTINE zsvd

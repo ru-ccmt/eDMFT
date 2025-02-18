@@ -159,7 +159,7 @@ def ComputeExactDC(nocc,lmbda,epsilon,icase,fh_info,projector='../projectorw.dat
             ylm[m,i,:] = special.sph_harm(m-l, l, phis, thetas[i])
     
     DEGENERATE=False
-    if abs(min(Vhartree)-max(Vhartree))<1e-4: DEGENERATE=True
+    #if abs(min(Vhartree)-max(Vhartree))<1e-4: DEGENERATE=True
     
     CIN = 1/137.0359895**2
     fA = interpolate.UnivariateSpline(Rx,Ag,s=0)
@@ -179,13 +179,14 @@ def ComputeExactDC(nocc,lmbda,epsilon,icase,fh_info,projector='../projectorw.dat
         rho = clip(rho,1e-10,1e10) # if rho becomes singular it should be removed   
         rs_1 = ((4*pi*rho)/3)**(1./3.)
         
-        (epx,Vxr) = yw_excor.exchangelda(rs_1,lmbda)#*renorm_lambda)
-        (epc,Vcr) = yw_excor.corrlda(1./rs_1, lmbda)#*renorm_lambda)
+        (epx,Vxr) = yw_excor.exchangelda(rs_1,lmbda) #
+        #(epc,Vcr) = yw_excor.corrlda(1./rs_1, lmbda) # here was a bug. We should not use corrlda_2 with epsilon, like in non-DEGENERATE
+        (epc,Vcr) = yw_excor.corrlda_2(1./rs_1, lmbda,epsilon) # here was a bug. We should not use corrlda_2 with epsilon, like in non-DEGENERATE
         
         Vx = integrate.romb(ul2*Vxr,dx=r[1]-r[0]) / epsilon
-        Vc = integrate.romb(ul2*Vcr,dx=r[1]-r[0]) / epsilon
+        Vc = integrate.romb(ul2*Vcr,dx=r[1]-r[0]) #/ epsilon   # I think corrlda_2 accounts for epsilon, hence should not divide
         ex = integrate.romb(ul2*epx,dx=r[1]-r[0])*ntot / epsilon
-        ec = integrate.romb(ul2*epc,dx=r[1]-r[0])*ntot /epsilon
+        ec = integrate.romb(ul2*epc,dx=r[1]-r[0])*ntot #/epsilon # I think corrlda_2 accounts for epsilon, hence should not divide
 
         Vhartree = sum(Vhartree[:]*deg[:])/sum(deg)
         Vdc = Vhartree+(Vx+Vc)*Ry2eV

@@ -236,3 +236,85 @@ contains
   END SUBROUTINE deallocate_kpts
 end module kpts
 
+module pair_mod
+  implicit none
+  type :: Pair
+     integer :: first
+     integer :: second
+  end type Pair
+  type :: PairList
+     type(Pair), allocatable :: pairs(:)
+  contains
+    final :: finalize_pairlist
+ end type PairList
+contains
+  subroutine finalize_pairlist(this)
+    type(PairList), intent(inout) :: this
+    if (allocated(this%pairs)) then
+       deallocate(this%pairs)
+    end if
+  end subroutine finalize_pairlist
+  subroutine print_pair_list(plist,fh)
+    type(PairList), intent(in) :: plist
+    integer, intent(in) :: fh
+    integer :: j
+    do j = 1, size(plist%pairs)
+       write(fh,'(A,I0,A,I0,A) ',advance="no") "(", plist%pairs(j)%first, ",", plist%pairs(j)%second, "),"
+    end do
+  end subroutine print_pair_list
+end module pair_mod
+
+module nested_list_mod
+  implicit none
+  private
+  public :: IntList, NestedList, print_nested_list
+  ! Derived type representing a list of integers.
+  type :: IntList
+     integer, allocatable :: data(:)
+   contains
+     final :: finalize_intlist     
+  end type IntList
+  ! Derived type representing a nested list (i.e. a list of IntList).
+  type :: NestedList
+     type(IntList), allocatable :: list(:)
+   contains
+     final :: finalize_nestedlist     
+  end type NestedList
+contains
+  !--------------------------------------------------------------------
+  ! Finalizer for IntList: deallocates the inner integer array.
+  !--------------------------------------------------------------------
+  subroutine finalize_intlist(this)
+    type(IntList), intent(inout) :: this
+    if (allocated(this%data)) then
+      deallocate(this%data)
+    end if
+  end subroutine finalize_intlist
+!--------------------------------------------------------------------
+  ! Finalizer for NestedList: deallocates the outer array.
+  ! Note: Each element of lists is an IntList, whose finalizer
+  !       will be automatically called upon deallocation.
+  !--------------------------------------------------------------------
+  subroutine finalize_nestedlist(this)
+    type(NestedList), intent(inout) :: this
+    if (allocated(this%list)) then
+       deallocate(this%list)
+    end if
+  end subroutine finalize_nestedlist
+  !--------------------------------------------------------------------
+  ! Subroutine to print the nested list.
+  !--------------------------------------------------------------------
+  subroutine print_nested_list(nl,name,fh)
+    type(NestedList), intent(in) :: nl
+    character*10, intent(in)::name
+    integer, intent(in) :: fh
+    integer :: i, j
+    do i = 1, size(nl%list)
+      write(fh, '(A,A,I0,A)', advance="no") TRIM(name),"[",i,"]=["
+      do j = 1, size(nl%list(i)%data)
+        write(fh, '(I0,A,1X)', advance="no") nl%list(i)%data(j),','
+      end do
+      write(fh, '(A)') "]"
+    end do
+  end subroutine print_nested_list
+end module nested_list_mod

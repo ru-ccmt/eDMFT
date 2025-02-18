@@ -42,7 +42,7 @@ SUBROUTINE cmp_DensityMatrix(g_inf, g_ferm, EF, E, s_oo, STrans, DMFTU, omega, n
   CALL AddSigma_optimized2(A_inf, s_oo, STrans, csize, 1, nbands, ncix, maxsize)
 
   CALL heigsys(A_inf, e_inf, nbands) ! hermitian eigenvalues and eigenvectors
-  
+  !write(6,*) 'e_inf_old=', e_inf
   allocate( cA_inf(maxdim2,nbands,norbitals) )
   cA_inf(:,:,:) = 0.0d0
   DO icase=1,natom      
@@ -131,6 +131,84 @@ SUBROUTINE cmp_DensityMatrix(g_inf, g_ferm, EF, E, s_oo, STrans, DMFTU, omega, n
   deallocate( gmk )
   deallocate( cA_inf )
 END SUBROUTINE cmp_DensityMatrix
+
+SUBROUTINE cmp_DensityMatrix2(g_inf, g_ferm, EF, E, s_oo, STrans2, UDMFT, omega, mweight_ikp, cixdim, nbands, norbs, nume, nemin, maxdim, nii, ncix, nomega)
+  use param, ONLY: gamma
+  IMPLICIT NONE
+  complex*16, intent(inout) :: g_inf(maxdim,maxdim,ncix,nomega), g_ferm(maxdim,maxdim,ncix)
+  real*8,     intent(in)    :: EF, E(nume), omega(nomega), mweight_ikp
+  complex*16, intent(in)    :: s_oo(nii), STrans2(nbands,nbands,nii), UDMFT(nbands,norbs) 
+  integer,    intent(in)    :: cixdim(ncix), maxdim, nii, ncix, nomega, nume, nbands, norbs, nemin
+  ! External function
+  Interface
+     FUNCTION ferm(x) result( fm )
+       REAL*8 :: fm, x
+     end Function ferm
+  end interface
+  !
+  real*8, allocatable     :: e_inf(:)
+  complex*16, allocatable :: A_inf(:,:), cA_inf(:,:), tmp(:,:), gmk(:,:)
+  complex*16, parameter   :: imag = (0.d0, 1.d0)
+  integer     :: iband, cxd, i, istart, iend, pre_cix, icix, ii, iom
+  real*8      :: beta, pi
+  complex*16  :: xomega
+  REAL*8,PARAMETER       :: Ry2eV= 13.60569253d0
+  !
+  pi=acos(-1.0D0)
+  beta = pi/omega(1)
+  if (beta.LT.0) then
+     ! You are probably on real axis and should not select matsubara
+     return
+  endif
+  !
+  ALLOCATE( e_inf(nbands), A_inf(nbands,nbands) )
+  A_inf = 0.d0
+  DO i=1,nbands
+     A_inf(i,i) = E(i+nemin-1)
+  ENDDO
+  do ii=1,nii
+     !write(6,'(A,I0,A,2F15.6)') 'Strans[',ii,']=',sum(STrans2(:,:,ii))
+     A_inf(:,:) = A_inf(:,:) + s_oo(ii) * STrans2(:,:,ii)
+  enddo
+
+  CALL heigsys(A_inf, e_inf, nbands) ! hermitian eigenvalues and eigenvectors
+  !write(6,*) 'e_inf_new=', e_inf
+  
+  allocate(cA_inf(maxdim,nbands), tmp(maxdim,nbands))
+  cA_inf(:,:) = 0.0d0
+  do icix=1,ncix
+     pre_cix=0
+     if (icix>1) pre_cix = sum(cixdim(:icix-1))
+     cxd = cixdim(icix)
+     allocate( gmk(cxd,cxd) )
+     istart = pre_cix+1
+     iend   = pre_cix+cxd
+     ! ham = A_inf * ek * A_inf^C
+     ! 1/(iom+mu-ham) = A_inf * 1/(iom+mu-ek) * A_inf^C
+     ! U^+ 1/(iom+mu-ham) U = U^+ A_inf * 1/(iom+mu-ek) A (U^+ A_inf)^C = cA_inf * 1/(iom+mu-ek) * cA_inf^C
+     cA_inf(:cxd,:nbands) = matmul( transpose(conjg(UDMFT(:,istart:iend))), A_inf(:,:))
+     !tmpq(:cxd,:cxd) = matmul(tmps(:cxd,:n_bands), UDMFT(:n_bands,istart:iend) )
+     !gmk(:cxd,:cxd,icix) = tmpq(:cxd,:cxd)
+     do iom=1,nomega
+        xomega = omega(iom)*IMAG
+        do iband=1,nbands
+           tmp(:cxd,iband) = cA_inf(:cxd,iband)*1/(xomega+EF-e_inf(iband)+IMAG*gamma)
+        enddo
+        gmk(:,:) = matmul( tmp(:cxd,:nbands), transpose(conjg(cA_inf(:cxd,:nbands))) )
+        g_inf(:cxd,:cxd,icix,iom) = g_inf(:cxd,:cxd,icix,iom) + gmk(:,:)*mweight_ikp
+     enddo
+     ! gf_inf <- tmp2(ind1,ind2) += cA_inf(ind1,iband,icix) * ferm(e_inf(iband)-mu) * conjg(cA_inf(ind2,iband,icix))
+     do iband=1,nbands
+        tmp(:cxd,iband) = cA_inf(:cxd,iband)*ferm((e_inf(iband)-EF)*beta)
+     enddo
+     gmk(:,:) = matmul( tmp(:cxd,:nbands), transpose(conjg(cA_inf(:cxd,:nbands))) )
+     g_ferm(:cxd,:cxd,icix) = g_ferm(:cxd,:cxd,icix) + gmk(:,:)*mweight_ikp
+     deallocate(gmk)
+  enddo
+  deallocate(cA_inf, tmp)
+
+  DEALLOCATE( A_inf, e_inf )
+END SUBROUTINE cmp_DensityMatrix2
 
 SUBROUTINE Print_DensityMatrix(gmloc, g_inf, g_ferm, omega, maxdim, ncix, Sigind, nomega, cixdim, iso)
   USE splines, ONLY: zspline3

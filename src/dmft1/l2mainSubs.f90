@@ -17,7 +17,7 @@ SUBROUTINE Create_Atom_Arrays(csort, maxucase, isort, iatom, nat, natm, natom)
      endif
   enddo
   maxucase = maxucase-1
-  
+
   if (Qprint) then
      WRITE(6,*)
      WRITE(6,*) '********** Information about the atomic index arrays ************'
@@ -25,13 +25,13 @@ SUBROUTINE Create_Atom_Arrays(csort, maxucase, isort, iatom, nat, natm, natom)
      WRITE(6,*) 'isort=', isort
      WRITE(6,*) 'csort=', csort
      WRITE(6,*) 'maxucase=', maxucase
-  
+
      DO icase=1,natom
         iucase = csort(isort(iatom(icase)))
         WRITE(6, '(A,6I6,1x)') 'icase, iucase, jatom, latom=', icase, iucase, isort(iatom(icase)), iatom(icase)
      ENDDO
   endif
-  
+
 END SUBROUTINE Create_Atom_Arrays
 
 SUBROUTINE Create_Orbital_Arrays(iorbital, norbitals, maxdim2, nl, ll, cix, natom, lmax2, iso)
@@ -44,20 +44,20 @@ SUBROUTINE Create_Orbital_Arrays(iorbital, norbitals, maxdim2, nl, ll, cix, nato
   !----------- Find index to atom/L named iorbital(icase,lcase) -------------------------------!
   iorbital=0
   maxdim2=0   !-- maximum size of the matrix over all atoms and l's requested in the input ----!
-              !---- do not confuse with maxdim, which is maximum size for correlated orbitals -!
+  !---- do not confuse with maxdim, which is maximum size for correlated orbitals -!
   norbitals=0 !-- number of atom/l cases, called orbitals -------------------------------------!
   do icase=1,natom
      do lcase=1,nl(icase)
         norbitals = norbitals+1
         iorbital(icase,lcase)=norbitals  !-- index to the orbital number ----!
         icix = cix(icase,lcase)
-        
+
         l1=ll(icase,lcase)
         nind=(2*l1+1)*iso
         maxdim2 = max(maxdim2, nind )
 
      enddo
-  enddo  
+  enddo
 
   if (Qprint) then
      WRITE(6,*)
@@ -77,19 +77,19 @@ SUBROUTINE Create_Orbital_Arrays(iorbital, norbitals, maxdim2, nl, ll, cix, nato
   endif
   !----------- Find index to atom/L named iorbital(icase,lcase) --------
 END SUBROUTINE Create_Orbital_Arrays
-  
 
-SUBROUTINE Create_Other_Arrays(cixdim, iSx, noccur, nindo, cix_orb, cfX, CF, nl, ll, cix, iorbital, csize, csizes, Sigind, iso, natom, maxdim, lmax2, ncix, maxsize, norbitals, maxdim2)
+
+SUBROUTINE Create_Other_Arrays(cixdim, iSx, noccur, nindo, cix_orb, cfX, CF, nl, ll, cix, iorbital, csize, csizes, uind, Sigind, iso, natom, maxdim, lmax2, ncix, maxsize, norbitals, maxdim2)
   USE com_mpi, ONLY: Qprint
   IMPLICIT NONE
-  INTEGER, intent(out)    :: cixdim(ncix), iSx(maxdim2, norbitals), noccur(maxsize,ncix), nindo(norbitals), cix_orb(norbitals), csizes(ncix)
+  INTEGER, intent(out)    :: cixdim(ncix), iSx(maxdim2, norbitals), noccur(maxsize,ncix), nindo(norbitals), cix_orb(norbitals), csizes(ncix), uind(norbitals+1)
   COMPLEX*16, intent(out) :: cfX(maxdim2,maxdim2,norbitals,norbitals)
   COMPLEX*16, intent(in)  :: CF(maxdim,maxdim,ncix)
   INTEGER, intent(in)     :: nl(natom), ll(natom,4), cix(natom,4), iorbital(natom,lmax2+1), csize(ncix)
   INTEGER, intent(in)     :: Sigind(maxdim,maxdim,ncix)
   INTEGER, intent(in)     :: natom, maxdim, lmax2, ncix, iso, maxsize, norbitals, maxdim2
   !----- locals
-  INTEGER :: icase, lcase, iorb, icix, ip, iq, it, l1, nind1, nind2, ip1, iorb1, iorb2, ind1, ind2, wcsize
+  INTEGER :: icase, lcase, iorb, icix, ip, iq, it, l1, nind1, nind2, ip1, iorb1, iorb2, ind1, ind2, wcsize, ind
 
   cixdim=0
   iSx=0
@@ -100,9 +100,8 @@ SUBROUTINE Create_Other_Arrays(cixdim, iSx, noccur, nindo, cix_orb, cfX, CF, nl,
         iorb = iorbital(icase,lcase)
         nind1 = (2*l1+1)*iso
         nindo(iorb) = nind1
-
         cix_orb(iorb) = icix
-        
+
         if ( icix.EQ.0 ) CYCLE
         do ip1=1,nind1
            cixdim(icix) = cixdim(icix) + 1
@@ -129,6 +128,12 @@ SUBROUTINE Create_Other_Arrays(cixdim, iSx, noccur, nindo, cix_orb, cfX, CF, nl,
      csizes(icix)=wcsize
   ENDDO
 
+  ind=0
+  uind(1)=ind
+  DO iorb1=1,norbitals
+     ind = ind+nindo(iorb1)
+     uind(iorb1+1) = ind
+  END DO
   DO iorb1=1,norbitals
      nind1 = nindo(iorb1)
      if ( cix_orb(iorb1).EQ.0 ) CYCLE
@@ -144,8 +149,7 @@ SUBROUTINE Create_Other_Arrays(cixdim, iSx, noccur, nindo, cix_orb, cfX, CF, nl,
         enddo
      ENDDO
   ENDDO
-  
-  
+
   if (Qprint) then
      do icix=1,ncix
         WRITE(6,'(A,I2,A,I2)') 'cixdim(', icix, ')=', cixdim(icix)
@@ -159,8 +163,9 @@ SUBROUTINE Create_Other_Arrays(cixdim, iSx, noccur, nindo, cix_orb, cfX, CF, nl,
         enddo
      enddo
      do iorb=1,norbitals
-        WRITE(6,'(A,I2,A,I3)') 'nindo(', iorb, ')=', nindo(iorb)
+        WRITE(6,'(A,I2,A,I3,2x,A,I2,A,I3)') 'uind(',iorb,')=',uind(iorb), 'nindo(', iorb, ')=', nindo(iorb)
      enddo
+     WRITE(6,'(A,I2,A,I3)') 'uind(',norbitals+1,')=',uind(norbitals+1)
      do iorb1=1,norbitals
         do iorb2=1,norbitals
            if ( cix_orb(iorb1).EQ.0 ) CYCLE
@@ -218,10 +223,10 @@ SUBROUTINE PrintSomeArrays(filename, nat, iso, norbitals, ncix, natom, nkpt, nma
         WRITE(fh, *) (2*ll(icase,lcase)+1)*iso          ! nind
      enddo
   enddo
-  
+
   WRITE(fh, *) 'csize'
   WRITE(fh, *) (csize(icix), icix=1,ncix)
-  
+
   WRITE(fh, *) 'iSx'
   do iorb=1,norbitals
      do ip1=1,nindo(iorb)
@@ -252,7 +257,7 @@ SUBROUTINE PrintSomeArrays(filename, nat, iso, norbitals, ncix, natom, nkpt, nma
         endif
      enddo
   ENDDO
-  
+
 END SUBROUTINE PrintSomeArrays
 
 SUBROUTINE CompressSigmaTransformation2(STrans, DMFTU, Sigind, iSx, cix, iorbital, ll, nl, natom, iso, ncix, maxdim, maxdim2, lmax2, norbitals, nbands, maxsize)
@@ -282,16 +287,16 @@ SUBROUTINE CompressSigmaTransformation2(STrans, DMFTU, Sigind, iSx, cix, iorbita
               do ind1=1,nind1
                  do ind2=1,nind2
                     it = abs(Sigind( iSx(ind1,iorb1),iSx(ind2,iorb2), icix ))
-                    
+
                     if (it.gt.0) then
                        !WRITE(*,'(A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2)') 'icase=',icase, 'jcase=',jcase, 'l1case=',l1case, 'l2case=',l2case, 'iorb1=',iorb1, 'iorb2=',iorb2, 'ind1=',ind1, 'ind2=',ind2, 'iSx1=', iSx(ind1,iorb1), 'iSx2=', iSx(ind2,iorb2), 'it=',it
-                       
+
                        DO i=1,nbands                     ! over bands-1
                           do j=1,nbands                  ! over bands-2
                              STrans(it,icix,i,j) = STrans(it,icix,i,j) + conjg(DMFTU(j,ind2,iorb2))*DMFTU(i,ind1,iorb1)
                           enddo
                        ENDDO
-                       
+
                     endif
                  enddo
               enddo
@@ -301,6 +306,135 @@ SUBROUTINE CompressSigmaTransformation2(STrans, DMFTU, Sigind, iSx, cix, iorbita
   ENDDO
 END SUBROUTINE CompressSigmaTransformation2
 
+SUBROUTINE CompressSigmaTransformationIndex(iaib, degs, nii, Sigind, icx_it, cixdim,  ncix, maxdim)
+  ! working,uind,iorbital, ll, nl, iSx, cix, iso,  maxdim2, lmax2, norbitals
+  use pair_mod 
+  use nested_list_mod
+  IMPLICIT NONE
+  type(PairList), intent(inout) :: iaib(nii)
+  integer, intent(out)          :: degs(nii)
+  !logical, intent(in)          :: working
+  INTEGER, intent(in)           :: nii, ncix, maxdim, cixdim(ncix)
+  INTEGER, intent(in)           :: Sigind(maxdim,maxdim,ncix)
+  type(NestedList), intent(in)  :: icx_it
+  !INTEGER, intent(in)           :: iorbital(natom,lmax2+1), ll(natom,4), nl(natom), uind(norbitals+1), iSx(maxdim2, norbitals), cix(natom,4)
+  !INTEGER, intent(in)           :: iso, maxdim2, lmax2, norbitals, natom
+  !----- locals
+  INTEGER :: i, j, icase, jcase, l1case, l2case, iorb1, iorb2, it, ind1, nind1, ind2, nind2, icix, l1, l2, ia, ib, ii, pre_cix
+  INTEGER, allocatable :: how_many(:), current(:)
+  allocate( how_many(nii), current(nii) )
+
+  !if (working) then
+  !   how_many(:)=0
+  !   DO icase=1,natom      
+  !      do l1case=1,nl(icase) 
+  !         icix = cix(icase,l1case)
+  !         if ( icix.EQ.0 ) CYCLE
+  !         l1 = ll(icase,l1case)
+  !         nind1 = (2*l1+1)*iso
+  !         iorb1 = iorbital(icase,l1case)
+  !         DO jcase=1,natom
+  !            do l2case=1,nl(jcase)
+  !               if ( cix(jcase,l2case).NE.icix ) CYCLE
+  !               l2 = ll(jcase,l2case)
+  !               nind2 = (2*l2+1)*iso
+  !               iorb2 = iorbital(jcase,l2case)
+  !               do ind1=1,nind1
+  !                  do ind2=1,nind2
+  !                     it = abs(Sigind( iSx(ind1,iorb1),iSx(ind2,iorb2), icix ))
+  !                     ii = icx_it%list(icix)%data(it) 
+  !                     how_many(ii) = how_many(ii)+1
+  !                  enddo
+  !               enddo
+  !            enddo
+  !         ENDDO
+  !      enddo
+  !   ENDDO
+  !   do ii=1,nii
+  !      allocate(iaib(ii)%pairs(how_many(ii)))
+  !   enddo
+  !   current=0
+  !   DO icase=1,natom      
+  !      do l1case=1,nl(icase) 
+  !         icix = cix(icase,l1case)
+  !         if ( icix.EQ.0 ) CYCLE
+  !         l1 = ll(icase,l1case)
+  !         nind1 = (2*l1+1)*iso
+  !         iorb1 = iorbital(icase,l1case)
+  !         DO jcase=1,natom
+  !            do l2case=1,nl(jcase)
+  !               if ( cix(jcase,l2case).NE.icix ) CYCLE
+  !               l2 = ll(jcase,l2case)
+  !               nind2 = (2*l2+1)*iso
+  !               iorb2 = iorbital(jcase,l2case)
+  !               do ind1=1,nind1
+  !                  do ind2=1,nind2
+  !                     it = abs(Sigind( iSx(ind1,iorb1),iSx(ind2,iorb2), icix ))
+  !                     if (it.gt.0) then
+  !                        !WRITE(*,'(A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2,1x,A,I2)') 'icase=',icase, 'jcase=',jcase, 'l1case=',l1case, 'l2case=',l2case, 'iorb1=',iorb1, 'iorb2=',iorb2, 'ind1=',ind1, 'ind2=',ind2, 'iSx1=', iSx(ind1,iorb1), 'iSx2=', iSx(ind2,iorb2), 'it=',it
+  !                        ii = icx_it%list(icix)%data(it) 
+  !                        ia = uind(iorb1)+ind1
+  !                        ib = uind(iorb2)+ind2
+  !                        degs(ii) = degs(ii)+1
+  !                        current(ii) = current(ii)+1
+  !                        iaib(ii)%pairs(current(ii))%first = ia
+  !                        iaib(ii)%pairs(current(ii))%second = ib
+  !                        !DO i=1,nbands                     ! over bands-1
+  !                        !   do j=1,nbands                  ! over bands-2
+  !                        !       STrans(it,icix,i,j) = STrans(it,icix,i,j) + DMFTU(i,ind1,iorb1)*conjg(DMFTU(j,ind2,iorb2))
+  !                        !   enddo
+  !                        !ENDDO                       
+  !                     endif
+  !                  enddo
+  !               enddo
+  !            enddo
+  !         ENDDO
+  !      enddo
+  !   ENDDO
+  !else
+     how_many(:)=0
+     DO icix=1,ncix
+        pre_cix=0
+        if (icix>1) pre_cix = sum(cixdim(:icix-1))        
+        DO ind1=1,cixdim(icix)
+           DO ind2=1,cixdim(icix)
+              it = abs(Sigind(ind1,ind2,icix))
+              if (it.gt.0) then
+                 ii = icx_it%list(icix)%data(it)
+                 how_many(ii) = how_many(ii)+1
+              endif
+           ENDDO
+        ENDDO
+     ENDDO
+     do ii=1,nii
+        allocate(iaib(ii)%pairs(how_many(ii)))
+     enddo
+     current=0
+     !write(6,*)'how_many=', how_many
+     DO icix=1,ncix
+        pre_cix=0
+        if (icix>1) pre_cix = sum(cixdim(:icix-1))        
+        DO ind1=1,cixdim(icix)
+           DO ind2=1,cixdim(icix)
+              it = abs(Sigind(ind1,ind2,icix))
+              if (it.gt.0) then
+                 ii = icx_it%list(icix)%data(it) 
+                 ia = pre_cix+ind1
+                 ib = pre_cix+ind2
+                 degs(ii) = degs(ii)+1
+                 current(ii) = current(ii)+1
+                 iaib(ii)%pairs(current(ii))%first = ia
+                 iaib(ii)%pairs(current(ii))%second = ib
+                 !WRITE(6,'(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') 'icix=', icix, ' ind1=', ind1, ' ind2=', ind2, ' it=', it, ' ii=', ii, ' ia=', ia, ' ib=', ib
+                 !flush(6)
+              endif
+           ENDDO
+        ENDDO
+     ENDDO
+  !endif
+  deallocate(how_many, current)
+
+END SUBROUTINE CompressSigmaTransformationIndex
 
 SUBROUTINE AddSigma_optimized2(gij, sigma, STrans, csize, sign, nbands, ncix, maxsize)
   !-- Add's self-energy to inverse of the Green's function in band representation
@@ -345,7 +479,7 @@ SUBROUTINE CompressGcTransformation4(GTrans, DMFTrans, nbands, nindo, norbitals,
               csum = csum + DMFTrans(i,j,ind1,ind1,iorb)
            enddo
            GTrans(i,j,iorb) = csum
-           
+
         ENDDO
      enddo
   ENDDO
@@ -378,10 +512,10 @@ SUBROUTINE CmpGkc2(gmk, gij, DMFTU, iSx, iorbital, ll, nl, cix, natom, iso, ncix
               nind2 = (2*l2+1)*iso
               iorb2 = iorbital(jcase,l2case)
               !print *, 'iorb1,iorb2=', iorb1, iorb2, maxdim2, nind1, nind2, nbands, maxdim2
-              
+
               call zgemm('C','N', nind1, nbands, nbands, (1.d0,0.d0), DMFTU(:,:,iorb1), nbands, gij(:,:),nbands, (0.d0,0.d0), tmp(:,:),maxdim2)
               call zgemm('N','N', nind1, nind2, nbands, (1.d0,0.d0), tmp,maxdim2, DMFTU(:,:,iorb2),nbands, (0.d0,0.d0), tgk,maxdim2)
-              
+
               !print *, 'tgk1=', tgk(:nind1,:nind2)
               !tgk(:nind1,:nind2) = matmul(matmul(transpose(conjg(DMFTU(:,:nind1,iorb1))), gij),DMFTU(:,:nind2,iorb2))
               !print *, 'tgk2=', tgk(:nind1,:nind2)
@@ -428,10 +562,51 @@ SUBROUTINE CmpGknc(gk, gij, GTrans, nindo, norbitals, ncix, nbands)
      endif
      gk(iorb)=gc !/nind
   ENDDO
-  
+
 END SUBROUTINE CmpGknc
 
 
+
+SUBROUTINE GetImpurityLevels3(Eimpmk, Olapmk, UDMFT, STrans2, E, EF, s_oo, nemin, nume, cixdim, ncix, maxdim, nbands, norbs, nii)
+  IMPLICIT NONE
+  COMPLEX*16, intent(out) :: Eimpmk(maxdim,maxdim,ncix)
+  COMPLEX*16, intent(out) :: Olapmk(maxdim,maxdim,ncix)
+  COMPLEX*16, intent(in)  :: UDMFT(nbands,norbs), STrans2(nbands,nbands,nii)
+  REAL*8,     intent(in)  :: E(nume), EF                         ! eigenvalues, chemical potential
+  COMPLEX*16, intent(in)  :: s_oo(nii)
+  INTEGER, intent(in)     :: nemin, nume, norbs
+  INTEGER, intent(in)     :: cixdim(ncix)
+  INTEGER, intent(in)     :: ncix, maxdim, nbands, nii
+  !--------- locals
+  COMPLEX*16, allocatable :: tgk(:,:), tmp(:,:), gij(:,:), olp(:,:)
+  INTEGER    :: i, istart, iend, icix, cxd, ii, pre_cix
+  allocate( tmp(maxdim,nbands), gij(nbands,nbands) )
+  gij=0
+  DO i=1,nbands
+     gij(i,i) = (E(i+nemin-1)-EF)
+  ENDDO
+  do ii=1,nii
+     gij(:,:) = gij(:,:) + s_oo(ii) * STrans2(:,:,ii)
+  enddo
+  !
+  Eimpmk=0
+  Olapmk=0
+  do icix=1,ncix
+     pre_cix=0
+     if (icix>1) pre_cix = sum(cixdim(:icix-1))
+     cxd = cixdim(icix)
+     istart = pre_cix+1
+     iend   = pre_cix+cxd
+     !Olapmk(:cxd,:cxd,icix) = matmul( transpose(conjg(UDMFT(:nbands,istart:iend))), UDMFT(:nbands,istart:iend))
+     !tmp(:cxd,:nbands) = matmul( transpose(conjg(UDMFT(:nbands,istart:iend))), gij(:,:))
+     !Eimpmk(:cxd,:cxd,icix) = matmul(tmp(:cxd,:nbands), UDMFT(:nbands,istart:iend) )
+     !
+     call zgemm('C','N', cxd,   cxd,  nbands, (1.d0,0.d0), UDMFT(:,istart:iend),nbands, UDMFT(:,istart:iend),nbands, (0.d0,0.d0), Olapmk(:,:,icix),maxdim)
+     call zgemm('C','N', cxd, nbands, nbands, (1.d0,0.d0), UDMFT(:,istart:iend),nbands, gij,nbands, (0.d0,0.d0), tmp,maxdim)               ! tmp(a,i) = U^+*(a,i)gij(i,j)
+     call zgemm('N','N', cxd,   cxd,  nbands, (1.d0,0.d0), tmp,maxdim, UDMFT(:,istart:iend),nbands, (0.d0,0.d0), Eimpmk(:,:,icix),maxdim)  ! tgk(a,b) = tmp(a,i) U(i,b)
+  enddo
+  deallocate( gij, tmp )
+END SUBROUTINE GetImpurityLevels3
 
 SUBROUTINE GetImpurityLevels2(Eimpmk, Olapmk, DMFTU, STrans, E, EF, s_oo, nemin, nume, iSx, iorbital, ll, nl, csize, cix, natom, iso, ncix, maxdim, maxdim2, lmax2, norbitals, nbands, maxsize)
   IMPLICIT NONE
@@ -446,17 +621,16 @@ SUBROUTINE GetImpurityLevels2(Eimpmk, Olapmk, DMFTU, STrans, E, EF, s_oo, nemin,
   !--------- locals
   COMPLEX*16, allocatable :: tgk(:,:), tmp(:,:), gij(:,:), olp(:,:)
   INTEGER    :: i, icase, jcase, l1case, l2case, icix, l1, l2, nind1, nind2, iorb1, iorb2, ind1, ind2
-
-  
   allocate( tmp(maxdim2,nbands), tgk(maxdim2, maxdim2), gij(nbands,nbands), olp(maxdim2,maxdim2) )
-
   gij=0
   DO i=1,nbands
      gij(i,i) = (E(i+nemin-1)-EF)
-  ENDDO  
-  
+  ENDDO
   CALL AddSigma_optimized2(gij, s_oo, STrans, csize, 1, nbands, ncix, maxsize)
-  
+  !write(6,*) '2: gii='
+  !do i=1,nbands
+  !   write(6,*) gij(i,i)
+  !enddo
   Eimpmk=0
   Olapmk=0
   DO icase=1,natom      
@@ -476,14 +650,14 @@ SUBROUTINE GetImpurityLevels2(Eimpmk, Olapmk, DMFTU, STrans, E, EF, s_oo, nemin,
               call zgemm('C','N', nind1, nind2, nbands, (1.d0,0.d0), DMFTU(:,:,iorb1),nbands, DMFTU(:,:,iorb2),nbands, (0.d0,0.d0), olp,maxdim2)
               call zgemm('C','N', nind1, nbands, nbands, (1.d0,0.d0), DMFTU(:,:,iorb1), nbands, gij(:,:),nbands, (0.d0,0.d0), tmp(:,:),maxdim2)
               call zgemm('N','N', nind1, nind2,  nbands, (1.d0,0.d0), tmp,maxdim2, DMFTU(:,:,iorb2), nbands, (0.d0,0.d0), tgk,maxdim2)
-              
+
               do ind1=1,nind1
                  do ind2=1,nind2
                     Eimpmk( iSx(ind1,iorb1), iSx(ind2,iorb2), icix ) = tgk(ind1,ind2)
                     Olapmk( iSx(ind1,iorb1), iSx(ind2,iorb2), icix ) = olp(ind1,ind2)
                  enddo
               enddo
-              
+
            enddo
         ENDDO
      enddo
@@ -511,6 +685,348 @@ SUBROUTINE CountFrequencyShape(n0_om, nom_max, beta, omega, nomega)
 
 END SUBROUTINE CountFrequencyShape
 
+
+SUBROUTINE GetDelta3(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma, s_oo, gamma, gmloc, Eimpm, Olapm, Sigind, icx_it, csize, cixdim, noccur, ncix, maxsize, maxdim, nomega, nii, projector,ComputeLogGloc)
+  use nested_list_mod
+  IMPLICIT NONE
+  COMPLEX*16, intent(out):: Deltac(maxsize, ncix,nomega), Glc(maxsize,ncix,nomega)
+  REAL*8, intent(out)    :: Eimpc(maxsize, ncix), Olapc(maxsize,ncix)
+  REAL*8, intent(out)    :: logGloc(ncix)
+  LOGICAL, intent(in)    :: matsubara
+  REAL*8,  intent(in)    :: omega(nomega)
+  COMPLEX*16, intent(in) :: sigma(nii,nomega), s_oo(nii)                                                                                                   
+  REAL*8, intent(in)     :: gamma
+  COMPLEX*16, intent(in) :: gmloc(maxdim,maxdim,ncix,nomega)
+  COMPLEX*16, intent(inout) :: Eimpm(maxdim,maxdim,ncix), Olapm(maxdim,maxdim,ncix)
+  INTEGER, intent(in)    :: Sigind(maxdim,maxdim,ncix), csize(ncix), cixdim(ncix)
+  type(NestedList), intent(in)  :: icx_it
+  INTEGER, intent(in)    :: noccur(maxsize,ncix)
+  INTEGER, intent(in)    :: ncix, maxsize, maxdim, nomega, projector, nii
+  LOGICAL, intent(in)    :: ComputeLogGloc
+  !----- externals
+  REAL*8 ::  FreeE0
+  LOGICAL :: Off_diagonalc
+  !----- locals
+  real*8, PARAMETER       :: Ry2eV = 13.60569193
+  COMPLEX*16, allocatable:: gcx(:,:), Eimpx(:,:), deltx(:,:), sigcx(:,:), sig_oo(:,:), gxc(:), Eim0x(:,:), olapx(:,:), tmp(:,:)
+  COMPLEX*16 :: xomega, zsum
+  INTEGER    :: icix, ip, iq, it, iom, cixdm, cixdms, n0_om, nom_max, n0, left, ii
+  complex*16 :: IMAG
+  REAL*8 :: PI, beta, omw, ywr, ywi, ypwr, ypwi, yppwr, yppwi
+  REAL*8, allocatable :: x(:), yr(:,:), yi(:,:), yppr(:,:), yppi(:,:)
+  COMPLEX*16, ALLOCATABLE :: evals(:) 
+  REAL*8, ALLOCATABLE     :: Einf(:)
+  INTEGER, ALLOCATABLE    :: cind(:), cini(:), Sigini(:,:)
+  INTEGER :: fh_Eimpx, iomega0
+  LOGICAL :: Off_diagonal, write_Eimpx
+  !---------------------------
+  ! Example for index arrays:
+  !---------------------------
+  !  Sigind=
+  !  [[1 0 0 0 0 0 0 0 0 0]
+  !   [0 2 0 0 0 0 0 0 0 0]
+  !   [0 0 0 0 0 0 0 0 0 0]
+  !   [0 0 0 3 0 0 0 0 0 0]
+  !   [0 0 0 0 4 0 0 0 0 0]
+  !   [0 0 0 0 0 5 0 0 0 0]
+  !   [0 0 0 0 0 0 6 0 0 0]
+  !   [0 0 0 0 0 0 0 0 0 0]
+  !   [0 0 0 0 0 0 0 0 0 0]
+  !   [0 0 0 0 0 0 0 0 0 0]
+  !  cixdm = 10
+  !  cixdms = 6
+  !  cind=[1,2,0,3,4,5,6,0,0,0]
+  !  cini=[1,2,4,5,6,7]
+  !  Sigini=[[1,0,0,0,0,0],
+  !          [0,2,0,0,0,0],
+  !          [0,0,4,0,0,0],
+  !          [0,0,0,5,0,0],
+  !          [0,0,0,0,6,0],
+  !          [0,0,0,0,0,7]]
+  !-----------------------
+  DATA IMAG/(0.0D0,1.0D0)/
+  !-----------------------
+  Deltac=0
+  Olapc=0
+  Glc=0
+  Eimpc=0
+  IF (matsubara) THEN
+     PI=ACOS(-1.0D0)
+     CALL CountFrequencyShape(n0_om, nom_max, beta, omega, nomega)
+  END IF
+  iomega0=1
+  do iom=2,nomega
+     if (abs(omega(iom)).LT.abs(omega(iomega0))) iomega0=iom
+  enddo
+  fh_Eimpx = 6
+  WRITE(fh_Eimpx,*) 'omega~0 is', omega(iomega0)*Ry2eV, 'at i=', iomega0
+  write_Eimpx = .True.
+  !filename = 'Eimpx.dat'
+  !open(fh_Eimpx,file=TRIM(filename),status='unknown')
+  if (write_Eimpx) WRITE(fh_Eimpx,*) 'Full matrix of impurity levels follows'
+
+  DO icix=1,ncix
+     cixdm = cixdim(icix)
+     allocate( cind(cixdm) )
+     ! If Sigind(i,i)=0, we eliminate the i-th column and rown, because such orbital should be treated as non-correlated
+     cixdms=0 ! real dimension, excluding states which must be projected out, because they are treated as non-correlated
+     cind=0   ! In most cases, cind(i)=i, however, when some states are projected out, cind points to smaller block
+     DO ip=1,cixdm
+        it = Sigind(ip,ip,icix)
+        if (it.gt.0) then
+           cixdms = cixdms + 1
+           cind(ip) = cixdms
+        endif
+     ENDDO
+     !print *, 'icix=', icix, 'cixdms=', cixdms
+     if (cixdms.EQ.0) then
+        deallocate( cind )
+        ! Even though all states are projected out, we still want to have GF printed.
+        do iom=1,nomega !------- for all frequencies --!
+           !---- packing Gloc to vector form
+           DO ip=1,cixdm
+              do iq=1,cixdm
+                 it = abs(Sigind(ip,iq,icix))
+                 if (it.ne.0) then
+                    Glc(it, icix, iom) =  Glc(it, icix, iom) + gmloc(ip,iq,icix,iom)
+                 endif
+              enddo
+           ENDDO
+           DO it=1,csize(icix)
+              Glc(it, icix, iom) = Glc(it, icix, iom)/noccur(it,icix)
+           ENDDO
+        enddo
+        CYCLE
+     endif
+
+     allocate( cini(cixdms), Sigini(cixdms,cixdms) )
+     do ip=1,cixdm
+        if (cind(ip).gt.0) cini(cind(ip))=ip
+     enddo
+     DO ip=1,cixdms
+        do iq=1,cixdms
+           Sigini(ip,iq) = abs(Sigind(cini(ip),cini(iq),icix)) ! This abs is probably not needed, since we do not expect negative Sigind on the off-diagonal components
+        enddo
+     ENDDO
+     !print *, 'cind=', cind
+     !print *, 'cini=', cini
+     !print *, 'Sigini=', Sigini
+     allocate( sigcx(cixdms,cixdms), gcx(cixdms,cixdms), Eimpx(cixdms,cixdms), Eim0x(cixdms,cixdms), deltx(cixdms,cixdms), sig_oo(cixdms,cixdms), Einf(cixdms), olapx(cixdms,cixdms), tmp(cixdms,cixdms) )
+     !---- Olap to vector form, and s_oo to matrix form
+     DO ip=1,cixdm
+        do iq=1,cixdm
+           it = abs(Sigind(ip,iq,icix))
+           if (it.gt.0) then
+              Olapc(it, icix) =  Olapc(it, icix) + real(Olapm(ip,iq,icix))
+           endif
+        enddo
+     ENDDO
+     DO it=1,csize(icix)
+        Olapc(it, icix) = Olapc(it, icix)/noccur(it,icix)
+     ENDDO
+     ! Set s_oo
+     sig_oo=0
+     DO ip=1,cixdms
+        do iq=1,cixdms
+           it = Sigini(ip,iq)
+           if (it.gt.0) then
+              ii = icx_it%list(icix)%data(it)
+              sig_oo(ip,iq) = s_oo(ii)
+           endif
+        enddo
+     ENDDO
+     ! Set olapx, Eim0x
+     DO ip=1,cixdms
+        do iq=1,cixdms
+           olapx(ip,iq) = Olapm(cini(ip),cini(iq),icix)
+           Eim0x(ip,iq) = Eimpm(cini(ip),cini(iq),icix)
+           if (projector.LT.0 .and. ip.NE.iq) then
+              ! Set off-diagonal terms to zero. DMFT-SCC is taken to be purely diagonal
+              olapx(ip,iq)=0.0
+              Eim0x(ip,iq)=0.0
+           end if
+        enddo
+     enddo
+
+     ! DMFT SCC in non-orthogonal base:
+     ! 1/(O*omega - E_imp - sigma - Delta) = \sum_k G_k 
+     ! Olapm = sum_k U^+_k U_k
+     ! Eimpm = sum_k U^+_k (eps_k-mu) U_k
+     ! O^{-1}/omega + O^{-1}E_{imp}O^{-1}/omega^2 + ... = Olapm/omega + Eimpm/omega^2 + ...
+     ! O = Olapm^{-1}
+     ! E_{imp} = O * Eimpm * O
+     ! 
+     CALL zinv(olapx, cixdms)
+     tmp = matmul(olapx,Eim0x)
+     Eimpx = matmul( tmp, olapx) !-- normalize by overlap
+     CALL GetEinf(Einf, Eimpx, Sigini, noccur(:,icix), cixdms, csize(icix), maxsize)
+     Eimpx = Eimpx - sig_oo !--- subtracting S_oo from Eimp such that the real impurity level is Eimpc-Edc
+
+     !---- Eimpc to vector form
+     DO ip=1,cixdms
+        do iq=1,cixdms
+           it = Sigini(ip,iq)
+           if (it.gt.0) then
+              Eimpc(it, icix) =  Eimpc(it, icix) + real(Eimpx(ip,iq))
+           endif
+        enddo
+     ENDDO
+     DO it=1,csize(icix)
+        Eimpc(it, icix) = Eimpc(it, icix)/noccur(it,icix)
+     ENDDO
+
+
+     if (write_Eimpx) then
+        WRITE(fh_Eimpx,*) 'icix=', icix
+        DO ip=1,cixdms
+           DO iq=1,cixdms
+              WRITE(fh_Eimpx,'(f14.8,1x,f14.8,3x)',advance='no') real(Eimpx(ip,iq))*Ry2eV, aimag(Eimpx(ip,iq))*Ry2eV
+           ENDDO
+           WRITE(fh_Eimpx,*)
+        ENDDO
+        WRITE(fh_Eimpx,*)
+     end if
+
+     do iom=1,nomega !------- for all frequencies --!
+
+        IF (matsubara) THEN
+           xomega = omega(iom)*IMAG
+        ELSE
+           xomega = omega(iom)
+        ENDIF
+        !---- unpacking sigma to matrix form
+        !gcx = gmloc(:cixdm,:cixdm,icix,iom)
+        sigcx=0
+        gcx=0
+        DO ip=1,cixdms
+           do iq=1,cixdms
+!!! Sigma_loc
+              it = Sigini(ip,iq)
+              if (it.gt.0) then
+                 ii = icx_it%list(icix)%data(it)
+                 sigcx(ip,iq) = sigma(ii, iom)
+              endif
+!!! G_loc
+              gcx(ip,iq) = gmloc(cini(ip),cini(iq),icix,iom)
+           enddo
+        ENDDO
+
+        if (projector.LT.0) then
+           ! Set off-diagonal terms to zero. DMFT-SCC is taken to be purely diagonal
+           DO ip=1,cixdms
+              do iq=1,cixdms
+                 if (ip.NE.iq) then
+                    gcx(ip,iq)=0.0
+                 end if
+              enddo
+           enddo
+        endif
+
+        CALL zinv(gcx,cixdms)
+
+        ! DMFT SCC in non-orthogonal base:
+        ! 1/(O*omega - E_imp - sigma - Delta) = \sum_k G_k==G_loc
+        ! Delta = O*omega - E_{imp} - sigma - G_loc^{-1}
+        !--- DMFT self-conistency condition
+        !deltx = Olapm(:cixdm,:cixdm,icix)*xomega - Eimpx - gcx - sigcx 
+        deltx = olapx*xomega - Eimpx - gcx - sigcx 
+        do ip=1,cixdms
+           deltx(ip,ip) = deltx(ip,ip) + (0.d0, 1.d0)*gamma
+        enddo
+
+        if (iom==iomega0 .and. write_Eimpx) then
+           tmp(:,:) = Eimpx(:,:) + 0.5*(deltx(:,:)+transpose(conjg(deltx(:,:))))
+           WRITE(fh_Eimpx,*) 'icix=', icix, 'at omega=0'
+           DO ip=1,cixdms
+              DO iq=1,cixdms
+                 WRITE(fh_Eimpx,'(f14.8,1x,f14.8,3x)',advance='no') real(tmp(ip,iq))*Ry2eV, aimag(tmp(ip,iq))*Ry2eV
+              ENDDO
+              WRITE(fh_Eimpx,*)
+           ENDDO
+           WRITE(fh_Eimpx,*)
+        endif
+
+        !---- packing delta to vector form
+        DO ip=1,cixdms
+           do iq=1,cixdms
+              it = Sigini(ip,iq)
+              if (it.gt.0) then
+                 Deltac( it, icix, iom ) =  Deltac( it, icix, iom ) + deltx(ip,iq)
+              endif
+           enddo
+        ENDDO
+        !---- packing Gloc to vector form
+        DO ip=1,cixdm
+           do iq=1,cixdm
+              it = abs(Sigind(ip,iq,icix))
+              if (it.ne.0) then
+                 Glc( it, icix, iom ) =  Glc( it, icix, iom ) + gmloc(ip,iq,icix,iom)
+              endif
+           enddo
+        ENDDO
+        DO it=1,csize(icix)
+           Deltac(it, icix, iom) = Deltac(it, icix, iom)/noccur(it,icix)
+           Glc(it, icix, iom) = Glc(it, icix, iom)/noccur(it,icix)
+        ENDDO
+     enddo
+
+     logGloc(:)=0.0
+     IF (matsubara .and. ComputeLogGloc) then  !!! This is new stuff on Tr(log(Gloc)) for free energy
+!!! At the moment this works only on imaginary axis. It should be extended to the real axis too.
+
+        Off_diagonal = Off_diagonalc(Sigind, cixdm, maxdim)
+        n0 = nomega-n0_om+1
+        allocate( x(n0), yr(n0,csize(icix)), yi(n0,csize(icix)), yppr(n0,csize(icix)), yppi(n0,csize(icix)) )
+        allocate( gxc(csize(icix)) )
+        x(:) = omega(n0_om:)
+        DO it=1,csize(icix)
+           yr(:,it) = dble(Glc(it,icix,n0_om:))
+           call spline_cubic_set( n0, x, yr(:,it), 0, 0.0D+00, 0, 0.0D+00, yppr(:,it) )
+           yi(:,it) = dimag(Glc(it,icix,n0_om:))
+           call spline_cubic_set( n0, x, yi(:,it), 0, 0.0D+00, 0, 0.0D+00, yppi(:,it) )
+        ENDDO
+
+        ALLOCATE( evals(cixdms) )
+
+        logGloc(icix)=0.0
+        DO iom=1,n0_om-1
+           CALL GlocEigvals(evals, Glc(:,icix,iom), Sigini, Off_diagonal, cixdms, csize(icix))
+           zsum=0.0
+           do it=1,cixdms
+              zsum = zsum + log(-evals(it)) + log(Einf(it)-omega(iom)*IMAG)
+           enddo
+           logGloc(icix) = logGloc(icix) + dble(zsum)*2/beta
+        ENDDO
+        left=0
+        DO iom=n0_om,nom_max
+           omw = (2*iom-1)*PI/beta
+           DO it=1,csize(icix)
+              call spline_cubic_val2(n0, x, yr(:,it), yppr(:,it), left, omw, ywr, ypwr, yppwr )
+              call spline_cubic_val2(n0, x, yi(:,it), yppi(:,it), left, omw, ywi, ypwi, yppwi )
+              gxc(it) = ywr+ywi*IMAG
+           ENDDO
+           CALL GlocEigvals(evals, gxc, Sigini, Off_diagonal, cixdms, csize(icix))
+           zsum=0.0
+           do it=1,cixdms
+              zsum = zsum + log(-evals(it)) + log(Einf(it)-omw*IMAG)
+           enddo
+           logGloc(icix) = logGloc(icix) + dble(zsum)*2/beta
+        ENDDO
+        do it=1,cixdms
+           logGloc(icix) = logGloc(icix) + FreeE0(Einf(it),1./beta)
+        enddo
+        WRITE(*,*) 'icix=', icix, 'logGloc=', logGloc(icix)
+
+        DEALLOCATE( evals )
+        deallocate( gxc )
+        deallocate( x, yr, yi, yppr, yppi )
+     END IF
+
+     deallocate( sigcx, gcx, Eimpx, Eim0x, deltx, sig_oo, Einf, olapx, tmp )
+     deallocate( cini, Sigini, cind )
+  ENDDO
+  !close(fh_Eimpx)
+END SUBROUTINE GetDelta3
 
 SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma, s_oo, gamma, gmloc, Eimpm, Olapm, Sigind, csize, cixdim, noccur, ncix, maxsize, maxdim, nomega, projector,ComputeLogGloc)
   IMPLICIT NONE
@@ -572,7 +1088,7 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
   Olapc=0
   Glc=0
   Eimpc=0
-  
+
   IF (matsubara) THEN
      PI=ACOS(-1.0D0)
      CALL CountFrequencyShape(n0_om, nom_max, beta, omega, nomega)
@@ -587,12 +1103,12 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
   !filename = 'Eimpx.dat'
   !open(fh_Eimpx,file=TRIM(filename),status='unknown')
   if (write_Eimpx) WRITE(fh_Eimpx,*) 'Full matrix of impurity levels follows'
-  
+
   DO icix=1,ncix
 
      cixdm = cixdim(icix)
      allocate( cind(cixdm) )
-     
+
      ! If Sigind(i,i)=0, we eliminate the i-th column and rown, because such orbital should be treated as non-correlated
      cixdms=0 ! real dimension, excluding states which must be projected out, because they are treated as non-correlated
      cind=0   ! In most cases, cind(i)=i, however, when some states are projected out, cind points to smaller block
@@ -641,8 +1157,8 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
      !print *, 'Sigini=', Sigini
 
      allocate( sigcx(cixdms,cixdms), gcx(cixdms,cixdms), Eimpx(cixdms,cixdms), Eim0x(cixdms,cixdms), deltx(cixdms,cixdms), sig_oo(cixdms,cixdms), Einf(cixdms), olapx(cixdms,cixdms), tmp(cixdms,cixdms) )
-     
-     
+
+
      !---- Olap to vector form, and s_oo to matrix form
      DO ip=1,cixdm
         do iq=1,cixdm
@@ -655,7 +1171,7 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
      DO it=1,csize(icix)
         Olapc(it, icix) = Olapc(it, icix)/noccur(it,icix)
      ENDDO
-     
+
      ! Set s_oo
      sig_oo=0
      DO ip=1,cixdms
@@ -692,7 +1208,7 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
      Eimpx = matmul( tmp, olapx) !-- normalize by overlap
      CALL GetEinf(Einf, Eimpx, Sigini, noccur(:,icix), cixdms, csize(icix), maxsize)
      Eimpx = Eimpx - sig_oo !--- subtracting S_oo from Eimp such that the real impurity level is Eimpc-Edc
-     
+
      !---- Eimpc to vector form
      DO ip=1,cixdms
         do iq=1,cixdms
@@ -705,8 +1221,8 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
      DO it=1,csize(icix)
         Eimpc(it, icix) = Eimpc(it, icix)/noccur(it,icix)
      ENDDO
-     
-     
+
+
      if (write_Eimpx) then
         WRITE(fh_Eimpx,*) 'icix=', icix
         DO ip=1,cixdms
@@ -719,7 +1235,7 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
      end if
 
      do iom=1,nomega !------- for all frequencies --!
-        
+
         IF (matsubara) THEN
            xomega = omega(iom)*IMAG
         ELSE
@@ -731,12 +1247,12 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
         gcx=0
         DO ip=1,cixdms
            do iq=1,cixdms
-              !!! Sigma_loc
+!!! Sigma_loc
               it = Sigini(ip,iq)
               if (it.gt.0) then
                  sigcx(ip,iq) = sigma( it, icix, iom )
               endif
-              !!! G_loc
+!!! G_loc
               gcx(ip,iq) = gmloc(cini(ip),cini(iq),icix,iom)
            enddo
         ENDDO
@@ -753,7 +1269,7 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
         endif
 
         CALL zinv(gcx,cixdms)
-        
+
         ! DMFT SCC in non-orthogonal base:
         ! 1/(O*omega - E_imp - sigma - Delta) = \sum_k G_k==G_loc
         ! Delta = O*omega - E_{imp} - sigma - G_loc^{-1}
@@ -776,7 +1292,7 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
            ENDDO
            WRITE(fh_Eimpx,*)
         endif
-        
+
         !---- packing delta to vector form
         DO ip=1,cixdms
            do iq=1,cixdms
@@ -803,8 +1319,8 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
 
      logGloc(:)=0.0
      IF (matsubara .and. ComputeLogGloc) then  !!! This is new stuff on Tr(log(Gloc)) for free energy
-        !!! At the moment this works only on imaginary axis. It should be extended to the real axis too.
-        
+!!! At the moment this works only on imaginary axis. It should be extended to the real axis too.
+
         Off_diagonal = Off_diagonalc(Sigind, cixdm, maxdim)
         n0 = nomega-n0_om+1
         allocate( x(n0), yr(n0,csize(icix)), yi(n0,csize(icix)), yppr(n0,csize(icix)), yppi(n0,csize(icix)) )
@@ -847,12 +1363,12 @@ SUBROUTINE GetDelta2(Deltac, Glc, Eimpc, Olapc, logGloc, matsubara, omega, sigma
            logGloc(icix) = logGloc(icix) + FreeE0(Einf(it),1./beta)
         enddo
         WRITE(*,*) 'icix=', icix, 'logGloc=', logGloc(icix)
-        
+
         DEALLOCATE( evals )
         deallocate( gxc )
         deallocate( x, yr, yi, yppr, yppi )
      END IF
-     
+
      deallocate( sigcx, gcx, Eimpx, Eim0x, deltx, sig_oo, Einf, olapx, tmp )
      deallocate( cini, Sigini, cind )
   ENDDO
@@ -883,7 +1399,7 @@ SUBROUTINE GetEinf(Einf, Eimpx, Sigini, noccur, cixdms, csize, maxsize)
   ! locals
   REAL*8, allocatable :: Einf0(:)
   INTEGER :: ip, it
-  
+
   ALLOCATE( Einf0(csize) )
   DO ip=1,cixdms
      it = Sigini(ip,ip)
@@ -894,7 +1410,7 @@ SUBROUTINE GetEinf(Einf, Eimpx, Sigini, noccur, cixdms, csize, maxsize)
   DO it=1,csize
      Einf0(it) = Einf0(it)/noccur(it)
   ENDDO
-  
+
   Einf=0
   DO ip=1,cixdms
      it = Sigini(ip,ip)
@@ -937,7 +1453,7 @@ SUBROUTINE GlocEigvals(evals, gxc, Sigini, Off_diagonal, cixdms, csize)
   COMPLEX*16, ALLOCATABLE :: cworkvec(:), evx(:,:), gcx(:,:)
   REAL*8, ALLOCATABLE     :: rworkvec(:)
   INTEGER :: ierr, ip, iq, it
-  
+
   if (Off_diagonal) then
      ALLOCATE( cworkvec(4*cixdms), evx(cixdms,cixdms), gcx(cixdms,cixdms), rworkvec(2*cixdms) )
      gcx(:,:)=0.0
@@ -961,7 +1477,7 @@ SUBROUTINE GlocEigvals(evals, gxc, Sigini, Off_diagonal, cixdms, csize)
      ENDDO
   endif
 END SUBROUTINE GlocEigvals
-  
+
 SUBROUTINE RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, projector, nbands, maxdim2, norbitals, maxdim, ncix)
   IMPLICIT NONE
   COMPLEX*16, intent(inout) :: DMFTU(nbands,maxdim2,norbitals)
@@ -978,7 +1494,7 @@ SUBROUTINE RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, project
   !
   DO icix=1,ncix
      cixdm = cixdim(icix)
-     
+
      ! If we project out some orbitals, for example eg-orbitals, we might have
      ! Sigind= [[0,0,0,0,0], [0,0,0,0,0], [0,0,1,0,0], [0,0,0,2,0], [0,0,0,0,3]]
      ! then
@@ -993,13 +1509,13 @@ SUBROUTINE RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, project
            cind(ip) = cixdms
         endif
      ENDDO
-     
+
      allocate( cini(cixdms))
      do ip=1,cixdm
         if (cind(ip).gt.0) cini(cind(ip))=ip
      enddo
      ! Now cini[1:3] = [3,4,5] contains the small index of non-zero components
-     
+
      ! If we have cluster-DMFT calculations, we need several orbitals combined into cix block
      allocate( Ucix(nbands,cixdms) )
      Ucix(:,:) = 0.d0
@@ -1014,7 +1530,7 @@ SUBROUTINE RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, project
 
      cixdms_m = min(cixdms,nbands) ! should normally be cixdms, as the number of bands should be larger
      allocate( ws(cixdms_m), Uw(nbands,cixdms_m), Vw(cixdms_m,cixdms) )
-     
+
      lwork = 2*cixdms*(cixdms+nbands)
      lrwork = 7*cixdms*(cixdms + 1)
      allocate( work(lwork), rwork(lrwork), iwork(8*cixdms) )
@@ -1027,7 +1543,7 @@ SUBROUTINE RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, project
      !   WRITE(6,*) "],"
      !enddo
 
-     
+
      call ZGESDD('S', nbands, cixdms, Ucix, nbands, ws, Uw, nbands, Vw, cixdms_m, work, lwork, rwork, iwork, info )
      if (info .ne. 0) then
         print *, 'SVD decomposition of the projector failed. Info-zgesdd=', info
@@ -1046,10 +1562,10 @@ SUBROUTINE RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, project
      !enddo
      print *, 'Singular values=', ws
 
-     
+
      deallocate( work, rwork, iwork )
      deallocate( ws, Uw, Vw )
-     
+
      DO iorb1=1,norbitals
         if ( cix_orb(iorb1).NE.icix ) CYCLE
         nind1 = nindo(iorb1)
@@ -1058,7 +1574,7 @@ SUBROUTINE RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, project
            if (cind(ip).gt.0) DMFTU(:,ind1,iorb1) = Ucix(:,cind(ip))
         enddo
      ENDDO
-     
+
      deallocate( cind, cini )
      deallocate( Ucix )
   ENDDO
@@ -1075,19 +1591,18 @@ SUBROUTINE RenormalizeTrans(DMFTU, Olapm0, SOlapm, cix_orb, cixdim, nindo, iSx, 
   INTEGER :: iorb1, icix, nind1, ind1, cixdm
   REAL*8  :: olocef
   COMPLEX*16, allocatable :: tmp3(:,:), Ucix(:,:), Ucix2(:,:)
-  
+
   if (SIMPLE) then
      DO iorb1=1,norbitals
         icix = cix_orb(iorb1)
         if ( icix.EQ.0 ) CYCLE
         nind1 = nindo(iorb1)
-
         do ind1=1,nind1
            olocef = 1/sqrt(real(Olapm0( iSx(ind1,iorb1), iSx(ind1,iorb1), icix )))
            DMFTU(:,ind1,iorb1) = DMFTU(:,ind1,iorb1) * olocef
         enddo
      ENDDO
-  else if (.True.) then
+  else
      DO icix=1,ncix
         cixdm = cixdim(icix)
         allocate( Ucix(nbands,cixdm), Ucix2(nbands,cixdm) )
@@ -1109,20 +1624,7 @@ SUBROUTINE RenormalizeTrans(DMFTU, Olapm0, SOlapm, cix_orb, cixdim, nindo, iSx, 
         ENDDO
         deallocate( Ucix, Ucix2 )
      ENDDO
-  else
-     allocate( tmp3(nbands,maxdim2) )
-     DO iorb1=1,norbitals
-        icix = cix_orb(iorb1)
-        if ( icix.EQ.0 ) CYCLE
-        nind1 = nindo(iorb1)
-
-        call zgemm('N','N', nbands, nind1, nind1, (1.d0,0.d0), DMFTU(:,:,iorb1),nbands, SOlapm(:,:,icix),maxdim, (0.d0,0.d0), tmp3, nbands)
-        DMFTU(:,:nind1,iorb1) = tmp3(:,:nind1)
-     ENDDO
-     deallocate( tmp3 )
   endif
-     
-  
 END SUBROUTINE RenormalizeTrans
 
 SUBROUTINE read_overlap_from_file(info, SOlapm, cixdim, maxdim, ncix)
@@ -1140,7 +1642,7 @@ SUBROUTINE read_overlap_from_file(info, SOlapm, cixdim, maxdim, ncix)
      info=1
      return
   endif
-  
+
   open(996, FILE='SOlapm.dat', status='old')
   DO icix=1,ncix
      cixdm = cixdim(icix)
@@ -1154,7 +1656,7 @@ SUBROUTINE read_overlap_from_file(info, SOlapm, cixdim, maxdim, ncix)
   ENDDO
   close(996)
   info=0
-  
+
   if (myrank.eq.master) then
      WRITE(6,*) 'SOlapm succesfully read from file'
      WRITE(6,*) 'Z will be used:'

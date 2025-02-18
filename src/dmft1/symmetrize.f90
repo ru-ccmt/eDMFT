@@ -224,23 +224,25 @@ SUBROUTINE CmpSymmetryTransformation(ig, RT, cfX, cix_orb, cixdim, iSx, iorbital
   endif
 END SUBROUTINE CmpSymmetryTransformation
 
-SUBROUTINE SymmetrizeLocalQuantities(Gmloc, Eimpm, Olapm, s_oo, sigma, cfX, cix_orb, cixdim, iSx, iorbital, nindo, norbitals, noccur, maxdim2, nomega)
+SUBROUTINE SymmetrizeLocalQuantities(Gmloc, Eimpm, Olapm, s_oo, sigma, cfX, icx_it, nii, cix_orb, cixdim, iSx, iorbital, nindo, norbitals, noccur, maxdim2, nomega)
   USE structure,  ONLY: iord
   USE case, ONLY: maxdim, ncix, natom, maxsize, csize, Sigind
   USE defs,  ONLY: IMAG
   USE param, ONLY: lmax2
+  use nested_list_mod
   IMPLICIT NONE
   COMPLEX*16, intent(inout):: Gmloc(maxdim,maxdim,ncix,nomega), Eimpm(maxdim,maxdim,ncix), Olapm(maxdim,maxdim,ncix)
-  COMPLEX*16, intent(inout):: s_oo(maxsize,ncix), sigma(maxsize,ncix,nomega)
+  COMPLEX*16, intent(inout):: s_oo(nii), sigma(nii,nomega) !sigma(maxsize,ncix,nomega)
   INTEGER, intent(in)      :: cix_orb(norbitals), cixdim(ncix), iSx(maxdim2, norbitals), iorbital(natom,lmax2+1), nindo(norbitals), noccur(maxsize,ncix)
-  INTEGER, intent(in)      :: norbitals, maxdim2, nomega
+  INTEGER, intent(in)      :: norbitals, maxdim2, nomega, nii
+  type(NestedList), intent(in)  :: icx_it
   COMPLEX*16, intent(in)   :: cfX(maxdim2,maxdim2,norbitals,norbitals)
   ! locals
   INTEGER    :: icix, ig, ip, iq, iom, it, i, j
   INTEGER    :: cdim
   COMPLEX*16 :: gc(maxdim,maxdim)
   !
-  INTEGER    :: ncix_unique
+  INTEGER    :: ncix_unique, ii
   INTEGER    :: size_cix_unique(ncix)
   INTEGER    :: cix_unique(ncix,ncix)
   COMPLEX*16, allocatable :: tmp(:,:)
@@ -270,7 +272,9 @@ SUBROUTINE SymmetrizeLocalQuantities(Gmloc, Eimpm, Olapm, s_oo, sigma, cfX, cix_
            do iq=1,cdim
               it = abs(Sigind(ip,iq,icix))
               if (it.ne.0) then
-                 sig(ip,iq) = sigma(it,icix,iom)
+                 !sig(ip,iq) = sigma(it,icix,iom)
+                 ii = icx_it%list(icix)%data(it)
+                 sig(ip,iq) = sigma(ii,iom)
               endif
            enddo
         ENDDO
@@ -278,19 +282,23 @@ SUBROUTINE SymmetrizeLocalQuantities(Gmloc, Eimpm, Olapm, s_oo, sigma, cfX, cix_
         do ig=1,iord
            gc(:cdim,:cdim) = gc(:cdim,:cdim) + matmul(conjg(transpose(RT(:cdim,:cdim,icix,ig))), matmul(sig(:cdim,:cdim), RT(:cdim,:cdim,icix,ig)))/iord
         end do
-        sigma(:,icix,iom)=0.d0
+        DO it=1,csize(icix)
+           ii = icx_it%list(icix)%data(it)
+           sigma(ii, iom) = 0
+        ENDDO
         DO ip=1,cdim
            do iq=1,cdim
               it = abs(Sigind(ip,iq,icix))
               if (it.ne.0) then
-                 sigma(it,icix,iom) = sigma(it,icix,iom) + gc(ip,iq)
+                 ii = icx_it%list(icix)%data(it)
+                 sigma(ii,iom) = sigma(ii,iom) + gc(ip,iq)
               endif
            enddo
         ENDDO
         DO it=1,csize(icix)
-           sigma(it, icix, iom) = sigma(it,icix,iom)/noccur(it,icix)
+           ii = icx_it%list(icix)%data(it)
+           sigma(ii, iom) = sigma(ii,iom)/noccur(it,icix)
         ENDDO
-        
      enddo
      
      ! Symmetrize the impurity levels
@@ -312,7 +320,8 @@ SUBROUTINE SymmetrizeLocalQuantities(Gmloc, Eimpm, Olapm, s_oo, sigma, cfX, cix_
         do iq=1,cdim
            it = abs(Sigind(ip,iq,icix))
            if (it.ne.0) then
-              sig(ip,iq) = s_oo(it,icix)
+              ii = icx_it%list(icix)%data(it)
+              sig(ip,iq) = s_oo(ii)
            endif
         enddo
      ENDDO
@@ -320,17 +329,22 @@ SUBROUTINE SymmetrizeLocalQuantities(Gmloc, Eimpm, Olapm, s_oo, sigma, cfX, cix_
      do ig=1,iord
         gc(:cdim,:cdim) = gc(:cdim,:cdim) + matmul(conjg(transpose(RT(:cdim,:cdim,icix,ig))), matmul(sig(:cdim,:cdim), RT(:cdim,:cdim,icix,ig)))/iord
      end do
-     s_oo(:,icix)=0.d0
+     DO it=1,csize(icix)
+        ii = icx_it%list(icix)%data(it)
+        s_oo(ii) = 0
+     ENDDO
      DO ip=1,cdim
         do iq=1,cdim
            it = abs(Sigind(ip,iq,icix))
            if (it.ne.0) then
-              s_oo(it,icix) = s_oo(it,icix) + gc(ip,iq)
+              ii = icx_it%list(icix)%data(it)
+              s_oo(ii) = s_oo(ii) + gc(ip,iq)
            endif
         enddo
      ENDDO
      DO it=1,csize(icix)
-        s_oo(it, icix) = s_oo(it,icix)/noccur(it,icix)
+        ii = icx_it%list(icix)%data(it)
+        s_oo(ii) = s_oo(ii)/noccur(it,icix)
      ENDDO
      
   enddo
