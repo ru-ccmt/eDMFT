@@ -1,6 +1,7 @@
 ! @Copyright 2007 Kristjan Haule
 
-SUBROUTINE Cmp_Optics(fenergy, fUdmft, fsymop, fh_m, fhb, ommax, Temperature_, delta, Nd, gammac, gamma, alphaV, Ndirection, Qsym, Qsimple, nom, nat, iso, norbitals, ncix, natom, nkpt, nmat, nume, Qcomplex, lmax2, maxdim2, maxdim, maxsize, dwindow, InterbandOnly)
+SUBROUTINE Cmp_Optics(fenergy, fUdmft, fsymop, fh_m, fhb, ommax, Temperature_, delta, Nd, gammac, gamma, alphaV, Ndirection, Qsym, Qsimple,&
+     nom, nat, iso, norbitals, ncix, natom, nkpt, nmat, nume, Qcomplex, lmax2, maxdim2, maxdim, maxsize, dwindow, InterbandOnly,newform)
   USE com_mpi, ONLY: nprocs, myrank, master, Reduce_MPI, Reduce_MPI_dos
   IMPLICIT NONE
   CHARACTER*100, intent(in) :: fenergy, fUdmft, fsymop!, fmommat
@@ -10,7 +11,7 @@ SUBROUTINE Cmp_Optics(fenergy, fUdmft, fsymop, fh_m, fhb, ommax, Temperature_, d
   INTEGER, intent(in) :: fhb, nom, nat, iso, norbitals, ncix, natom, nkpt, nmat, nume
   LOGICAL, intent(in) :: Qcomplex
   INTEGER, intent(in) :: lmax2, maxdim2, maxdim, maxsize
-  LOGICAL, intent(in) :: InterbandOnly
+  LOGICAL, intent(in) :: InterbandOnly, newform
   ! Functions
   !COMPLEX*16 :: Opt_Inside_Simple, Opt_Inside, Opt_Noncorrelated
   interface
@@ -119,7 +120,6 @@ SUBROUTINE Cmp_Optics(fenergy, fUdmft, fsymop, fh_m, fhb, ommax, Temperature_, d
   ! optics matrix elements
   !open(fh_m, file=fmommat, status='old')
   READ(fh_m,*) 
-
   COmega=0
 
   
@@ -177,7 +177,7 @@ SUBROUTINE Cmp_Optics(fenergy, fUdmft, fsymop, fh_m, fhb, ommax, Temperature_, d
         wgh(ikp)=0
      ENDIF
      
-     CALL ReadVelocityK(Vel, NE, fh_m, nb_min, nb_max) !nemin, nbands)
+     CALL ReadVelocityK(Vel, NE, fh_m, nb_min, nb_max, newform) !nemin, nbands)
           
      if (Qsym) then 
         Nsymw = nsymop  ! Over all reducible k-points (all group transformations)
@@ -433,29 +433,43 @@ SUBROUTINE Cmp_Optics(fenergy, fUdmft, fsymop, fh_m, fhb, ommax, Temperature_, d
   DEALLOCATE( amesh, zomega, conduc, gc )
   DEALLOCATE( opimat )
   DEALLOCATE( sigma, omega, wsigma )
-9010 FORMAT(/,2X,' KP:',I6,' NEMIN NEMAX : ',2I5, ' dE:',2f5.2,' K:',a10 /)
+!9010 FORMAT(/,2X,' KP:',I6,' NEMIN NEMAX : ',2I5, ' dE:',2f5.2,' K:',a10 /)
+9010 FORMAT(/,2X,' KP:',I6,' NEMIN NEMAX : ',2I5, ' dE:',2f6.1,' K:',a10 /)
 9040 FORMAT(3X,2I4,6E13.6,F13.8)
+  
 END SUBROUTINE Cmp_Optics
 
 
 
-SUBROUTINE ReadVelocityK(Vel, NE, fh_m, nb_min, nb_max)!, nemin, nbands)
+SUBROUTINE ReadVelocityK(Vel, NE, fh_m, nb_min, nb_max, newform)
   IMPLICIT NONE
   COMPLEX*16, intent(out) :: Vel(NE,NE,3)
   INTEGER, intent(out) :: nb_min, nb_max
   INTEGER, intent(in) :: fh_m, NE!, nemin, nbands
+  LOGICAL, intent(in) :: newform
   ! locals
   INTEGER      :: iikp, i1, i2, ib1, ib2, ixyz
   REAL*8       :: wEmin, wEmax, dE
   CHARACTER*10 :: kname
+  CHARACTER*256:: format4
   COMPLEX*16   :: O(3)
   
   Vel = 0
 !!! Reading optics matrix elements
   READ(fh_m,9010) iikp,nb_min,nb_max,wEmin,wEmax,kname
+
+  if (newform) then
+     write(format4,'(I0)') nb_max ! make a character of the length 'NEMAX'
+     write(format4,'(A,I0,A)') '(2(I',len(trim(format4)),',1X),6(ES13.6,1X),F13.8)'
+  endif
+  
   do i1=nb_min,nb_max
      do i2=i1,nb_max
-        READ(fh_m, 9040) ib1,ib2, O(1), O(2), O(3), dE
+        if (newform) then
+           READ(fh_m,trim(format4)) ib1,ib2, O(1), O(2), O(3), dE
+        else
+           READ(fh_m, 9040) ib1,ib2, O(1), O(2), O(3), dE
+        endif
         if (i1.ne.ib1 .or. i2.ne.ib2) then
            print *, 'ERROR', i1, ib1, i2, ib2
         endif
@@ -472,8 +486,9 @@ SUBROUTINE ReadVelocityK(Vel, NE, fh_m, nb_min, nb_max)!, nemin, nbands)
   enddo
   if (nb_max.GT.NE) nb_max = NE
 !9010 FORMAT(/,2X,' KP:',I6,' NEMIN NEMAX : ',2I5, ' dE:',2f5.2,' K:',a10 /)
-9010 FORMAT(/,2X,4X,I6,15X,2I5,4X,2f5.2,3X,a10 /)
-9040 FORMAT(3X,2I4,6E13.6,F13.8)
+!9010 FORMAT(/,2X,4X,I6,15X,2I5,4X,2f5.2,3X,a10 /)
+9010 FORMAT(/,2X,4X,I6,15X,2I5,4X,2f6.1,3X,a10 /)
+9040 FORMAT(3X,2I4,6E13.6,F13.8)  
 END SUBROUTINE ReadVelocityK
 
 SUBROUTINE ReadEnergiesK(Ek, wgh, NE, ikp, nkpt, nume)
@@ -953,13 +968,31 @@ SUBROUTINE Opt_Noncorrelated(copt, Cv0, Ek, womega, EF, wgamma,nb_min, nb_max, n
   DEALLOCATE( lg_p, lg_q )
 END SUBROUTINE Opt_Noncorrelated
 
-
+logical FUNCTION NewFormat(fh_m)
+  IMPLICIT NONE
+  INTEGER, intent(in) :: fh_m
+  ! checking whether the form of the file is new or old
+  INTEGER :: iikp,nb_min,nb_max, ios,ib1,ib2
+  REAL*8  :: wEmin,wEmax,dE
+  CHARACTER*10 :: kname
+  COMPLEX*16   :: O1,O2,O3
+  read(fh_m,*)
+  NewFormat = .false.
+  READ(fh_m,9010) iikp,nb_min,nb_max,wEmin,wEmax,kname
+  READ(fh_m,9040, IOSTAT=ios) ib1,ib2, O1, O2, O3, dE
+  if (ios.ne.0) then
+     NewFormat = .true.
+  endif
+9010 FORMAT(/,2X,4X,I6,15X,2I5,4X,2f6.1,3X,a10 /)
+9040 FORMAT(3X,2I4,6E13.6,F13.8)  
+END FUNCTION NewFormat
 
 program read_optm
   USE com_mpi, ONLY: start_MPI, stop_MPI
   IMPLICIT NONE
   ! functions
   INTEGER :: CountSelfenergy
+  LOGICAL :: NewFormat 
   ! variables
   CHARACTER*100 :: case, fmommat, fsymop, fUdmft, fenergy, fbasicArrays, fsigname
   CHARACTER*2   :: updn, dnup, so
@@ -971,7 +1004,7 @@ program read_optm
   INTEGER :: Nd, Nd0, i, j, l
   CHARACTER*5 :: adum
   INTEGER :: Ndirection
-  LOGICAL :: file_exists
+  LOGICAL :: file_exists, newform
   REAL*8, ALLOCATABLE :: alphaV(:,:,:)
 
   
@@ -1051,6 +1084,11 @@ program read_optm
   endif
   open(fh_m, file=fmommat, status='old')
 
+  newform = NewFormat(fh_m)
+  write(*,'(A,L1)') 'newform=', newform
+  close(fh_m)
+  open(fh_m, file=fmommat, status='old')
+  
   if (Temperature.NE.0.0) then
      ! We will use linear mesh only. We need to set very large Nd, so that
      ! cutoff >=4*T, and ommax/(2*delta)=Nd
@@ -1079,11 +1117,12 @@ program read_optm
 
 
   Nd = 2*Nd0
-  CALL Cmp_Optics(fenergy, fUdmft, fsymop, fh_m, fhb, ommax, Temperature, delta, Nd, gammac, gamma, alphaV, Ndirection, Qsym, Qsimple, nom, nat, iso, norbitals, ncix, natom, nkpt, nmat, nume, Qcomplex, lmax2, maxdim2, maxdim, maxsize, dwindow, InterbandOnly)
+  CALL Cmp_Optics(fenergy, fUdmft, fsymop, fh_m, fhb, ommax, Temperature, delta, Nd, gammac, gamma, alphaV, Ndirection, Qsym, Qsimple, nom, nat, iso, norbitals, ncix, natom, nkpt, nmat, nume, Qcomplex, lmax2, maxdim2, maxdim, maxsize, dwindow, InterbandOnly, newform)
   
   close(fh_m)
   DEALLOCATE( alphaV )
   CALL stop_MPI()
+
   
 end program read_optm
 

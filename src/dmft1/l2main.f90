@@ -1049,6 +1049,9 @@ SUBROUTINE L2MAIN(Qcomplex,nsymop,mode,projector,Qrenormalize,fUdmft)
               allocate( Ssvd(norbs), Usvd(nbands,nbands), Vsvd(norbs,norbs) )
               call zsvd(UDMFT, Ssvd, Usvd, Vsvd, nbands, norbs)
               n_bands = norbs
+              if (myrank.eq.master) then
+                 write(6,'(A,I0,A,I0)') 'SVD of projector: norbs=', norbs, ' nbands=', nbands
+              endif
               !write(6,*) "Singular values:"
               !do i = 1, n_bands
               !   write(6,*)  i, Ssvd(i)
