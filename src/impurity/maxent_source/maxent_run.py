@@ -8,6 +8,7 @@ Sigma(omega) = omega+s_oo-1/G(omega)
 which is written to 'Sig.out'
 """
 import sys, shutil, os
+from scipy import interpolate
 os.environ["OMP_NUM_THREADS"] = "1"
 import math, cmath
 import numpy as np
@@ -17,6 +18,27 @@ from maxentropy import *
 if len(sys.argv)<2:
     print('give input file Sigma(iom)')
     sys.exit(0)
+
+#def Ropt(muc, om, Sr, Si):
+#    cc = (muc-Sr)/((om-Si)**2 + (muc-Sr)**2)
+#    fc = interpolate.UnivariateSpline(om, cc, s=0)
+#    return fc(0.0)
+
+def dRopt(muc, om,Sr,Si):
+    """ Computes the extrapolation of the value of the local cumulant at zero frequency.
+    We define local cumulant as
+           M(om) = 1/(om*1j + muc - Sr(om) - Si(om)*1j)
+    The real part is:
+         Re(M(om)) =  ( muc-Sr(om) )/ ( (om-Si(om))**2 + (muc-Sr(om))**2 )
+    We want to extrapolate this value Re(M(om->0)).
+    In addition, we also return derivative  d Re(M(om->0))/ dmu, which is given as
+        d/dmuc Re(M(om->0)) = lim_{om->0} ( (om-Si(om))**2 - (muc-Sr(om))**2 )/( (om-Si(om))**2 + (muc-Sr(om))**2 )**2
+    """
+    cc = (muc-Sr)/((om-Si)**2 + (muc-Sr)**2)
+    dc = ((om-Si)**2 - (muc-Sr)**2)/((om-Si)**2 + (muc-Sr)**2)**2
+    fc = interpolate.UnivariateSpline(om, cc, s=0)
+    gc = interpolate.UnivariateSpline(om, dc, s=0)
+    return fc(0), gc(0)
 
 Parallel, mpi_rank = False, 0
 if len(sys.argv)>=2:
@@ -75,6 +97,7 @@ if not os.path.exists('maxent_params.dat'):
     'Nitt'      : 500,     # maximum number of outside iterations, 1000 can take too much time
     'Nr'        : 0,       # number of smoothing runs
     'Nf'        : 40,      # to perform inverse Fourier, high frequency limit is computed from the last Nf points
+    'SymCum'    : True,   # Should we try to make local cumulant particle-hole symmetric before continuation?
     }"""
     with open('maxent_params.dat', 'w') as fo:
         fo.write(mparams)
@@ -93,9 +116,20 @@ if Parallel:
     task = list(range(per_proc*mpi_rank,min(nb,per_proc*(mpi_rank+1))))
 else:
     task = range(nb)
+
+n0 = np.searchsorted(iom, 5.0, side='left')    
 Sigt=[]
 for b in task:
-    Gm = 1/(iom*1j-Sdata[1+2*b]-Sdata[2+2*b]*1j)
+    muc = 0.0
+    if 'SymCum' in params and params['SymCum']:
+        # We try to make local cumulant as particle-hole symmetric as possible.
+        #muc_sol = optimize.root_scalar(Ropt, args=(iom[:n0],Sdata[1+2*b,:n0],Sdata[2+2*b,:n0]), method='newton', x0=Sdata[1+2*b,0])
+        muc_sol = optimize.root_scalar(dRopt, args=(iom[:n0],Sdata[1+2*b,:n0],Sdata[2+2*b,:n0]), method='newton', fprime=True, x0=Sdata[1+2*b,0])
+        muc = muc_sol.root
+        print('muc=', muc)
+    
+    Gm = 1/(iom*1j+muc-Sdata[1+2*b]-Sdata[2+2*b]*1j)
+    np.savetxt('gw0.'+str(b), np.vstack((iom.real,Gm.real,Gm.imag)).transpose())
     
     Gt = InverseFourier(Gm, iom, tau, beta, params['Nf'])
     np.savetxt('gt0.'+str(b), np.vstack((tau,Gt)).transpose())
@@ -115,7 +149,9 @@ for b in task:
 
     Aw_r = KramarsKronig(omega_n, Aw_n)
     Gd = -pi*(Aw_r + Aw_n*1j)
-    Sc = omega_n-1/Gd
+
+    np.savetxt('go0.'+str(b), np.array([omega_n,np.real(Gd),np.imag(Gd)]).T)
+    Sc = omega_n+muc-1/Gd
     
     np.savetxt('sig.'+str(b), np.array([omega_n,np.real(Sc),np.imag(Sc)]).transpose())
     if b==0: Sigt.append(omega_n)
@@ -145,3 +181,5 @@ if mpi_rank==0:
             for b in sg:
                 print(b, end=' ', file=fo)
             print(file=fo)
+
+
