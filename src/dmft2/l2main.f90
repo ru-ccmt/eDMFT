@@ -8,7 +8,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   USE charf, ONLY: init_charf, zero_charf, fini_charf
   USE lo,    ONLY: elo_store!, nlov, nlon, nlo, loor, lapw, ilo, alo, blo, clo, pi12lo, pe12lo, pr12lo!, a1lo, b1lo
   USE lohelp,ONLY: init_lohelp, fini_lohelp !, u21, ue21, u12, ue12, u22, zerotc_lohelp, !, sum12, sum21, sum22, sume21, sume12
-  USE structure, ONLY: iatnr, mult, isplit, jri, pos, rotij, rmt, rotloc, r0, dx, vol, br1, natm, cform, ZZ !, v, tauij, br2
+  USE structure, ONLY: iatnr, mult, isplit, jri, pos, rotij, rmt, rotloc, r0, dx, vol, br1, natm, cform, ZZ, aname !, v, tauij, br2
   USE xa,    ONLY: LM, R, fj, dfj, E, WEIGHT, init_xa, fini_xa !, TC100, TCA100, TCB100, SUMA, SUMB, SUMAB, SUMBA, AVEC, BK, BKRLOC, BKROT
   USE xa3,   ONLY: bk3, aK, bk3lo, init_xa3, fini_xa3, k3, k3lo, As, As_lo!, A, A_lo
   USE reclat,ONLY: inst, tauk, kzz
@@ -430,7 +430,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         write(6, 1005) LMMAX,((w_lm(j,jlm,jatom),j=1,2), jlm=1,lmmax)
      endif
      if (myrank.EQ.master) then
-        WRITE(21,13)   jatom, iatnr(jatom), (POS(i,lfirst),i=1,3),mult(jatom)
+        WRITE(21,13)   jatom, iatnr(jatom), (POS(i,lfirst),i=1,3), mult(jatom), ZZ(jatom), aname(jatom)
         WRITE(21,1005) LMMAX,((w_lm(j,jlm,jatom),j=1,2), jlm=1,lmmax)
      endif
   end do
@@ -1300,7 +1300,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
 3019 FORMAT(/,22X,'QXX',9X,'QXY',9X,'QYY',9X,'QZZ',7X,'UP TO R',/)
 3121 FORMAT(':VZZ',i3.3,':',8x,4F12.5,F12.3)
 3021 FORMAT(':VZZ',i3.3,':',8x,3F12.5,F12.3)
-13   FORMAT(////,':POS',i3.3,':',1x,'AT.NR.',I4,1X,'POSITION =',3F8.5,2X,'MULTIPLICITY =',I3)
+13   FORMAT(/,':POS',i3.3,':',1x,'ATOM ',I4,1X,'X,Y,Z =',3F8.5,2X,'MULT=',I2,'  ZZ=',f7.3,2x,a10)
 7207 FORMAT(1H ,' EFG INSIDE SPHERE',I5,1H:,F12.6,5X,' UP TO R = ',F10.7)                                                          
 7720 FORMAT(':VZZ',i3.3,':',1X,'EFG INSIDE SPHERE ',I3,' = ',F12.6,5X,' UP TO R =',F10.5)
 

@@ -963,6 +963,7 @@ SUBROUTINE L2MAIN(Qcomplex,nsymop,mode,projector,Qrenormalize,fUdmft)
            !  and requires a bit more work.
            time0=time1
            allocate( UDMFT(nbands,norbs), STrans2(nbands,nbands,nii) )
+           UDMFT(:,:)=0
            do iorb=1,norbitals
               icix = cix_orb(iorb)
               pre_cix=0
