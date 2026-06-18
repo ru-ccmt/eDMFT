@@ -155,7 +155,11 @@ if __name__ == '__main__':
         for ip in range(len(phis)):
             if False:
                 for l in range(0,lmax+1):
-                    y_lm[l**2:(l+1)**2,ip,it] = special.sph_harm(arange(-l,l+1), l, phis[ip], thetas[it])
+                    mvals = arange(-l, l+1)
+                    if hasattr(special, 'sph_harm'):
+                        y_lm[l**2:(l+1)**2,ip,it] = special.sph_harm(mvals, l, phis[ip], thetas[it])
+                    else:
+                        y_lm[l**2:(l+1)**2,ip,it] = special.sph_harm_y(l, mvals, thetas[it], phis[ip])
             else:
                 v=array([sin(thetas[it])*cos(phis[ip]),sin(thetas[it])*sin(phis[ip]),cos(thetas[it])])
                 y_lm[:,ip,it] = ylm.ylm(v,lmax)

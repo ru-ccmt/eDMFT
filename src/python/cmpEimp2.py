@@ -2,6 +2,7 @@
 # @Copyright 2007 Kristjan Haule
 from numpy import *
 import sys,os,re
+import json
 from scipy import interpolate
 import builtins
 
@@ -14,48 +15,82 @@ Sig='Sig.out'
 #nf,mu,Ekin,Epot,TrSigmaG,mom=0,0,0,0,0,0
 
 def ReadPARAMS2(fparams, fout):
-    fp = open(fparams, 'r')
-    for line in fp:
+    with open(fparams, 'r') as fp:
+        lines = fp.readlines()
+
+    stripped = []
+    for line in lines:
         n = line.find('#')
         if n>=0:
             line = line[:n]
-        dat = line.split()
-        if len(dat)>=2:
-            m = re.search('cix|Delta|Gf|Sig', dat[0])
-            if m is not None :
-                cmn = dat[0]+'="'+dat[1]+'"'
-                exec(cmn, globals())
-                print('executed:', cmn, file=fout)
-            m = re.search('beta|mu',dat[0])
-            if m is not None :
-                cmn = dat[0]+'='+dat[1]
-                exec(cmn, globals())
-                print('executed:', cmn, file=fout)
+        stripped.append(line)
+    content = ''.join(stripped).strip()
+
+    if content.startswith('{'):
+        params = json.loads(content)
+        mapping = {'fSig': 'Sig', 'fGf': 'Gf', 'Delta': 'Delta', 'cix': 'cix', 'beta': 'beta', 'mu': 'mu'}
+        for key_in, key_out in mapping.items():
+            if key_in in params:
+                globals()[key_out] = params[key_in]
+                print('executed:', key_out+'='+repr(params[key_in]), file=fout)
+    else:
+        for line in stripped:
+            dat = line.split()
+            if len(dat)>=2:
+                m = re.search('cix|Delta|Gf|Sig', dat[0])
+                if m is not None :
+                    cmn = dat[0]+'="'+dat[1]+'"'
+                    exec(cmn, globals())
+                    print('executed:', cmn, file=fout)
+                m = re.search('beta|mu',dat[0])
+                if m is not None :
+                    cmn = dat[0]+'='+dat[1]
+                    exec(cmn, globals())
+                    print('executed:', cmn, file=fout)
     print('beta=', beta, 'mu=', mu, 'cix=', cix, 'Delta=', Delta, file=fout)
     return (cix,Delta,Gf,Sig,beta,mu)
 
 def ReadCix(cix, fout):
     fcx = open(cix,'r')
     next(fcx);next(fcx)
-    (Nclust,Nm,Ns,maxm) = list(map(int,next(fcx).split()))
-    next(fcx)
+    header = next(fcx).split()
     Deg={}
-    for i in range(Ns):
-        dat = list(map(int,next(fcx).split()))
-        dim = dat[1]
-        if (dim>1): 
-            print('WARNING: The impurity functional cmpEimp2.py works for now only when baths are diagonal. You should not trust total free energy. Needs some development...!')
-        for j in range(dim):
-            for k in range(dim):
-                if k==j:
-                    ii = dat[2+k+j*dim]
-                    if ii in Deg:
-                        Deg[ii] += 1
-                    else:
-                        Deg[ii]=1
+
+    if len(header) == 4:
+        (Nclust,Nm,Ns,maxm) = list(map(int, header))
+        next(fcx)
+        for i in range(Ns):
+            dat = list(map(int,next(fcx).split()))
+            dim = dat[1]
+            if (dim>1): 
+                print('WARNING: The impurity functional cmpEimp2.py works for now only when baths are diagonal. You should not trust total free energy. Needs some development...!')
+            for j in range(dim):
+                for k in range(dim):
+                    if k==j:
+                        ii = dat[2+k+j*dim]
+                        if ii in Deg:
+                            Deg[ii] += 1
+                        else:
+                            Deg[ii]=1
+        next(fcx)
+        ss = next(fcx)
+    else:
+        # New Bold-CTQMC cix format:
+        # cluster_size, number of states, number of psi^+ operators,
+        # number of baths, number of blocks, maximum_matrix_size
+        Ns = int(header[3])
+        next(fcx)
+        for i in range(Ns):
+            dat = next(fcx).split()
+            ii = int(dat[3])
+            if ii in Deg:
+                Deg[ii] += 1
+            else:
+                Deg[ii] = 1
+        next(fcx)
+        ss = next(fcx)
+
     print('Deg=', Deg, file=fout)
-    next(fcx)
-    ss = next(fcx)
     if ss[:11]=='FL_FROM_IFL':
         for i in range(Ns):
             next(fcx)
@@ -63,7 +98,13 @@ def ReadCix(cix, fout):
         ss = next(fcx)
     Eks = list(map(float,ss.split()))
     print('Eks=', Eks, file=fout)
-    return (Deg, array(Eks))
+    if len(Deg)>0:
+        deg = zeros(builtins.max(list(Deg.keys())) + 1, dtype=int)
+        for ii,val in Deg.items():
+            deg[ii] = val
+    else:
+        deg = zeros(0, dtype=int)
+    return (deg, array(Eks))
 
 
 def ReadGandSigandDelta(Gf, Sig, Delta, fout):
@@ -379,4 +420,3 @@ if __name__ == '__main__':
     print('ev: Phi_DMFT-Vdc*nd=', Phi_DMFT-Vdc_nd, 'Fimp+TS=', Fimp, 'logGimp=', lnGimp, 'zeorb=', zeorb)
     print('Ry: Phi_DMFT-Vdc*nd=', (Phi_DMFT-Vdc_nd)/Ry2eV, 'FImp+TS=', Fimp/Ry2eV, 'logGimp=', lnGimp/Ry2eV, 'zeorb=', zeorb/Ry2eV)
     
-

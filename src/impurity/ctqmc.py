@@ -18,7 +18,7 @@ TrSigmaG=0  # We need those variables to be global in order to use python exect
 class IMP_CTQMC:
     """Wrapper for ctqmc
     """
-    def __init__(self, Znuc, dire, params, Sigind, CF):
+    def __init__(self, Znuc, dire, params, Sigind, CF, Print=True):
         """
          Prepares several variables, which will be passed to ED for impurity solver, and eventualy to ctqmc impurity solver.
 
@@ -80,24 +80,10 @@ class IMP_CTQMC:
             params['CoulombF']=["'"+Default_CoulombF+"'", "# Full Coulomb repulsion"]
         # now all parameters in params are being remembered
         for p in params:
-            if type(params[p][0]) is str:
-                setattr(self, p, params[p][0])
-            else:
-                setattr(self, p, params[p][0])
+            #if type(params[p][0]) is str:
+            #else:
+            setattr(self, p, params[p][0])
             print('setting ctqmc.self.'+p+'=', params[p][0], file=self.fh_info)
-        
-        
-        #if 'CoulombF' in params:
-        #    CoulombF = params['CoulombF'][0].strip("'").strip('"')
-        #else:
-        #    params['CoulombF']=["'"+Default_CoulombF+"'", "# Full Coulomb repulsion"]
-        #    CoulombF = Default_CoulombF
-        #
-        #if 'icase' in params:
-        #    self.icase = params['icase']
-        #if 'UlamJ' in params:
-        #    self.UlamJ = params['UlamJ']
-        
         
         # find smallest sigind to shift siginds so they start by 1
         minsigind = min([s for s in self.Sigind.flat if s != 0])
@@ -140,7 +126,8 @@ class IMP_CTQMC:
                       'GlobalFlip':1000000,
                       'Gf':'Gf.out',
                       'OffDiagonal':'real'}
-        print('At ctqmc.__init__ self.sparams=', self.sparams, file=self.fh_info)
+        if Print:
+            print('At ctqmc.__init__ self.sparams=', self.sparams, file=self.fh_info)
         
         vars_for_ED = ['l','J','mode',                                              # relevant for both EDs
                        'Ewindow', 'max_M_size', 'CoulombF', 'add_occupancy',        # relevant for atom_d.py (l=0,1,2)
@@ -189,8 +176,9 @@ class IMP_CTQMC:
         
         # extra off-diagonal spin-orbit
         self.cx = 0 if 'cx' not in self.spr else self.spr['cx']
-        print('At ctqmc.__init__ self.spr=', self.spr, file=self.fh_info)
-        print('At ctqmc.__init__ self.l=', self.l, 'self.cx=', self.cx, 'self.J=', self.J, file=self.fh_info)
+        if Print:
+            print('At ctqmc.__init__ self.spr=', self.spr, file=self.fh_info)
+            print('At ctqmc.__init__ self.l=', self.l, 'self.cx=', self.cx, 'self.J=', self.J, file=self.fh_info)
     
 
     def _exe(self, params, DCs, extn, UpdateAtom, gbroad=0.0, kbroad=0.0, maxAc=2000.):
@@ -222,7 +210,7 @@ class IMP_CTQMC:
         #E0 = params['Ed'][0][0]+2*self.cx
         E0 = self.Eimps[0]
         if (self.l == 3):
-            if (Qaverage):
+            if (Qaverage): # also rarely used, but sometimes we want to average shells that are degenerate in j-j coupling
                 # 5/2 energy levels:
                 Eimps_5_2 = [self.Eimps[self.Sigind[i,i]-1] for i in range(2*self.l)]
                 aEimps_5_2 = sum(Eimps_5_2)/(2*self.l)
@@ -243,7 +231,10 @@ class IMP_CTQMC:
         if UpdateAtom or not os.path.isfile(self.dir+'/'+self.sparams['cix']) : # no cix file yet -> create it
             Eimps = (array(self.Eimps)-E0*Ident).tolist()
             print('Eimps_new=', Eimps, ' muQMC=', mu_QMC, file=self.fh_info)
-            Impq = [self.Sigind_shifted[i,i]-1 for i in range(len(self.Sigind_shifted))]
+            # Sigind_shifted is a NumPy array, so indexing returns NumPy
+            # integer scalars.  Helper executables parse textual lists and
+            # expect plain Python integer strings like "[0,1,2]".
+            Impq = [int(self.Sigind_shifted[i,i]-1) for i in range(len(self.Sigind_shifted))]
             print('Impq=', Impq, file=self.fh_info)
             
             # Variables which are updated from the current paramateres

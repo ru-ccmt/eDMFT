@@ -5,11 +5,11 @@ class Config:
   prefix      = "bin"    # Installation path
 
   compiler    = "GNU"          # Compiler
-  cxx         = "g++-13"       # C++ compiler
-  cc          = "gcc-13"
+  cxx         = "g++-15"       # C++ compiler
+  cc          = "gcc-15"
   
   cflags      = "-O3"          # compiling flags for C++ programs
-  fflags      = "-O3 -fallow-argument-mismatch"          # compiling flags for Fortran programs
+  fflags      = "-O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow"          # compiling flags for Fortran programs
   ldflags     = ""             # linking flags for Fortran programs
   ompflag     = "-fopenmp"     # linker/compiler flag for openmp
 

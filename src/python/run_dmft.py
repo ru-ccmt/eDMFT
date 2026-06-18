@@ -17,6 +17,7 @@ import utils
 import indmffile
 import convert_processes
 import ctqmc#, oca
+import bctqmc
 from imp2lattc import ImpurityLatticeConnection, SimplifySiginds, iSigindDropNegative, ConvertFromLatticeToImp, Connect_ImpurityProjector
 import builtins
 
@@ -332,7 +333,7 @@ def SolveImpurity(EF, asolver, iat, extn, p, UpdateAtom, nl_imp, fh_info, fh_pin
     SolveImpurity_num_calls+=1
     
     
-    if p['solver'] in ['OCA','NCA','CTQMC']:
+    if p['solver'] in ['OCA','NCA','CTQMC','BCTQMC']:
         asolver._exe(ipars, p['DCs'], extn, UpdateAtom, p['wbroad'], p['kbroad'])
     else:
         print('ERROR: Impurity solver not defined!')
@@ -635,13 +636,6 @@ if __name__ == '__main__':
     dmfe = utils.DmftEnvironment()  # DMFT paths
     w2k = utils.W2kEnvironment()    # W2k filenames and paths
     
-    para = ''
-    if p['dftKS'] and dmfe.MPI2:
-        para = ' -p'  # Parallel run with internal lapw1. We could use either '-p' to have many vector files, or just '', to have single vector file. Not clear what is faster...
-    if os.path.isfile('.machines') and os.path.getsize('.machines')>0 : 
-        para = ' -p'              # Using w2k parallelization. For not neccessary for SO.
-        p['dftKS'] = False        # Switching off internal lapw1
-    
     # we want to clean certain files that might interfere with this run
     to_clean = ['*.scf','Edc.dat','dmft[1|2].error*','*.[dlt|gc1|cdos].*','*.outputdmf[1|2].*','dmft[1|2]_info.out', '*.broyd*']
     toclean = []
@@ -687,6 +681,13 @@ if __name__ == '__main__':
     
     # Reading parameters from params.dat
     p.refresh()
+    
+    para = ''
+    if p['dftKS'] and dmfe.MPI2:
+        para = ' -p'  # Parallel run with internal lapw1. We could use either '-p' to have many vector files, or just '', to have single vector file. Not clear what is faster...
+    if os.path.isfile('.machines') and os.path.getsize('.machines')>0 : 
+        para = ' -p'              # Using w2k parallelization. For not neccessary for SO.
+        p['dftKS'] = False        # Switching off internal lapw1
 
     # Reads structure file
     struct = Struct(inAngs=False)
@@ -782,11 +783,11 @@ if __name__ == '__main__':
         print('UlamJ=', UlamJ, file=fh_info)
     
     # Solvers initialized
-    if p['solver'] in ['OCA', 'NCA','CTQMC']:
+    if p['solver'] in ['OCA', 'NCA','CTQMC','BCTQMC']:
         if inl.matsubara and p['solver'] in ['OCA', 'NCA']:
             print('ERROR: Can not run OCA/NCA on imaginary axis! Change case.indmfl:matsubara or params.dat:solver')
-        if not inl.matsubara and p['solver'] in ['CTQMC']:
-            print('ERROR: Can not run CTQMC on real axis! Change case.indmfl:matsubara or params.dat:solver')
+        if not inl.matsubara and p['solver'] in ['CTQMC', 'BCTQMC']:
+            print('ERROR: Can not run CTQMC/BCTQMC on real axis! Change case.indmfl:matsubara or params.dat:solver')
         solver=[]
         for ic,isigind in iSigind.items():
             if len(imp2latt[ic])==0: continue  # This atom is treated as open-core
@@ -802,6 +803,8 @@ if __name__ == '__main__':
                 solver.append( oca.IMP_OCA(Zn, imp_dir, imp_params, isigind_, cftrans) )
             if p['solver'] in ['CTQMC']:
                 solver.append( ctqmc.IMP_CTQMC(Zn, imp_dir, imp_params, isigind_, cftrans) )        
+            if p['solver'] in ['BCTQMC']:
+                solver.append( bctqmc.IMP_BCTQMC(Zn, imp_dir, imp_params, isigind_, cftrans) )
     else:
         print('ERROR: No correct solver specified! Bolling out.')
         sys.exit(1)

@@ -156,7 +156,10 @@ def ComputeExactDC(nocc,lmbda,epsilon,icase,fh_info,projector='../projectorw.dat
     ylm = zeros((2*l+1,len(thetas),len(phis)),dtype=complex)
     for m in range(2*l+1):
         for i in range(len(thetas)):
-            ylm[m,i,:] = special.sph_harm(m-l, l, phis, thetas[i])
+            if hasattr(special, 'sph_harm'):
+                ylm[m,i,:] = special.sph_harm(m-l, l, phis, thetas[i])
+            else:
+                ylm[m,i,:] = special.sph_harm_y(l, m-l, thetas[i], phis)
     
     DEGENERATE=False
     #if abs(min(Vhartree)-max(Vhartree))<1e-4: DEGENERATE=True

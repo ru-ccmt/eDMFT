@@ -1,6 +1,6 @@
 include Makefile.in
 
-SRC = impurity/ctqmc impurity/atom_ctqmc impurity/atomg broad impurity/NCA impurity/OCA impurity/atomd impurity/fort impurity/maxent_source impurity/ancont impurity/skrams optics magnetSusc/dmft_bubble magnetSusc/dmftgk downfold putils/MMoment putils/local_axes putils/wavef exactDC dmft1 dmft2 dftKS dftso putils/akplt tbg
+SRC = impurity/ctqmc impurity/bctqmc impurity/atom_ctqmc impurity/atomg broad impurity/NCA impurity/OCA impurity/atomd impurity/fort impurity/maxent_source impurity/ancont impurity/skrams optics magnetSusc/dmft_bubble magnetSusc/dmftgk downfold putils/MMoment putils/local_axes putils/wavef exactDC dmft1 dmft2 dftKS dftso putils/akplt tbg
 
 all:
 	for dir in ${SRC} - ; do \
@@ -26,8 +26,10 @@ install :
 	cp impurity/atomd/*.so ${DESTDIR}/
 	cp impurity/atomd/atom_d.py ${DESTDIR}/
 	cp impurity/atom_ctqmc/atomh ${DESTDIR}/
+	cp impurity/atom_ctqmc/atomh.py ${DESTDIR}/
 	cp impurity/ctqmc/ctqmc ${DESTDIR}/
 	cp impurity/ctqmc/ctqmcf ${DESTDIR}/
+	cp impurity/bctqmc/bctqmc ${DESTDIR}/
 	cp impurity/*.py ${DESTDIR}/
 	cp impurity/link/link.py ${DESTDIR}/
 	cp dmft2/dmft2 ${DESTDIR}/

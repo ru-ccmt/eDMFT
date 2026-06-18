@@ -86,3 +86,16 @@ if opt in ['-d', '-a']:
         for fl in fle:
             print('Copying ... ', fl)
             shutil.copy2(fl, '.')
+
+    # Bold-CTQMC restart profits strongly from carrying over the last
+    # pseudo-particle self-energy stored inside impurity subdirectories.
+    # Keep the generic dmft_copy behavior unchanged otherwise: if PPSigma.0
+    # is absent we simply skip it.
+    for impdir in glob.glob(cpdr + '/imp.*'):
+        ppsig = os.path.join(impdir, 'PPSigma.0')
+        if os.path.isfile(ppsig):
+            local_imp = os.path.basename(impdir)
+            if not os.path.isdir(local_imp):
+                os.mkdir(local_imp)
+            print('Copying ... ', ppsig)
+            shutil.copy2(ppsig, os.path.join(local_imp, 'PPSigma.0'))
