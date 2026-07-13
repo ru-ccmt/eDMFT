@@ -2,6 +2,7 @@
 # @Copyright 2007 Kristjan Haule
 from numpy import *
 import sys,os,re
+import ast
 import json
 from scipy import interpolate
 import builtins
@@ -420,3 +421,218 @@ if __name__ == '__main__':
     print('ev: Phi_DMFT-Vdc*nd=', Phi_DMFT-Vdc_nd, 'Fimp+TS=', Fimp, 'logGimp=', lnGimp, 'zeorb=', zeorb)
     print('Ry: Phi_DMFT-Vdc*nd=', (Phi_DMFT-Vdc_nd)/Ry2eV, 'FImp+TS=', Fimp/Ry2eV, 'logGimp=', lnGimp/Ry2eV, 'zeorb=', zeorb/Ry2eV)
     
+
+
+# ===== BHQMC (bold-CTQMC) free-energy helpers ported from fork (uses ctqmc.log) =====
+def obtain_last_value(valuename, log_path):
+    """
+    Reads the last occurrence of `valuename` from ctqmc.log.
+
+    Examples
+    --------
+    obtain_last_value('Epot =', log_path) -> 80.550044989283
+    obtain_last_value('bath_density_matrix=', log_path) -> [0.513..., ...]
+    """
+    with open(log_path, 'r') as fh:
+        lines = fh.readlines()
+
+    for line in reversed(lines):
+        pos = line.find(valuename)
+        if pos < 0:
+            continue
+
+        tail = line[pos + len(valuename):].strip()
+        if not tail:
+            return None
+
+        # Array-like values, e.g. [1.0,2.0,...]
+        if tail[0] == '[':
+            end = tail.find(']')
+            if end < 0:
+                raise ValueError(f"Malformed list for {valuename} in {log_path}")
+            return ast.literal_eval(tail[:end+1])
+
+        # Scalar numeric value
+        m = re.search(r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?', tail)
+        if m is None:
+            raise ValueError(f"Could not parse value for {valuename} from line:\n{line}")
+        return float(m.group(0))
+
+    raise ValueError(f"Could not find {valuename} in {log_path}")
+
+def ReadCix_bhqmc(cix, fout):
+    with open(cix, 'r') as fcx:
+        next(fcx)  # # Cix file for cluster DMFT with Bold-CTQMC
+        next(fcx)  # # cluster_size, number of states, ...
+
+        (Nclust, Nstates, Npsis, Ns, Nblocks, Mblocksize) = list(map(int, next(fcx).split()))
+        print('header=', Nclust, Nstates, Npsis, Ns, Nblocks, Mblocksize, file=fout)
+
+        next(fcx)  # # c^+_i,c_i, Sigind  spin   moment
+
+        Deg = {}
+        for i in range(Ns):
+            dat = next(fcx).split()
+            if len(dat) < 4:
+                continue
+
+            ii = int(dat[3])
+
+            if ii in Deg:
+                Deg[ii] += 1
+            else:
+                Deg[ii] = 1
+
+        print('Deg=', Deg, file=fout)
+
+        next(fcx)  # # cluster energies for non-equivalent baths, eps[k]
+        ss = next(fcx).strip()
+
+        # for FL_FROM_IFL: not done yet. currently we do not need this.
+        # if ss[:11] == 'FL_FROM_IFL':
+        #     # TODO:
+        #     # for i in range(...):
+        #     #     next(fcx)
+        #     # next(fcx)
+        #     # ss = next(fcx).strip()
+        #     pass
+
+        Eks = list(map(float, ss.split()))
+        print('Eks=', Eks, file=fout)
+
+        return (Deg, array(Eks))
+
+def ReadGandSigandDelta_bhqmc(Gf, Sig, Delta,boldlog, Eks,Sigind,fout):
+    Delta_data = loadtxt(Delta).transpose()
+    omD = Delta_data[0]
+    Dlta = Delta_data[1::2]+Delta_data[2::2]*1j
+    
+    Gf_data = loadtxt(Gf).transpose()
+    om = Gf_data[0]
+    Gfc = Gf_data[1::2]+Gf_data[2::2]*1j
+
+    Sig_data = loadtxt(Sig).transpose()
+    om3 = Sig_data[0]
+    Sigc = Sig_data[1::2]+Sig_data[2::2]*1j
+    
+    print('shapes=', shape(om), shape(omD), shape(om3), file=fout)
+    #print 'Diff=', sum(abs(om-omD))
+    #if sum(abs(om-omD))>1. or sum(abs(om-om3))>1.:
+    #    print >> fout, 'frequency mesh of ',Gf,' and ',Sig, 'and', Delta,' are not equal', om-om2, om-om3
+    
+    # in bhqmc they can be obtained from ctqmc.log
+    Epot=obtain_last_value('Epot = ',boldlog)
+    mu=obtain_last_value('"mu": ',boldlog)
+
+
+    # DenMat=obtain_last_value('bath_density_matrix=',boldlog)# density matrix
+    # nf= sum(DenMat)
+    # # mom is the total occupation on each nonquivalent orbitals.
+    # mom=zeros(max(diag(Sigind)))
+    # for iorb in arange(len(Sigind[0])):
+    #     mom[Sigind[iorb][iorb]-1]+=DenMat[iorb]#up
+    #     mom[Sigind[iorb][iorb]-1]+=DenMat[iorb+len(Sigind[0])]#down
+    # TrSigmaG=Epot-sum(mom*Eks)
+
+
+    # nf and the per-component occupations `mom` from the Gf.out Print_Physical2
+    # header.  The current bctqmc binary already folds the cluster occupations into
+    # mom = [Gamma, X=Y, M] (one entry per independent Sigind component, sum(mom)=nf).
+    # The old May-boldc binary instead wrote the raw per-spin bath_density_matrix
+    # which this function then refolded; the Jun binary writes the reduced header,
+    # so we read mom/nf straight from it (same convention as IMP_BCTQMC.HighFrequency
+    # and the ctqmc parent).
+    hdr = {}
+    with open(Gf, 'r') as _fh:
+        for par in _fh.readline().strip().split():
+            if '=' in par:
+                _k, _v = par.split('=', 1)
+                if _k in ('nf', 'mom', 'TrSigmaG'):
+                    try:
+                        hdr[_k] = eval(_v)
+                    except Exception:
+                        pass
+    nf = hdr['nf']
+    mom = array(hdr['mom'])
+
+    TrSigmaG = Epot - sum(mom * Eks)
+        
+    print('nf=', nf, 'mu=', mu,  'Epot=', Epot, file=fout)
+    return (om, omD, Gfc, Sigc, Dlta, nf, mu,  Epot, TrSigmaG, mom)
+
+def GiveImpFunctional_bctqmc(dire, fparams, Vdc,Sigind, fout=sys.stdout):
+
+    if not (os.path.exists(dire+'/'+fparams) and os.path.getsize(dire+'/'+fparams)>0):
+        print('Give input PARAMS file', file=fout)
+        sys.exit(0)
+    
+    (cix,Delta,Gf,Sig,beta,mu_qmc) = ReadPARAMS2(dire+'/'+fparams, fout)
+
+    (Deg, Eks) = ReadCix_bhqmc(dire+'/'+cix, fout)
+    # note: Ekin in ctqmc is estimated from average perturbation order... there is no such thing in bhqmc i think.
+    (om, omD, Gfc, Sigc, Dlta, nf, mu, Epot, TrSigmaG, mom) = ReadGandSigandDelta_bhqmc(dire+'/'+Gf, dire+'/'+Sig, dire+'/'+Delta,dire+'/'+'ctqmc.log', Eks,Sigind,fout)
+
+    s_oo = Sigc[:,-1].real
+    print('s_oo=', s_oo, file=fout)
+    
+    lengh = builtins.min(len(Eks),len(s_oo))
+    EimpS = Eks[:lengh]-mu_qmc+s_oo[:lengh]
+    # Tr(log(-Gimp))
+    lnGimp = LogGimp(om,Gfc,EimpS,beta,Deg,fout) 
+
+    #lnGS = LogGimpSig(om, Gfc, Sigc, Vdc, EimpS, beta, Deg, fout)
+
+    trsigg =  fTrSigmaG(om, Gfc, Sigc, Deg, EimpS, beta, fout) # numericall Tr((Sigma-s_oo)*G)
+    trsigg_oo = sum(mom[:]*s_oo[:])
+
+    # Tr(Delta*G)
+    TrDeltaG = fTrDeltaG(om, omD, Dlta, Gfc, Deg, EimpS, beta, fout)
+
+    Ekin=TrDeltaG
+    print('This is BHQMC. Ekin is set to be the same as TrDeltaG', file=fout)
+    print('TrDeltaG=', TrDeltaG, '<k>/T=', Ekin, file=fout)
+    # Tr(om*dDelta/dom)
+    cxx = CmpImpurityCorrection2(om, omD, Dlta, Gfc, Deg, EimpS, beta, fout)
+
+    # Eimp = Tr(Delta*G)+1/2*Tr(Sigma*G)+eimp*nimp-Tr(om*dDelta/dom)
+    #Eimp = Ekin+Epot-cxx-mu*nf                # Impurity Energy
+    Eimp = TrDeltaG+Epot-cxx-mu*nf                # Impurity Energy
+
+    # Potthof2[G] == Phi[G]-1/2*Tr(Sigma*G)+T*S_imp = Eimp-Tr(log(-G_imp))+1/2*Tr(Sigma*G)
+    #Potthof2 = Eimp-lnGimp+TrSigmaG            # Phi[G]-1/2*Tr(Sigma*G)+T*S_imp
+
+    #nd_numeric=zeros(len(Deg))
+    #for i in range(len(Deg)):
+    #    Gd = Gfc[i,:]
+    #    eimps = EimpS[i]
+    #    ff = Gd[:]-1./(om*1j-eimps)
+    #    nd_numeric[i] = (2*sum(ff.real)/beta + ferm(eimps*beta))*Deg[i]
+    #print 'nd_numeric=', nd_numeric
+    
+    #Eimp1 = lnGS - lnGimp + Eimp  # Tr(log(1+Sigma*G))-Tr(log(-Gloc))+E_imp
+
+    # in BHQMC, Fimp = lambda0 - T log Q. basically read from projection Q.
+    Fimp=obtain_last_value('Fimp = ',dire +'ctqmc.log')
+    Entropy = (Eimp-Fimp)*beta
+    print('Entropy=', Entropy, 'Fimp=', Fimp, file=fout)
+    Eimp2 = TrSigmaG   # 1/2*Tr(Sigma*G)
+    print('lnGimp=', lnGimp, file=fout)
+    print("%-12s "*6 % ('Eimp', 'Ekin', 'Epot', 'cxx', 'mu*nf', 'lnGimp'), file=fout)
+    print("%-12.6f "*6 % (Eimp, TrDeltaG, Epot, cxx, mu*nf, lnGimp), file=fout)
+    print('#',"%-12.6f "*6 % (Eimp+Ekin-TrDeltaG, Ekin, Epot, cxx, mu*nf, lnGimp), file=fout)
+    print('Eimp=', Eimp, file=fout)
+
+
+    print('1/2*Tr(Sigma*G)=', 0.5*(trsigg+trsigg_oo), 'deimp*nf=', sum(Eks*mom), file=fout)
+
+    Vdc_nd = sum(array(mom[:])*array(Vdc[:]))
+    zeorb = TrDeltaG+Epot-cxx - sum(Eks*mom) # note that Epot ~ 1/2*Tr(Sigma*G)+Eks*mom
+    print('Vdc*nf=', Vdc_nd, file=fout)
+    Phi_DMFT = -lnGimp+Eimp+(trsigg+trsigg_oo)
+    print('Phi_DMFT=', Phi_DMFT, file=fout)
+    print('Phi_DMFT - Vdc*nf=', Phi_DMFT-Vdc_nd, file=fout)
+    Ry2eV = 13.60569193
+    print('Phi_DMFT - Vdc*nf=', (Phi_DMFT-Vdc_nd)/Ry2eV, 'Ry', file=fout)
+    print('Epot - Vdc*nf=', (TrSigmaG-Vdc_nd)/Ry2eV, 'Ry', file=fout)
+    print('zeorb[eV]=', zeorb, file=fout)
+    return (Phi_DMFT, lnGimp, Eimp, Vdc_nd, zeorb,TrSigmaG)

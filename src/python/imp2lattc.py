@@ -82,9 +82,11 @@ def Connect_ImpurityProjector(imp2latt,indmfl,struct,log):
             latt2imp[icix]=imp       # latt2imp[cix_i]=imp
     print('latt2imp=', latt2imp, file=log)
     atms = list(indmfl.atoms.keys())
+
     #print('atms=', atms)
     impurity_projector=-ones(len(imp2latt),dtype=int)  # the connection between the impurity and projector.dat
     first_atom, icase = 0, 0
+    mem=[]
     for jatom in range(struct.nat):          # all atom types in structure, just like when building projector
         if (first_atom+1) in atms:           # This atom listed in indmfl file and projector exists
             ia = atms.index(first_atom+1)    # It appears as the ia consequitive atom in indmfl file
@@ -105,10 +107,38 @@ def Connect_ImpurityProjector(imp2latt,indmfl,struct,log):
                             # just take the first one, with understanding that exact-DC
                             # does not work when cluster is between two atoms of different type
                             impurity_projector[imp]=icase # and imp is index of impurity
+                            mem.append(first_atom+1) # store the atom
                             print('ImpurityProjector: Found icix=', icix, 'jatom=', jatom, 'first_atom=', first_atom,
                                   'imp=', imp, 'icase=', icase, file=log)
                     icase += 1
         first_atom += struct.mult[jatom]
+
+    # In some cluster calculation we can have repeated correlated atoms
+    # hence some -1 value remain in impurity_projector that should be corrected
+    # NOTE : only the first atom of each cluster is stored in impurity_projector,
+    # hence works only for cluster of similar atoms
+    if -1 in impurity_projector:
+        # we start by extracting the full list of correlated atoms including
+        # repetitions
+        all_atms=[value[0][0] for value in indmfl.cix.values()] # by doing so we take only first atom of each cluster impurity
+        # then count repetitions of atoms that were identified in the procedure above
+        repeat=[]
+        for i in range(len(mem)):
+            repeat.append(all_atms.count(mem[i])-1)
+        # check if number of repeated atoms matches number of -1 in impurity_projector
+        if sum(array(repeat))!=count_nonzero(impurity_projector==-1):
+            raise ValueError('Error in impurity_projector: number of repeated atoms does not match number of -1 in impurity_projector')
+        # now we can find the repeated atoms
+        # by convention, if multiple atoms are repeated, there are always repated like at1 at2 at1 at2 etc...
+        nextis=0
+        for i in range(len(impurity_projector)):
+            if impurity_projector[i]==-1:
+                impurity_projector[i]=impurity_projector[nextis]            # assign value of previous atom
+                if nextis<len(mem)-1:                        # next atom
+                    nextis+=1
+                else:                                        # otherwise loop back to first atom
+                    nextis=0
+
     return impurity_projector.tolist()
 
 if __name__ == '__main__':

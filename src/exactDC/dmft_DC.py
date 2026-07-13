@@ -62,16 +62,46 @@ def AverageHartreeFock(nocc,Fk,l):
     #print 'Vu=', Vu, 'Vj=', Vj
     return Vu-Vj
 
-def ComputeExactDC(nocc,lmbda,epsilon,icase,fh_info,projector='../projectorw.dat',trans='Trans.dat',o_Nk=8,uniform=False):
+def ComputeExactDC(rawnocc, lmbda, epsilon, *args, **kwargs):
+    """Backward-compatible dispatcher for cluster vs single-site signatures.
+
+    Old (single-site) call (used by ctqmc.py, inorg.py):
+        ComputeExactDC(nocc, lmbda, epsilon, icase, fh_info,
+                       projector=..., trans=..., o_Nk=..., uniform=...)
+
+    New (cluster) call (used by bctqmc.py):
+        ComputeExactDC(rawnocc, lmbda, epsilon, clsshape, icase, fh_info,
+                       projector=..., trans=..., o_Nk=..., uniform=...)
+
+    Detection: first positional arg after epsilon is either clsshape
+    (list/tuple/ndarray, cluster signature) or icase (int, single-site).
+    Single-site call is synthesized with clsshape=np.array([1,1]) so the
+    underlying impl always sees a clsshape.
+    """
+    import numpy as _np
+    if len(args) >= 1 and (isinstance(args[0], (list, tuple)) or
+                           (isinstance(args[0], _np.ndarray) and args[0].ndim >= 1)):
+        # New cluster signature
+        clsshape = args[0]
+        rest = args[1:]
+    else:
+        # Old single-site signature: numsites = 1*1 = 1
+        clsshape = _np.array([1, 1])
+        rest = args
+    return _ComputeExactDC_impl(rawnocc, lmbda, epsilon, clsshape, *rest, **kwargs)
+
+
+def _ComputeExactDC_impl(rawnocc,lmbda,epsilon,clsshape,icase,fh_info,projector='../projectorw.dat',trans='Trans.dat',o_Nk=8,uniform=False):
     print('ComputeExactDC: icase=', icase, 'of projector "'+projector+'"', file=fh_info)
     print('ComputeExactDC: lambda=', lmbda, file=fh_info)
     print('ComputeExactDC: epsilon=', epsilon, file=fh_info)
-    print('ComputeExactDC: nocc=', nocc, file=fh_info)
+    print('ComputeExactDC: cluster shape=', clsshape, file=fh_info)
+    print('ComputeExactDC: nocc=', rawnocc, file=fh_info)
     print('ComputeExactDC: k radial (2**k+1)=', o_Nk, file=fh_info)
     print('ComputeExactDC: trans=', trans, file=fh_info)
     
     lmax_integration=13 # The same as in wien2k: The number of theta points is lmax_integration+1, and of phi is 2*lmax_integration+1
-    
+    numsites=clsshape[0]*clsshape[1]# number of sites in the cluster
     # Reads the radial wave function for the DMFT projector
     Nk=2**o_Nk+1
     (Rx_, Ag_, Bg_, ls_) = GetWaveF(projector)
@@ -91,24 +121,66 @@ def ComputeExactDC(nocc,lmbda,epsilon,icase,fh_info,projector='../projectorw.dat
     if not uniform:
         # Reading Trans.dat file, which contains T2C transformation and Sigind index
         print('ComputeExactDC: Reading file', trans, file=fh_info)
-        (Sigind, CF) = ReadTrans(trans, fh_info)
+        (rawSigind, rawCF) = ReadTrans(trans, fh_info)
         
         # Matrix contained in Trans.dat should be T(i,m):
         #   - i runs over real harmonics (z^2, x^2-y^2, yz, xz, xy)
         #   - m runs over complex harmonics (-2, -1, 0, 1, 2)
         # The matrix in Trans.dat, read into CF, is the transpose of
         # what we want in T2C, hence the T2C = transpose(CF) statement
-        T2C = transpose(CF)
-        
-        if len(CF)==2*l+1:
+        rawT2C = transpose(rawCF)
+
+
+
+
+        # change to (2l+1)* number of sites in the cluster?
+        if len(rawCF)==(2*l+1)*numsites:
             nspin=1
-        elif len(CF)==2*(2*l+1):
+        elif len(rawCF)==2*(2*l+1)*numsites:
             nspin=2
         else:
             print('ComputeExactDC: ERROR: Transformation CF=T2C does not have correct dimension', file=fh_info)
             sys.exit(1)
         
-        deg = Sigind_deg(Sigind)
+        # if it is a cluster DMFT the T2C has to be modified to make T2C is mapped to real space d orbitals  but not in K space.
+        # hence both sigind has to be modified.
+        # Note: current implementation only work for clusters whose all sites are equal.
+
+        # according to the huge sigind to figure out how many active orbitals per site. here we assume all sites are equal.
+        # here we assume the convension in sigind[i][i]: first all K points of one of the orbitals, then all K points of another orbital (if needed),etc.
+        if numsites==1:
+            T2C=rawT2C
+            Sigind=rawSigind
+            nocc=rawnocc
+        else:# cluster DMFT.
+            cor_orb_num=0# total correlated orbitals in the entire cluster
+            dimsigind=int(len(rawCF)/numsites)# (2l+1)*nspin
+            rawdeg = Sigind_deg(rawSigind)
+            for i in np.arange(len(rawCF)):
+                if rawSigind[i][i]>0:
+                    cor_orb_num+=1
+            cor_orb_num//=numsites
+            nocc=zeros(cor_orb_num)
+            Sigind=zeros((dimsigind,dimsigind),dtype=int)
+            for i in np.arange(cor_orb_num):
+                Sigind[i][i]=i+1
+                for j in np.arange(numsites):
+                    # nocc[i]+=rawnocc[rawSigind[j+i*numsites][j+i*numsites]-1]/numsites
+                    idx = rawSigind[j+i*numsites][j+i*numsites] - 1
+                    nocc[i] += rawnocc[idx] / rawdeg[idx] / numsites
+            # modify CF
+            CF=zeros((dimsigind,dimsigind), dtype=complex)
+            for i in arange(dimsigind):
+                CF[i,:]=np.sum(rawCF[i*numsites:(i+1)*numsites,:dimsigind],axis=(0))/sqrt(numsites)
+            T2C = transpose(CF)
+            # modify nf and mom. 
+
+            pass
+
+
+
+
+        deg = Sigind_deg(Sigind)# value of deg[i] means number of orbitals has sigind i. i>0.
         
         print('ComputeExactDC: Sigind is:', file=fh_info)
         print(Sigind, file=fh_info)
@@ -283,8 +355,10 @@ def ComputeExactDC(nocc,lmbda,epsilon,icase,fh_info,projector='../projectorw.dat
             #print ii, 'Vdc=', Vhartree[ii]+Vxc, 'Vhartree=', Vhartree[ii], 'Vxc=', Vxc
             #print('ComputeExactDC: ',ii, 'PhiDC=', PhiDC, 'Vdc=', Vdc, 'Vdc_Anisimov=', Vdc_Anisimov, 'Vdc_fixn=', Vdc_fixn, 'Vh=', VHartree[ii], 'Vx=', Vx, 'Vc=', Vc)
             print('ComputeExactDC: ',ii, 'PhiDC=', PhiDC, 'Vdc=', Vdc, 'Vdc_Anisimov=', Vdc_Anisimov, 'Vdc_fixn=', Vdc_fixn, 'Vh=', VHartree[ii], 'Vx=', Vx, 'Vc=', Vc, file=fh_info)
-            
-        return (Vedc, PhiDC)
+        if numsites==1:
+            return (Vedc, PhiDC)
+        else:
+            return (Vedc*np.ones(np.max(rawSigind)),PhiDC*numsites)
         
         
 if __name__ == '__main__':

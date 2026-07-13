@@ -1413,6 +1413,18 @@ retVals GetLambda0_in_sector(int ib,
     int ii = abs(cix.Sgm_symmetry[ib](0,0))-1; // note that cix.Sgm_symmetry starts with 1, hence need to subtract 1.
     double S0 =0;
     for (int it=0; it<tau.extent(0); ++it) S0 += Sm(ii,it)*tau_dh(it);
+    // H2 (ported from real_axis_spectra.h:30-38): non-finite or huge integrated self-energy
+    // means the pseudo-particle propagators feeding Sm are already broken; die cleanly with
+    // diagnostics instead of feeding garbage lambda0 to the whole solver.
+    if (!std::isfinite(S0) or fabs(S0)>1e3){
+      clog<<"ERROR in GetLambda0_in_sector: non-finite or too large S0="<<S0<<" for ib="<<ib+1<<" ii="<<ii<<endl;
+      ofstream out("lambda0_debug.dat"); out.precision(12);
+      out<<"# ib="<<ib+1<<" ii="<<ii<<" S0="<<S0<<endl;
+      for (int it=0; it<tau.extent(0); ++it) out<<tau(it)<<" "<<Sm(ii,it)<<" "<<tau_dh(it)<<endl;
+      out.close();
+      clog.flush();
+      exit(1);
+    }
     double lmbda = E-S0-peak_posT;
     r.lambda0=lmbda;
     r.followPeak=ib+1;
@@ -1436,6 +1448,15 @@ retVals GetLambda0_in_sector(int ib,
     Array<double,1> S0_pp(counter); S0_pp=0;
     for (const auto& [ii, icount] : indx){
       for (int it=0; it<tau.extent(0); ++it) S0_pp(icount) += Sm(ii,it)*tau_dh(it);
+      if (!std::isfinite(S0_pp(icount)) or fabs(S0_pp(icount))>1e3){
+        clog<<"ERROR in GetLambda0_in_sector: non-finite or too large S0_pp="<<S0_pp(icount)<<" for ib="<<ib+1<<" ii="<<ii<<endl;
+        ofstream out("lambda0_debug.dat"); out.precision(12);
+        out<<"# ib="<<ib+1<<" ii="<<ii<<" S0_pp="<<S0_pp(icount)<<endl;
+        for (int it=0; it<tau.extent(0); ++it) out<<tau(it)<<" "<<Sm(ii,it)<<" "<<tau_dh(it)<<endl;
+        out.close();
+        clog.flush();
+        exit(1);
+      }
     }
     //cout<<" ingerals are S0_pp"<< S0_pp << " or " << _S0_pp_ << endl;
     Array<double,2> HS(N,N); HS=0;

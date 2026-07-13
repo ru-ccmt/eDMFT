@@ -23,11 +23,15 @@ import shutil
 import subprocess
 import sys
 import builtins
+from contextlib import redirect_stdout, redirect_stderr
 
 from numpy import *
 from scipy import interpolate
 
 import ctqmc
+import gen_cix
+import dmft_DC
+from cmpEimp2 import GiveImpFunctional_bctqmc, obtain_last_value
 
 
 def _strip_quotes(text):
@@ -79,9 +83,19 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
         "tmeassure": '"tsample"',
     }
 
-    def __init__(self, Znuc, dire, params, Sigind, CF):
+    def __init__(self, Znuc, dire, params, Sigind, CF, nambu=False):
         # ctqmc parent constructor
         super().__init__(Znuc, dire, params, Sigind, CF, Print=False)
+
+        # Cluster / K-native state.  For the K-diagonal (kspace) cluster indmfl
+        # the incoming Sigind is already K-diagonal (e.g. diag([1,2,2,3]) for a
+        # 2x2 plaquette), so no site<->K transform is needed here.
+        if 'clustershape' in params:
+            self.clustershape = diag(array(params['clustershape'][0]))
+        else:
+            self.clustershape = array([1, 1])
+        self.nambu = nambu
+        self._input_basis = params['input_basis'][0] if 'input_basis' in params else 'kspace'
 
         #@ remove some variables that we don't need in bold solver.
         self.sparams.pop('GlobalFlip', None)
@@ -235,19 +249,258 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
             print("}", file=fp)
 
     def HighFrequency(self, params, DCs, nl_imp, extn, wbroad=0.0, kbroad=0.0):
-        """Postprocesses Bold-CTQMC output using the legacy ctqmc.py logic.
+        """Postprocesses Bold-CTQMC output.
 
-        The bold solver now writes the same DMFT-facing filenames and Gf.out
-        header fields as the old impurity solver (`Sig.out`, `Gf.out`,
-        `ctqmc.log`, `nf`, `TrSigmaG`, `mom`, ...).  That means the existing
-        high-frequency and double-counting machinery from ctqmc.py can be
-        reused directly.
+        For the single-site / f-electron path the bold solver writes the same
+        DMFT-facing filenames and Gf.out header fields as the old impurity
+        solver, so the existing high-frequency and double-counting machinery
+        from ctqmc.py is reused directly (delegated to the parent).
 
-        Keeping an explicit override here makes that choice visible and gives
-        us one natural place to customize the postprocessing later if Bold-CTQMC
-        needs solver-specific handling.
+        For the K-native cluster path (``clustershape`` in params) the density
+        matrix and energetics live in ``ctqmc.log`` (read via obtain_last_value)
+        and the cluster cix bath order is interleaved up/dn.  This branch is
+        ported from bhqmc.py's kspace (non-nambu, non-site) logic.
         """
-        return super().HighFrequency(params, DCs, nl_imp, extn, wbroad=wbroad, kbroad=kbroad)
+        if 'clustershape' not in params:
+            return super().HighFrequency(params, DCs, nl_imp, extn, wbroad=wbroad, kbroad=kbroad)
+
+        # ---------------- K-native cluster path (ported from bhqmc.py) ---------------
+        if kbroad > 0.0 or wbroad > 0.0:
+            bexe = self.env.ROOT + '/broad'
+            shutil.move(self.dir + self.sparams['Sig'], self.dir + self.sparams['Sig'] + 'b')
+            broad_cmd = 'cd ' + self.dir + '; ' + bexe + ' -w ' + str(wbroad) + ' -k ' + str(kbroad) + ' ' + self.sparams['Sig'] + 'b  > ' + self.sparams['Sig']
+            print(broad_cmd, file=self.fh_info)
+            ret = subprocess.call(broad_cmd, shell=True, stdout=self.fh_info, stderr=self.fh_info)
+        OffDiagonalExist = False
+        Sigind = array(self.Sigind_shifted)
+        self.Diagonal = {}
+        for i in range(len(Sigind)):
+            for j in range(len(Sigind)):
+                if Sigind[i, j] > 0:
+                    self.Diagonal[Sigind[i, j] - 1] = (i == j)
+                    if i != j:
+                        OffDiagonalExist = True
+
+        # Reading Self-energy of the impurity
+        Sg_data = loadtxt(self.dir + self.sparams['Sig']).T
+        om = Sg_data[0]
+        Sigo = Sg_data[1::2, :] + Sg_data[2::2, :] * 1j
+
+        if getattr(self, 'nambu', False):
+            # K-native Nambu (d-wave SC): boldc writes 3 normal + 1 anomalous; the
+            # normal-block machinery below (OffDiagonal, mom/nf from Gf.out header,
+            # diagonal causality clamp, normal DC) does not apply.  Rebuild the
+            # 33-col Nambu sig.out inline (no bhqmc_site_wrapper).
+            return self._highfrequency_nambu(om, Sigo, extn)
+
+        # Computing self-energy in alternative way to keep off-diagonal components forcing G_{loc}=G_{imp}
+        if (self.sparams['OffDiagonal'] and OffDiagonalExist):
+            Sign = self.SigmaOffDiagonal(om, Sigo, wbroad, kbroad)
+            if Sign is not None:
+                Sigo = Sign
+
+        # nf and the per-K-component occupations `mom` come from the Gf.out
+        # Print_Physical2 header.  The current bctqmc binary already folds the
+        # cluster occupations into mom = [Gamma, X=Y, M] (one entry per independent
+        # Sigind component, sum(mom) = nf), exactly the quantity the DC needs.
+        # (The old May-boldc binary wrote the raw per-spin `bath_density_matrix`
+        # vector which had to be refolded eDMFT-side; the Jun binary writes the
+        # reduced header, so we read mom straight from it -- same convention as the
+        # ctqmc.py parent's HighFrequency.)
+        hdr = {}
+        with open(self.dir + self.sparams['Gf'], 'r') as fS:
+            for par in fS.readline().strip().split():
+                if '=' in par:
+                    k, v = par.split('=', 1)
+                    if k in ('nf', 'TrSigmaG', 'mom', 'nd', 'density_matrix'):
+                        try:
+                            hdr[k] = eval(v)
+                        except Exception:
+                            pass
+        nf = hdr['nf']
+        mom = array(hdr['mom'])
+        density_matrix = array(hdr['density_matrix'])
+        ntot = nf
+
+        print('From impurity Gf.out header: nf=', nf, 'mom=', mom, file=self.fh_info)
+        for b in range(shape(Sigo)[0]):
+            if self.Diagonal[b]:
+                for iom in range(shape(Sigo)[1]):
+                    if Sigo[b, iom].imag > 0:  # violates causality, correct it.
+                        print('Disregarding non-causal self-energy at Sig[' + str(b) + ',' + str(iom) + ']=', Sigo[b, iom], file=self.fh_info)
+                        Sigo[b, iom] = Sigo[b, iom].real
+
+        # mesh-fix: re-grid the solver's Sig.out from its internal uniform Matsubara
+        # mesh back onto the eDMFT INPUT mesh self._om_edmft (the Delta.imp mesh), so
+        # sgather mixes it consistently against the eDMFT seed.  Beyond the solver's
+        # last frequency the dynamic self-energy -> its high-freq constant (clamp).
+        if getattr(self, '_om_edmft', None) is not None:
+            _ome = array(self._om_edmft)
+            _ome = _ome[_ome < 1000.0]
+            if not (len(_ome) == len(om) and allclose(_ome, om)):
+                _Sigo_e = zeros((shape(Sigo)[0], len(_ome)), dtype=complex)
+                for _b in range(shape(Sigo)[0]):
+                    _fr = interpolate.UnivariateSpline(om, Sigo[_b].real, s=0)
+                    _fi = interpolate.UnivariateSpline(om, Sigo[_b].imag, s=0)
+                    _re = _fr(_ome)
+                    _im = _fi(_ome)
+                    _hi = _ome > om[-1]
+                    _re[_hi] = Sigo[_b, -1].real
+                    _im[_hi] = Sigo[_b, -1].imag
+                    _Sigo_e[_b] = _re + 1j * _im
+                print('mesh-fix: regrid Sig.out %d->%d freq, om[-1] %.4f -> %.4f eV'
+                      % (len(om), len(_ome), om[-1], _ome[-1]), file=self.fh_info)
+                om = _ome
+                Sigo = _Sigo_e
+
+        sinf = copy(Sigo[:, -1]).real
+        print('sinf=', sinf, file=self.fh_info)
+
+        # Reading old Edc and impurity levels
+        (Eimp_old, Olap_old, Edc_old) = loadtxt(self.dir + '/Eimp.inp', ndmin=2)
+        print('Diagonal=', self.Diagonal, file=self.fh_info)
+        print('len(Edc_old)=', len(Edc_old), 'Eimp_old=', Eimp_old, file=self.fh_info)
+
+        # Here we compute self-energy(infinity) and double-counting using impurity occupancy
+        print('DCs=', DCs, file=self.fh_info)
+        Ud = params['U'][0]
+        if type(self.J) is list:
+            Jd = sum(self.J) / len(self.J)
+        else:
+            Jd = self.J
+        # If we want to have U different than the U used in double counting
+        # (useful for cluster-DMFT when U can not be simply added in ctqmc)
+        if 'Ud' in params:
+            Ud = params['Ud'][0]
+        if 'Jd' in params:
+            Jd = params['Jd'][0]
+
+        DC_ones = array([int(self.Diagonal[i]) for i in range(len(Edc_old))])
+
+        if DCs[:5] == 'exact':
+            # exact DC is a LOCAL atomic quantity.  Reduce the K-decomposed
+            # occupations to the local per-site occupation and call the
+            # SINGLE-SITE ComputeExactDC with the invariant local d-orbital T2C
+            # (x2y2 correlated).  (bhqmc.py kspace approach A.)
+            lmbda = self.UlamJ[1]
+            epsilon = self.UlamJ[2]
+            # DC occupation source selectable via iparams0 'nimp_nf_nd' (default 'nf'=mom).
+            _dc_src = params['nimp_nf_nd'][0] if 'nimp_nf_nd' in params else 'nf'
+            if   _dc_src == 'nd':    nf_ = density_matrix
+            elif _dc_src == 'nimp':  nf_ = nl_imp if not isscalar(nl_imp) else mom
+            else:                    nf_ = mom            # 'nf' default (sum=nf)
+            print('exact-DC nimp_nf_nd=%s n_imp='%_dc_src, nf_, 'isscalar(nlattice)=', isscalar(nl_imp), file=self.fh_info)
+            if len(DCs) > 6 and DCs[6] == 'l' and not isscalar(nl_imp):
+                nf_ = nl_imp         # DCs='exact_l' override (kept for compat)
+            print('Here we have nl_imp=', nf_, file=self.fh_info)
+            print('lmbda=', lmbda, 'epsilon=', epsilon, file=self.fh_info)
+            numsites = int(self.clustershape[0]) * int(self.clustershape[1])
+            n_local = sum(nf_) / float(numsites)   # K->site reduction (uniform plaquette |U[K,r]|^2 = 1/numsites)
+            _s = sqrt(0.5)
+            _T2C = array([[   _s, 0,    0,    0,    _s],
+                          [    0, 0,    1,    0,     0],
+                          [    0, _s,   0,  -_s,     0],
+                          [    0, 1j*_s, 0, 1j*_s,   0],
+                          [-1j*_s, 0,   0,    0, 1j*_s]], dtype=complex)
+            _pp_trans = self.dir + 'Trans_loc_pp.dat'
+            with open(_pp_trans, 'w') as _ft:
+                print('5 5', file=_ft)
+                print('#---- Sigind (single-site pp-block for exact DC; x2y2 correlated)', file=_ft)
+                for _i in range(5):
+                    print(' '.join(('1' if (_i == 0 and _j == 0) else '0') for _j in range(5)), file=_ft)
+                print('#---- CF', file=_ft)
+                for _i in range(5):
+                    for _j in range(5):
+                        print('%12.8f %12.8f' % (_T2C[_i, _j].real, _T2C[_i, _j].imag), end='  ', file=_ft)
+                    print(file=_ft)
+            (Edc_loc, Phidc0_site) = dmft_DC.ComputeExactDC(
+                [n_local], lmbda, epsilon, self.icase, self.fh_info,
+                projector='projectorw.dat', trans=_pp_trans)
+            Vdc = Edc_loc[0]
+            if not (1.0 < Vdc < 10.0):
+                print('WARNING exact-DC: Vdc=%g outside sane [1,10] eV (n_local=%g) -- '
+                      'check local d-T2C / occupation' % (Vdc, n_local), file=self.fh_info)
+            Edc0 = DC_ones * Vdc
+            Phidc0 = numsites * Phidc0_site        # cluster total (equivalent sites)
+            print('The Exact Double-counting is: Vdc=', Edc0, 'PhiDC=', Phidc0,
+                  '(single-site local n=%g, numsites=%d)' % (n_local, numsites), file=self.fh_info)
+
+        elif DCs == 'FLL' or DCs == 'default' or DCs == 'FLL_l':
+            nf_ = nf
+            if DCs == 'FLL_l' and nf_:
+                nf_ = sum(nl_imp)
+            # This is the fully localized limit double-counting by Anisimov
+            Edc0 = DC_ones * (Ud * (nf_ - 0.5) - Jd * (nf_ / 2. - 0.5))
+            Phidc0 = Ud * 0.5 * nf_ * (nf_ - 1.) - Jd * 0.25 * nf_ * (nf_ - 2.)
+        elif DCs == 'AMF' or DCs == 'AMF_l':
+            nf_ = nf
+            if DCs == 'AMF_l' and nf_:
+                nf_ = sum(nl_imp)
+            Ueff = Ud * (1 - 1. / (2. * (2. * self.l + 1.))) - Jd * self.l / (2 * self.l + 1.)
+            Edc0 = DC_ones * Ueff * nf_
+            Phidc0 = Ueff * nf_ ** 2 / 2.
+        elif DCs == 'fixn' or DCs == 'nominal':
+            nf_ = nf
+            nf0 = params['nf0'][0]
+            Vdc = Ud * (nf0 - 0.5) - Jd * (nf0 / 2. - 0.5)
+            Edc0 = DC_ones * Vdc
+            Phidc0 = ntot * Vdc
+        else:
+            print('ERROR: Unkown double-counting', DCs)
+            sys.exit(1)
+
+        if 'dDC' in params:
+            Edc0 += array(params['dDC'][0])
+            Phidc0 += sum([params['dDC'][0][i] * nf_[i] for i in range(len(nf_))])
+            print('The Double-counting corrected to: Vdc=', Edc0, 'PhiDC=', Phidc0, file=self.fh_info)
+
+        Edc = Edc_old  # we want to keep Edc<-1000 for orbitals which are projected out!
+        for i in range(len(Edc)):
+            if (Edc_old[i] > -1000.):  # this is true for all orbitals which are kept!
+                Edc[i] = Edc0[i]
+            else:                      # projected out -> keep sinf=Edc for those
+                sinf[i] = Edc[i]
+
+        # Copying data at each iteration to follow the evolution
+        shutil.copy2(self.dir + self.sparams['Sig'], self.dir + self.sparams['Sig'] + '.' + extn)
+        shutil.copy2(self.dir + self.sparams['Gf'], self.dir + self.sparams['Gf'] + '.' + extn)
+        shutil.copy2(self.dir + 'ctqmc.log', self.dir + 'ctqmc.log' + '.' + extn)
+        shutil.copy2(self.dir + 'Probability.dat', self.dir + 'Probability.dat' + '.' + extn)
+        cix_file = self.dir + self.sparams['cix']
+        if os.path.exists(cix_file):
+            shutil.copy2(cix_file, cix_file + '.' + extn)
+
+        (Phi_DMFT, lnGimp, Eimp, Vdc_nd, zeorb, TrSigmaG) = GiveImpFunctional_bctqmc(
+            self.dir, self.PARAMS, Edc, self.Sigind, self.fh_info)
+        print('nimp, TrSigmaG=', ntot, TrSigmaG, file=self.fh_info)
+        self.fh_info.flush()
+
+        Ry2eV = 13.60569193
+        Epotential = TrSigmaG
+
+        with open(self.dir + '/Eorb.dat', 'w') as fE:
+            print('#  Phidc=', Phidc0, file=fE)
+            print('#  Tr(Sigma*G)/2=', Epotential, file=fE)
+            print('#  Tr(Sigma*G)/2-Phidc=', (Epotential - Phidc0), file=fE)
+            print('#  Phi_DMFT=', Phi_DMFT, file=fE)
+            print('#  Phi_DMFT-Phi_DC=', Phi_DMFT - Phidc0, file=fE)
+            print('#  Tr(log(-Gimp))=', lnGimp, file=fE)
+            print('#  Fimpurity+TS=', Eimp, file=fE)
+            print('#  E_pot+E_kin-Tr(w*dD/dw)=', zeorb, file=fE)
+            print(':IEORB ', (Epotential - Phidc0) / Ry2eV, file=fE)
+            print(':XEORB ', (Phi_DMFT - Phidc0) / Ry2eV, file=fE)
+            print(':ZEORB ', (zeorb - Phidc0) / Ry2eV, file=fE)
+
+        with open(self.dir + '/sig.out', 'w') as fE:
+            print('# s_oo=', sinf.tolist(), file=fE)
+            print('# Edc=', Edc.tolist(), file=fE)
+            for iom in range(len(om)):
+                print(("%20.15f " % om[iom]), end=' ', file=fE)
+                for b in range(len(Sigo)):
+                    print(("%20.15f %20.15f  " % (Sigo[b, iom].real - Edc[b], Sigo[b, iom].imag)), end=' ', file=fE)
+                print(file=fE)
+
+        return ntot
 
     def _exe(self, params, DCs, extn, UpdateAtom, gbroad=0.0, kbroad=0.0, maxAc=2000.0):
         """Executes the Bold-CTQMC impurity solver."""
@@ -257,6 +510,9 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
         (Eimp, Olap, Edc) = loadtxt(self.dir + "/Eimp.inp", ndmin=2)
         Delta_dat = loadtxt(self.dir + "/Delta.imp").T
         om = Delta_dat[0]
+        # eDMFT input Matsubara mesh; HighFrequency regrids sig.out back onto it
+        # (mesh-fix: the solver outputs on its own uniform mesh, not this one).
+        self._om_edmft = array(om).copy()
         Delta = Delta_dat[1::2] + Delta_dat[2::2] * 1j
 
         # The new direct-basis atomh.py assumes spin-orbit is already included
@@ -266,15 +522,45 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
             self.Eimps = ones(len(self.Eimps)) * sum(self.Eimps) / len(self.Eimps)
             print("Eimps(fixn0)=", self.Eimps, file=self.fh_info)
 
+        if getattr(self, 'nambu', False):
+            # === K-native Nambu input reduction (no site<->K Fourier) ===
+            # Delta/Eimps arrive K-diagonal in sigind order
+            #   [pp(K) | Phi(K) | PhiD(K) | Shh(K)],  K=4, K-index = [Gamma,X,Y,M].
+            # boldc's SC cix (gen_cix superc=1) wants 3 normal (Gamma/X=Y/M, C4-merged)
+            # + 1 anomalous (d-wave amplitude = Phi at the Y=(0,pi) channel).
+            ncols = shape(Delta)[0]
+            K = ncols // 4                       # 4 blocks pp/Phi/PhiD/Shh
+            _KIDX_Y = 2                           # K order Gamma=0,X=1,Y=2,M=3
+            Eimp_pp = array(self.Eimps[:K]).real
+            Eimp3 = array([Eimp_pp[0],
+                           0.5 * (Eimp_pp[1] + Eimp_pp[2]),   # X=Y average (C4)
+                           Eimp_pp[3]])
+            Dnorm3 = vstack([Delta[0:1],
+                             0.5 * (Delta[1:2] + Delta[2:3]),
+                             Delta[3:4]])
+            Danom1 = Delta[K + _KIDX_Y: K + _KIDX_Y + 1]      # Phi_Y -> single anomalous
+            self.Eimps = Eimp3                    # 3 normal K levels
+            Delta = vstack([Dnorm3, Danom1])      # (4, n_omega): 3 normal + 1 anom
+            self._nambu_nnorm = Dnorm3.shape[0]   # 3 (HighFrequency split)
+            self.sparams['cix'] = 'bctqmc_U_' + str(params['Ud'][0]) + '_SC1.cix'
+            print('bctqmc[Nambu]: K-native input -> Eimp3=', Eimp3,
+                  ' Delta = 3 normal + 1 anomalous', shape(Delta), file=self.fh_info)
+
         params["Ed"] = [self.Eimps.tolist(), "# Impurity levels"]
 
         E0 = self.Eimps[0]
         mu_QMC = -E0
 
         Ident = zeros(len(self.Eimps))
-        for i in range(len(self.Sigind)):
-            if self.Sigind_shifted[i, i] > 0:
-                Ident[self.Sigind_shifted[i, i] - 1] = 1.0
+        if getattr(self, 'nambu', False):
+            # Nambu: self.Eimps was reduced to the 3 normal channels above; the full
+            # doubled Sigind_shifted (indices up to 4K) would index Ident out of
+            # bounds.  All 3 normal channels are kept.
+            Ident = ones(len(self.Eimps))
+        else:
+            for i in range(len(self.Sigind)):
+                if self.Sigind_shifted[i, i] > 0:
+                    Ident[self.Sigind_shifted[i, i] - 1] = 1.0
         print("Ident=", Ident, file=self.fh_info)
 
         if UpdateAtom or not os.path.isfile(self.dir + "/" + self.sparams["cix"]):
@@ -306,7 +592,45 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
                 ret = subprocess.call(cmd, shell=True, stdout=self.fh_info, stderr=self.fh_info)
                 print("ret=", ret, file=self.fh_info)
             elif self.l < 3:
-                print('l=', self.l, ' will implement atom_d.py', file=self.fh_info)
+                # K-native cluster DMFT (s,p,d).  The indmfl is already K-diagonal
+                # (e.g. diag([1,2,2,3]) for a 2x2 plaquette: Gamma/X=Y/M), so the
+                # kinetic terms are diagonal and only the interaction is off-diagonal
+                # in K.  gen_cix.main2 builds the matching cluster cix (bctqmc.cix).
+                if 'clustershape' in params and 'Ud' in params and params['Ud'][0] != 0.0:
+                    print('doing cluster DMFT...', file=self.fh_info)
+                    if getattr(self, 'nambu', False):
+                        # Nambu: re-expand the C4-merged 3 normal levels (E0-shifted)
+                        # back to the 4 cluster K-slots [Gamma, X, Y, M] with X=Y, so
+                        # that len(fullEimp)==Nm==4 for gen_cix (FindClusterQuantities
+                        # of [[2,0],[0,2]] gives Nm=4).  The d-wave SIGN lives in the
+                        # anomalous bath (gen_cix Nambu_d, superc=1), NOT in ek, so a
+                        # C4-symmetric ek with Eimp_X==Eimp_Y is correct.  This mirrors
+                        # the normal else-branch (Sigind diag [1,2,2,3] -> 4 positions).
+                        fullEimp = array([Eimps[0], Eimps[1], Eimps[1], Eimps[2]])
+                    else:
+                        indnum = 0
+                        for index in diag(self.Sigind):
+                            if index > 0:
+                                indnum += 1
+                        fullEimp = zeros(indnum)
+                        for i in arange(indnum):
+                            fullEimp[i] = Eimps[self.Sigind[i][i] - 1]
+                    print('fullEimp=', fullEimp, file=self.fh_info)
+                    old_cwd = os.getcwd()
+                    try:
+                        os.chdir(self.dir)  # so bctqmc.cix is generated in imp.N/
+                        with open("gen_cix.log", "w") as flog:
+                            with redirect_stdout(flog), redirect_stderr(flog):
+                                gen_cix.main2(params['Ud'][0],
+                                              array(params['clustershape'][0]),
+                                              fullEimp,
+                                              None, None,
+                                              superc=(1 if getattr(self, 'nambu', False) else 0),
+                                              ifDCA=0)
+                    finally:
+                        os.chdir(old_cwd)
+                else:
+                    print('l=', self.l, ' will implement atom_d.py', file=self.fh_info)
             else:
                 print('l=', self.l, ' not yet implemented!', file=self.fh_info)
             if REMOVE_STATUS:
@@ -331,12 +655,21 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
         # whitespace-delimited PARAMS format used by ctqmc.
         self._write_solver_params(params)
 
-        Sigind = array(self.Sigind_shifted)
-        Diagonal = {}
-        for i in range(len(Sigind)):
-            for j in range(len(Sigind)):
-                if Sigind[i, j] > 0:
-                    Diagonal[Sigind[i, j] - 1] = i == j
+        if getattr(self, 'nambu', False):
+            # Reduced channels: n_norm normal (diagonal, causality-clamped) + the
+            # anomalous component(s) (EXEMPT from the diagonal-only causality clamp;
+            # the anomalous self-energy legitimately may have positive Im).
+            n_norm = getattr(self, '_nambu_nnorm', 3)
+            Diagonal = {ib: True for ib in range(n_norm)}
+            for ib in range(n_norm, shape(Delta)[0]):
+                Diagonal[ib] = False
+        else:
+            Sigind = array(self.Sigind_shifted)
+            Diagonal = {}
+            for i in range(len(Sigind)):
+                for j in range(len(Sigind)):
+                    if Sigind[i, j] > 0:
+                        Diagonal[Sigind[i, j] - 1] = i == j
 
         print("Diagonal=", Diagonal, file=self.fh_info)
 
@@ -353,6 +686,14 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
 
             # creating big mesh
             T = 1.0 / params["beta"][0]
+            # Strip the omega=5000 high-frequency sentinel row (written by
+            # _highfrequency_nambu, rides through the eDMFT loop into Delta.imp).
+            # If left in, m_max uses om[-1]=5000 and the Matsubara mesh explodes
+            # (~40k pts).  No-op for the normal path (om[-1]~100, no sentinel).
+            _phys = om < 1000.0
+            if not _phys.all():
+                om = om[_phys]
+                Delta = Delta[:, _phys]
             m_max = int(om[-1] / (pi * T) + 1e-6)
             lom = arange(1, m_max + 1, 2) * pi * T
             lDelta = []
@@ -396,6 +737,106 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
         #new_log = self.dir + "ctqmc.log"
         #if os.path.exists(old_log) and not os.path.exists(new_log):
         #    shutil.move(old_log, new_log)
+
+
+    def _highfrequency_nambu(self, om, Sigo, extn):
+        """K-native Nambu (d-wave SC) output path.
+
+        boldc writes Sig.out with omega + 3 normal (Gamma/X=Y/M) + 1 anomalous
+        (d-wave amplitude).  Rebuild the eDMFT 33-col (8K+1) Nambu sig.out with
+        sigind order Spp|Phi|PhiD|Shh and tau3 headers, byte-matching the Nambu
+        indmfl.  K-native: NO site<->K Fourier (no bhqmc_site_wrapper).  Returns ntot.
+
+        Storage (== inorg.merge_nambu_sigout / bhqmc._highfrequency_nambu):
+          pp : (Re(Spp)-Edc_pp, Im(Spp))
+          Phi: (Re(Phi),        Im(Phi))                 [no Edc]
+          PhiD=conj(Phi):       (Re(Phi), -Im(Phi))
+          hh = -conj(Spp):      (-(Re(Spp)-Edc_pp), Im(Spp))
+          header s_oo/Edc (4K): [pp] + [0]*K + [0]*K + [-pp]
+          sentinel row at omega=5000: (s_oo[i]-Edc[i], 0)
+        """
+        n_norm = getattr(self, '_nambu_nnorm', 3)
+        Sig_norm = Sigo[:n_norm]               # (3, n_omega) normal Gamma/X=Y/M
+        Sig_anom = Sigo[n_norm:n_norm + 1]     # (1, n_omega) d-wave amplitude
+        K = 4                                  # K-native lifted Gamma/X/Y/M
+        _KIDX_GAMMA, _KIDX_X, _KIDX_Y, _KIDX_M = 0, 1, 2, 3
+        n_omega = Sig_norm.shape[1]
+
+        # --- inline K-native expand (replaces wrap_output_nambu site Fourier) ---
+        Spp4 = zeros((K, n_omega), dtype=complex)
+        Spp4[_KIDX_GAMMA] = Sig_norm[0]
+        Spp4[_KIDX_X]     = Sig_norm[1]
+        Spp4[_KIDX_Y]     = Sig_norm[1]        # replicate X=Y (C4 in the normal block)
+        Spp4[_KIDX_M]     = Sig_norm[2]
+        amp = Sig_anom[0]
+        Phi4 = zeros((K, n_omega), dtype=complex)
+        Phi4[_KIDX_Y] =  amp                   # d-wave: Y=+amp, X=-amp, Gamma=M=0
+        Phi4[_KIDX_X] = -amp
+        PhiD4 = conj(Phi4)                     # Phi^dag = conj(Phi)
+        Shh4  = -conj(Spp4)                    # Sigma_hh = -conj(Sigma_pp)
+
+        try:
+            ntot = float(sum(obtain_last_value('bath_density_matrix=', self.dir + 'ctqmc.log')))
+        except Exception as _e:
+            print('bctqmc[Nambu]: could not read bath_density_matrix:', _e, file=self.fh_info)
+            ntot = 0.0
+
+        try:
+            _E, _O, Edc_file = loadtxt(self.dir + '/Eimp.inp', ndmin=2)
+            Edc_pp = array(Edc_file).real.ravel()[:K]
+        except Exception as _e:
+            print('bctqmc[Nambu]: could not read Edc from Eimp.inp:', _e, file=self.fh_info)
+            Edc_pp = zeros(K)
+        if len(Edc_pp) < K:
+            Edc_pp = concatenate([Edc_pp, zeros(K - len(Edc_pp))])
+
+        sinf_pp = Spp4[:, -1].real
+        s_oo16 = list(sinf_pp) + [0.0] * K + [0.0] * K + [(-x) for x in sinf_pp]
+        Edc16  = list(Edc_pp)  + [0.0] * K + [0.0] * K + [(-x) for x in Edc_pp]
+
+        for f in (self.sparams['Sig'], self.sparams['Gf'], 'ctqmc.log'):
+            src = self.dir + f
+            if os.path.exists(src):
+                shutil.copy2(src, src + '.' + extn)
+
+        with open(self.dir + '/sig.out', 'w') as fE:
+            print('# s_oo=', s_oo16, file=fE)
+            print('# Edc=', Edc16, file=fE)
+            for iom in range(len(om)):
+                print(("%20.15f " % om[iom]), end=' ', file=fE)
+                for k in range(K):                                   # Spp
+                    print(("%20.15f %20.15f  " % (Spp4[k, iom].real - Edc_pp[k],
+                                                   Spp4[k, iom].imag)), end=' ', file=fE)
+                for k in range(K):                                   # Phi
+                    print(("%20.15f %20.15f  " % (Phi4[k, iom].real,
+                                                   Phi4[k, iom].imag)), end=' ', file=fE)
+                for k in range(K):                                   # PhiD = conj(Phi)
+                    print(("%20.15f %20.15f  " % (PhiD4[k, iom].real,
+                                                   PhiD4[k, iom].imag)), end=' ', file=fE)
+                for k in range(K):                                   # hh = -conj(Spp)
+                    print(("%20.15f %20.15f  " % (-(Spp4[k, iom].real - Edc_pp[k]),
+                                                   Spp4[k, iom].imag)), end=' ', file=fE)
+                print(file=fE)
+            # sentinel row at omega=5000 (high-frequency limit)
+            print(("%20.15f " % 5000.0), end=' ', file=fE)
+            for i in range(4 * K):
+                print(("%20.15f %20.15f  " % (s_oo16[i] - Edc16[i], 0.0)),
+                      end=' ', file=fE)
+            print(file=fE)
+
+        print('bctqmc[Nambu]: wrote sig.out (K=%d, %d cols) + sentinel; ntot=%g'
+              % (K, 8 * K + 1, ntot), file=self.fh_info)
+        self.fh_info.flush()
+
+        # Eorb.dat placeholder (Nambu free-energy / d-wave pairing energetics not wired)
+        with open(self.dir + '/Eorb.dat', 'w') as fE:
+            print('#  Nambu SC placeholder: impurity free-energy / d-wave pairing', file=fE)
+            print('#  energetics not yet wired.  sig.out is unaffected.', file=fE)
+            print('#  ntot=', ntot, file=fE)
+            print(':IEORB ', 0.0, file=fE)
+            print(':XEORB ', 0.0, file=fE)
+            print(':ZEORB ', 0.0, file=fE)
+        return ntot
 
 
 # The old driver code expects a class-like object inside the module.  Keeping

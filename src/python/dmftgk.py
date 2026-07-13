@@ -19,7 +19,7 @@ def PrintM(A):
         for j in range(np.shape(A)[1]):
             print(f"({A[i,j].real:12.7f},{A[i,j].imag:12.7f})", end=' ')
         print()
-        
+
 def main(args):
     """ Python equivalent of the Fortran program dmftgk """
     mpisize, myrank = comm.size, comm.rank
@@ -28,6 +28,10 @@ def main(args):
     Dhybrid = True
     store_Ak = args.store_Ak
     mode = args.mode
+    if args.nambu and args.m_ext:
+        raise ValueError("Nambu mode does not support magnetic extension (-l).")
+    if args.nambu:
+        args.full_inversion = True
     case = au.get_case()
     # read case.indmfl and set imatsubara, gamma, gammac & energy-cutoff from case.indmfl file.
     inl = au.Indmfl(case)
@@ -50,11 +54,11 @@ def main(args):
     feigenvals = 'eigenvalues.dat'
     fUR = 'UR.dat'
     fUL = 'UL.dat'
-    
-    
+
+
     (nat,iso,norbitals,nindo,ncix,cixdim,natom,nkpt,nl,ll_arr,iorbital,cix,nind,
      csize,iSx,Sigind,cix_orb,EF,VOL,posc,nmat,nume,Qcomplex,lmax2,maxdim2,maxdim,maxsize) = ReadBasicArrays('BasicArrays.dat',myrank)
-    
+
     # going over possible klists and determine which one is compatible with nkp from projector
     klists = [case+'.klist', case+'.klist_band']
     fklist=None
@@ -90,18 +94,23 @@ def main(args):
         print("fUL=", fUL)
         print("emin,emax=", emin, emax)
 
-        
+
     # Reading k-points from case.klist or case.klist_band
     kvec, wgh = ReadKlist(fklist)
     tweight = np.sum(wgh)
     if myrank==0:
         print('tweight=', tweight)
-    
+
     # output filenames for mode='g'
     fgkout    = ['Gk.'+str(icix+1) for icix in range(ncix)]
-    fglocout  = ['Glocal.'+str(icix+1) for icix in range(ncix)]
-    fgloc     = ['g_local.'+str(icix+1) for icix in range(ncix)]
-    
+    if args.nambu:
+        fglocout  = [case+'.gc'+str(icix+1)+args.m_ext+band for icix in range(ncix)]
+        fdltout   = [case+'.dlt'+str(icix+1)+args.m_ext+band for icix in range(ncix)]
+        feimpout  = [case+'.Eimp'+str(icix+1)+args.m_ext+band for icix in range(ncix)]
+    else:
+        fglocout  = ['Glocal.'+str(icix+1) for icix in range(ncix)]
+        fgloc     = ['g_local.'+str(icix+1) for icix in range(ncix)]
+
     # here we decided to create combined index icx_it so that all needed local indices are just one simple vector.
     icx_it=[[[] for it in range(csize[icix])] for icix in range(ncix)]
     nii = sum([csize[icix] for icix in range(ncix)])
@@ -110,7 +119,7 @@ def main(args):
         for it in range(csize[icix]):
             icx_it[icix][it] = ii
             ii+=1
-    
+
     norbs = sum(cixdim)
     if myrank==0:
         print('nii=', nii, 'icx_it=', icx_it)
@@ -131,19 +140,50 @@ def main(args):
     #    for (ind1,ind2) in small_indx[icix]:
     #        ii = small_indx[icix][(ind1,ind2)]
     #        print('icix=', icix, '('+str(ind1)+','+str(ind2)+')','ii=', ii)
-    
+
     # Reading the self-energy for all orbitals
     sig0 = np.loadtxt(fsigname[0])
     (nom,norb_2) = np.shape(sig0)
     sigma = np.zeros((nom,nii),dtype=np.complex128)
+    if args.nambu:
+        phi_sigma = np.zeros((nom,nii),dtype=np.complex128)
+        phi_dag_sigma = np.zeros((nom,nii),dtype=np.complex128)
+        sigma_hh = np.zeros((nom,nii),dtype=np.complex128)
     # Read each correlated sub-block from fsigname(icix):
     for icix in range(ncix):
         dat = np.loadtxt(fsigname[icix]).T
         omega = dat[0]
-        sig = dat[1::2]+dat[2::2]*1j
-        for it in range(csize[icix]):
-            sigma[:,icx_it[icix][it]] = sig[it,:]
-    
+        if args.nambu:
+            all_sig = dat[1::2]+dat[2::2]*1j
+            K = csize[icix]
+            # Unified sig.inp layout (8K+1 columns, 4K complex components):
+            #   sigind 1..K:     Sigma_pp (particle self-energy)
+            #   sigind K+1..2K:  Phi      (anomalous, upper-right)
+            #   sigind 2K+1..3K: Phi_dag  (anomalous, lower-left)
+            #   sigind 3K+1..4K: Sigma_hh (hole self-energy)
+            if all_sig.shape[0] < 4*K:
+                raise ValueError(f"Nambu mode expects unified sig.inp with {4*K} components "
+                               f"(8K+1={8*K+1} columns), got {all_sig.shape[0]} components. "
+                               f"Is this a Nambu-format file?")
+            for it in range(K):
+                sigma[:,icx_it[icix][it]] = all_sig[it,:]
+                phi_sigma[:,icx_it[icix][it]] = all_sig[K+it,:]
+                phi_dag_sigma[:,icx_it[icix][it]] = all_sig[2*K+it,:]
+                sigma_hh[:,icx_it[icix][it]] = all_sig[3*K+it,:]
+        else:
+            sig = dat[1::2]+dat[2::2]*1j
+            for it in range(csize[icix]):
+                sigma[:,icx_it[icix][it]] = sig[it,:]
+
+    # Nambu symmetry verification (runtime checks, not enforced)
+    if args.nambu and myrank == 0:
+        ph_viol = np.max(np.abs(sigma_hh + np.conj(sigma)))
+        if ph_viol > 1e-10:
+            print(f"WARNING: particle-hole symmetry violation |Sigma_hh + Sigma_pp*| = {ph_viol:.2e}")
+        hc_viol = np.max(np.abs(phi_dag_sigma - np.conj(phi_sigma)))
+        if hc_viol > 1e-10:
+            print(f"WARNING: anomalous Hermitian symmetry violation |Phi_dag - Phi*| = {hc_viol:.2e}")
+
     if args.interp:
         # Interpolates sigmas on equidistant mesh!
         eq_om = np.linspace(inl.om_emin, inl.om_emax, inl.om_npts)  # Equidistant mesh
@@ -153,14 +193,26 @@ def main(args):
             fi = interpolate.UnivariateSpline(omega, sigma[:,ii].imag,s=0)
             sig_band[:,ii] = fr(eq_om)+fi(eq_om)*1j
         sigma = sig_band
+        if args.nambu:
+            phi_band = np.zeros((len(eq_om),nii), dtype=np.complex128)
+            phi_dag_band = np.zeros((len(eq_om),nii), dtype=np.complex128)
+            sigma_hh_band = np.zeros((len(eq_om),nii), dtype=np.complex128)
+            for ii in range(nii):
+                for src, dst in [(phi_sigma, phi_band), (phi_dag_sigma, phi_dag_band), (sigma_hh, sigma_hh_band)]:
+                    fr = interpolate.UnivariateSpline(omega, src[:,ii].real,s=0)
+                    fi = interpolate.UnivariateSpline(omega, src[:,ii].imag,s=0)
+                    dst[:,ii] = fr(eq_om)+fi(eq_om)*1j
+            phi_sigma = phi_band
+            phi_dag_sigma = phi_dag_band
+            sigma_hh = sigma_hh_band
         omega = eq_om
         nom = len(eq_om)
-        
+
     iaib,degs =  Find_iaib(Sigind, icx_it, cixdim, nii)
     if myrank==0:
         print('iaib=', iaib)
         print('degs=', degs)
-    
+
     # Reading projector from Udmft.myrank
     fh_p = open(fUdmft[:-1]+str(myrank), 'rb')
     data_bytes = FortranReadRecord(fh_p, fUdmft)
@@ -170,22 +222,24 @@ def main(args):
     tnindo = struct.unpack(str(norbitals)+"i", data_bytes)
     if not np.allclose(tnindo,nindo):
         print('WARNING: when reading', fUdmft, 'in binary mode tnindo=', tnindo, 'while indo=', nindo)
-    
+
     pr_proc  = int(nkpt/mpisize+0.999)
     print(f"rank={myrank} pr_procr={numk} pr_proc={pr_proc} nkpt={nkpt} nsymop={nsymop} tnorbitals={tnorbitals}")
 
-    
+
     # reading case.energy file on all cores
     fh_ene = open(fenergy, 'r')
     (Eks, kps, wgs) = ReadEnergyFile(fenergy, nat, nkpt)
     #print('len(Eks)=', len(Eks), 'nkp=', nkpt)
     if not np.allclose(wgh,wgs):
          print("ERROR: mismatch in k-point weight", wgs, wgh)
-    
+
     tw_new=0
     if mode=='g':
         # local greens function
         gmloc = np.zeros((nom,nii), dtype=np.complex128)
+        if args.nambu:
+            gmloc_anom = np.zeros((nom,nii), dtype=np.complex128)
         if store_Ak:
             Akom = np.zeros((numk,nom,nii+1), dtype=float)
             gtot = np.zeros(nom, dtype=np.complex128)
@@ -221,7 +275,7 @@ def main(args):
                     for ind in range(nindo[iorb]):
                         UDMFT[pre_cix+iSx[iorb][ind]-1,:] = DMFTU[iorb][ind][:]
                 del DMFTU # done with old projector, from now on use the new UDMFT
-                
+
                 t0 = time.time()
                 if not args.full_inversion:
                     # Create projector in matrix form for SVD
@@ -230,7 +284,7 @@ def main(args):
                     # SVD to integrate out the unnecesary matrix part
                     U, S, Vh = np.linalg.svd(UF, full_matrices=True)
                     Unew = S[:,np.newaxis]*Vh  # new projector in rotated basis, taking out unitary matrix U
-                    # efficient projection 
+                    # efficient projection
                     STrans = np.zeros((nii,nlow,nlow),dtype=np.complex128) # projector for self-energy using Unew
                     for ii in range(len(iaib)):
                         for ia,ib in iaib[ii]:
@@ -273,45 +327,81 @@ def main(args):
                     STrans = np.zeros((nii,nbands,nbands),dtype=np.complex128)
                     for ii in range(len(iaib)):
                         for ia,ib in iaib[ii]:
-                            STrans[ii,:,:] += np.outer(UDMFT[ia,:],UDMFT[ib,:].conj()) 
+                            STrans[ii,:,:] += np.outer(UDMFT[ia,:],UDMFT[ib,:].conj())
                     GTrans = np.reshape(STrans.conj(),(nii,nbands*nbands))
-                    Eimp += (GTrans @ e_ks.reshape((nbands*nbands)))*kweight
+                    if args.nambu:
+                        Eimp += (GTrans @ np.diag(e_ks).ravel())*kweight
+                    else:
+                        Eimp += (GTrans @ e_ks.reshape((nbands*nbands)))*kweight
                     # loop over frequency
                     for iom in range(nom):
                         xomega = omega[iom]*1j+gamma*1j if imatsubara else omega[iom]+gamma*1j
                         Sigma = np.einsum('i,ijk->jk', sigma[iom, :], STrans)  # einstein summation : Sigma[j,k] = \sum_i sigma[iom,i]*STrans[i,j,k]
-                        gk = np.diag(xomega-e_ks) - Sigma
-                        gk = np.linalg.inv(gk)
-                        gmk = GTrans @ gk.reshape( (nbands*nbands) )
-                        gmk *= 1./degs
-                        gmloc[iom,:] += gmk*kweight
-                        if store_Ak: # This is used for plotting with plt_sakplot.py
-                            Akom[iikp,iom,1:] -= gmk.imag/(np.pi*nsymop)
-                            # We store spectral function projected to orbitals in row 1...nii,
-                            # while in row 0 we store the total spectral function Tr(1/(om+mu-ek-Sigma)).
-                            gtc = np.trace(gk)+np.sum(1/(xomega-Ek[:nemin-1]+EF+gamma*4j))+np.sum(1/(xomega-Ek[nemin-1+nbands:]+EF+gamma*4j))
-                            # Note that we should add bands which were removed from consideration in DMFT
-                            Akom[iikp,iom,0] -= gtc.imag/(np.pi*nsymop)
-                            gtot[iom] += gtc*kweight
-                            
+                        if args.nambu:
+                            Phi = np.einsum('i,ijk->jk', phi_sigma[iom, :], STrans)
+                            Phi_dag = np.einsum('i,ijk->jk', phi_dag_sigma[iom, :], STrans)
+                            Sigma_hh = np.einsum('i,ijk->jk', sigma_hh[iom, :], STrans)
+                            ginv_nambu = np.zeros((2*nbands,2*nbands), dtype=np.complex128)
+                            ginv_nambu[:nbands,:nbands] = np.diag(xomega-e_ks) - Sigma
+                            ginv_nambu[nbands:,nbands:] = np.diag(xomega+e_ks) - Sigma_hh
+                            ginv_nambu[:nbands,nbands:] = -Phi
+                            ginv_nambu[nbands:,:nbands] = -Phi_dag
+                            gk_nambu = np.linalg.inv(ginv_nambu)
+
+                            gmk = GTrans @ gk_nambu[:nbands,:nbands].reshape((nbands*nbands))
+                            gmk *= 1./degs
+                            gmloc[iom,:] += gmk*kweight
+
+                            fmk = GTrans @ gk_nambu[:nbands,nbands:].reshape((nbands*nbands))
+                            fmk *= 1./degs
+                            gmloc_anom[iom,:] += fmk*kweight
+
+                            if store_Ak: # This is used for plotting with plt_sakplot.py
+                                Akom[iikp,iom,1:] -= gmk.imag/(np.pi*nsymop)
+                                gtc = np.trace(gk_nambu[:nbands,:nbands])+np.sum(1/(xomega-Ek[:nemin-1]+EF+gamma*4j))+np.sum(1/(xomega-Ek[nemin-1+nbands:]+EF+gamma*4j))
+                                Akom[iikp,iom,0] -= gtc.imag/(np.pi*nsymop)
+                                gtot[iom] += gtc*kweight
+                        else:
+                            gk = np.diag(xomega-e_ks) - Sigma
+                            gk = np.linalg.inv(gk)
+                            gmk = GTrans @ gk.reshape( (nbands*nbands) )
+                            gmk *= 1./degs
+                            gmloc[iom,:] += gmk*kweight
+                            if store_Ak: # This is used for plotting with plt_sakplot.py
+                                Akom[iikp,iom,1:] -= gmk.imag/(np.pi*nsymop)
+                                # We store spectral function projected to orbitals in row 1...nii,
+                                # while in row 0 we store the total spectral function Tr(1/(om+mu-ek-Sigma)).
+                                gtc = np.trace(gk)+np.sum(1/(xomega-Ek[:nemin-1]+EF+gamma*4j))+np.sum(1/(xomega-Ek[nemin-1+nbands:]+EF+gamma*4j))
+                                # Note that we should add bands which were removed from consideration in DMFT
+                                Akom[iikp,iom,0] -= gtc.imag/(np.pi*nsymop)
+                                gtot[iom] += gtc*kweight
+
                 t2 = time.time()
                 tw_new += t2-t0
 
         if myrank==0:
             print('Time ', tw_new, 's')
             gmsum = np.empty_like(gmloc)
+            if args.nambu:
+                gmsum_anom = np.empty_like(gmloc_anom)
             Esum = np.empty_like(Eimp)
             if store_Ak: gsm = np.empty_like(gtot)
         else:
             gmsum = None
+            if args.nambu:
+                gmsum_anom = None
             Esum = None
             gsm = None
         comm.Reduce(gmloc, gmsum, op=MPI.SUM, root=0)
+        if args.nambu:
+            comm.Reduce(gmloc_anom, gmsum_anom, op=MPI.SUM, root=0)
         comm.Reduce(Eimp, Esum, op=MPI.SUM, root=0)
         if store_Ak: comm.Reduce(gtot, gsm, op=MPI.SUM, root=0)
         if myrank==0:
             Eimp = Esum
             gmloc = gmsum
+            if args.nambu:
+                gmloc_anom = gmsum_anom
             if store_Ak: gtot = gsm
             #print('Eimp=', Esum.real)
             for icix in range(ncix):
@@ -323,37 +413,107 @@ def main(args):
                         for it in range(csize[icix]):
                             gc = gmloc[iom,icx_it[icix][it]]
                             print(gc.real, gc.imag, end=' ', file=fo)
+                        if args.nambu:
+                            for it in range(csize[icix]):
+                                fc = gmloc_anom[iom,icx_it[icix][it]]
+                                print(fc.real, fc.imag, end=' ', file=fo)
+                            # F† = conj(F): same Re, negated Im
+                            for it in range(csize[icix]):
+                                fc = gmloc_anom[iom,icx_it[icix][it]]
+                                print(fc.real, -fc.imag, end=' ', file=fo)
+                            # G_hh = -conj(G_pp): negated Re, same Im
+                            for it in range(csize[icix]):
+                                gc = gmloc[iom,icx_it[icix][it]]
+                                print(-gc.real, gc.imag, end=' ', file=fo)
                         print(file=fo)
-                        
+
+            if args.nambu:
+                for icix in range(ncix):
+                    Ed = [Eimp[icx_it[icix][it]].real / degs[icx_it[icix][it]] for it in range(csize[icix])]
+                    print(f'dmftgk_nambu: icix={icix} csize={csize[icix]} Ed={Ed}')
+                    print(f'dmftgk_nambu: degs={[degs[icx_it[icix][it]] for it in range(csize[icix])]}')
+                    K = csize[icix]
+                    Ed = Ed + [0.0]*K + [0.0]*K + [-x for x in Ed]
+                    # Olap: 1.0 for sigind on diagonal, 0.0 for off-diagonal
+                    # Check the sigind matrix to determine which components are diagonal
+                    Olap = []
+                    for it in range(csize[icix]):
+                        sig_val = it + 1  # 1-based sigind value
+                        is_diag = any(Sigind[icix][i, i] == sig_val
+                                      for i in range(cixdim[icix]))
+                        Olap.append(1.0 if is_diag else 0.0)
+                    Olap = Olap + [0.0]*K + [0.0]*K + Olap  # hh has same diagonal structure as pp
+                    print(f'dmftgk_nambu: Olap={Olap}')
+                    with open(feimpout[icix], 'w') as fo:
+                        print('Ed='+str(Ed), file=fo)
+                        print('Olap='+str(Olap), file=fo)
+
             if Dhybrid:
                 delta = np.zeros_like(gmloc)
+                if args.nambu:
+                    delta_anom = np.zeros_like(gmloc_anom)
                 for icix in range(ncix):
                     glc = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
                     sig = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
                     eim = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
                     dlt = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
+                    if args.nambu:
+                        flc = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
+                        phi = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
                     for iom in range(len(omega)):
                         xomega = omega[iom]*1j+gamma*1j if imatsubara else omega[iom]+gamma*1j
+                        if args.nambu:
+                            dlt_anom = np.zeros_like(dlt)
                         for (ind1,ind2) in small_indx[icix]:
                             ii = small_indx[icix][(ind1,ind2)]
                             glc[ind1,ind2] = gmloc[iom,ii]
                             sig[ind1,ind2] = sigma[iom,ii]
-                            eim[ind1,ind2] = Esum[ii]
-                        ginv = np.linalg.inv(glc)
-                        dlt = xomega*np.eye(cixdim[icix]) - eim - sig - ginv
+                            if args.nambu:
+                                eim[ind1,ind2] = Esum[ii] / degs[ii]  # normalize by degs to match Ed convention (Fortran dmft1)
+                                flc[ind1,ind2] = gmloc_anom[iom,ii]
+                                phi[ind1,ind2] = phi_sigma[iom,ii]
+                            else:
+                                eim[ind1,ind2] = Esum[ii]
+                        if args.nambu:
+                            glc_hole = -np.conj(glc)  # G_hole(iω_n) = -G_n*(iω_n) by Matsubara symmetry
+                            gloc_nambu = np.block([[glc, flc], [np.conj(flc.T), glc_hole]])
+                            ginv_nambu = np.linalg.pinv(gloc_nambu)
+                            dlt = xomega*np.eye(cixdim[icix]) - eim - sig - ginv_nambu[:cixdim[icix],:cixdim[icix]]
+                            dlt_anom = -phi - ginv_nambu[:cixdim[icix],cixdim[icix]:]
+                        else:
+                            ginv = np.linalg.inv(glc)
+                            dlt = xomega*np.eye(cixdim[icix]) - eim - sig - ginv
                         for (ind1,ind2) in small_indx[icix]:
                             ii = small_indx[icix][(ind1,ind2)]
                             delta[iom,ii] += dlt[ind1,ind2]/degs[ii]
-                            
+                            if args.nambu:
+                                delta_anom[iom,ii] += dlt_anom[ind1,ind2]/degs[ii]
+
                 for icix in range(ncix):
-                    with open('Dlt.'+str(icix+1),'w') as fo:
+                    if args.nambu:
+                        dlt_path = fdltout[icix]
+                    else:
+                        dlt_path = 'Dlt.'+str(icix+1)
+                    with open(dlt_path,'w') as fo:
                         for iom in range(len(omega)):
                             print(omega[iom], end=' ', file=fo)
                             for it in range(csize[icix]):
                                 dl = delta[iom,icx_it[icix][it]]
                                 print(dl.real, dl.imag, end=' ', file=fo)
+                            if args.nambu:
+                                for it in range(csize[icix]):
+                                    dl = delta_anom[iom,icx_it[icix][it]]
+                                    print(dl.real, dl.imag, end=' ', file=fo)
+                                # Δ_anom† = conj(Δ_anom): same Re, negated Im
+                                for it in range(csize[icix]):
+                                    dl = delta_anom[iom,icx_it[icix][it]]
+                                    print(dl.real, -dl.imag, end=' ', file=fo)
+                                # Δ_hh = -conj(Δ_pp): negated Re, same Im
+                                for it in range(csize[icix]):
+                                    dl = delta[iom,icx_it[icix][it]]
+                                    print(-dl.real, dl.imag, end=' ', file=fo)
                             print(file=fo)
-            
+
         if store_Ak:
             if myrank==0:
                 recv_counts = np.array([min(max(0,nkpt-pr_proc*(iproc)),pr_proc) for iproc in range(mpisize)],dtype=int)
@@ -365,7 +525,7 @@ def main(args):
                 recv_counts = None
                 displacements = None
                 A_kom = np.empty(1)
-            
+
             comm.Gatherv(sendbuf=Akom.ravel(), recvbuf=(A_kom.ravel(), recv_counts, displacements, MPI.DOUBLE), root=0)
             if myrank==0:
                 np.save('A_kom.npy',A_kom)
@@ -375,8 +535,8 @@ def main(args):
                 #        for iom in range(len(omega)):
                 #            print(omega[iom], end=' ', file=fo)
                 #            print(('{:12.7f} '*(nii+1)).format(*(A_kom[ik,iom,:])), file=fo)
-                        
-        
+
+
     elif mode=='e':
         zek    = [[] for iikp in range(numk)]
         nemins = np.zeros(numk, dtype=int)
@@ -404,12 +564,12 @@ def main(args):
                     for ind in range(nindo[iorb]):
                         UDMFT[pre_cix+iSx[iorb][ind]-1,:] = DMFTU[iorb][ind][:]
                 del DMFTU
-                
+
                 t0 = time.time()
                 STrans = np.zeros((nii,nbands,nbands),dtype=np.complex128)
                 for ii in range(len(iaib)):
                     for ia,ib in iaib[ii]:
-                        STrans[ii,:,:] += np.outer(UDMFT[ia,:],UDMFT[ib,:].conj()) 
+                        STrans[ii,:,:] += np.outer(UDMFT[ia,:],UDMFT[ib,:].conj())
                 # loop over frequency
                 for iom in range(nom):
                     #xomega = omega[iom]*1j+gamma*1j if imatsubara else omega[iom]+gamma*1j
@@ -427,7 +587,7 @@ def main(args):
                     UAr = UDMFT.conj() @ Ar
                     UAl = Al.T.conj() @ UDMFT.T
                     zeks[iom,:] += _zek_ * 1./nsymop
-                    
+
                 t2 = time.time()
                 tw_new += t2-t0
             if myrank==0:
@@ -438,7 +598,7 @@ def main(args):
             iend = np.where(min_zek<emax)[0][-1]+1
             zek[iikp] = zeks[:,istart:iend]
             nemins[iikp] = nemin+istart
-            
+
         all_zek = comm.gather(zek, root=0)
         all_nemins = comm.gather(nemins, root=0)
         if myrank==0:
@@ -460,7 +620,7 @@ def main(args):
                             for iband in range(nbands):
                                 print(f'{zeks[iom,iband].real+EF:24.15f} {zeks[iom,iband].imag:24.15f}', end=' ', file=fe)
                             print(file=fe)
-                    
+
                     # '(A,5I5,2x,F23.20,2x,A)') '!', ikp, isym, nbands, nemin, nom, wgh(ikp)/(nsymop*tweight), ': ikp, isym, nbands nemin, nomega, kweight'
                     #WRITE(fh_ee+0,'(F19.14,2x,2I5,1x)',advance='no') omega(iom), nxmax-nxmin+1, nxmin+nemin-1
                     #WRITE(fh_ee+0,'(2E24.16,1x)',advance='no') zek(ibnd)
@@ -468,7 +628,7 @@ def main(args):
     if myrank==0:
         print("STOP dmftgk")
 
-    
+
 def ReadKlist(fklist):
     """
     Reads k-list of wien2k
@@ -503,7 +663,7 @@ def ReadKlist(fklist):
                 break
             kvec.append( [int(line[w[i]:w[i+1]]) for i in range(4)] )
             wgh.append( float(line[w[4]:w[5]]) )
-            
+
     kvec = np.array(kvec).T
     wgh = np.array(wgh)
     return kvec, wgh
@@ -529,8 +689,8 @@ def ReadDMFTUi(fh_p, fUdmft, nindo, nbands):
             _DMFTU_.append(dmftu[::2]+dmftu[1::2]*1j)
         DMFTU.append(_DMFTU_)
     return DMFTU
-    
- 
+
+
 def ReadBasicArrays(fbasicArrays,myrank):
     # --- Read the header of BasicArrays.dat to get dimensions ---
     with open(fbasicArrays, 'r') as fhb:
@@ -618,7 +778,7 @@ def ReadBasicArrays(fbasicArrays,myrank):
             icix=     cix[icase][lcase]
             #          nind[icase][lcase]
             cix_orb[iorb-1]=icix-1
-        
+
     QPrint=False
     if QPrint and myrank==0:
         print("nindo =", nindo)
@@ -648,7 +808,7 @@ def ReadEnergyFile(fenergy, nat, nkpt):
       - A 10-character string,
       - Two integers (each in a 6-character field),
       - One floating-point number in E19.12 format.
-      
+
     After the header, there are NE lines, each containing:
       - NUM (an integer band index, assumed to be 1-indexed),
       - E1   (a floating-point energy).
@@ -667,13 +827,13 @@ def ReadEnergyFile(fenergy, nat, nkpt):
       NE : int
           The number of energy lines read.
       Ek : numpy.ndarray of shape (nume,)
-          The energy array with energies placed at positions (NUM-1).  
+          The energy array with energies placed at positions (NUM-1).
           (All values are initially zero except for the ones read from the file.)
     """
     with open(fenergy, 'r') as fh_ene:
         data = fh_ene.readlines()
         #data = fh_ene.read().splitlines()
-    
+
     # In Fortran, read linearization energies for i=1..nat, skipping them
     ipos = 2*nat
     Eks=[]
@@ -734,56 +894,56 @@ if __name__ == "__main__":
  We are computing local Green's function using the numerical trick to speed up the inversion of the matrix.
  The matrix to invert is of the size norbs x norbs rather than nbans x nbands.
  To compute the local Green's function using projector Uk, we normally do the following:
- 
+
     G =  Uk^+ * (om + mu - ek - Uk*Sigma*Uk^+ )^{-1} * Uk
- 
- here Uk is projector/embeddor and Sigma is defined in orbital basis, while ek is a 
+
+ here Uk is projector/embeddor and Sigma is defined in orbital basis, while ek is a
  Kohn-Sham digonal matrix of band eigenvalues. Here Uk(:nbands,:norbs).
- The idea is to perform SVD decomposition of the projector Uk = U*s*Vt, and 
- U(:nbands,:nbands) is a unitary matrix in large bands space, and Vt(:norbs,:norbs) 
+ The idea is to perform SVD decomposition of the projector Uk = U*s*Vt, and
+ U(:nbands,:nbands) is a unitary matrix in large bands space, and Vt(:norbs,:norbs)
  is unitary in the smaller orbital space. We have only s(:norbs) finite singular values.
  It is straighforward to rewrite the above equation into
- 
+
    G =  Vt^+ * s * (om + mu - U^+*ek*U - s*Vt*Sigma*Vt^+*s)^{-1} * s*Vt
- 
- We now recognize that we only need to compute the inverse in the block where singular values 
- s are finite. The rest of the matrix does not contribute to the projected Green's function. 
- It does contribute to the total DOS, or, partial DOS for orbitals which are not correlated 
- (in the projector). Hence, when any icix=0, we need to invert the entire matrix (full_inversion=.True.) 
+
+ We now recognize that we only need to compute the inverse in the block where singular values
+ s are finite. The rest of the matrix does not contribute to the projected Green's function.
+ It does contribute to the total DOS, or, partial DOS for orbitals which are not correlated
+ (in the projector). Hence, when any icix=0, we need to invert the entire matrix (full_inversion=.True.)
  But for self-consistent cDMFT, we can invert only a submatrix in the following way:
- 
+
   H11 = U^+[:norbs,:]*(ek-mu)*U[:,:norbs]
   H12 = U^+[:norbs,:]*(ek-mu)*U[:,norbs:]
   H22 = U^+[norbs:,:]*(ek-mu)*U[:,norbs:]
- 
+
   G =         (  om - H11 - s*Vt*Sigma*Vt^+*s,  -H12 )^{-1}
        Vt^+*s*(  -H21                        , om-H22)      * s*Vt
- 
+
   G = Vt^+*s* ( om - H11 - s*Vt*Sigma*Vt^+*s - H12 * 1/(om-H22) * H21 )^{-1} * s*Vt
- 
+
   We can also diagonalize Hermitian matrix H22, i.e., H22 = A*ekp*A^+, and than we can write:
- 
+
   G = Vt^+*s* ( om - H11 - s*Vt*Sigma*Vt^+*s - H12*A * 1/(om-ekp) * (H12*A)^+ )^{-1} * s*Vt
- 
- The crucial observation is that the dimension of H11 is norbs x norbs, as opposed to original G^{-1} 
+
+ The crucial observation is that the dimension of H11 is norbs x norbs, as opposed to original G^{-1}
  size of nbands x nbands. We thus need to invert only norbs x norbs matrix to get the local Green's function.
- Note that SVD problem is frequency independent problem, and diagonalization of H22 is also done 
- outside frequency loop, so that for each frequency om, we just need to embbed Sigma with 
- new embeddor U_new==s*Vt and add improper part of the self-energy, which is H12*A * 1/(om-ekp) * (H12*A)^+. 
- This comes from the presence of all other bands in the system, which are not correlated. 
+ Note that SVD problem is frequency independent problem, and diagonalization of H22 is also done
+ outside frequency loop, so that for each frequency om, we just need to embbed Sigma with
+ new embeddor U_new==s*Vt and add improper part of the self-energy, which is H12*A * 1/(om-ekp) * (H12*A)^+.
+ This comes from the presence of all other bands in the system, which are not correlated.
  If we defined hi12== H12*A, we have
- 
+
   G = U_new^+ * (om - H11 - U_new*Sigma*U_new^+ - hi12*1/(om-ekp)*hi12^+ )^{-1} * U_new
- 
- and at each frequency we need to effectively only invert the small matrix norbs x norbs, 
- and compute matrix product of hi12*1/(om-ekp)*hi12^+, which is amounts to one matrix-matrix 
+
+ and at each frequency we need to effectively only invert the small matrix norbs x norbs,
+ and compute matrix product of hi12*1/(om-ekp)*hi12^+, which is amounts to one matrix-matrix
  multiplication of norbs x norbs.
- We can also compute total DOS, which is Tr(G), but in this case we need to add back 
+ We can also compute total DOS, which is Tr(G), but in this case we need to add back
  the second part of the matrix. We have:
-  
+
   Tr(G) = ( om - H11 - U_new*Sigma*U_new^+ - hi12*1/(om-ekp)*hi12^+ )^{-1},  ......                                                          )
           (..............................................................., (om - H22 - H21*(om - H11 - U_new*Sigma*U_new^+)^{-1} *H12)^{-1} )
- 
+
  which translates into
 
   Tr(G) = Tr( ( om - H11 - U_new*Sigma*U_new^+ - hi12*1/(om-ekp)*hi12^+ )^{-1} ) + Tr( (om - H22 - H21*(om - H11 - U_new*Sigma*U_new^+)^{-1} *H12 )^{-1} )
@@ -796,7 +956,8 @@ if __name__ == "__main__":
     parser.add_argument('-s', dest='store_Ak', default=False, action='store_true', help='store A_kom.npy for plotting with plt_sakplot.py')
     parser.add_argument('-l', dest='m_ext', type=str, default='', help='reading sig.inpxdn/sig.inpx, when set to dn/left-blank')
     parser.add_argument('-f', dest='full_inversion', default=False, action='store_true', help='perform full inversion, which is slower but safer')
-    parser.add_argument('-c', dest='cutoff', type=float, default=1.0, help='cutoff energy is taken from case.indmfl and increased by cutoff (1eV by default)') 
+    parser.add_argument('-c', dest='cutoff', type=float, default=1.0, help='cutoff energy is taken from case.indmfl and increased by cutoff (1eV by default)')
+    parser.add_argument('--nambu', dest='nambu', default=False, action='store_true', help='enable Nambu Dyson solver for superconductivity')
     args = parser.parse_args()
     main(args)
-            
+

@@ -222,6 +222,14 @@ public:
   auto ReadPseudoSig00(string Sfilename, MPIcls& mpi){
     bool debug = true;
     auto retval = _ReadPseudoSig00_<double>(Sfilename, cix.Npseudo_unique, mpi);
+    // H3: a restart mesh with <2 points cannot be splined (degenerate Spline1DMany input).
+    // Treat it exactly like a failed read: caller (boldc.cc: if(!Sinitialized)
+    // InitializeSig00 -> CreateSigma000) then performs a clean cold start.
+    if (retval.Sinitialized and retval.xn.size()<2){
+      (*mpi.out) <<"WARN: The read "<<Sfilename<<" has a degenerate restart mesh (xn.size()="
+                 <<retval.xn.size()<<"). Falling back to cold start (Sinitialized=0)."<<endl;
+      retval.Sinitialized = 0;
+    }
     if (retval.Sinitialized){
       double beta_S00 = retval.xn(retval.xn.size()-1);
       double beta = tau(tau.size()-1);
@@ -239,17 +247,22 @@ public:
 	for (int k=0; k<retval.Sm.extent(0); ++k)
 	  for (int i=0; i<retval.xn.extent(0); ++i) fSig(i,k) = retval.Sm(k,i);
 	fSig.splineIt(retval.xn);
-	Array<double,2> Sm_new(retval.Sm.extent(0),tau.extent(0));
+	// H3: interpolate into a FRESH (Npseudo, tau.size()) array. The old in-place write into
+	// retval.Sm -- allocated (Npseudo, old-mesh-size) by _ReadPseudoSig00_ -- ran i up to
+	// tau.extent(0)-1 and was out-of-bounds whenever the restart mesh was smaller than the
+	// current tau mesh: the confirmed heap-corruption bug on degenerate restart files.
+	Array<double,2> SmNew(retval.Sm.extent(0), tau.size());
+	SmNew = 0;
 	int pos=0;
 	for (int i=0; i<tau.extent(0); ++i){
 	  intpar ips = InterpLeft(tau(i)*stretch, pos,retval.xn);
 	  for (int k=0; k<retval.Sm.extent(0); ++k)
-	    Sm_new(k,i) = fSig(ips,k);
+	    SmNew(k,i) = fSig(ips,k);
 	}
+	retval.Sm.resize(SmNew.extent(0), SmNew.extent(1));
+	retval.Sm = SmNew;
 	retval.xn.resize(tau.size());
 	retval.xn = tau;
-	retval.Sm.resize(Sm_new.shape());
-	retval.Sm = Sm_new;
 	if (debug){
 	  ofstream out("PPSigma.0.interpolated"); out.precision(12);
 	  for (int i=0; i<tau.extent(0); ++i){
@@ -1311,6 +1324,24 @@ public:
     int n = diag.extent(0);
     int minorder = N_min_order;
     int n_mino = n-minorder;
+    // n3fix ENTRY GUARD: configurations whose reweighting denominator W=|sumPhi|/phi_weight is
+    // zero/non-finite, or whose hybridization product Phi_dd underflowed to exact 0 (deep Nambu
+    // blocks: exp(-dE*tau) < DBL_MIN at beta=140), cannot be measured by the divide-based
+    // estimator (Phi_dd/W, .../cDelta(ihyb) would be inf/NaN/0/0). Their exact-arithmetic
+    // sampling probability is zero, so skipping contributes no bias. Count + report.
+    {
+      double _pw_ = weight(n_mino)/sqrtbetalist(n_mino);
+      double _W_  = abs(sumPhi)/_pw_;
+      double _Phidd_ = Product(cDelta(Range(0,n-1)));
+      static long long n3fix_skip = 0;
+      if (!(_W_>0.0) || _Phidd_==0.0 || !std::isfinite(_Phidd_/_W_)) {
+        ++n3fix_skip;
+        if (n3fix_skip==1 || n3fix_skip%1000000==0)
+          cout<<"n3fix: skipped zero/underflowed-weight measurement count="<<n3fix_skip
+              <<" sumPhi="<<sumPhi<<" Phi_dd="<<_Phidd_<<endl;
+        return;
+      }
+    }
     N_measure(n_mino) += 1;
     if (DEBUG) cout<<"   physical_visits["<<n_mino<<"]="<<N_measure(n_mino)<<endl;
     string ccstr=" ";
@@ -1520,8 +1551,13 @@ public:
 	      int ii0 = abs(_ii0_)-1;
 	      int imp_ii0 = G_importance[ii0];
 	      double g0 = Gmx(idx,0)(j0,j1);
-	      double _f0g0_ = Fi[0](j0)*g0 * (Phi_dd/W)*sgns;
-	      double sgn_ii0_g0 = sign(_ii0_)/g0;
+	      // FIX N3xSC-NaN (sealed root cause): amputated products replace divide-by-g below.
+	      // In the Nambu/SC dim-22 pairing block at beta=140, g=exp(-dE*tau) legitimately
+	      // underflows to exact 0.0 (worst exponent 6314 >> 745), so sign(_ii)/g was inf and
+	      // inf*0 == NaN -> Phi_cOCA NaN -> factor=-nan -> all output NaN.
+	      double F0 = Fi[0](j0);
+	      double c = (Phi_dd/W)*sgns;
+	      double fg0 = F0*g0;
 	      for (int j2=0; j2<Nm[2]; ++j2){
 		int _ii1_ = remember_ii(idx,1)(j1,j2);
 		if (_ii1_==0) continue;
@@ -1529,9 +1565,11 @@ public:
 		int imp_ii1 = G_importance[ii1];
 		if (imp_ii0 + imp_ii1 > OCA_cut_sum) continue;
 		double g1 = Gmx(idx,1)(j1,j2);
-		double f1g1 = Fi[1](j1)*g1;
-		double _f0g0_f1g1_ = _f0g0_*f1g1;
-		double sgn_ii1_g1 = sign(_ii1_)/g1;
+		double F1 = Fi[1](j1);
+		double fg1 = F1*g1;
+		double fg0_fg1 = fg0*fg1;   // legs 0,1 with their own g (un-amputated)
+		double F0_fg1  = F0*fg1;    // leg-0 amputated (g0 dropped, F0 kept)
+		double fg0_F1  = fg0*F1;    // leg-1 amputated (g1 dropped, F1 kept)
 		for (int j3=0; j3<Nm[3]; ++j3){
 		  int _ii2_ = remember_ii(idx,2)(j2,j3);
 		  if (_ii2_==0) continue;
@@ -1543,17 +1581,23 @@ public:
 		  int importance = imp_ii0 + imp_ii1 + imp_ii2 + G_importance[ii3];
 		  if (importance <= OCA_cut_sum ){
 		    double g2 = Gmx(idx,2)(j2,j3);
-		    double f2g2 = Fi[2](j2)*g2;
+		    double F2 = Fi[2](j2);
+		    double fg2 = F2*g2;
 		    double g3 = Gmx(idx,3)(j3,j0);
-		    double f3g3 = Fi[3](j3)*g3;
-		    //double phiLR = Fi[0](j0)*Gmx(idx,0)(j0,j1)*Fi[1](j1)*Gmx(idx,1)(j1,j2)*Fi[2](j2)*Gmx(idx,2)(j2,j3)*Fi[3](j3)*Gmx(idx,3)(j3,j0);
-		    //double Phi_this_block = phiLR*(Phi_dd/W)*sgns;
-		    double Phi_this_block = _f0g0_f1g1_*f2g2*f3g3;
-		    Phi_this_block_OCA += Phi_this_block;
-		    _dS_(ii0,0) += sgn_ii0_g0*Phi_this_block;
-		    _dS_(ii1,1) += sgn_ii1_g1*Phi_this_block;
-		    _dS_(ii2,2) += sign(_ii2_)/g2*Phi_this_block;
-		    _dS_(ii3,3) += sign(_ii3_)/g3*Phi_this_block;
+		    double F3 = Fi[3](j3);
+		    double fg3 = F3*g3;
+		    double fg2_fg3 = fg2*fg3;
+		    // Algebraically identical to the old (sign/g)*Phi form whenever g!=0 (fg/g==F cancels
+		    // exactly); performs ZERO divisions, so an exact-0 underflowed g yields the correct
+		    // finite (typically 0) contribution instead of inf*0==NaN or 0/0==NaN.
+		    // NOTE: a plain if(g==0) continue would be WRONG physics (drops the legitimate
+		    // amputated contribution of the other legs).
+		    double Phi_this_block_here = fg0_fg1*fg2_fg3*c;
+		    Phi_this_block_OCA += Phi_this_block_here;
+		    _dS_(ii0,0) += sign(_ii0_)*F0_fg1*fg2_fg3*c;   // leg-0 amputated
+		    _dS_(ii1,1) += sign(_ii1_)*fg0_F1*fg2_fg3*c;   // leg-1 amputated
+		    _dS_(ii2,2) += sign(_ii2_)*fg0_fg1*F2*fg3*c;   // leg-2 amputated
+		    _dS_(ii3,3) += sign(_ii3_)*fg0_fg1*fg2*F3*c;   // leg-3 amputated
 		  }
 		}
 	      }
@@ -1873,12 +1917,12 @@ public:
 		    if (trans_njmm){
 		      for (int k=0; k<Nm; ++k){
 			int imp_ii = importance_m(idx,ihyb)(i,k);
-			tmp0(imp_ii) += Gtm(idx,ihyb)(i,k)*njmm(j,k);
+			if (imp_ii < tmp0.extent(0)) tmp0(imp_ii) += Gtm(idx,ihyb)(i,k)*njmm(j,k); // n3fix EDIT-C: OOB guard (imp_ii can exceed OCA_cut_sum)
 		      }
 		    }else{
 		      for (int k=0; k<Nm; ++k){
 			int imp_ii = importance_m(idx,ihyb)(i,k);
-			tmp0(imp_ii) += Gtm(idx,ihyb)(i,k)*njmm(k,j);
+			if (imp_ii < tmp0.extent(0)) tmp0(imp_ii) += Gtm(idx,ihyb)(i,k)*njmm(k,j); // n3fix EDIT-C: OOB guard
 		      }
 		    }
 		    tmp1(i,j,Range::all()) = tmp0(Range::all());
@@ -1989,10 +2033,16 @@ public:
 	    else
 	      F00(n_mino,s,Range::all()) += utl(ihyb,Range::all()) * Phi_F(ihyb) / cDelta(ihyb);
 	  }else{
+	    // n3fix EDIT-A (routing): the Nambu channel of a hybridization line is a static
+	    // property of the bath entry (Njm_ind decodes creation/annihilation from Fi_indx
+	    // parity, read_cix.h:141-148); the start-vs-end substitution (F_use_ie) changes the
+	    // EOM side (G*Sigma vs Sigma*G, Njm transposed, cf. comment at :1703-1707) but NOT
+	    // the channel. The analytic oracle (nca_oca_imag_axis.h:182-185,213) routes purely
+	    // by destroys_Cooper_pair_or_normal_down. Old code inverted the routing here.
 	    if (destroys_Cooper_pair_or_normal_down)
-	      F00(n_mino,s,Range::all()) += utl(ihyb,Range::all()) * Phi_F(ihyb) / cDelta(ihyb);
-	    else
 	      F01(n_mino,s,Range::all()) += utl(ihyb,Range::all()) * Phi_F(ihyb) / cDelta(ihyb);
+	    else
+	      F00(n_mino,s,Range::all()) += utl(ihyb,Range::all()) * Phi_F(ihyb) / cDelta(ihyb);
 	  }
 	}else{ // If superconductivity is absent, all goes into F00.
 	  F00(n_mino,s,Range::all()) += utl(ihyb,Range::all()) * Phi_F(ihyb) / cDelta(ihyb);
@@ -2009,12 +2059,11 @@ public:
 		//_F00_cOCA(s,Range::all()) += utl(ihyb,Range::all()) * Phi_F_OCA(ihyb) / cDelta(ihyb);
 	      }
 	    }else{
+	      // n3fix EDIT-B: mirror of EDIT-A for the cOCA accumulators (consistency when OCA_cut<1).
 	      if (destroys_Cooper_pair_or_normal_down){
-		F00_cOCA(s,Range::all()) += utl(ihyb,Range::all()) * Phi_F_OCA(ihyb) / cDelta(ihyb);
-		//_F02_OCA(s,Range::all()) += utl(ihyb,Range::all()) * Phi_F_OCA(ihyb) / cDelta(ihyb);
-	      }else{
 		F01_cOCA(s,Range::all()) += utl(ihyb,Range::all()) * Phi_F_OCA(ihyb) / cDelta(ihyb);
-		//_F03_OCA(s,Range::all()) += utl(ihyb,Range::all()) * Phi_F_OCA(ihyb) / cDelta(ihyb);
+	      }else{
+		F00_cOCA(s,Range::all()) += utl(ihyb,Range::all()) * Phi_F_OCA(ihyb) / cDelta(ihyb);
 	      }
 	    }
 	  }else{

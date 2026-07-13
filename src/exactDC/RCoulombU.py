@@ -69,8 +69,8 @@ def GetLambdas(UJ_icase, log=sys.stdout, projector_file='projectorw.dat', option
             print('lambda=', lmbda, 'epsilon=', epsilon, file=log)
             Fk = array(Fk)/epsilon
             print('Fk=', Fk.tolist(), 'U_J=', SlaterF2J(Fk,l), file=log)
-            if UJ_icase[icase][1]>0: # J existed before, hence use it
-                Js = ones(l)*UJ_icase[icase][1] 
+            if UJ_icase[icase][1]>=0: # J existed before, hence use it (>=0 so J=0 -> Js=0; was > which left Js undefined and crashed on J=0)
+                Js = ones(l)*UJ_icase[icase][1]
             print('J=', Js, file=log)
             UlamJ[icase]=(UJ_icase[icase][0],lmbda,epsilon,Js.tolist())
         

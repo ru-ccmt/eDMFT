@@ -6,6 +6,7 @@
 #include <limits>
 #include <algorithm>
 #include <ctime>
+#include <cmath>   // H1: std::isfinite
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -709,6 +710,29 @@ void CurrentMC6(Array<double,1>& Phi_tot, Array<double,2>& Sm, Array<T,2>& G00, 
     if (cOCA_needed){
       factor = Phi_lowest_order*Q/Phi_cOCA;   // normalization from NCA or OCA
       factorf = cmpPhysG ? Phi_lowest_order*Q/Phi_cOCAf : 0.0;
+    }
+    // H1: a non-finite normalization factor means this iteration's entire output would be
+    // garbage (NaN propagates into PPSigma/Sig files and every later iteration). Die loudly
+    // NOW, MPI-safely: mpi.Abort() -> MPI_Abort(MPI_COMM_WORLD,1) kills ALL ranks (same
+    // idiom as the Delta-read failure path in this file).
+    if (!std::isfinite(factor) or !std::isfinite(factorf)){
+      std::cerr << "FATAL: non-finite normalization factor -- aborting before writing output."
+                << " factor=" << factor << " factorf=" << factorf
+                << " Phi_lowest_order=" << Phi_lowest_order << " Q=" << Q
+                << " Phi_accumulate(0)=" << Phi_accumulate(0)
+                << " Phi_accumulatef(0)=" << Phi_accumulatef(0)
+                << " Phi_cOCA=" << Phi_cOCA << " Phi_cOCAf=" << Phi_cOCAf
+                << " cOCA_needed=" << cOCA_needed << " cmpPhysG=" << cmpPhysG << std::endl;
+      (*mpi.out) << "FATAL: non-finite normalization factor -- aborting before writing output."
+                 << " factor=" << factor << " factorf=" << factorf
+                 << " Phi_lowest_order=" << Phi_lowest_order << " Q=" << Q
+                 << " Phi_accumulate(0)=" << Phi_accumulate(0)
+                 << " Phi_accumulatef(0)=" << Phi_accumulatef(0)
+                 << " Phi_cOCA=" << Phi_cOCA << " Phi_cOCAf=" << Phi_cOCAf
+                 << " cOCA_needed=" << cOCA_needed << " cmpPhysG=" << cmpPhysG << std::endl;
+      (*mpi.out).flush();
+      mpi.Abort();
+      exit(1);
     }
     double discrete_factor = ra.discrete_factor();
     Phi_accumulate *= factor/Q;

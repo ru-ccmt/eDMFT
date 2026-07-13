@@ -1438,7 +1438,7 @@ def FastIsing(Nrange,UC):
                     for bs4 in bkeep:
                         Uc = 0.0
                         for k in range(0,l+1):
-                            UC += real(UC[k,bs1,bs2,bs3,bs4])*Fk[k,l]
+                            Uc += real(UC[k,bs1,bs2,bs3,bs4])*Fk[k,l]
                         if abs(Uc)>1e-6:
                             print("%2d %2d %2d %2d  %12.8f" % (bs1,bs2,bs3,bs4,Uc), file=fcix)
     

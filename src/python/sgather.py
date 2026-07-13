@@ -208,12 +208,31 @@ if __name__=='__main__':
         
         # The number of frequencies should be the same, but sometimes some frequencies are mising in the new iteration. Than mix just existing frequencies
         nom_new = shape(rSigma)[1]
+        nom_old = shape(rSigma_old)[1]
+        nom_common = min(nom_new, nom_old)   # mix only over the shared frequency mesh
         print('shape sigma old', shape(rSigma_old))
         print('shape sigma new', shape(rSigma))
-        
+        if nom_new != nom_old:
+            # e.g. the Nambu boldc output (imp.?/sig.out) carries an extra omega=5000
+            # high-frequency sentinel row that the (normal-state-seeded) old sig.inp lacks.
+            # Mixing the full arrays then raises 'operands could not be broadcast together'
+            # and the gathered sig.inp is silently left frozen -> no DMFT self-consistency.
+            # Mix on the common mesh instead; the result keeps the common (=old) mesh length
+            # so downstream ssplit/dmftgk are unchanged (s_oo/Edc live in the header, not in
+            # the sentinel row).
+            print('WARNING sgather: freq-mesh length mismatch new=%d old=%d -> mixing on common %d rows' % (nom_new, nom_old, nom_common))
+
+        # FIX (workflow wfm6leepl): row 0 of rSigma is the Matsubara FREQUENCY AXIS
+        # (rSigma[0]=om upstream).  Mixing it blends the new-solver mesh with the old
+        # (possibly different-beta) seed mesh -> the omega axis drifts geometrically
+        # (e.g. 0.4*pi/200 + 0.6*pi/50 = 0.04398), so dmftgk evaluates the Gor'kov
+        # inversion at WRONG Matsubara frequencies and BOTH normal and anomalous Sigma
+        # swing wildly.  Never blend the frequency axis: keep the new-solver mesh.
+        new_om = rSigma[0, :nom_common].copy()   # the clean new-solver Matsubara axis
         rs_oo[:] = options.mix*rs_oo[:]  + (1-options.mix)*array(s_oo)
         rEdc[:]  = options.mix*rEdc[:]   + (1-options.mix)*array(Edc)
-        rSigma = options.mix*rSigma[:,:] + (1-options.mix)*rSigma_old[:,:nom_new]
+        rSigma = options.mix*rSigma[:,:nom_common] + (1-options.mix)*rSigma_old[:,:nom_common]
+        rSigma[0] = new_om                        # restore the frequency axis (never mixed)
 
     
     print('osig=', options.osig)
