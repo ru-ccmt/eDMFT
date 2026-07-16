@@ -13,6 +13,10 @@ import scipy
 import dpybind
 from numpy import zeros
 from inorg_edmft_io import plaquette_unitary
+from cluster_interaction import (
+    build_single_band_cluster_tensor,
+    resolve_interaction_spec,
+)
 
 
 def _parse_nmat_txt(nmat_path, nambu=False, fh_info=None):
@@ -271,6 +275,42 @@ def extract_impurity_matrix_from_outputdmf1(outputdmf1_file):
 
 Default_CoulombF = 'Ising'
 
+
+def _resolve_inorg_sym(nambu, params):
+    """Return a solver symmetry token consistent with the execution mode."""
+    requested = None
+    if 'sym' in params:
+        requested = str(params['sym'][0]).strip("'\"")
+
+    if nambu:
+        allowed = {'psc', 'dsc', 'K-dsc'}
+        if requested is None:
+            return 'K-dsc'
+        if requested not in allowed:
+            raise ValueError(
+                "iNORG: Nambu mode requires sym in "
+                f"{sorted(allowed)}, got {requested!r}")
+        return requested
+
+    allowed = {'normal-pm', 'normal-af'}
+    if requested is None:
+        return 'normal-pm'
+    if requested not in allowed:
+        raise ValueError(
+            "iNORG: normal mode requires sym in "
+            f"{sorted(allowed)}, got {requested!r}")
+    return requested
+
+
+def _validate_inorg_interaction_spec(spec, coulomb_form):
+    """Reject interaction models that the iNORG serializer cannot represent."""
+    if (spec.mode == 'single_band_hubbard'
+            and coulomb_form not in ['Ising', 'IsingS', 'IsingK']):
+        raise ValueError(
+            "iNORG: Uc selects the single-band cluster Hubbard model, "
+            "which supports only the Ising CoulombF family; got "
+            + repr(coulomb_form))
+
 class IMP_INORG(object):
     """
     Wrapper for inorg
@@ -454,14 +494,22 @@ class IMP_INORG(object):
 
 
         ##### Prepare Uijkl interaction matrix  ###################################################
-        if 'cluster' in params and params['cluster'][0]:
+        is_cluster = bool('cluster' in params and params['cluster'][0])
+        interaction_spec = resolve_interaction_spec(
+            params, solver='iNORG', cluster=is_cluster)
+        if is_cluster:
             print("Impurity "+self.dir+" is a cluster impurity, we reconstruct"
                   +" the interaction matrix accordingly", file=self.fh_info)
-            Uc = ClusterCoulombMatrix(params,self.dir,self.fh_info,cix)
+            _validate_inorg_interaction_spec(
+                interaction_spec, self.CoulombF)
+            U_tensor = ClusterCoulombMatrix(
+                params, self.dir, self.fh_info, cix,
+                interaction_spec=interaction_spec)
         else:
             print("Impurity "+self.dir+" is a single-site impurity, setting up"
                   +" interaction matrix normally", file=self.fh_info)
-            Uc = CoulombMatrix(params,self.dir+'/Trans.dat',self.l,self.fh_info)
+            U_tensor = CoulombMatrix(
+                params, self.dir+'/Trans.dat', self.l, self.fh_info)
         self.fh_info.flush()
 
         #### Prepare executable  ##################################################################
@@ -492,32 +540,12 @@ class IMP_INORG(object):
                     print('{:10s}  {:10s}  {:s}'.format(p, val_str, params[p][1]), file=fp)
 
             # ---------------------------------------------------------------- #
-            # Write sym parameter                                               #
-            # Nambu mode: default 'K-dsc' (d-wave constraint, most accurate).  #
-            #   Accept Nambu-compatible syms: psc, dsc, K-dsc.                 #
-            #   Override normal-state syms (starting with 'normal'/'K-normal'). #
-            # Normal mode: default 'psc', overridable via params['sym'].        #
+            # Write sym parameter.  The bridge identifies normal mode from a   #
+            # ``normal-*`` token, so accepting a superconducting token in a    #
+            # normal calculation (or vice versa) changes interaction signs.    #
+            # Fail instead of silently changing the requested model.           #
             # ---------------------------------------------------------------- #
-            if self.nambu:
-                nambu_compatible_syms = {'psc', 'dsc', 'K-dsc'}
-                sym_value = 'K-dsc'  # Nambu default
-                if 'sym' in params:
-                    requested_sym = str(params['sym'][0]).strip("'\"")
-                    if requested_sym in nambu_compatible_syms:
-                        sym_value = requested_sym
-                    else:
-                        print(
-                            f"WARNING: Nambu mode — sym={requested_sym!r} is not "
-                            f"Nambu-compatible ({nambu_compatible_syms}). "
-                            f"Overriding to 'K-dsc'.",
-                            file=self.fh_info
-                        )
-                        sym_value = 'K-dsc'
-            else:
-                # Normal mode: default 'psc', allow params override
-                sym_value = 'psc'
-                if 'sym' in params:
-                    sym_value = str(params['sym'][0]).strip("'\"")
+            sym_value = _resolve_inorg_sym(self.nambu, params)
 
             print('{:10s}  {:10s}'.format('sym', sym_value), file=fp)
 
@@ -595,7 +623,9 @@ class IMP_INORG(object):
         shutil.copy2(self.dir+self.sparams['Delta'], self.dir+self.sparams['Delta']+'.'+extn)
 
         #### Prepare the input file with Eimp, Delta and Uijkl formatted for the ED solver
-        prepare_EDinput(self.dir+'input.tsv', self.Sigind, self.Eimps, lDelta, lom, Uc, self.CoulombF, self.spin_dep, self.fh_info, nambu=self.nambu)
+        prepare_EDinput(self.dir+'input.tsv', self.Sigind, self.Eimps,
+                        lDelta, lom, U_tensor, self.CoulombF,
+                        self.spin_dep, self.fh_info, nambu=self.nambu)
 
 
         # Write mpi_prefix.dat so inorg_run.py can use it for the C++ binary
@@ -1527,7 +1557,7 @@ def CoulombMatrix(params,ftrans,l,fh_info):
 
     return Uc
 
-def ClusterCoulombMatrix(params,dir,fh_info,cix):
+def ClusterCoulombMatrix(params,dir,fh_info,cix,interaction_spec=None):
     """
     Reconstructs the Coulomb matrix for a cluster calculation
     """
@@ -1553,22 +1583,43 @@ def ClusterCoulombMatrix(params,dir,fh_info,cix):
     if len(Sigind)==numpy.sum([2*(2*l+1) for l in at_l]):   # if spin_dep
         spin_deg=2
 
-    # Now for each atom: construct Trans_local_i.dat file, and construct Coulomb matrix
+    # Construct each Trans_local_i.dat and remember its global-orbital mapping.
+    # The legacy path also builds a Slater tensor for each atom.  The explicit
+    # Uc path must bypass SlaterF: SlaterF(Uc,J) gives
+    # U_x2-y2=Uc+8J/7 rather than the requested literal onsite Uc.
+    if interaction_spec is None:
+        interaction_spec = resolve_interaction_spec(
+            params, solver='iNORG', cluster=True)
     Uc_cluster = {}
     mem_indx = {}
     for iat in range(nat):
         print("Constructing Coulomb matrix for atom ", iat, file=fh_info)
         ftrans, mem_indx[iat], spin_deg = ConstructLocalTrans(iat,at_l,dir,Sigind,CF,spin_deg)
-        Uc_cluster[iat] = CoulombMatrix(params,ftrans,at_l[iat],fh_info)
+        if interaction_spec.mode == 'legacy_slater':
+            Uc_cluster[iat] = CoulombMatrix(
+                params, ftrans, at_l[iat], fh_info)
 
-    # Reconstruct the full interaction Matrix
+    # Reconstruct the full interaction matrix.
     print("Reconstructing Coulomb matrix for cluster ", iat, file=fh_info)
-    if spin_deg==2:
-        Uc = ReconstructCoulombMatrix(Uc_cluster,mem_indx,int(len(Sigind)/2))
+    if interaction_spec.mode == 'legacy_slater':
+        if spin_deg==2:
+            U_tensor = ReconstructCoulombMatrix(
+                Uc_cluster, mem_indx, int(len(Sigind)/2))
+        else:
+            U_tensor = ReconstructCoulombMatrix(
+                Uc_cluster, mem_indx, len(Sigind))
+    elif interaction_spec.mode == 'single_band_hubbard':
+        U_tensor = build_single_band_cluster_tensor(
+            interaction_spec, Sigind, mem_indx, nat, spin_deg)
+        print('Using literal single-band cluster interaction Uc=',
+              interaction_spec.value, 'source=', interaction_spec.source,
+              file=fh_info)
     else:
-        Uc = ReconstructCoulombMatrix(Uc_cluster,mem_indx,len(Sigind))
+        raise ValueError(
+            'iNORG: unsupported cluster interaction mode '
+            + repr(interaction_spec.mode))
 
-    return Uc
+    return U_tensor
 
 def ReconstructCoulombMatrix(Uc_cluster,mem_indx,size):
     """
@@ -1746,18 +1797,19 @@ def GetClusterAtoml(indmfl,cix):
 
     return len(at_l), at_l
 
-def prepare_EDinput(f, Sigind, Eimps, Delta, lom, Uc, CoulombF, spin_dep, fh_info, nambu=False):
+def prepare_EDinput(f, Sigind, Eimps, Delta, lom, U_tensor, CoulombF, spin_dep, fh_info, nambu=False):
     """
     Function that writes the impurity energies, hybridization function,
     and interaction matrix in the ED solver format.
 
-    In Nambu mode, Eimp and Delta use the full Nambu Sigind, but Uc remains
+    In Nambu mode, Eimp and Delta use the full Nambu Sigind, but U_tensor remains
     a physical (normal-state) interaction and is indexed only with the pp block.
     """
     norb = numpy.count_nonzero(numpy.diag(Sigind))  #nbr of correlated orbitals (spin included if spin dependent)
     ntot = len(Sigind)
 
-    # Nambu: Uc is a normal-state (pp-block only) interaction even though Sigind/Eimp/Delta are 2x larger
+    # Nambu: U_tensor is a normal-state (pp-block only) interaction even though
+    # Sigind/Eimp/Delta are 2x larger.
     Sigind_uc = Sigind
     ntot_uc = ntot
     if nambu:
@@ -1834,11 +1886,11 @@ def prepare_EDinput(f, Sigind, Eimps, Delta, lom, Uc, CoulombF, spin_dep, fh_inf
                                 for m4 in range(int(ntot_uc/divider)):
                                     if Sigind_uc[m4,m4]!=0:
                                         if (m1==m4 and m2==m3):
-                                            if numpy.abs(Uc[m1,m2,m3,m4])>1e-8:
-                                                Vij_abba[i1,i2] = Uc[m1,m2,m3,m4].real
+                                            if numpy.abs(U_tensor[m1,m2,m3,m4])>1e-8:
+                                                Vij_abba[i1,i2] = U_tensor[m1,m2,m3,m4].real
                                         if (m1==m3 and m2==m4 and m1!=m2):
-                                            if numpy.abs(Uc[m1,m2,m3,m4])>1e-8:
-                                                Vij_abab[i1,i2] = Uc[m1,m2,m3,m4].real
+                                            if numpy.abs(U_tensor[m1,m2,m3,m4])>1e-8:
+                                                Vij_abab[i1,i2] = U_tensor[m1,m2,m3,m4].real
                                         i4+=1
                                 i3+=1
                         i2+=1
@@ -1864,8 +1916,8 @@ def prepare_EDinput(f, Sigind, Eimps, Delta, lom, Uc, CoulombF, spin_dep, fh_inf
                             if Sigind_uc[m3,m3]!=0:
                                 for m4 in range(int(ntot_uc/divider)):
                                     if Sigind_uc[m4,m4]!=0:
-                                        if numpy.abs(Uc[m1,m2,m3,m4])>1e-8:
-                                            print(i1+1, i2+1, i3+1, i4+1, Uc[m1,m2,m3,m4].real, file=f)    #only real interaction terms
+                                        if numpy.abs(U_tensor[m1,m2,m3,m4])>1e-8:
+                                            print(i1+1, i2+1, i3+1, i4+1, U_tensor[m1,m2,m3,m4].real, file=f)    #only real interaction terms
                                         i4+=1
                                 i3+=1
                         i2+=1

@@ -22,6 +22,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import builtins
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -31,7 +32,16 @@ from scipy import interpolate
 import ctqmc
 import gen_cix
 import dmft_DC
+from cluster_interaction import (
+    InteractionSpec,
+    interaction_fingerprint,
+    resolve_interaction_spec,
+)
 from cmpEimp2 import GiveImpFunctional_bctqmc, obtain_last_value
+
+
+_INTERACTION_SIDECAR_SCHEMA = 1
+_RESTART_NAMES = ("sampled_data", "PPSigma.0")
 
 
 def _strip_quotes(text):
@@ -58,6 +68,56 @@ def _json_ready(value):
     if isinstance(value, floating):
         return float(value)
     return value
+
+
+def _atomic_write_json(path, payload):
+    """Writes a JSON sidecar without exposing a partially-written file."""
+    directory = os.path.dirname(os.path.abspath(path))
+    fd, temporary = tempfile.mkstemp(prefix=".interaction-", suffix=".json", dir=directory)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            json.dump(_json_ready(payload), stream, sort_keys=True, indent=2)
+            stream.write("\n")
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def _stable_context_fingerprint(spec, context):
+    """Extends the canonical interaction hash with CIX structural inputs."""
+    return interaction_fingerprint(spec, extra=_json_ready(context))
+
+
+def _cluster_site_count(clustershape):
+    """Returns the number of sites represented by two cluster lattice vectors."""
+    shape = array(clustershape, dtype=float)
+    if shape.shape != (2, 2):
+        raise ValueError(
+            "BCTQMC scalar Uc currently requires a two-dimensional 2x2 "
+            "clustershape matrix")
+    determinant = abs(float(linalg.det(shape)))
+    nsite = int(round(determinant))
+    if nsite <= 0 or not isclose(determinant, nsite, rtol=0.0, atol=1e-10):
+        raise ValueError("invalid clustershape with non-integral site count: %r"
+                         % clustershape)
+    return nsite
+
+
+def _cluster_cache_actions(update_atom, cix_exists, sidecar_matches):
+    """Return whether to rebuild the CIX and whether restart is incompatible.
+
+    ``UpdateAtom`` controls regeneration of the CIX (including its dynamic
+    impurity levels), as it did in the legacy wrapper.  It must not by itself
+    discard Bold-CTQMC's warm-start state.  Restart files are cleared only when
+    the cached interaction/CIX identity is missing or does not match.
+    """
+    cache_incompatible = not cix_exists or not sidecar_matches
+    rebuild_cix = bool(update_atom or cache_incompatible)
+    return rebuild_cix, cache_incompatible
 
 
 class IMP_BCTQMC(ctqmc.IMP_CTQMC):
@@ -90,12 +150,21 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
         # Cluster / K-native state.  For the K-diagonal (kspace) cluster indmfl
         # the incoming Sigind is already K-diagonal (e.g. diag([1,2,2,3]) for a
         # 2x2 plaquette), so no site<->K transform is needed here.
-        if 'clustershape' in params:
+        explicit_cluster = bool(params['cluster'][0]) if 'cluster' in params else False
+        self._cluster_mode = explicit_cluster or 'clustershape' in params
+        if 'Uc' in params and not self._cluster_mode:
+            raise ValueError(
+                "BCTQMC scalar Uc is supported only for a cluster impurity")
+        if self._cluster_mode and 'clustershape' not in params:
+            raise ValueError(
+                "BCTQMC cluster=True requires clustershape for cix generation")
+        if self._cluster_mode:
             self.clustershape = diag(array(params['clustershape'][0]))
         else:
             self.clustershape = array([1, 1])
         self.nambu = nambu
         self._input_basis = params['input_basis'][0] if 'input_basis' in params else 'kspace'
+        self._restart_fingerprint = None
 
         #@ remove some variables that we don't need in bold solver.
         self.sparams.pop('GlobalFlip', None)
@@ -146,13 +215,161 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
         # the accumulated statistics in `sampled_data` and the last pseudo
         # self-energy estimate `PPSigma.0`.
         restart_files = glob.glob("status.*")
-        for fil in ("sampled_data", "PPSigma.0"):
+        for fil in _RESTART_NAMES:
             if os.path.exists(fil):
                 restart_files.append(fil)
-        if self.dir != "./":
+        self._restart_sources = [os.path.abspath(fil) for fil in restart_files]
+        if self.dir != "./" and not self._cluster_mode:
             print("Copying restart files to", self.dir, file=self.fh_info)
-            for fil in restart_files:
-                shutil.copy2(fil, self.dir + "/" + fil)
+            self._copy_restart_sources()
+        elif self._cluster_mode and self._restart_sources:
+            print("Delaying cluster restart import until the CIX fingerprint is validated",
+                  file=self.fh_info)
+
+    def _copy_restart_sources(self):
+        """Copies restart candidates without ever modifying their source directory."""
+        destination_dir = os.path.abspath(self.dir)
+        for source in self._restart_sources:
+            if not os.path.isfile(source):
+                continue
+            destination = os.path.join(destination_dir, os.path.basename(source))
+            if os.path.abspath(source) == os.path.abspath(destination):
+                continue
+            shutil.copy2(source, destination)
+
+    def _clear_local_restart(self):
+        """Removes only restart state inside this impurity working directory."""
+        local_dir = os.path.abspath(self.dir)
+        candidates = glob.glob(os.path.join(local_dir, "status.*"))
+        candidates.extend(os.path.join(local_dir, name) for name in _RESTART_NAMES)
+        removed = []
+        for filename in candidates:
+            if os.path.isfile(filename) or os.path.islink(filename):
+                os.remove(filename)
+                removed.append(os.path.basename(filename))
+        if removed:
+            print("Cleared incompatible local Bold-CTQMC restart:", sorted(set(removed)),
+                  file=self.fh_info)
+
+    def _cluster_interaction_state(self, params):
+        """Resolves Uc and derives the fingerprinted CIX/sidecar identity."""
+        spec = resolve_interaction_spec(params, solver="bctqmc", cluster=True)
+        if not isinstance(spec, InteractionSpec):
+            raise TypeError("resolve_interaction_spec must return InteractionSpec")
+        if spec.Uc is None:
+            raise ValueError("BCTQMC cluster interaction requires Uc (or legacy Ud fallback)")
+
+        context = {
+            "schema": _INTERACTION_SIDECAR_SCHEMA,
+            "solver": "bctqmc",
+            "generator": "gen_cix.main2",
+            "generator_schema": 1,
+            "clustershape": params["clustershape"][0],
+            "l": int(self.l),
+            "nambu": bool(getattr(self, "nambu", False)),
+            "superc": 1 if getattr(self, "nambu", False) else 0,
+            "input_basis": getattr(self, "_input_basis", "kspace"),
+            "sigind_shifted": self.Sigind_shifted,
+        }
+        fingerprint = _stable_context_fingerprint(spec, context)
+        # The mode is already part of the fingerprint context, so Normal and
+        # Nambu files need no extra suffix.  Keep the full digest in the name
+        # to make the on-disk cache identity unambiguous.
+        cix_name = "bctqmc_cluster_%s.cix" % fingerprint
+        sidecar = {
+            "schema": _INTERACTION_SIDECAR_SCHEMA,
+            "fingerprint": fingerprint,
+            "cix": cix_name,
+            "interaction": {
+                "canonical_fingerprint": interaction_fingerprint(spec),
+                "model": spec.model,
+                "Uc": float(spec.Uc),
+                "source": spec.source,
+            },
+            "context": context,
+        }
+        return spec, fingerprint, cix_name, sidecar
+
+    def _sidecar_matches(self, sidecar_path, fingerprint, cix_name):
+        try:
+            with open(sidecar_path, "r") as stream:
+                saved = json.load(stream)
+        except (OSError, ValueError, TypeError):
+            return False
+        return (
+            saved.get("schema") == _INTERACTION_SIDECAR_SCHEMA
+            and saved.get("fingerprint") == fingerprint
+            and saved.get("cix") == cix_name
+        )
+
+    def _prepare_cluster_restart(self, fingerprint, reset, import_parent):
+        """Validates restart reuse against the interaction/CIX fingerprint."""
+        if reset:
+            self._clear_local_restart()
+            self._restart_fingerprint = fingerprint
+            return
+        if self._restart_fingerprint == fingerprint:
+            return
+        if import_parent:
+            self._copy_restart_sources()
+        self._restart_fingerprint = fingerprint
+
+    def _apply_cluster_cache_policy(self, fingerprint, update_atom,
+                                    cix_exists, sidecar_matches):
+        """Apply the independent CIX-rebuild and restart-reset decisions."""
+        rebuild_cix, reset_restart = _cluster_cache_actions(
+            update_atom, cix_exists, sidecar_matches
+        )
+        self._prepare_cluster_restart(
+            fingerprint,
+            reset=reset_restart,
+            import_parent=sidecar_matches,
+        )
+        return rebuild_cix, reset_restart
+
+    def _generate_cluster_cix(self, resolved_u, params, full_eimp, target_path, sidecar):
+        """Generates a cluster CIX in scratch and atomically installs it."""
+        expected_sites = _cluster_site_count(params["clustershape"][0])
+        if len(full_eimp) != expected_sites:
+            raise ValueError(
+                "BCTQMC scalar Uc requires exactly one active orbital per "
+                "cluster site: expected %d levels, got %d"
+                % (expected_sites, len(full_eimp)))
+        target_path = os.path.abspath(target_path)
+        target_dir = os.path.dirname(target_path)
+        superc = 1 if getattr(self, "nambu", False) else 0
+        generated_name = (
+            "bctqmc_U_" + str(resolved_u) + "_SC1.cix"
+            if superc else "bctqmc.cix"
+        )
+
+        with tempfile.TemporaryDirectory(prefix=".bctqmc-cix-", dir=target_dir) as scratch:
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(scratch)
+                with open("gen_cix.log", "w") as log_stream:
+                    with redirect_stdout(log_stream), redirect_stderr(log_stream):
+                        gen_cix.main2(
+                            resolved_u,
+                            array(params["clustershape"][0]),
+                            full_eimp,
+                            None,
+                            None,
+                            superc=superc,
+                            ifDCA=0,
+                        )
+            finally:
+                os.chdir(old_cwd)
+
+            generated_path = os.path.join(scratch, generated_name)
+            if not os.path.isfile(generated_path):
+                raise RuntimeError("gen_cix.main2 did not create " + generated_name)
+            os.replace(generated_path, target_path)
+            generated_log = os.path.join(scratch, "gen_cix.log")
+            if os.path.isfile(generated_log):
+                os.replace(generated_log, os.path.join(target_dir, "gen_cix.log"))
+
+        _atomic_write_json(target_path + ".interaction.json", sidecar)
 
     def _build_atomh_args(self, eimps, impq):
         """Builds the CLI for the new direct-basis atomh.py generator."""
@@ -202,6 +419,10 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
         for key, value in params.items():
             if len(key) > 5 and key[:5] == "atom_":
                 continue
+            # Uc is an eDMFT-side cluster-construction control.  Bold-CTQMC
+            # must not see it as a runtime interaction in addition to the CIX.
+            if self._cluster_mode and key == "Uc":
+                continue
             mapped = self._solver_key(key)
             if mapped not in payload:
                 order.append(mapped)
@@ -218,6 +439,18 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
         payload.pop("tsample", None)
         comments.pop("tsample", None)
         order = [key for key in order if key != "tsample"]
+
+        if self._cluster_mode:
+            # The cluster Hubbard interaction is already embedded by
+            # gen_cix.main2.  Keep all original params intact for the DC path,
+            # but disable the solver's separate runtime-U channel.
+            payload.pop("Uc", None)
+            comments.pop("Uc", None)
+            order = [key for key in order if key != "Uc"]
+            if "U" not in payload:
+                order.append("U")
+            payload["U"] = 0.0
+            comments["U"] = "runtime U disabled; cluster interaction is embedded in cix"
 
         # The impurity executable is selected by the Python wrapper itself;
         # the JSON file is consumed only by bctqmc.
@@ -515,6 +748,45 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
         self._om_edmft = array(om).copy()
         Delta = Delta_dat[1::2] + Delta_dat[2::2] * 1j
 
+        cluster_spec = None
+        cluster_sidecar = None
+        cluster_fingerprint = None
+        cluster_rebuild = False
+        restart_reset = False
+        if self._cluster_mode:
+            (cluster_spec, cluster_fingerprint, cix_name,
+             cluster_sidecar) = self._cluster_interaction_state(params)
+            self.sparams["cix"] = cix_name
+            cix_path = os.path.join(self.dir, cix_name)
+            sidecar_path = cix_path + ".interaction.json"
+            cix_exists = os.path.isfile(cix_path)
+            sidecar_matches = cix_exists and self._sidecar_matches(
+                sidecar_path, cluster_fingerprint, cix_name
+            )
+            cluster_rebuild, restart_reset = self._apply_cluster_cache_policy(
+                cluster_fingerprint, UpdateAtom, cix_exists, sidecar_matches
+            )
+            if cluster_rebuild:
+                # Invalidate the commit marker first.  If generation fails,
+                # the remaining CIX cannot accidentally be accepted next run.
+                try:
+                    os.remove(sidecar_path)
+                except FileNotFoundError:
+                    pass
+            print(
+                "BCTQMC cluster interaction: model=%s Uc=%s source=%s fingerprint=%s cix=%s %s restart=%s"
+                % (
+                    cluster_spec.model,
+                    cluster_spec.Uc,
+                    cluster_spec.source,
+                    cluster_fingerprint,
+                    cix_name,
+                    "rebuild" if cluster_rebuild else "reuse",
+                    "reset" if restart_reset else "preserve",
+                ),
+                file=self.fh_info,
+            )
+
         # The new direct-basis atomh.py assumes spin-orbit is already included
         # in Eimp, so there is no cx-based correction here.
         self.Eimps = Eimp - Edc
@@ -530,6 +802,12 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
             # + 1 anomalous (d-wave amplitude = Phi at the Y=(0,pi) channel).
             ncols = shape(Delta)[0]
             K = ncols // 4                       # 4 blocks pp/Phi/PhiD/Shh
+            expected_sites = _cluster_site_count(params['clustershape'][0])
+            if K != expected_sites:
+                raise ValueError(
+                    "BCTQMC scalar Uc requires exactly one active orbital per "
+                    "cluster site: expected %d Nambu pp channels, got %d"
+                    % (expected_sites, K))
             _KIDX_Y = 2                           # K order Gamma=0,X=1,Y=2,M=3
             Eimp_pp = array(self.Eimps[:K]).real
             Eimp3 = array([Eimp_pp[0],
@@ -542,7 +820,6 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
             self.Eimps = Eimp3                    # 3 normal K levels
             Delta = vstack([Dnorm3, Danom1])      # (4, n_omega): 3 normal + 1 anom
             self._nambu_nnorm = Dnorm3.shape[0]   # 3 (HighFrequency split)
-            self.sparams['cix'] = 'bctqmc_U_' + str(params['Ud'][0]) + '_SC1.cix'
             print('bctqmc[Nambu]: K-native input -> Eimp3=', Eimp3,
                   ' Delta = 3 normal + 1 anomalous', shape(Delta), file=self.fh_info)
 
@@ -563,7 +840,12 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
                     Ident[self.Sigind_shifted[i, i] - 1] = 1.0
         print("Ident=", Ident, file=self.fh_info)
 
-        if UpdateAtom or not os.path.isfile(self.dir + "/" + self.sparams["cix"]):
+        rebuild_cix = (
+            cluster_rebuild
+            if self._cluster_mode
+            else (UpdateAtom or not os.path.isfile(self.dir + "/" + self.sparams["cix"]))
+        )
+        if rebuild_cix:
             Eimps = (array(self.Eimps) - E0 * Ident).tolist()
             print("Eimps_new=", Eimps, " muQMC=", mu_QMC, file=self.fh_info)
             # Sigind_shifted is a NumPy array inherited from ctqmc.py, so its
@@ -574,7 +856,7 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
             Impq = [int(self.Sigind_shifted[i, i] - 1) for i in range(len(self.Sigind_shifted))]
             print("Impq=", Impq, file=self.fh_info)
 
-            if self.l==3:
+            if self.l == 3 and not self._cluster_mode:
                 self.atom_exe = os.path.join(self.env.ROOT, "atomh.py")
                 atom_arg = self._build_atomh_args(Eimps, Impq)
                 print("atomh.py arguments=", atom_arg, file=self.fh_info)
@@ -591,12 +873,12 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
                 )
                 ret = subprocess.call(cmd, shell=True, stdout=self.fh_info, stderr=self.fh_info)
                 print("ret=", ret, file=self.fh_info)
-            elif self.l < 3:
+            elif self.l < 3 or self._cluster_mode:
                 # K-native cluster DMFT (s,p,d).  The indmfl is already K-diagonal
                 # (e.g. diag([1,2,2,3]) for a 2x2 plaquette: Gamma/X=Y/M), so the
                 # kinetic terms are diagonal and only the interaction is off-diagonal
                 # in K.  gen_cix.main2 builds the matching cluster cix (bctqmc.cix).
-                if 'clustershape' in params and 'Ud' in params and params['Ud'][0] != 0.0:
+                if self._cluster_mode:
                     print('doing cluster DMFT...', file=self.fh_info)
                     if getattr(self, 'nambu', False):
                         # Nambu: re-expand the C4-merged 3 normal levels (E0-shifted)
@@ -616,19 +898,13 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
                         for i in arange(indnum):
                             fullEimp[i] = Eimps[self.Sigind[i][i] - 1]
                     print('fullEimp=', fullEimp, file=self.fh_info)
-                    old_cwd = os.getcwd()
-                    try:
-                        os.chdir(self.dir)  # so bctqmc.cix is generated in imp.N/
-                        with open("gen_cix.log", "w") as flog:
-                            with redirect_stdout(flog), redirect_stderr(flog):
-                                gen_cix.main2(params['Ud'][0],
-                                              array(params['clustershape'][0]),
-                                              fullEimp,
-                                              None, None,
-                                              superc=(1 if getattr(self, 'nambu', False) else 0),
-                                              ifDCA=0)
-                    finally:
-                        os.chdir(old_cwd)
+                    self._generate_cluster_cix(
+                        float(cluster_spec.Uc),
+                        params,
+                        fullEimp,
+                        os.path.join(self.dir, self.sparams["cix"]),
+                        cluster_sidecar,
+                    )
                 else:
                     print('l=', self.l, ' will implement atom_d.py', file=self.fh_info)
             else:
