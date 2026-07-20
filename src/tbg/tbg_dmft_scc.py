@@ -30,12 +30,14 @@ class EmbeddOrbitals:
             
         self.wk = ones(Nik) # k-point weights. For now, we did not yet use symmetry, hence all point have unity weight
         self.beta = beta
+        self.wbroad = par.get('wbroad', 0.0)
+        self.wbroad_low = par.get('wbroad_low', 1.0)
         if axis=='real':
             if plot_bands: # need equdistant mesh for imshow
                 w_min, w_max, Nw = par['plt_w']
                 self.w = linspace(w_min, w_max, Nw)
             else:
-                Nmax, x0, wmax = par['Nmax'], par['x0'], par['wmax']
+                Nmax, x0, wmax = par['Nmax'], par['x0'], par['L']
                 w_half = GiveTanMesh(x0,wmax,int(Nmax/2))
                 self.w = hstack( (-w_half[::-1], w_half[:]) )
             self.nom = 100  # just so that it does not fail
@@ -45,10 +47,15 @@ class EmbeddOrbitals:
             nmax = nmax_nom*self.nom
             #self.w = (2*arange(Nmax)+1)*pi/beta
             self.w , self.ind_om = create_log_mesh(self.nom, nmax, ntail, beta)
+    def RealFrequency(self, w, mu=0.0):
+        high_broad = 4.0/unit
+        low_broad = high_broad*self.wbroad_low/self.wbroad if self.wbroad > 0 else 0.0
+        broad = maximum(low_broad, minimum(self.wbroad*abs(w), high_broad))
+        return w + mu + 1j*broad
+
     def ComputeGloc0(self, axis, mu):
         if axis=='real':
-            broad_values = np.minimum(wbroad*np.abs(self.w), 4.0/unit)
-            om = self.w + mu + broad_values*1j
+            om = self.RealFrequency(self.w, mu)
             #wn = self.w + mu + vbroad(self.w)*1j
             #_w_ = tensordot(ones(self.Nband), wn, axes=0)
         else:
@@ -98,8 +105,7 @@ class EmbeddOrbitals:
         
     def ComputeGloc_internal(self, axis, mu, Sigmas):
         if axis=='real':
-            broad_values = np.minimum(wbroad*np.abs(self.w), 4.0/unit)
-            wn = self.w + mu + broad_values*1j
+            wn = self.RealFrequency(self.w, mu)
         else:
             wn = self.w*1j + mu
         Nd0 = 0.0
@@ -158,7 +164,7 @@ class EmbeddOrbitals:
         #if sum(abs(Sigmas))<1e-5:
         #    return self.ComputeGloc0(axis, mu)
         if axis=='real':
-            wn = self.w + mu + vbroad(self.w)*1j
+            wn = self.RealFrequency(self.w, mu)
         else:
             wn = self.w*1j + mu
         Nd0 = 0.0
@@ -327,7 +333,7 @@ class EmbeddOrbitals:
         
         for iw in range(len(self.w)):
             if axis=='real':
-                _w_ = self.w[iw]*Id
+                _w_ = self.RealFrequency(self.w[iw])*Id
             else:
                 _w_ = self.w[iw]*1j*Id
             for iAA in range(2):
@@ -717,18 +723,34 @@ if __name__ == '__main__':
         sig = zeros( (len(uns),len(em.w)), dtype=complex ) # this is the self-energy we need
         if sigma_read:    # managed to read sigma
             sg = sdat[1::2,:] + sdat[2::2,:]*1j # the rest is put together to complex function
-            #print 'Came here', sigma_read
-            if sum(abs(om[:em.nom]-em.w[:em.nom]))<1e-3: # Matsubara mesh from the file, and the new generated mesh is the same
-                for iw in range(len(em.ind_om)):         # only a subset of points is used here
-                    sig[:,iw] = sg[:,em.ind_om[iw]]
-            else: # Matsubara mesh has changed, need to interpolate
-                print('Now interpolating')
-                for icol in range(len(uns)):
-                    fsr = interpolate.UnivariateSpline(om, sg[icol].real, s=0)
-                    fsi = interpolate.UnivariateSpline(om, sg[icol].imag, s=0)
-                    sig[icol,:] = fsr(em.w) + fsi(em.w)*1j
-                dd = vstack( (em.w, sig.real, sig.imag) )
-                savetxt('debug_Sig', dd.T)
+            if axis=='imag':
+                #print 'Came here', sigma_read
+                if sum(abs(om[:em.nom]-em.w[:em.nom]))<1e-3: # Matsubara mesh from the file, and the new generated mesh is the same
+                    for iw in range(len(em.ind_om)):         # only a subset of points is used here
+                        sig[:,iw] = sg[:,em.ind_om[iw]]
+                else: # Matsubara mesh has changed, need to interpolate
+                    print('Now interpolating')
+                    for icol in range(len(uns)):
+                        fsr = interpolate.UnivariateSpline(om, sg[icol].real, s=0)
+                        fsi = interpolate.UnivariateSpline(om, sg[icol].imag, s=0)
+                        sig[icol,:] = fsr(em.w) + fsi(em.w)*1j
+                    dd = vstack( (em.w, sig.real, sig.imag) )
+                    savetxt('debug_Sig', dd.T)
+            else:
+                if len(om)==len(em.w) and sum(abs(om-em.w))<1e-3:
+                    sig[:,:] = sg[:,:]
+                else:
+                    print('Now interpolating real-axis self-energy')
+                    ind = argsort(om)
+                    oms = om[ind]
+                    sgs = sg[:,ind]
+                    inside = logical_and(em.w >= oms[0], em.w <= oms[-1])
+                    for icol in range(len(uns)):
+                        fsr = interpolate.UnivariateSpline(oms, sgs[icol].real, s=0)
+                        fsi = interpolate.UnivariateSpline(oms, sgs[icol].imag, s=0)
+                        sig[icol,inside] = fsr(em.w[inside]) + fsi(em.w[inside])*1j
+                    dd = vstack( (em.w, sig.real, sig.imag) )
+                    savetxt('debug_Sig', dd.T)
             #print 'sig=', sig
         else:
             print('WARNING : did not manage to read sigma from '+sname+'. Creating empty self-energy')

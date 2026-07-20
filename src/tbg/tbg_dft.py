@@ -93,6 +93,22 @@ class TwistGraphene:
         z_tk = self.t * sum(exp(dot(self.Rnnp,k)*1j))
         return npy.array([[0.,z_tk],[conj(z_tk),0.]])
 
+    def dH0m(self, k):
+        "Cartesian derivatives of H0(-theta/2,k)"
+        exps = exp(dot(self.Rnnm,k)*1j)            # exps[inn] = exp(i Rnn[inn,:2]*k[:2])
+        dzdk = 1j * self.t * dot(exps, self.Rnnm)  # dzdk[:2] = i t \sum_inn exps[inn] * Rnn[inn,:2]
+        dHx = npy.array([[0., dzdk[0]],[conj(dzdk[0]), 0.]])  # because Rnn[:,:2] are in cartesian coordinates, dHx and dHy are expressed in cartesian also
+        dHy = npy.array([[0., dzdk[1]],[conj(dzdk[1]), 0.]])
+        return (dHx, dHy)
+
+    def dH0p(self, k):
+        "Cartesian derivatives of H0(+theta/2,k)"
+        exps = exp(dot(self.Rnnp,k)*1j)            # exps[inn] = exp(i Rnn[inn,:2]*k[:2])
+        dzdk = 1j * self.t * dot(exps, self.Rnnp)  # dzdk[:2] = i t \sum_inn exps[inn] * Rnn[inn,:2]
+        dHx = npy.array([[0., dzdk[0]],[conj(dzdk[0]), 0.]]) # dHx = [[0,dz/dkx],[dz/dkx^*,0]]
+        dHy = npy.array([[0., dzdk[1]],[conj(dzdk[1]), 0.]]) # dHy = [[0,dz/dky],[dz/dky^*,0]]
+        return (dHx, dHy)
+
     def Vkp(self, k, G1, p, G2):
         k_Gk = dot(k + G1, self.bs)
         tw0 = self.tq_w0(norm(k_Gk))
@@ -292,7 +308,7 @@ class TwistGraphene:
         #    aclose = allclose(n_pk[_k_], n_pk_value[n_pk_index[_k_[0],_k_[1]]])
         #    print(_k_, '  ', aclose, shape(n_pk[_k_]))
     
-    def BuildIterlayerH(self, Hk, ks_lattice, n_pk, n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np):
+    def BuildInterlayerH(self, Hk, ks_lattice, n_pk, n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np):
         FAST=True
         dim_k = len(n_k)
         if (not FAST): # readable code
@@ -336,9 +352,52 @@ class TwistGraphene:
         else:  # maximally optimized code, but equivalent to above
             self_bs = npy.array(self.bs, dtype=float64)
             self_r_BAm = npy.array(self.r_BAm, dtype=float64)
-            BuildIterlayerH_faster(Hk, ks_lattice, self.n_pk_index, self.n_pk_value,
+            BuildInterlayerH_faster(Hk, ks_lattice, self.n_pk_index, self.n_pk_value,
                                        n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np,
                                        self_bs, self.tq0, self.tq1, self.al_di_gm, self_r_BAm, self.r_BAp)
+
+    def BuildHamiltonian(self, Hk, ks_lattice, n_pk, n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np):
+        """Build Hk in the same basis order used by BuildVelocity."""
+        dim_k = len(n_k)
+        k_bas=[]
+        for ik in range(len(n_k)):
+            nk = ks_lattice + n_k[ik] + n_k_reciprocal[ik]
+            kc = dot(nk, self.bs)
+            Hk[2*ik:2*(ik+1),2*ik:2*(ik+1)] += self.H0m(kc)
+            k_bas.append(kc)
+        for ip in range(len(n_p)):
+            np = ks_lattice + n_p[ip] + n_p_reciprocal[ip]
+            pc = dot(np, self.bs)
+            Hk[2*(dim_k+ip):2*(dim_k+ip+1),2*(dim_k+ip):2*(dim_k+ip+1)] += self.H0p(pc)
+            k_bas.append(pc)
+        self.BuildInterlayerH(Hk, ks_lattice, n_pk, n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np)
+        return Hk, k_bas
+
+    def BuildVelocity(self, Vx, Vy, ks_lattice, n_pk, n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np):
+        """Build Cartesian velocity matrices dH/dkx and dH/dky.
+
+        The basis order is identical to BuildInterlayerH: first all minus-layer
+        sublattice doublets, then all plus-layer doublets.
+        """
+        dim_k = len(n_k)
+        for ik in range(len(n_k)):
+            nk = ks_lattice + n_k[ik] + n_k_reciprocal[ik]
+            kc = dot(nk, self.bs)
+            dHkx, dHky = self.dH0m(kc)
+            Vx[2*ik:2*(ik+1),2*ik:2*(ik+1)] += dHkx
+            Vy[2*ik:2*(ik+1),2*ik:2*(ik+1)] += dHky
+        for ip in range(len(n_p)):
+            np = ks_lattice + n_p[ip] + n_p_reciprocal[ip]
+            pc = dot(np, self.bs)
+            dHpx, dHpy = self.dH0p(pc)
+            Vx[2*(dim_k+ip):2*(dim_k+ip+1),2*(dim_k+ip):2*(dim_k+ip+1)] += dHpx
+            Vy[2*(dim_k+ip):2*(dim_k+ip+1),2*(dim_k+ip):2*(dim_k+ip+1)] += dHpy
+        self_bs = npy.array(self.bs, dtype=float64)
+        self_r_BAm = npy.array(self.r_BAm, dtype=float64)
+        BuildInterlayerVelocity_faster(Vx, Vy, ks_lattice, self.n_pk_index, self.n_pk_value,
+                             n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np,
+                             self_bs, self.tq0, self.tq1, self.al_di_gm, self_r_BAm, self.r_BAp)
+        return Vx, Vy
     
 def IsInBZ(nk):
     small = 1e-7
@@ -383,9 +442,10 @@ def Give_k_Path(path, Nkp, bs):
     return (kpath, Npth)
 
 @jit(nopython=True)
-def BuildIterlayerH_faster(Hk, ks_lattice, n_pk_index, n_pk_value,
+def BuildInterlayerH_faster(Hk, ks_lattice, n_pk_index, n_pk_value,
                             n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np,
                             self_bs, self_tq0, self_tq1, self_al_di_gm, self_r_BAm, self_r_BAp):
+    dim_k = len(n_k)
     for ik in range(len(n_k)):
         for ip in range(len(n_p)):
             npk = n_p[ip]-n_k[ik]
@@ -430,6 +490,69 @@ def BuildIterlayerH_faster(Hk, ks_lattice, n_pk_index, n_pk_value,
                     #    print('nk=', n_k[ik], 'np=', n_p[ip], str_Gk, str_Gp, str_kGk, str_pGp, str_w0, str_phase, 'Vkp=', Vkp.tolist())
 
 
+@jit(nopython=True)
+def BuildInterlayerVelocity_faster(Vx, Vy, ks_lattice, n_pk_index, n_pk_value,
+                          n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np,
+                          self_bs, self_tq0, self_tq1, self_al_di_gm, self_r_BAm, self_r_BAp):
+    dim_k = len(n_k)
+    gamma = 1.25
+    for ik in range(len(n_k)):
+        for ip in range(len(n_p)):
+            npk = n_p[ip]-n_k[ik]
+            GpG = n_pk_value[n_pk_index[npk[0],npk[1]]]
+            k = ks_lattice + n_k[ik] + n_k_reciprocal[ik]
+            for gpg in GpG:
+                n_Gk = gpg[0]*Nm[0]+gpg[1]*Nm[1]
+                G1 = n_Gk - n_k_reciprocal[ik]
+                k_Gk = (k + G1) @ self_bs
+                qnorm = norm(k_Gk)
+                t_exp = exp(-self_al_di_gm * qnorm**gamma)
+                tw0, tw1 = self_tq0 * t_exp,  self_tq1 * t_exp
+                if abs(tw0) > 1e-4:
+                    if qnorm > 1e-14:
+                        dfac = -self_al_di_gm * gamma * qnorm**(gamma-2.0)
+                        dtw0x = tw0 * dfac * k_Gk[0]
+                        dtw0y = tw0 * dfac * k_Gk[1]
+                        dtw1x = tw1 * dfac * k_Gk[0]
+                        dtw1y = tw1 * dfac * k_Gk[1]
+                    else:
+                        dtw0x = 0.0
+                        dtw0y = 0.0
+                        dtw1x = 0.0
+                        dtw1y = 0.0
+
+                    phase_m = (G1 + 0.0) @ self_r_BAm
+                    n_Gp = gpg[2]*Np[0]+gpg[3]*Np[1]
+                    G2 = -n_Gp - n_p_reciprocal[ip]
+                    phase_p = (G2 + 0.0) @ self_r_BAp
+                    exp_m = exp(2*pi*1j*phase_m)
+                    exp_p = exp(2*pi*1j*phase_p)
+                    cexp_p = conj(exp_p)
+
+                    i0 = 2*ik
+                    j0 = 2*(dim_k+ip)
+
+                    Vx[i0  ,j0  ] += dtw0x
+                    Vx[i0  ,j0+1] += dtw1x*cexp_p
+                    Vx[i0+1,j0  ] += dtw1x*exp_m
+                    Vx[i0+1,j0+1] += dtw0x*exp_m*cexp_p
+
+                    Vx[j0  ,i0  ] += conj(dtw0x)
+                    Vx[j0+1,i0  ] += conj(dtw1x*cexp_p)
+                    Vx[j0  ,i0+1] += conj(dtw1x*exp_m)
+                    Vx[j0+1,i0+1] += conj(dtw0x*exp_m*cexp_p)
+
+                    Vy[i0  ,j0  ] += dtw0y
+                    Vy[i0  ,j0+1] += dtw1y*cexp_p
+                    Vy[i0+1,j0  ] += dtw1y*exp_m
+                    Vy[i0+1,j0+1] += dtw0y*exp_m*cexp_p
+
+                    Vy[j0  ,i0  ] += conj(dtw0y)
+                    Vy[j0+1,i0  ] += conj(dtw1y*cexp_p)
+                    Vy[j0  ,i0+1] += conj(dtw1y*exp_m)
+                    Vy[j0+1,i0+1] += conj(dtw0y*exp_m*cexp_p)
+
+
 
 if __name__ == '__main__':
     if not os.path.exists('tbg_params.py'):
@@ -445,6 +568,7 @@ par_bs={
    'Ecutoff'   : 1000., # Energy cutoff in meV for band structure to compute
    'npr'       : 10,    # number of bands/2 around the Fermi level to save for further processing
    'PlotBands' : True, # Either PltBands or save all-k points for computing projector and the Green's function later
+   'ComputeVelocity' : False, # Compute velocity.npz on the DMFT k-mesh
    'shift_mesh': 1./3., # twisted boundary condition, mesh-shift
    'path'      : [(2/3.,1/3.),(1/2.,1/2.),(1/3.,2/3.),(0,0),(1/2.,1/2.)], # path, relevant only when plotting 
    'path_legend':["K","M","K'","\Gamma","M"]
@@ -462,6 +586,7 @@ par_pr={
 
 par={
     'axis'       : 'real', # real or imag axis
+    'solver'     : 'CTQMC', # CTQMC or BCTQMC impurity solver
     'Nc'         : 20-4+Nf,# desired occupancy (we keep 10 band hence half-filling is 10 electrons
     'Sigma'      : 'Sigma.inp',# input filename or Sigma.inp_real
     'mu'         : 0.,     # current chemical potential
@@ -473,7 +598,8 @@ par={
     'ntail'      : 300,    # number of matsubara points in the tail
     'x0'         : 0.001,  # smallest mesh point on the real axis
     'Nmax'       : 2000,   # number of frequency points on the real axis
-    'wbroad'     : 0.05,    # broadening
+    'wbroad'     : 0.1,     # high-frequency real-axis broadening slope
+    'wbroad_low' : 0.01,    # low-frequency real-axis broadening scale; wbroad_low/wbroad sets the fraction of the high-frequency cap
     'rotateb'    : [False,True], # whether to diagonalize Eimp for the two sites AA and AB
     'rotateU'    :  False, # Should we rotate Coulomb U
     'dirs'       : ['imp.0', 'imp.1'], # directories for impurity calculation
@@ -517,11 +643,14 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
         ss = p + '=' + str(par_bs[p])
         print(ss)
         exec(ss)
+    ComputeVelocity = par_bs.get('ComputeVelocity', False)
+    if ComputeVelocity and PlotBands:
+        print('ComputeVelocity=True : using the DMFT k-mesh, not the band path.')
     
     #shift_mesh = 1./3.
     tw = TwistGraphene(itheta, w0_w1)
 
-    if PlotBands:
+    if PlotBands and not ComputeVelocity:
         kpath, Npth = Give_k_Path(path, Nkpt, tw.bs)
         #print 'kpath=', kpath
     else:
@@ -564,12 +693,29 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
     imin = max(0,int(nh/2)-npr)
     imax = min(  int(nh/2)+npr,nh)
 
+    use_saved_bands = False
+    if ComputeVelocity and os.path.exists('ene.npy') and os.path.exists('vector.npy') and os.path.exists('n_k.npy') and os.path.exists('n_p.npy'):
+        Psis_saved = npy.load('vector.npy')
+        Eks_saved = npy.load('ene.npy')
+        n_k_saved = npy.load('n_k.npy')
+        n_p_saved = npy.load('n_p.npy')
+        if (Psis_saved.shape == (len(kpath), imax-imin, nh) and
+            Eks_saved.shape == (len(kpath), imax-imin) and
+            n_k_saved.shape == n_k.shape and n_p_saved.shape == n_p.shape and
+            npy.array_equal(n_k_saved, n_k) and npy.array_equal(n_p_saved, n_p)):
+            use_saved_bands = True
+            print('Using compatible ene.npy/vector.npy for velocity calculation.')
+        else:
+            print('Existing ene.npy/vector.npy are not compatible with current mesh/basis; recomputing bands first.')
+
     save('n_k', n_k)
     save('n_p', n_p)
     
     Eks=[]
     Psis=[]
     k_basis=[]
+    Vxs=[]
+    Vys=[]
     for iik in range(len(kpath)):
         
         ks_lattice = kpath[iik]
@@ -578,6 +724,18 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
         # note that everything is here expressed in terms of emergent BZ vectors tw.bs
         n_k_reciprocal = tw.Find_If_Out_of_BZ(ks_lattice, n_k, Nm, False)
         n_p_reciprocal = tw.Find_If_Out_of_BZ(ks_lattice, n_p, Np, False)
+
+        if ComputeVelocity and use_saved_bands:
+            Vx = npy.zeros(( (dim_k+dim_p)*2, (dim_k+dim_p)*2 ), dtype=complex)
+            Vy = npy.zeros(( (dim_k+dim_p)*2, (dim_k+dim_p)*2 ), dtype=complex)
+            _tv1_ = timer()
+            Vx, Vy = tw.BuildVelocity(Vx, Vy, ks_lattice, n_pk, n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np)
+            psi_cut = Psis_saved[iik]
+            Vxs.append(psi_cut.conj() @ Vx @ psi_cut.T)
+            Vys.append(psi_cut.conj() @ Vy @ psi_cut.T)
+            _tv2_ = timer()
+            print(iik, 't(velocity)=', _tv2_-_tv1_)
+            continue
         
         Hk = npy.zeros(( (dim_k+dim_p)*2, (dim_k+dim_p)*2 ), dtype=complex)
         
@@ -585,29 +743,11 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
 
         _t5_ = timer()
         
-        k_bas=[]
-        for ik in range(len(n_k)):
-            nk = ks_lattice + n_k[ik] + n_k_reciprocal[ik]
-            kc = dot(nk, tw.bs)  # k in cartesian
-            Hk[2*ik:2*(ik+1),2*ik:2*(ik+1)] += tw.H0m(kc)
-            k_bas.append(kc)
-        for ip in range(len(n_p)):
-            np = ks_lattice + n_p[ip] + n_p_reciprocal[ip]
-            pc = dot(np, tw.bs) # p in cartesian
-            Hk[2*(dim_k+ip):2*(dim_k+ip+1),2*(dim_k+ip):2*(dim_k+ip+1)] += tw.H0p(pc)
-            k_bas.append(pc)
+        Hk, k_bas = tw.BuildHamiltonian(Hk, ks_lattice, n_pk, n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np)
         k_basis.append(k_bas)
         _t6_ = timer()
 
-        print(iik, 't(H-diagonal)=', _t6_-_t5_)
-        
-        #print 'Hk0='
-        #PrintH(Hk)
-        
-        tw.BuildIterlayerH(Hk, ks_lattice, n_pk, n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np)
-        
-        _t7_ = timer()
-        print(iik, 't(H-offdiagonal)=', _t7_-_t6_)
+        print(iik, 't(H-build)=', _t6_-_t5_)
         
         diff = Hk - Hk.conj().T
         print(iik, 'Is Hermitian=', (sum(abs(diff)) < 0.01))
@@ -622,7 +762,17 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
             Psis.append( psi[imin:imax] )
 
         _t8_ = timer()
-        print(iik, 't(diagonalize)=', _t8_-_t7_)
+        print(iik, 't(diagonalize)=', _t8_-_t6_)
+
+        if ComputeVelocity:
+            Vx = npy.zeros(( (dim_k+dim_p)*2, (dim_k+dim_p)*2 ), dtype=complex)
+            Vy = npy.zeros(( (dim_k+dim_p)*2, (dim_k+dim_p)*2 ), dtype=complex)
+            Vx, Vy = tw.BuildVelocity(Vx, Vy, ks_lattice, n_pk, n_k, n_p, n_k_reciprocal, n_p_reciprocal, Nm, Np)
+            psi_cut = psi[imin:imax]
+            Vxs.append(psi_cut.conj() @ Vx @ psi_cut.T)
+            Vys.append(psi_cut.conj() @ Vy @ psi_cut.T)
+            _t9_ = timer()
+            print(iik, 't(velocity)=', _t9_-_t8_)
         
         Eks.append(  ek[imin:imax] )
         
@@ -631,6 +781,12 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
         #print
         #print 'Hk='
         #PrintH(Hk)
+
+    if ComputeVelocity and use_saved_bands:
+        savez('velocity', vx=npy.array(Vxs)/unit, vy=npy.array(Vys)/unit,
+              kpath=kpath, n_k=n_k, n_p=n_p, bands=npy.arange(imin,imax), unit=unit)
+        print('Saved velocity.npz')
+        raise SystemExit
 
     ne = len(Eks[0])
     e0m = max([Eks[iik][int(ne/2)-1] for iik in range(len(Eks))])
@@ -642,7 +798,7 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
     Psis = npy.array(Psis)
     Eks = npy.array(Eks)
     
-    if PlotBands:
+    if PlotBands and not ComputeVelocity:
         fout = open('res1.dat', 'w')
         for iik in range(len(kpath)):
             evs = (Eks[iik]-e0)/unit
@@ -665,3 +821,8 @@ iparams0={"U"                  : [U0                   , "# Coulomb repulsion (F
         save('ene', (Eks-e0)/unit)
         save('vector', Psis)
         savez('basis', k_basis=k_basis, Rm=tw.Rm, Rp=tw.Rp, Rs=tw.Rs, rBAm=tw.rBAm, rBAp=tw.rBAp, bm=tw.bm, bp=tw.bp, bs=tw.bs, b0=tw.b0, Nm=Nm, Np=Np)
+
+    if ComputeVelocity:
+        savez('velocity', vx=npy.array(Vxs)/unit, vy=npy.array(Vys)/unit,
+              kpath=kpath, n_k=n_k, n_p=n_p, bands=npy.arange(imin,imax), unit=unit)
+        print('Saved velocity.npz')
