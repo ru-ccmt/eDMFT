@@ -239,14 +239,17 @@ public:
 	for (int k=0; k<retval.Sm.extent(0); ++k)
 	  for (int i=0; i<retval.xn.extent(0); ++i) fSig(i,k) = retval.Sm(k,i);
 	fSig.splineIt(retval.xn);
+	Array<double,2> Sm_new(retval.Sm.extent(0),tau.extent(0));
 	int pos=0;
 	for (int i=0; i<tau.extent(0); ++i){
 	  intpar ips = InterpLeft(tau(i)*stretch, pos,retval.xn);
 	  for (int k=0; k<retval.Sm.extent(0); ++k)
-	    retval.Sm(k,i) = fSig(ips,k);
+	    Sm_new(k,i) = fSig(ips,k);
 	}
 	retval.xn.resize(tau.size());
 	retval.xn = tau;
+	retval.Sm.resize(Sm_new.shape());
+	retval.Sm = Sm_new;
 	if (debug){
 	  ofstream out("PPSigma.0.interpolated"); out.precision(12);
 	  for (int i=0; i<tau.extent(0); ++i){
@@ -280,7 +283,7 @@ public:
       (*mpi.out)<<endl;
     }
     
-    auto [lambda0,followPeak] = DeterminePseudoPropagators(Gm,/**/tau,tau_dh,Sm,cix,beta,lambda0_fixed,followPeak_fixed,itt,mpi,pars,0);
+    auto [lambda0,followPeak] = DeterminePseudoPropagators(Gm,/**/tau,tau_dh,Sm,cix,beta,lambda0_fixed,followPeak_fixed,itt,mpi,pars,pars["peak_pos"]);
     
     FindLargestEigenvalues(gm,
 			   Gm,tau,cix,itt,mpi);
@@ -439,10 +442,31 @@ public:
       }
     }
     Sigm.resize(cix.Nbath_unique_unique,iom.extent(0)); Sigm=0;
+    Array<complex<double>,2> SigB(cix.Nbath_unique_unique,iom.extent(0)); SigB=0;
     Array<complex<double>,2> SigD(cix.Nbath_unique_unique,iom.extent(0)); SigD=0;
     Array<complex<double>,2> Gcn(cix.Nbath_unique_unique,iom.extent(0)); Gcn=0;
     density_matrix.resize(cix.Nbath_unique_unique); density_matrix=0;
     Ekin = 0; nf=0;
+
+    const bool blend_sdyson_bulla = pars["Sdyson_Bulla_blend"].get<bool>();
+    const double blend_alpha = pars["Sdyson_Bulla_alpha"].get<double>();
+    const double blend_cutoff_fraction = pars["Sdyson_Bulla_cutoff_fraction"].get<double>();
+    const double blend_start_ratio = pars["Sdyson_Bulla_start_ratio"].get<double>();
+    const double r_OCA_mesh = pars["r_OCA_mesh"].get<double>();
+    const double Ntau = pars["Ntau"].get<int>();
+    const double omega_N = M_PI*Ntau*r_OCA_mesh/beta;
+    const double w_end = blend_alpha*blend_cutoff_fraction*omega_N;
+    const double w_start = blend_start_ratio*w_end;
+    auto smoothstep = [](double x){
+      x = std::max(0.0, std::min(1.0, x));
+      return x*x*x*(10.0 - 15.0*x + 6.0*x*x);
+    };
+    auto bulla_weight = [&](double w){
+      if (!blend_sdyson_bulla) return 1.0;
+      if (blend_alpha <= 0.0) return 0.0;
+      if (w_end <= w_start) return 1.0;
+      return smoothstep((std::abs(w)-w_start)/(w_end-w_start));
+    };
     
     vector<bool> component_set(cix.Nbath_unique_unique,false);
     complex<double> j(0.,1.);
@@ -462,10 +486,14 @@ public:
 	      double E_inf_scalar;
 	      complex<double> om_Eimp, tail_sum=0;
 	      double _Ekin_ = 0, _nf_ = 0;
-	      //Sigm(iib,Range::all())  = 0.5*(Fc1(iib,Range::all())+Fc2(iib,Range::all()))/Gc(iib,Range::all());
-	      Sigm(iib,Range::all())  = Fc1(iib,Range::all())/Gc(iib,Range::all());
-	      E_inf_scalar = Eimp*ib_sg + std::real(Sigm(iib,ilast))*ib_sg;
+	      //SigB(iib,Range::all())  = 0.5*(Fc1(iib,Range::all())+Fc2(iib,Range::all()))/Gc(iib,Range::all());
+	      SigB(iib,Range::all())  = Fc1(iib,Range::all())/Gc(iib,Range::all());
+	      E_inf_scalar = Eimp*ib_sg + std::real(SigB(iib,ilast))*ib_sg;
 	      SigD(iib,Range::all()) = -1.0/Gc(iib,Range::all())*ib_sg-iDeltaw(iib,Range::all())*ib_sg-Eimp*ib_sg+iom(Range::all())*j;
+	      for (int iw=0; iw<iom.size(); ++iw){
+		const double W = bulla_weight(iom(iw));
+		Sigm(iib,iw) = (1.0-W)*SigD(iib,iw) + W*SigB(iib,iw);
+	      }
 	      Gcn (iib,Range::all()) =  1.0/(iom(Range::all())*j-Eimp*ib_sg-Sigm(iib,Range::all())*ib_sg-iDeltaw(iib,Range::all())*ib_sg);
 	      for (int iw=0; iw<iom.size(); ++iw){
 		om_Eimp = iom(iw)*j - E_inf_scalar;
@@ -617,7 +645,7 @@ public:
 	    }
 	  }
 	  MatrixXcd Gminv = Gm.inverse();         // Gm^{-1}
-	  MatrixXcd Sm    = Gminv * Fm;           // Sm = Gm^{-1} * Fm
+	  MatrixXcd SmB   = Gminv * Fm;           // Bulla/EOM estimator: SmB = Gm^{-1} * Fm
 	  MatrixXcd SmD   = om_Eimp - Gminv - Dm; // Dyson: Σ = (ω - E_imp) - G^{-1} - Δ
 	  
 	  if (mpi.rank==mpi.master){
@@ -628,7 +656,7 @@ public:
 	    out7<<iom(iw)<<" ";
 	    for (int i=0; i<N; ++i)
 	      for (int j=0; j<N; ++j){
-		out1 << Sm(i,j).real() << " " << Sm(i,j).imag()<< " ";
+		out1 << SmB(i,j).real() << " " << SmB(i,j).imag()<< " ";
 		out3 << Dm(i,j).real() << " " << Dm(i,j).imag()<< " ";
 		out4 << Gm(i,j).real() << " " << Gm(i,j).imag()<< " ";
 		out5 << Fm(i,j).real() << " " << Fm(i,j).imag()<< " ";
@@ -643,12 +671,14 @@ public:
 	  
 	  if (SC){ // we need to symmetrize anomalous components
 	    const int N2 = N/2;
-	    MatrixXcd S12 = Sm.block(0, N2, N2, N2);
-	    MatrixXcd S21 = Sm.block(N2, 0, N2, N2);
+	    MatrixXcd S12 = SmB.block(0, N2, N2, N2);
+	    MatrixXcd S21 = SmB.block(N2, 0, N2, N2);
 	    MatrixXcd A = 0.5*(S12 + S21);
-	    Sm.block(0, N2, N2, N2) = A;
-	    Sm.block(N2, 0, N2, N2) = A;
+	    SmB.block(0, N2, N2, N2) = A;
+	    SmB.block(N2, 0, N2, N2) = A;
 	  }
+	  const double W = bulla_weight(iom(iw));
+	  MatrixXcd Sm = (1.0-W)*SmD + W*SmB;     // NEW after realizing Sdyson is needed at low w: Combined self-energy used by DMFT: Sdyson at low w, Bulla at high w.
 	  MatrixXcd Ginv  = om_Eimp - Sm - Dm;    // G^{-1} = (ω - E_imp - Σ - Δ)
 	  MatrixXcd Gmc  = Ginv.inverse();        // G = (ω - E_imp - Σ - Δ)^{-1}
 	  
@@ -668,10 +698,11 @@ public:
 	    if (bb.orb_ind[iorb][0]==ib){
 	      int iib0 = cix.bath_sigind0(iorb);
 	      double ib_sg = (iib0 < 0 ? -1 : 1);
-	      int iib   = std::abs(iib0);
-	      if (not component_set[iib]){
+		int iib   = std::abs(iib0);
+		if (not component_set[iib]){
 		int j=bb.orb_ind[iorb][1], k=bb.orb_ind[iorb][2];
 		Sigm(iib,iw) = Sm(j,k)*ib_sg;  // just find the first occurence of this component.
+		SigB(iib,iw) = SmB(j,k)*ib_sg;
 		SigD(iib,iw) = SmD(j,k)*ib_sg;
 		Gcn(iib,iw) = Gmc(j,k)*ib_sg;
 		//cout<<"Sigm["<<iib<<","<<iw<<"]= Sm["<<j<<","<<k<<"]*"<<ib_sg<<endl;
@@ -746,6 +777,7 @@ public:
     }
     Gc = Gcn; // Be careful. Gc becomes 1/(om-Eimp-Sigma-Delta)
     if (mpi.rank==mpi.master){
+      Print_Physical1("Sbulla.out", SigB);
       Print_Physical1(dysonFname+"out", SigD);
     }
     /*

@@ -359,11 +359,14 @@ public:
       if (DEBUG) cout<<"2.line="<<line<<endl;
       std::istringstream iss(line);
       Array<double,1> energies(idim), spin(idim);
+      spin=0;
       for (int j=0; j<idim; ++j) iss >> energies(j);
-      for (int j=0; j<idim; ++j) iss >> spin(j);
-      if (DEBUG) cout<<"energies="<<energies<<endl;
       bool spin_present=false;
-      if (iss) spin_present=true;
+      if (iss >> spin(0)){
+	for (int j=1; j<idim; ++j) iss >> spin(j);
+	spin_present=true;
+      }
+      if (DEBUG) cout<<"energies="<<energies<<" spin_present="<<spin_present<<endl;
       Ham[i].resize(idim,idim);
       Spn[i].resize(idim,idim); Spn[i]=0;
       for (int j = 0; j<idim; ++j) {

@@ -491,7 +491,7 @@ auto DeterminProbabilities(const Array<double,1>& om, const Array<complex<double
 
   if (mpi.rank==mpi.master){
     clog<<"   "<<itt<<") nd= "<<r.nd<<endl;
-    clog<<"   "<<itt<<") Q = "<<r.Q<<endl;
+    clog<<"   "<<itt<<") Q=  "<<r.Q<<endl;
     for (int ib=0; ib<cix.Nblock; ++ib){
       int N = cix.Block[ib].size();
       double Ptot=0;
@@ -614,11 +614,41 @@ double DifferenceS(const Array<double,1>& xn, const Array<double,2>& Smt_new, co
 #include "Eigen/Dense"
 using Eigen::MatrixXcd;  // complex<double> matrix
 
-void ComputePhysicalSelfEnergyOnMesh(Array<complex<double>,2>& Sigm, Array<complex<double>,2>& SigD, Array<complex<double>,2>& Gc,
+inline double SdysonBullaSmootherStep(double x)
+{
+  x = std::max(0.0, std::min(1.0, x));
+  return x*x*x*(10.0 - 15.0*x + 6.0*x*x);
+}
+
+inline double RealAxisBullaWeight(double w, double L, double L_low, bool blend_sdyson_bulla)
+{
+  if (!blend_sdyson_bulla) return 1.0;
+  if (L<=0.0) return 1.0;
+  L_low = std::max(0.0, L_low);
+
+  double core, edge;
+  if (L > 2.0*L_low){
+    core = L_low;
+    edge = L - L_low;
+  }else{
+    core = 0.4*L;
+    edge = 0.6*L;
+  }
+  if (edge<=core) return (std::abs(w)<=core) ? 0.0 : 1.0;
+  const double aw = std::abs(w);
+  if (aw<=core) return 0.0;
+  if (aw>=edge) return 1.0;
+  return SdysonBullaSmootherStep((aw-core)/(edge-core));
+}
+
+void ComputePhysicalSelfEnergyOnMesh(Array<complex<double>,2>& Sigm, Array<complex<double>,2>& SigB, Array<complex<double>,2>& SigD, Array<complex<double>,2>& Gc,
 				     const Array<double,1>& om, const Array<complex<double>,2>& Gimp, const Array<complex<double>,2>& Fimp1, const Array<complex<double>,2>& Fimp2,
 				     const Array<complex<double>,2>& iDeltaw,
-				     const BathBlocks& bb, const Cix& cix, ostream& clog/**mpi.out*/, double small, bool debugPrint=false)
+				     const BathBlocks& bb, const Cix& cix, ostream& clog/**mpi.out*/, double small, bool debugPrint=false,
+				     bool blend_sdyson_bulla=true, double L_low=5.0)
 {
+  double L=0;
+  for (int iw=0; iw<om.size(); ++iw) L = std::max(L, std::abs(om(iw)));
 
   vector<bool> component_set(cix.Nbath_unique_unique,false);
   for (int ib=0; ib<(int)bb.blocks.size(); ++ib){
@@ -631,8 +661,12 @@ void ComputePhysicalSelfEnergyOnMesh(Array<complex<double>,2>& Sigm, Array<compl
 	  int iib   = std::abs(iib0);
 	  if (not component_set[iib]){
 	    double Eimp = cix.Ebath(iib);
-	    Sigm(iib,Range::all())  = Fimp1(iib,Range::all())/Gimp(iib,Range::all());
+	    SigB(iib,Range::all()) = Fimp1(iib,Range::all())/Gimp(iib,Range::all());
 	    SigD(iib,Range::all()) = -1.0/Gimp(iib,Range::all())*ib_sg-iDeltaw(iib,Range::all())*ib_sg-Eimp*ib_sg+om(Range::all());
+	    for (int iw=0; iw<om.size(); ++iw){
+	      const double Wb = RealAxisBullaWeight(om(iw), L, L_low, blend_sdyson_bulla);
+	      Sigm(iib,iw) = (1.0-Wb)*SigD(iib,iw) + Wb*SigB(iib,iw);
+	    }
 	    Gc  (iib,Range::all()) =  1.0/(om(Range::all())-Eimp*ib_sg-Sigm(iib,Range::all())*ib_sg-iDeltaw(iib,Range::all())*ib_sg);
 	    component_set[iib]=true;
 	    //
@@ -714,16 +748,18 @@ void ComputePhysicalSelfEnergyOnMesh(Array<complex<double>,2>& Sigm, Array<compl
 	  }
 	}
 	MatrixXcd Gminv = Gm.inverse();          // Gm^{-1}
-	MatrixXcd Sm    = Gminv * Fm;            // Sm = Gm^{-1} * Fm
+	MatrixXcd SmB   = Gminv * Fm;            // Bulla/EOM estimator: SmB = Gm^{-1} * Fm
 	MatrixXcd SmD   = om_Eimp - Gminv - Dm;  // Dyson: Σ = (ω - E_imp) - G^{-1} - Δ
 	if (SC){ // we need to symmetrize anomalous components
 	  const int N2 = N/2;
-	  MatrixXcd S12 = Sm.block(0, N2, N2, N2);
-	  MatrixXcd S21 = Sm.block(N2, 0, N2, N2);
+	  MatrixXcd S12 = SmB.block(0, N2, N2, N2);
+	  MatrixXcd S21 = SmB.block(N2, 0, N2, N2);
 	  MatrixXcd A = 0.5*(S12 + S21);
-	  Sm.block(0, N2, N2, N2) = A;
-	  Sm.block(N2, 0, N2, N2) = A;
+	  SmB.block(0, N2, N2, N2) = A;
+	  SmB.block(N2, 0, N2, N2) = A;
 	}
+	const double Wb = RealAxisBullaWeight(om(iw), L, L_low, blend_sdyson_bulla);
+	MatrixXcd Sm = (1.0-Wb)*SmD + Wb*SmB;
 	{
 	  complex<double> I(0.0,1.0);
 	  Eigen::MatrixXcd A = (0.5*I)* (Sm - Sm.adjoint());
@@ -762,6 +798,7 @@ void ComputePhysicalSelfEnergyOnMesh(Array<complex<double>,2>& Sigm, Array<compl
 	    if (not component_set[iib]){
 	      int j=bb.orb_ind[iorb][1], k=bb.orb_ind[iorb][2];
 	      Sigm(iib,iw) = Sm(j,k)*ib_sg;  // just find the first occurence of this component.
+	      SigB(iib,iw) = SmB(j,k)*ib_sg;
 	      SigD(iib,iw) = SmD(j,k)*ib_sg;
 	      Gc(iib,iw) = Gmc(j,k)*ib_sg;
 	      component_set[iib] = true;

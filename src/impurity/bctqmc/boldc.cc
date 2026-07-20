@@ -1011,7 +1011,6 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
 	string ending = (not next_break) ? string(".")+to_string(ist) : "";
 	ra.Print_Physical2(pars["fSig"].get<string>()+ending, Sigm, density_matrix0, nd, mu, Fimp, Epot, TrSigmaG, Ekin, nf, density_matrix, cix.deg_bath);
 	ra.Print_Physical2(pars["fGf"].get<string>()+ending, Gc, density_matrix0, nd, mu, Fimp, Epot, TrSigmaG, Ekin, nf, density_matrix, cix.deg_bath);
-	ra.Print_Physical("Gimp.out"s+ending, G00, F00, F01);
       }
     }
     
@@ -1117,6 +1116,7 @@ int main(int argc, char *argv[])
   pars["subExprElim"]=true;
   pars["min_weight"]=1e-2;         // when weight for any order becomes smaller than that, dont reduce it further
   pars["lambda0_fixed"] = 0.0;     // means lambda0 should be recomputed
+  pars["peak_pos"]      = 0.0;     // shift pseudo-particle threshold by peak_pos*T when determining lambda0
   pars["cutoffw"]      = 30.;      // real_axis_only: cutoff frequency on the real axis, the largest energy scale. Should not be in pars_r, because needed above
   pars["distr_width"]  = 1.5;      // real_axis_only: when adding new frequency, what is the width of the distribution. Should not be in pars_r, because needed above
   pars["broad"]        = 2.0;      // real_axis_only: how much to broad results compared to estimated error. Should not be in pars_r, because needed above
@@ -1124,11 +1124,11 @@ int main(int argc, char *argv[])
   pars["OCA_cut2"] = 1.0;
   pars["OCA_cut_sum"] = 3;
   pars["OCA_MC"] = true;          // When analytic OCA is the last order, should we add MC corrections or not.
+  pars["Sdyson_Bulla_blend"] = true;  // if true, Sig.out is Sdyson at low energy smoothly blended to Bulla at high energy.
   // added by codex
   //pars["matrix_mc_samples"] = 0;
   //pars["matrix_mc_burnin"] = 32;
   // real axis calculation
-  pars_r["peak_pos"]     = 0.0;     // to determine lambda0 we want spectral function to be peaked at peak_pos*T rather than 0, because this works better
   pars_r["Wtypical"]     = 1.0;     // typical frequency scale
   pars_r["wNbin"]        = 400;     // # bins for observables on real axis
   pars_r["gauss_x_width"]= 0.5;     // step in changing frequency
@@ -1155,6 +1155,7 @@ int main(int argc, char *argv[])
   pars_r["brd_exclude"] = 1.0;// removing noise for frequency above that energy
   pars_r["brd_max_der"] = 10.0;// removing when derivative due to noise is bigger than that 
   pars_r["brd_beta"] = 2.0;   // artificial cutoff beta for fermi function which cuts-off high frequency noise
+  pars_r["Sdyson_Bulla_L_low"] = 5.0;   // real-axis energy below which Sdyson is always used; above L-L_low Bulla is used.
   // imaginary axis calculation
   pars_i["diff_adapt_mesh"]=0; // so that we don't adapt mesh or fix lambda0
   pars_i["Ntau"]     = 512;
@@ -1178,8 +1179,17 @@ int main(int argc, char *argv[])
   pars_i["volterra_practical_team_size_cap"] = 8;    // practical cap used by scheduler; larger teams usually do not help because Volterra scaling saturates
   pars_i["volterra_max_dedicated_blocks"] = 5;       // maximum number of largest blocks that may receive dedicated inside-parallel teams
   pars_i["volterra_promote_medium_blocks"] = true;   // if true, medium-large blocks between the two size thresholds may also get dedicated teams if ranks remain
-  pars_i["volterra_print_diagnostics"] = true;      // print scheduler decisions (chosen teams, block sizes, rank split) for tuning and debugging
-  
+  pars_i["volterra_print_diagnostics"] = true;       // print scheduler decisions (chosen teams, block sizes, rank split) for tuning and debugging
+  pars_i["volterra_lambda_rescue"] = true;            // if Q becomes too large, scan a nearby lambda0 in the culprit pseudo-particle block and recompute propagators
+  pars_i["volterra_lambda_rescue_Q"] = 500.0;         // trigger rescue when raw sum_i G_i(beta) exceeds this threshold
+  pars_i["volterra_lambda_rescue_target_Q"] = 50.0;   // accept the first nearby lambda shift with culprit block max endpoint below this value
+  pars_i["volterra_lambda_rescue_negative_tol"] = 0.5; // also rescue if a diagonal endpoint weight is more negative than this
+  pars_i["volterra_lambda_rescue_max_delta"] = 0.05;  // largest |delta lambda0| tested around the static lambda0
+  pars_i["volterra_lambda_rescue_step"] = 0.001;      // lambda scan step used only when rescue is triggered
+  pars_i["r_OCA_mesh"] = 1.0;                        // OCA uses equidistant mesh, and r_OCA_mesh makes equidistant mesh larger for Nt->Nt*r_OCA_mesh.
+  pars_i["Sdyson_Bulla_alpha"] = 1.0;                // alpha<=1 moves the blend to lower frequency; reduce when MC noise is present.
+  pars_i["Sdyson_Bulla_cutoff_fraction"] = 0.6;      // largest clean blend end is alpha*cutoff_fraction*omega_Nyquist.
+  pars_i["Sdyson_Bulla_start_ratio"] = 0.6;          // blend starts at start_ratio*w_end.
   // 2) Read PARAMS file (with comments removed) and parse once
   if (inp2.str().empty()) {
     std::cerr << "PARAMS not present or empty\n";

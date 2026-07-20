@@ -1582,13 +1582,26 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
   Gm.resize(cix.Npseudo_unique,tau.size());
   Gm = 0;
   Array<double,1> E;
+  // Diagnostics returned by a single Volterra block solve.  The normal code path
+  // writes Gm/Prob_eig, while the rescue path calls the same solve with
+  // write_output=false to cheaply test nearby lambda0 values for just one block.
+  struct BlockSolveStats{
+    double sumQ = 0.0;    // sum of diagonal G(beta) in this block, before normalization
+    double maxQ = 0.0;    // largest |diagonal G(beta)| in this block
+    int maxPseudo = -1;   // pseudo-particle label (1-based) responsible for maxQ
+  };
   ////// This is helper function solve_block
+  // Solves the Dyson-Volterra equation for one pseudo-particle block at the
+  // current r.lambda0.  For multi-state blocks we first rotate to the atomic
+  // Hamiltonian eigenbasis, solve with diagonal bare propagators, and then
+  // rotate G back to the computational basis.
   auto solve_block = [&](int ib, bool write_output
 #ifdef _MPI
 			 , bool use_inside_parallel, MPI_Comm team_comm, int team_rank, int team_size
 #endif
 			 )
   {
+    BlockSolveStats stats;
     int N = cix.Block[ib].size();
     if (N==1){
       auto t0 = get_cpu_time();
@@ -1596,13 +1609,16 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
       int ii = abs(cix.Sgm_symmetry[ib](0,0))-1;
       Array<double,1> Gm_view;
       volterra.cmp1(Gm_view, Sm(ii,Range::all()), Em);
+      stats.sumQ = Gm_view(itlast);
+      stats.maxQ = abs(Gm_view(itlast));
+      stats.maxPseudo = cix.Block[ib](0);
       if (write_output){
 	Gm(ii,Range::all()) = Gm_view;
 	int i_pseudo = cix.Block[ib](0);
 	Prob_eig(i_pseudo-1) = Gm_view(itlast);
       }
       t_oneD += get_cpu_time()-t0;
-      return;
+      return stats;
     }
 
     auto t0 = get_cpu_time();
@@ -1648,6 +1664,14 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
 	Prob_eig(i_pseudo-1) = Gmm(itlast,i,i);
       }
     }
+    for (int i=0; i<N; ++i){
+      double q = Gmm(itlast,i,i);
+      stats.sumQ += q;
+      if (abs(q)>stats.maxQ){
+	stats.maxQ = abs(q);
+	stats.maxPseudo = cix.Block[ib](i);
+      }
+    }
     // Now transforming G back to non-diagonal basis, i.e., computational basis
     for (int it=0; it<tau.size(); ++it){
       tiny::dot(Sg1,H,Gmm(it,Range::all(),Range::all()),true,false); // Sg1 = H^+*G
@@ -1669,7 +1693,15 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
       }
     }
     t_set_g += get_cpu_time()-t4;
+    return stats;
   };/// end of helper function solve_block
+
+  // Run the normal block-parallel Volterra solve for all inequivalent blocks.
+  // This lambda wrapper lets the rescue path recompute the whole Gm once after
+  // it has selected a safer lambda0, while reusing the existing MPI scheduling.
+  auto solve_all_blocks = [&](){
+  Gm = 0;
+  Prob_eig = 0;
   ////////////////////////////////////////////////
   // parallelization is optimized depending of how many cores are available and how large are blocks.
   std::vector<BlockJob> dedicated_jobs, medium_candidates, small_jobs;
@@ -1755,6 +1787,118 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
 #else
   for (const auto& job : jobs) solve_block(job.id, true);
 #endif
+  };
+
+  solve_all_blocks();
+
+  struct GlobalEndpointStats{
+    double Q = 0.0;
+    double maxAbsDiag = 0.0;
+    double minDiag = 0.0;
+    int culpritBlock = -1;
+    int culpritPseudo = -1;
+    bool finite = true;
+  };
+  auto compute_global_endpoint_stats = [&](){
+    GlobalEndpointStats st;
+    for (int ib=0; ib<cix.Nblock; ++ib){
+      int N = cix.Block[ib].size();
+      for (int i=0; i<N; ++i){
+	int _ii_ = cix.Sgm_symmetry[ib](i,i);
+	int ii = abs(_ii_)-1;
+	if (ii<0) continue;
+	double q = sign(_ii_)*Gm(ii,itlast);
+	st.Q += q;
+	if (!std::isfinite(q)) st.finite = false;
+	if (abs(q)>st.maxAbsDiag){
+	  st.maxAbsDiag = abs(q);
+	  st.culpritBlock = ib;
+	  st.culpritPseudo = cix.Block[ib](i);
+	}
+	if (q<st.minDiag){
+	  st.minDiag = q;
+	  st.culpritBlock = ib;
+	  st.culpritPseudo = cix.Block[ib](i);
+	}
+      }
+    }
+    if (!std::isfinite(st.Q) || !std::isfinite(st.maxAbsDiag) || !std::isfinite(st.minDiag)) st.finite = false;
+    return st;
+  };
+
+  // The static prescription lambda0=min eig(H0-int Sigma) can occasionally put
+  // a finite-order Volterra kernel almost exactly on a pole.  The robust
+  // symptom is not only a huge Q, but also Q<=0 or sizeable negative diagonal
+  // endpoint weights.  We therefore diagnose the full diagonal trace over all
+  // blocks, with the same multiplicities that enter the later normalization.
+  double rescue_threshold = pars.contains("volterra_lambda_rescue_Q") ? pars["volterra_lambda_rescue_Q"].get<double>() : 500.0;
+  double negative_tol = pars.contains("volterra_lambda_rescue_negative_tol") ? pars["volterra_lambda_rescue_negative_tol"].get<double>() : 0.5;
+  bool rescue_enabled = pars.contains("volterra_lambda_rescue") ? pars["volterra_lambda_rescue"].get<bool>() : true;
+  GlobalEndpointStats raw_stats = compute_global_endpoint_stats();
+  bool rescue_lambda = rescue_enabled && (!raw_stats.finite || raw_stats.Q<=0 || abs(raw_stats.Q)>rescue_threshold || raw_stats.minDiag < -negative_tol);
+
+  if (rescue_lambda){
+    double max_delta = pars.contains("volterra_lambda_rescue_max_delta") ? pars["volterra_lambda_rescue_max_delta"].get<double>() : 0.05;
+    double target_q = pars.contains("volterra_lambda_rescue_target_Q") ? pars["volterra_lambda_rescue_target_Q"].get<double>() : 50.0;
+    double step = pars.contains("volterra_lambda_rescue_step") ? pars["volterra_lambda_rescue_step"].get<double>() : 0.001;
+    int nscan = std::max(1, int(std::ceil(max_delta/step)));
+    double best_delta = 0.0;
+    double best_score = 1e300;
+    double saved_lambda = r.lambda0;
+    if (mpi.rank==mpi.master){
+      clog<<"   "<<itt<<") Volterra lambda rescue: Q="<<raw_stats.Q
+	  <<" threshold="<<rescue_threshold
+	  <<" target_Q="<<target_q
+	  <<" minDiag="<<raw_stats.minDiag
+	  <<" negative_tol="<<negative_tol
+	  <<" culprit_pp="<<raw_stats.culpritPseudo
+	  <<" culprit_block="<<raw_stats.culpritBlock+1
+	  <<" maxAbsDiag="<<raw_stats.maxAbsDiag<<endl;
+    }
+
+    // Search only in the damping direction.  In the code convention the bare
+    // pseudo-particle propagator uses exp(-(Ebare-lambda0)*tau), hence a
+    // smaller lambda0 increases Ebare-lambda0 and damps G(tau).  If Q is huge
+    // or negative, shifting lambda0 upward would reduce damping and is the
+    // physically wrong side of the pole.
+    //
+    // Each trial recomputes all blocks, not just the apparent culprit.  This is
+    // more expensive, but it verifies the global Q and catches cases where the
+    // leading instability moves from one symmetry sector to another.
+    for (int is=1; is<=nscan; ++is){
+      double delta = -is*step;
+      r.lambda0 = saved_lambda + delta;
+      solve_all_blocks();
+      GlobalEndpointStats st = compute_global_endpoint_stats();
+      bool good = st.finite && st.Q>0 && st.Q<=target_q && st.minDiag>=-negative_tol;
+      double excess_high = st.finite ? std::max(0.0, st.Q-target_q) : 1e150;
+      double excess_negative_Q = st.finite ? std::max(0.0, -st.Q) : 1e150;
+      double excess_negative_diag = st.finite ? std::max(0.0, -st.minDiag-negative_tol) : 1e150;
+      double score = excess_high*excess_high + excess_negative_Q*excess_negative_Q
+	+ excess_negative_diag*excess_negative_diag + 1e-6*abs(delta);
+      if (score < best_score){
+	best_score = score;
+	best_delta = delta;
+      }
+      if (mpi.rank==mpi.master && (good || is==1 || is==nscan)){
+	clog<<"   "<<itt<<") Volterra lambda rescue trial delta="<<delta
+	    <<" Q="<<st.Q<<" minDiag="<<st.minDiag
+	    <<" maxAbsDiag="<<st.maxAbsDiag
+	    <<" accepted="<<good<<endl;
+      }
+      if (good) break;
+    }
+    r.lambda0 = saved_lambda + best_delta;
+    solve_all_blocks();
+    GlobalEndpointStats final_stats = compute_global_endpoint_stats();
+    if (mpi.rank==mpi.master){
+      clog<<"   "<<itt<<") Volterra lambda rescue selected delta="<<best_delta
+	  <<" lambda0="<<r.lambda0
+	  <<" Q="<<final_stats.Q
+	  <<" minDiag="<<final_stats.minDiag
+	  <<" maxAbsDiag="<<final_stats.maxAbsDiag<<endl;
+    }
+  }
   
   if (DEBUG and mpi.rank==mpi.master){
     ofstream out2("PPG.dat"); out2.precision(10);

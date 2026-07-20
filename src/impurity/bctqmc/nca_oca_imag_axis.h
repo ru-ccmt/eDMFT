@@ -321,40 +321,10 @@ double I_NCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
   return Phi_tot;
 }
 
-/*
-vector<int> ImportanceOfPseudo(const Spline1DMany& Gms, const Cix& cix, std::array<double,2> cut={0.1,0.5}, bool debug=false)
-{
-  if (Gms.size()!=cix.Npseudo_unique){ cerr << "ERROR in ImportanceOfPseudo: Gms.size="<<Gms.size()<<" should be Npseudo_unique="<<cix.Npseudo_unique<<endl;}
-  
-  Array<double,1> Gwidth(cix.Npseudo_unique);
-  int middle = Gms.x_.extent(0)/2;
-  // just taking |G(beta/2)| as the marker of PP importance. It's simple and reasonable, and is simply related to G(omega=0)
-  for (int ipp=0; ipp<cix.Npseudo_unique; ++ipp) Gwidth(ipp) = fabs(Gms(middle,ipp));
-  
-  std::vector<int> idx(cix.Npseudo_unique);
-  std::iota(idx.begin(), idx.end(), 0); // 0..N-1
-  std::sort(idx.begin(), idx.end(), [&](int a, int b){ return Gwidth(a) > Gwidth(b); });
-
-  vector<int> G_importance(cix.Npseudo_unique,0);
-  for (int k = 0; k < (int)idx.size(); ++k) {
-    int ipp = idx[k];
-    if (k>cut[0]*cix.Npseudo_unique) G_importance[ipp]=1;
-    if (k>cut[1]*cix.Npseudo_unique) G_importance[ipp]=2;
-  }
-  if (debug){
-    for (int k = 0; k < (int)idx.size(); ++k) {
-      int ipp = idx[k];
-      fmt::print(std::cout, "{:<3d} {:<4d} {:3d} {:10.3g}\n", k, ipp+1, G_importance[ipp], Gwidth(ipp));
-    }
-  }
-  return G_importance;
-}
-*/
-
 double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, Array<double,2>& F01t,
 	     bool cmpPhysG, double Q, double beta, const Array<double,1>& tau,
 	     const Spline1DMany& Gms, const Spline1DMany& Deltas,
-	     Cix& cix, json& pars, const vector<int>& G_importance, int OCA_cut_sum, MPIcls& mpi, double r_OCA_mesh=1)
+	     Cix& cix, json& pars, const vector<int>& G_importance, int OCA_cut_sum, MPIcls& mpi/*, double r_OCA_mesh*/)
 {
   ////////////////////////////
   // input :
@@ -386,10 +356,9 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 
   //int OCA_cut_sum = pars["OCA_cut_sum"].get<int>();
   //std::array<double,2> OCA_cut({pars["OCA_cut1"].get<double>(),pars["OCA_cut2"].get<double>()});
-
   if (fabs(beta-tau(tau.size()-1))>1e-7){ cerr<<"ERROR in I_OCA: last point in tau="<< tau(tau.size()-1)<<" should be beta="<<beta<<endl;}
   // we need uniform mesh for OCA
-  int Nt = tau.size()*r_OCA_mesh;
+  int Nt = tau.size()*pars["r_OCA_mesh"].get<double>();//r_OCA_mesh;
   double dh = beta/(Nt-1.0);
   // functions on the uniform mesh, evaluated from splines
   Array<double,2> Gm(Gms.size(),Nt), Delta(Deltas.size(),Nt);

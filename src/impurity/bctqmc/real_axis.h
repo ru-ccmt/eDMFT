@@ -323,12 +323,14 @@ public:
     }
     Sigm.resize(cix.Nbath_unique_unique,om.extent(0));
     Gc.resize(cix.Nbath_unique_unique,om.extent(0));
+    Array<complex<double>,2> SigB(cix.Nbath_unique_unique,om.extent(0));
     Array<complex<double>,2> SigD(cix.Nbath_unique_unique,om.extent(0));
     density_matrix.resize(cix.Nbath_unique_unique); density_matrix=0; // still need to implement
     Ekin=0; nf=0;// still need to implement
     
-    ComputePhysicalSelfEnergyOnMesh(Sigm, SigD, Gc,
-    				    om, Gimp, Fimp1, Fimp2, iDeltaw, bb, cix, *mpi.out, small, true);
+    ComputePhysicalSelfEnergyOnMesh(Sigm, SigB, SigD, Gc,
+    				    om, Gimp, Fimp1, Fimp2, iDeltaw, bb, cix, *mpi.out, small, true,
+				    pars["Sdyson_Bulla_blend"].get<bool>(), pars["Sdyson_Bulla_L_low"].get<double>());
 
     if (pars["AdaptPhysicalMesh"].get<bool>()){
 
@@ -393,9 +395,11 @@ public:
 
 	Sigm.resize(cix.Nbath_unique_unique,om_new.extent(0));
 	Gc.resize(cix.Nbath_unique_unique,om_new.extent(0));
+	SigB.resize(cix.Nbath_unique_unique,om_new.extent(0));
 	SigD.resize(cix.Nbath_unique_unique,om_new.extent(0));
-	ComputePhysicalSelfEnergyOnMesh(Sigm, SigD, Gc,
-					om, Gimp, Fimp1, Fimp2, iDeltaw, bb, cix, *mpi.out, small, false);
+	ComputePhysicalSelfEnergyOnMesh(Sigm, SigB, SigD, Gc,
+					om, Gimp, Fimp1, Fimp2, iDeltaw, bb, cix, *mpi.out, small, false,
+					pars["Sdyson_Bulla_blend"].get<bool>(), pars["Sdyson_Bulla_L_low"].get<double>());
     
 	dh.resize(om.size());
 	dh = GiveDh(om);
@@ -416,6 +420,7 @@ public:
 	for (int ib=0; ib<Nps; ++ib)
 	  (*mpi.out)<<"# Final pintegral["<<ib<<"]="<< integral1(ib) <<" and original "<< integral0(ib) << " with diff="<< (integral1(ib)-integral0(ib)) << endl;
 
+	Print_Physical1("Sbulla.out", SigB);
 	Print_Physical1(dysonFname+"out", SigD);
       }
 
@@ -437,6 +442,14 @@ public:
       }
       feo.resize(om.size());
       for (int i=0; i<om.size(); ++i) feo(i)=fermi(beta*om(i));
+    }else{
+      if (mpi.rank==mpi.master){
+	Print_Physical1("Sbulla.out", SigB);
+	Print_Physical1(dysonFname+"out", SigD);
+      }
+    }
+    if (mpi.rank==mpi.master){
+      Print_Physical("Gimp.out", Gimp, Fimp1, Fimp2);
     }
 	
     /*
