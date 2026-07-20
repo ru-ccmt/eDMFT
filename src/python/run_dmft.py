@@ -419,7 +419,7 @@ def expand_siginp_to_nambu(sig_path, phi_seed, pairing_symmetry, fh_info):
     phi_cols = zeros((nfreq, 2*K))
     for i in range(K):
         if pairing_symmetry == 'd' and K == 4:
-            d_wave_signs = [0.0, +1.0, -1.0, 0.0]
+            d_wave_signs = [0.0, -1.0, +1.0, 0.0]   # Gamma,X(-),Y(+),M => Phi_Y>0 textbook (unified 2026-07-20; was [0,+1,-1,0]=mirror Phi_X>0, contradicted the cos kx-cos ky form factor + Frontera bin)
             sign = d_wave_signs[i]
         elif pairing_symmetry == 'd':
             # Fallback for K≠4: alternate signs (old behavior)
