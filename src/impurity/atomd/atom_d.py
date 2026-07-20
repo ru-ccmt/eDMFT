@@ -806,6 +806,147 @@ def Diagonalize(Ham, small=1e-4, fh=sys.stdout):
     return [seigv,seigx]
 
 
+def FindHamiltonianBlocks(Ham, small=1e-4):
+    """Returns direct-basis Hamiltonian blocks and block eigenvalues."""
+    ndim = len(Ham)
+    blck = list(range(ndim))
+    for i in range(ndim):
+        for j in range(i+1, ndim):
+            if abs(Ham[i][j]) > small:
+                commonb = builtins.min(blck[i], blck[j])
+                for k in range(ndim):
+                    if blck[k] in [blck[i], blck[j]]:
+                        blck[k] = commonb
+
+    blocks = []
+    for i in range(ndim):
+        block = [j for j in range(ndim) if blck[j] == i]
+        if block:
+            blocks.append(block)
+
+    eigs = []
+    for block in blocks:
+        hs = Ham[block, :][:, block]
+        eigs.append(linalg.eigvalsh(hs))
+    return blocks, eigs
+
+
+def PrintCixForBold(fname, baths, bkeep, Sigind, Eimp, wstates, op, iFi, ind_basis,
+                    Hams, UC, Fk, l, HB2, Q3d, CoulombF, fh_info, small=1e-6):
+    """Writes the direct-basis CIX file consumed by the bold impurity solver."""
+    Hks = [[] for _ in range(len(wstates))]
+    grps = [[] for _ in range(len(wstates))]
+    Eigs = [[] for _ in range(len(wstates))]
+    global_index2 = []
+    iglb = 0
+
+    for ni, ns in enumerate(wstates):
+        states = ns[2]
+        blocks, eigs = FindHamiltonianBlocks(Hams[ni], small)
+        glb_indx = [0 for _ in range(len(states))]
+        for block, eig in zip(blocks, eigs):
+            Hks[ni].append(Hams[ni][block, :][:, block])
+            Eigs[ni].append(eig)
+            for iig, ijg in enumerate(block):
+                glb_indx[ijg] = iglb + 1 + iig
+            iglb += len(block)
+        global_index2.append(glb_indx)
+        grps[ni] = blocks
+
+    block_sizes = [len(block) for blocks in grps for block in blocks]
+    if not block_sizes:
+        print('ERROR: No blocks found while writing '+fname, file=fh_info)
+        sys.exit(1)
+
+    with open(fname, 'w') as bcix:
+        print('# Cix file for cluster DMFT with Bold-CTQMC', file=bcix)
+        print('# cluster_size, number of states, number of psi^+ operators, number of baths, number of blocks, maximum_matrix_size', file=bcix)
+        print(1, iglb, len(baths), len(baths), len(block_sizes), max(block_sizes), file=bcix)
+        print('# baths, psi^+, psi, Sigind, # spin, moment', file=bcix)
+        for ib, bath in enumerate(baths):
+            print(f"{ib} {ib} {ib}* {Sigind[ib,ib]-1} {bath[1]/2:4.1f} {bath[0]}", file=bcix)
+        print('# cluster energies for non-equivalent baths, eps[k]', file=bcix)
+        print(('{:f} '*len(Eimp)).format(*Eimp), file=bcix)
+        print(f"#  iblck  n k  Sz   ", " ".join([f"F^+_{t:<2}" for t in range(len(baths))]), file=bcix)
+
+        iblock = 1
+        for ni, ns in enumerate(wstates):
+            states = ns[2]
+            for block in grps[ni]:
+                for ii in block:
+                    st = states[ii]
+                    igl = global_index2[ni][ii]
+                    print(f"{igl:<4d} {iblock:3} {ns[0]:2} {0:1d} {ns[1]/2:4.1f}  ", file=bcix, end='')
+                    for ib, bath in enumerate(baths):
+                        newst, sig = op.Fp(st, ib)
+                        ifi = iFi[ni, ib]
+                        jg = 0
+                        if newst > 0:
+                            jj = ind_basis[ifi][newst]
+                            jg = global_index2[ifi][jj]
+                        print(f"{jg*sig:6} ", file=bcix, end='')
+                    print(f" # {op.printn(st)}", file=bcix)
+                iblock += 1
+
+        print('# All blocks of local Hamiltonian follow', file=bcix)
+        iblock = 1
+        for ni, ns in enumerate(wstates):
+            for block, Ham, eig in zip(grps[ni], Hks[ni], Eigs[ni]):
+                ind0 = [global_index2[ni][ii] for ii in block]
+                print(iblock, len(ind0), '   ', ' '.join([str(x) for x in ind0]), '  ', [float(x) for x in eig], '# iblock, dim, indices, eigvals', file=bcix)
+                for ii in range(len(Ham)):
+                    print('    ', ('{:14.10f} '*len(Ham)).format(*Ham[ii,:].real), file=bcix)
+                iblock += 1
+
+        if (HB2 and Q3d):
+            ii = 0
+            iind = {}
+            for i1, bs1 in enumerate(baths):
+                m1 = bs1[0]
+                if m1 not in bkeep:
+                    continue
+                iind[i1] = ii
+                ii += 1
+            print("# UCoulomb : (m1,s1) (m2,s2) (m3,s2) (m4,s1)  Uc[m1,m2,m3,m4]", file=bcix)
+            for i1, bs1 in enumerate(baths):
+                m1, s1 = bs1
+                if m1 not in bkeep:
+                    continue
+                for i2, bs2 in enumerate(baths):
+                    m2, s2 = bs2
+                    if m2 not in bkeep:
+                        continue
+                    for i3, bs3 in enumerate(baths):
+                        m3, s3 = bs3
+                        if s2 != s3 or m3 not in bkeep:
+                            continue
+                        for i4, bs4 in enumerate(baths):
+                            m4, s4 = bs4
+                            if s4 != s1 or m4 not in bkeep:
+                                continue
+                            if CoulombF[:5] == 'Ising' and not ((i1 == i4 and i2 == i3) or (i1 == i3 and i2 == i4)):
+                                continue
+                            Uc = 0.0
+                            for k in range(0, int(l+1)):
+                                Uc += real(UC[k,m1,m2,m3,m4])*Fk[k,int(l)]
+                            if abs(Uc) > 1e-6:
+                                print("%2d %2d %2d %2d  %12.8f" % (iind[i1], iind[i2], iind[i3], iind[i4], Uc), file=bcix)
+
+        if (HB2 and not Q3d):
+            print("# UCoulomb : (m1,s1) (m2,s2) (m3,s2) (m4,s1)  Uc[m1,m2,m3,m4]", file=bcix)
+            for ib1 in bkeep:
+                for ib2 in bkeep:
+                    for ib3 in bkeep:
+                        for ib4 in bkeep:
+                            if CoulombF[:5] == 'Ising' and not ((ib1 == ib4 and ib2 == ib3) or (ib1 == ib3 and ib2 == ib4)):
+                                continue
+                            Uc = 0.0
+                            for k in range(0, int(l+1)):
+                                Uc += UC[k,ib1,ib2,ib3,ib4]*Fk[k,int(l)]
+                            if abs(Uc) > 1e-6:
+                                print("%2d %2d %2d %2d  %12.8f" % (ib1, ib2, ib3, ib4, Uc.real), file=bcix)
+
+
 def thesame(mx,my,small=1e-3):
     if list(mx.keys()) != list(my.keys()): return False
     for k in list(mx.keys()):
@@ -1732,6 +1873,7 @@ if __name__ == '__main__':
     Ene=[] # Energy
     Te=[]  # eigenvectors
     S2w=[] # Spin
+    Hams=[] # Direct-basis Hamiltonians for bold CTQMC cix output
     #### NEW
     if PrintSminus:
         Si_minus={}
@@ -1836,6 +1978,7 @@ if __name__ == '__main__':
         #print >> fh_info, 'H='
         #print('H=', file=fh_info)
         #mprint(fh_info, Ham)
+        Hams.append(Ham.copy())
         
         if CoulombF[:4] == 'Full':
             eig = Diagonalize(Ham, small, fh_info)  # Block diagonalization is better!!
@@ -1901,6 +2044,11 @@ if __name__ == '__main__':
 
     print('Br:', 'kindx=', kindx)
 
+    ind_basis = [{} for i in range(len(wstates))]
+    for ni,ns in enumerate(wstates):
+        for js,st in enumerate(ns[2]):
+            ind_basis[indx[(ns[0],ns[1])]][st] = js
+    
     # Here we create index for psi^dagger
     iFi = zeros((len(wstates),len(baths)),dtype=int)
     for ni,ns in enumerate(wstates):
@@ -1913,6 +2061,10 @@ if __name__ == '__main__':
                 st = (ns[0]+1, 0)  # (n+1,sz+s)
                 if st in kindx:
                     iFi[ni,ib] = indx[st]
+    
+    PrintCixForBold('bctqmc.cix', baths, bkeep, Sigind, Eimp, wstates, op,
+                    iFi, ind_basis, Hams, UC, Fk, l, HB2, Q3d,
+                    CoulombF, fh_info, small)
     
     wgr = [[] for iw in range(len(wstates))]
     print('Br:', 'Stage1: Computing F^ in direct base')
@@ -2520,4 +2672,3 @@ if __name__ == '__main__':
                     else:
                         print("%2d %2d" % (0, 0), end=' ', file=fcix)
                     print(file=fcix)
-
