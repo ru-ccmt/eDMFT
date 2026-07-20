@@ -760,6 +760,14 @@ void ComputePhysicalSelfEnergyOnMesh(Array<complex<double>,2>& Sigm, Array<compl
 	}
 	const double Wb = RealAxisBullaWeight(om(iw), L, L_low, blend_sdyson_bulla);
 	MatrixXcd Sm = (1.0-Wb)*SmD + Wb*SmB;
+	if (SC){ // enforce S12=S21 on the FINAL blended self-energy BEFORE the causality/PSD clamp
+	  const int N2 = N/2;
+	  MatrixXcd S12 = Sm.block(0,  N2, N2, N2);
+	  MatrixXcd S21 = Sm.block(N2, 0,  N2, N2);
+	  MatrixXcd A = 0.5*(S12 + S21);
+	  Sm.block(0,  N2, N2, N2) = A;
+	  Sm.block(N2, 0,  N2, N2) = A;
+	}
 	{
 	  complex<double> I(0.0,1.0);
 	  Eigen::MatrixXcd A = (0.5*I)* (Sm - Sm.adjoint());

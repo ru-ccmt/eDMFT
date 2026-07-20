@@ -692,6 +692,14 @@ public:
 	  }
 	  const double W = bulla_weight(iom(iw));
 	  MatrixXcd Sm = (1.0-W)*SmD + W*SmB;     // NEW after realizing Sdyson is needed at low w: Combined self-energy used by DMFT: Sdyson at low w, Bulla at high w.
+	  if (SC){ // enforce S12=S21 on the FINAL blended self-energy (covers SmD's un-symmetrized anomalous block at low w)
+	    const int N2 = N/2;
+	    MatrixXcd S12 = Sm.block(0,  N2, N2, N2);
+	    MatrixXcd S21 = Sm.block(N2, 0,  N2, N2);
+	    MatrixXcd A = 0.5*(S12 + S21);
+	    Sm.block(0,  N2, N2, N2) = A;
+	    Sm.block(N2, 0,  N2, N2) = A;
+	  }
 	  MatrixXcd Ginv  = om_Eimp - Sm - Dm;    // G^{-1} = (ω - E_imp - Σ - Δ)
 	  MatrixXcd Gmc  = Ginv.inverse();        // G = (ω - E_imp - Σ - Δ)^{-1}
 	  
