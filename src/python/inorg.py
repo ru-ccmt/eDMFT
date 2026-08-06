@@ -865,7 +865,15 @@ class IMP_INORG(object):
                   file=self.fh_info)
             _DCs_effective = 'FLL'
 
-        if _DCs_effective[:5]=='exact':
+        _nambu_freeze_dc = bool(params['nambu_freeze_dc'][0]) if 'nambu_freeze_dc' in params else True
+
+        if getattr(self, 'nambu', False) and _nambu_freeze_dc:
+            nf_ = mom
+            Edc0 = numpy.array(Edc_old, dtype=float)
+            Phidc0 = 0.0
+            print('Nambu: DC frozen at the Eimp.inp value (normal-state reference); Vdc=',
+                  Edc0, file=self.fh_info)
+        elif _DCs_effective[:5]=='exact':
             # We allow DCs = ['exact', 'exact_l', 'exactd', 'exactdl']
             # exact and exactd use impurity occupation. exact uses yukawa&dielectric, while exactd uses dielectric screening only
             # exact_l and exactdl use lattice occupations. exact_l uses yukawa&dielectric, while exactdl uses dielectric screening only
