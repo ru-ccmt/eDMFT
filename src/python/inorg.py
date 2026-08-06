@@ -714,10 +714,14 @@ class IMP_INORG(object):
             nband = len(mom)
             Sigind_block = numpy.array(self.Sigind)[:nband, :nband]
             max_sig = int(numpy.max(Sigind_block)) if nband > 0 else 0
-            if is_k_native and not self.nambu and max_sig > 0:
+            if is_k_native and max_sig > 0:
                 # K-native: mom from nmat.txt is already K-basis per-orbital
                 # [n_Γ, n_X, n_Y, n_M].  Compress by SUMMING per diagonal-Sigind
                 # component (NO K->site rotation):  -> [n_Γ, n_X+n_Y, n_M].
+                # This applies to Nambu as well (the discriminator above already
+                # tests the pp block): Sigind_block is then sig[:nband,:nband], so
+                # mom keeps the same K-resolved meaning as in the normal run
+                # instead of being rotated into (by symmetry degenerate) sites.
                 kspace_numsites = nband
                 mom_Kbasis = list(mom)
                 mom = [0.0] * max_sig
@@ -915,7 +919,11 @@ class IMP_INORG(object):
                     # run_dmft.py:455 Edc_nambu = Edc_pp + [0]*K + [0]*K + [-Edc_pp]
                     # and the sig.out tau3 header.  (DC_ones*Vdc would put +Vdc on the
                     # hh block too -- wrong sign.)
-                    K_pp = kspace_numsites if kspace_numsites > 0 else len(nf_)   # =4 for 2x2 plaquette
+                    # Length of ONE tau3 block = number of independent pp-block
+                    # components = len(nf_).  That is NOT the site count whenever
+                    # cluster momenta are degenerate; kspace_numsites is the site
+                    # count and belongs to numsites above, not here.
+                    K_pp = len(nf_)
                     Edc0 = numpy.array([Vdc]*K_pp + [0.0]*K_pp + [0.0]*K_pp + [-Vdc]*K_pp)
                     assert len(Edc0) == len(Edc_old), \
                         'Nambu tau3 Edc0 len %d != Edc_old len %d' % (len(Edc0), len(Edc_old))
