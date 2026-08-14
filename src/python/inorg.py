@@ -521,7 +521,7 @@ class IMP_INORG(object):
         if self.nambu:
             skip_params.add('ful_pcl_sch')  # forced to 0 explicitly below
         # Parameters whose list values should be written without [] and commas
-        list_params = {'fit_points', 'restrain', 'distribute'}
+        list_params = {'fit_points', 'restrain', 'distribute', 'nb'}
         with open(self.dir+self.PARAMS, 'w') as fp:
             # Write if_details as 0/1 integer for C++ solver
             if 'if_details' in params:
@@ -530,7 +530,7 @@ class IMP_INORG(object):
                     val = val[0]
                 int_val = 1 if val else 0
                 print('{:10s}  {:10s}'.format('if_details', str(int_val)), file=fp)
-            for p in ['if_spin_incl', 'orbital', 'if_mat_type', 'if_norg_degenerate', 'CoulombF', 'beta', 'basis', 'fit_range', 'fit_points', 'NOOC', 'restrain', 'distribute', 'Minsulator', 'ful_pcl_sch', 'weight_nooc', 'weight_freze']:
+            for p in ['if_spin_incl', 'orbital', 'if_mat_type', 'if_norg_degenerate', 'CoulombF', 'beta', 'basis', 'fit_range', 'fit_points', 'NOOC', 'restrain', 'distribute', 'nb', 'Minsulator', 'ful_pcl_sch', 'weight_nooc', 'weight_freze']:
                 if p in params and p not in skip_params:
                     val = params[p][0]
                     if p in list_params:
