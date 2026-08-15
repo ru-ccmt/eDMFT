@@ -175,11 +175,21 @@ def main(args):
             for it in range(csize[icix]):
                 sigma[:,icx_it[icix][it]] = sig[it,:]
 
-    # Nambu symmetry verification of the input self-energy.
+    # Nambu symmetry verification of the input self-energy.  MATSUBARA AXIS ONLY.
+    # The exact relations are
+    #     Sigma_hh(z) = -conj(Sigma_pp(-conj(z)))      Phi_dag(z) = conj(Phi(-conj(z)))
+    # which collapse to a pointwise conjugation only on the imaginary axis, where
+    # -conj(z) = z.  On the real axis they connect +omega with -omega, so a CORRECT
+    # real-frequency self-energy violates the pointwise form: checking it there would
+    # raise a false alarm and, under --strict-nambu, kill a healthy run.  A real-axis
+    # check needs a mesh symmetric about zero and is not attempted inline.
     # Warning-only by default; with --strict-nambu a violation is a hard stop.
     # Every rank reads the same sig.inp files, hence every rank can evaluate the
     # check and exit together (printing is left to rank 0).
-    if args.nambu:
+    if args.nambu and not imatsubara and myrank == 0:
+        print('NOTE: real-frequency axis, so the pointwise Nambu symmetry check on the input '
+              'self-energy is skipped (the exact relations connect +omega with -omega).')
+    if args.nambu and imatsubara:
         nambu_viol = []
         ph_viol = np.max(np.abs(sigma_hh + np.conj(sigma)))
         if ph_viol > 1e-10:
@@ -355,6 +365,20 @@ def main(args):
                         xomega = omega[iom]*1j+gamma*1j if imatsubara else omega[iom]+gamma*1j
                         Sigma = np.einsum('i,ijk->jk', sigma[iom, :], STrans)  # einstein summation : Sigma[j,k] = \sum_i sigma[iom,i]*STrans[i,j,k]
                         if args.nambu:
+                            # All four Nambu blocks embed with the SAME STrans, and all four
+                            # back-project with GTrans.  That is exact, not an approximation:
+                            # the hole sector needs U(-k), and time reversal with REAL local
+                            # orbitals gives U(-k) = conj(U(k)), whose conjugation cancels the
+                            # one carried by the dagger in the Nambu spinor.  Verified against
+                            # an exact BdG oracle to 1e-15 (src/python/tests/test_nambu_embed.py).
+                            # LIMIT: this holds while the correlated local orbitals are real,
+                            # i.e. real harmonics, and -- for a cluster in a K basis -- while
+                            # every cluster momentum is self-conjugate (-K = K modulo a
+                            # reciprocal lattice vector).  True for the 2x2 plaquette
+                            # {G,X,Y,M}.  For a cluster whose K-set is NOT closed under
+                            # K -> -K (e.g. a 3-site cluster) the hole/anomalous sector needs
+                            # the extra permutation C[a,b] = <chi_a|conj(chi_b)> and this code
+                            # is then WRONG, not merely approximate.
                             Phi = np.einsum('i,ijk->jk', phi_sigma[iom, :], STrans)
                             Phi_dag = np.einsum('i,ijk->jk', phi_dag_sigma[iom, :], STrans)
                             Sigma_hh = np.einsum('i,ijk->jk', sigma_hh[iom, :], STrans)
