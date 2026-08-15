@@ -322,8 +322,35 @@ def FileDiffMaxAbs(f1, f2):
     return float(amax(abs(d1-d2)))
 
 
-def LogConvergence(iteration, sigma_diff, phi_diff, fh_info):
-    print(':NAMBUDIFF iter={:d} sigma_diff={} phi_diff={}'.format(iteration, sigma_diff, phi_diff), file=fh_info)
+def NambuChannelDiffs(f1, f2):
+    """Per-channel max|difference| between two unified Nambu sig.inp files.
+
+    Column layout is the one documented in monitor_sc.py:read_unified_siginp
+    (col 0 omega; 1..2K Sigma_pp; 2K+1..4K Phi; 4K+1..6K Phi_dag; 6K+1..8K Sigma_hh).
+    Kept local rather than imported because monitor_sc's reader calls sys.exit()
+    on a read error, which must never happen from inside the DMFT loop.
+
+    Returns (sigma_pp_diff, phi_diff), either entry None if it cannot be computed.
+    """
+    if (not os.path.exists(f1)) or (not os.path.exists(f2)):
+        return (None, None)
+    try:
+        d1 = loadtxt(f1)
+        d2 = loadtxt(f2)
+    except Exception:
+        return (None, None)
+    if shape(d1) != shape(d2) or len(shape(d1)) != 2:
+        return (None, None)
+    ncols = shape(d1)[1]
+    K = (ncols-1)//8
+    if K < 1 or 8*K+1 != ncols:   # not a Nambu file
+        return (None, None)
+    dd = abs(d1-d2)
+    return (float(amax(dd[:,1:2*K+1])), float(amax(dd[:,2*K+1:4*K+1])))
+
+
+def LogConvergence(iteration, sigma_diff, phi_diff, fh_info, all_diff=None):
+    print(':NAMBUDIFF iter={:d} sigma_diff={} phi_diff={} all_diff={}'.format(iteration, sigma_diff, phi_diff, all_diff), file=fh_info)
 
 
 def detect_siginp_format(sig_path):
@@ -1152,7 +1179,6 @@ if __name__ == '__main__':
               'if_details'    : False,     # If True, show detailed NORG output during particle search in iNORG solver
               'nambu'           : False,    # True: enable Nambu d-wave SC pre-flight + loop
               'phi_seed'        : 0.01,     # initial pairing seed amplitude (eV)
-              'mix_phi'         : 1.0,      # mixing for anomalous self-energy
               'pairing_symmetry': 'd',      # seed symmetry: 's' or 'd'
               }
 
@@ -1215,7 +1241,6 @@ if __name__ == '__main__':
         --- Nambu d-wave superconductivity (set nambu=True in params.dat) ---
         nambu            [True|False] False         If True, run d-wave Nambu CDMFT (single-shot, frozen mu)
         phi_seed         [float] 0.01               Initial pairing seed amplitude (eV)
-        mix_phi          [float] 1.0                Anomalous self-energy mixing factor
         pairing_symmetry ['s'|'d'] 'd'              Pairing seed symmetry
 
         """
@@ -1316,6 +1341,15 @@ if __name__ == '__main__':
             raise ValueError('Nambu mode incompatible with magnetic extension (m_extn)')
         if wopt['m_extn']:
             raise ValueError('Nambu mode incompatible with magnetic extension (case.indmfldn)')
+        if ('GoodGuess' in p.p) and p['GoodGuess']:
+            # Nambu forces finish=1, so only icycle==0 exists; GoodGuess sets
+            # max_dmft_iterations=0 at icycle==0.  The two together make the inner
+            # DMFT loop never execute: no dmftgk, no impurity solve, no sgather --
+            # the run completes silently having computed nothing.  The combination is
+            # also meaningless (GoodGuess means 'converge the CHARGE on an existing
+            # self-energy', and Nambu freezes the charge loop outright).
+            raise ValueError('Nambu mode is incompatible with GoodGuess=True: together they '
+                             'skip every impurity solve. Remove GoodGuess from params.dat.')
 
         # --- Unified Nambu sig.inp architecture ---
         # 1. Generate Nambu indmfl (8x8 sigind) from normal-state indmfl (4x4)
@@ -1324,6 +1358,30 @@ if __name__ == '__main__':
         nambu_indmfl = w2k.case + '.indmfl_nambu'
 
         is_already_nambu, K_normal = detect_nambu_indmfl(normal_indmfl, w2k.case)
+
+        # 0. Refuse a HALF-RESTORED deck.  The pre-flight below rewrites BOTH
+        # case.indmfl and case.indmfi in place, doubling the sigind dimension of
+        # each.  Restoring only case.indmfl from its .normal_bak leaves a normal
+        # indmfl next to a Nambu indmfi; detect_nambu_indmfl inspects only the
+        # indmfl, so such a deck passes every other gate and then runs and
+        # produces garbage.  Nambu doubles lattice and impurity sigind together,
+        # so their dimensions must agree here whatever state we are in.
+        # (Magnetic mode also doubles the indmfi, but m_extn already raised above,
+        # so it cannot reach this point.)
+        if os.path.isfile(w2k.case + '.indmfi'):
+            _iSig_chk = indmffile.ParsIndmfi(w2k.case)
+            _dim_imp = shape(_iSig_chk[0])[0]
+            _icx_chk = sorted(inl.siginds.keys())[0]
+            _dim_latt = shape(inl.siginds[_icx_chk])[0]
+            if _dim_imp != _dim_latt:
+                raise ValueError(
+                    'Nambu pre-flight: {case}.indmfl and {case}.indmfi disagree about being Nambu. '
+                    'Lattice sigind block cix={icx} has dimension {dl}, impurity problem 0 in '
+                    '{case}.indmfi has dimension {di}. Nambu doubles both together, so this is a '
+                    'half-restored deck (one file reverted, the other still Nambu). Restore BOTH '
+                    'from their backups -- {case}.indmfl.normal_bak and {case}.indmfi.normal_bak -- '
+                    'or delete both and re-run the normal-state stage.'.format(
+                        case=w2k.case, icx=_icx_chk, dl=_dim_latt, di=_dim_imp))
 
         # 0a. Generate Udmft.N projector files if missing (BUG #5 fix)
         # MUST run with K=3 indmfl — Fortran dmftu cannot handle K=4 sigind.
@@ -1355,6 +1413,13 @@ if __name__ == '__main__':
         if not is_already_nambu:
             # Save original and generate Nambu version
             shutil.copy2(normal_indmfl, normal_indmfl + '.normal_bak')
+            # case.indmfi is rewritten in place a few lines below, so back it up
+            # here, on the same not-already-Nambu path and from the same
+            # normal-state snapshot, or the deck cannot be restored as a pair.
+            normal_indmfi = w2k.case + '.indmfi'
+            if os.path.isfile(normal_indmfi) and not os.path.isfile(normal_indmfi + '.normal_bak'):
+                shutil.copy2(normal_indmfi, normal_indmfi + '.normal_bak')
+                print('Nambu: saved normal-state '+normal_indmfi+' to '+normal_indmfi+'.normal_bak', file=fh_info)
             generate_nambu_indmfl(normal_indmfl, nambu_indmfl, w2k.case)
             shutil.copy2(nambu_indmfl, normal_indmfl)
             print('Nambu: generated 8x8 indmfl from normal-state (K={})'.format(K_normal), file=fh_info)
@@ -1788,8 +1853,13 @@ if __name__ == '__main__':
                 if p['nambu']:
                     # Unified sig.inp contains Phi — convergence tracked through sigma_diff
                     sigma_diff = FileDiffMaxAbs(sigma_prev_file, 'sig.inp')
+                    # Per-channel diagnostics: sigma_diff/phi_diff used to be the SAME
+                    # whole-file number, so ':NAMBUDIFF phi_diff=' never reported the
+                    # anomalous channel. Convergence still keys on the whole-file max
+                    # (reported as all_diff) so the ':CONVERGED' criterion is unchanged.
+                    (pp_diff, phi_diff) = NambuChannelDiffs(sigma_prev_file, 'sig.inp')
                     sigma_prev_file = 'sig.inp.'+extn
-                    LogConvergence(itt+1, sigma_diff, sigma_diff, fh_info)
+                    LogConvergence(itt+1, pp_diff, phi_diff, fh_info, all_diff=sigma_diff)
                     # itt>=1 (i.e. iteration >=2): do NOT test convergence on the FIRST DMFT iteration.
                     # sigma_prev_file is initialised to the SSplit shard 'sig.inp.0' (NOT a snapshot of
                     # the pre-loop sig.inp), so the iter-1 sigma_diff is a spurious 0.0 that would falsely

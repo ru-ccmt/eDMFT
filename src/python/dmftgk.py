@@ -175,14 +175,27 @@ def main(args):
             for it in range(csize[icix]):
                 sigma[:,icx_it[icix][it]] = sig[it,:]
 
-    # Nambu symmetry verification (runtime checks, not enforced)
-    if args.nambu and myrank == 0:
+    # Nambu symmetry verification of the input self-energy.
+    # Warning-only by default; with --strict-nambu a violation is a hard stop.
+    # Every rank reads the same sig.inp files, hence every rank can evaluate the
+    # check and exit together (printing is left to rank 0).
+    if args.nambu:
+        nambu_viol = []
         ph_viol = np.max(np.abs(sigma_hh + np.conj(sigma)))
         if ph_viol > 1e-10:
-            print(f"WARNING: particle-hole symmetry violation |Sigma_hh + Sigma_pp*| = {ph_viol:.2e}")
+            if myrank == 0:
+                print(f"WARNING: particle-hole symmetry violation |Sigma_hh + Sigma_pp*| = {ph_viol:.2e}")
+            nambu_viol.append(f"|Sigma_hh + Sigma_pp*| = {ph_viol:.2e}")
         hc_viol = np.max(np.abs(phi_dag_sigma - np.conj(phi_sigma)))
         if hc_viol > 1e-10:
-            print(f"WARNING: anomalous Hermitian symmetry violation |Phi_dag - Phi*| = {hc_viol:.2e}")
+            if myrank == 0:
+                print(f"WARNING: anomalous Hermitian symmetry violation |Phi_dag - Phi*| = {hc_viol:.2e}")
+            nambu_viol.append(f"|Phi_dag - Phi*| = {hc_viol:.2e}")
+        if nambu_viol and args.strict_nambu:
+            if myrank == 0:
+                print('ERROR: --strict-nambu is set and the input self-energy violates Nambu symmetry '
+                      '(tolerance 1e-10): ' + '; '.join(nambu_viol))
+            sys.exit(1)
 
     if args.interp:
         # Interpolates sigmas on equidistant mesh!
@@ -239,7 +252,11 @@ def main(args):
         # local greens function
         gmloc = np.zeros((nom,nii), dtype=np.complex128)
         if args.nambu:
-            gmloc_anom = np.zeros((nom,nii), dtype=np.complex128)
+            # The four Nambu blocks of the local Green's function. They are all
+            # computed from the same k-resolved Gor'kov inverse, none is fabricated.
+            gmloc_anom = np.zeros((nom,nii), dtype=np.complex128)  # ph block, F
+            gmloc_hp   = np.zeros((nom,nii), dtype=np.complex128)  # hp block, F^dagger
+            gmloc_hh   = np.zeros((nom,nii), dtype=np.complex128)  # hh block, G_hole
         if store_Ak:
             Akom = np.zeros((numk,nom,nii+1), dtype=float)
             gtot = np.zeros(nom, dtype=np.complex128)
@@ -356,6 +373,14 @@ def main(args):
                             fmk *= 1./degs
                             gmloc_anom[iom,:] += fmk*kweight
 
+                            fmk_hp = GTrans @ gk_nambu[nbands:,:nbands].reshape((nbands*nbands))
+                            fmk_hp *= 1./degs
+                            gmloc_hp[iom,:] += fmk_hp*kweight
+
+                            gmk_hh = GTrans @ gk_nambu[nbands:,nbands:].reshape((nbands*nbands))
+                            gmk_hh *= 1./degs
+                            gmloc_hh[iom,:] += gmk_hh*kweight
+
                             if store_Ak: # This is used for plotting with plt_sakplot.py
                                 Akom[iikp,iom,1:] -= gmk.imag/(np.pi*nsymop)
                                 gtc = np.trace(gk_nambu[:nbands,:nbands])+np.sum(1/(xomega-Ek[:nemin-1]+EF+gamma*4j))+np.sum(1/(xomega-Ek[nemin-1+nbands:]+EF+gamma*4j))
@@ -384,17 +409,23 @@ def main(args):
             gmsum = np.empty_like(gmloc)
             if args.nambu:
                 gmsum_anom = np.empty_like(gmloc_anom)
+                gmsum_hp   = np.empty_like(gmloc_hp)
+                gmsum_hh   = np.empty_like(gmloc_hh)
             Esum = np.empty_like(Eimp)
             if store_Ak: gsm = np.empty_like(gtot)
         else:
             gmsum = None
             if args.nambu:
                 gmsum_anom = None
+                gmsum_hp   = None
+                gmsum_hh   = None
             Esum = None
             gsm = None
         comm.Reduce(gmloc, gmsum, op=MPI.SUM, root=0)
         if args.nambu:
             comm.Reduce(gmloc_anom, gmsum_anom, op=MPI.SUM, root=0)
+            comm.Reduce(gmloc_hp, gmsum_hp, op=MPI.SUM, root=0)
+            comm.Reduce(gmloc_hh, gmsum_hh, op=MPI.SUM, root=0)
         comm.Reduce(Eimp, Esum, op=MPI.SUM, root=0)
         if store_Ak: comm.Reduce(gtot, gsm, op=MPI.SUM, root=0)
         if myrank==0:
@@ -402,8 +433,30 @@ def main(args):
             gmloc = gmsum
             if args.nambu:
                 gmloc_anom = gmsum_anom
+                gmloc_hp   = gmsum_hp
+                gmloc_hh   = gmsum_hh
             if store_Ak: gtot = gsm
             #print('Eimp=', Esum.real)
+            if args.nambu and imatsubara:
+                # Output-side Nambu check. Valid ONLY for the k-SUMMED local blocks:
+                # individual k-points legitimately violate these relations, which is why
+                # this check must stay outside the k-loop. On the real axis the relations
+                # connect +omega and -omega, hence the imatsubara guard.
+                out_viol = []
+                hh_viol = np.max(np.abs(gmloc_hh + np.conj(gmloc)))
+                if hh_viol > 1e-8:
+                    print(f"WARNING: local Nambu symmetry violation |G_hh + G_pp*| = {hh_viol:.2e}")
+                    out_viol.append(f"|G_hh + G_pp*| = {hh_viol:.2e}")
+                hp_viol = np.max(np.abs(gmloc_hp - np.conj(gmloc_anom)))
+                if hp_viol > 1e-8:
+                    print(f"WARNING: local Nambu symmetry violation |F_dag - F*| = {hp_viol:.2e}")
+                    out_viol.append(f"|F_dag - F*| = {hp_viol:.2e}")
+                if out_viol and args.strict_nambu:
+                    # Only rank 0 owns these arrays, so terminate the whole job collectively.
+                    print('ERROR: --strict-nambu is set and the k-summed local Greens function violates '
+                          'Nambu symmetry (tolerance 1e-8): ' + '; '.join(out_viol))
+                    sys.stdout.flush()
+                    comm.Abort(1)
             for icix in range(ncix):
                 with open(fglocout[icix],'w') as fo:
                     for iom in range(len(omega)):
@@ -414,17 +467,17 @@ def main(args):
                             gc = gmloc[iom,icx_it[icix][it]]
                             print(gc.real, gc.imag, end=' ', file=fo)
                         if args.nambu:
+                            # F, F† and G_hh are the genuine ph/hp/hh blocks of the k-summed
+                            # Gor'kov Green's function, not reconstructed from G_pp and F.
                             for it in range(csize[icix]):
                                 fc = gmloc_anom[iom,icx_it[icix][it]]
                                 print(fc.real, fc.imag, end=' ', file=fo)
-                            # F† = conj(F): same Re, negated Im
                             for it in range(csize[icix]):
-                                fc = gmloc_anom[iom,icx_it[icix][it]]
-                                print(fc.real, -fc.imag, end=' ', file=fo)
-                            # G_hh = -conj(G_pp): negated Re, same Im
+                                fc = gmloc_hp[iom,icx_it[icix][it]]
+                                print(fc.real, fc.imag, end=' ', file=fo)
                             for it in range(csize[icix]):
-                                gc = gmloc[iom,icx_it[icix][it]]
-                                print(-gc.real, gc.imag, end=' ', file=fo)
+                                gc = gmloc_hh[iom,icx_it[icix][it]]
+                                print(gc.real, gc.imag, end=' ', file=fo)
                         print(file=fo)
 
             if args.nambu:
@@ -452,34 +505,51 @@ def main(args):
                 delta = np.zeros_like(gmloc)
                 if args.nambu:
                     delta_anom = np.zeros_like(gmloc_anom)
+                    delta_hp   = np.zeros_like(gmloc_hp)
+                    delta_hh   = np.zeros_like(gmloc_hh)
                 for icix in range(ncix):
                     glc = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
                     sig = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
                     eim = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
                     dlt = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
                     if args.nambu:
-                        flc = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
-                        phi = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
+                        flc     = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
+                        flc_hp  = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
+                        glc_hh  = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
+                        phi     = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
+                        phi_dag = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
+                        sig_hh  = np.zeros((cixdim[icix],cixdim[icix]),dtype=complex)
                     for iom in range(len(omega)):
                         xomega = omega[iom]*1j+gamma*1j if imatsubara else omega[iom]+gamma*1j
                         if args.nambu:
                             dlt_anom = np.zeros_like(dlt)
+                            dlt_hp   = np.zeros_like(dlt)
+                            dlt_hh   = np.zeros_like(dlt)
                         for (ind1,ind2) in small_indx[icix]:
                             ii = small_indx[icix][(ind1,ind2)]
                             glc[ind1,ind2] = gmloc[iom,ii]
                             sig[ind1,ind2] = sigma[iom,ii]
                             if args.nambu:
                                 eim[ind1,ind2] = Esum[ii] / degs[ii]  # normalize by degs to match Ed convention (Fortran dmft1)
-                                flc[ind1,ind2] = gmloc_anom[iom,ii]
-                                phi[ind1,ind2] = phi_sigma[iom,ii]
+                                flc[ind1,ind2]     = gmloc_anom[iom,ii]
+                                flc_hp[ind1,ind2]  = gmloc_hp[iom,ii]
+                                glc_hh[ind1,ind2]  = gmloc_hh[iom,ii]
+                                phi[ind1,ind2]     = phi_sigma[iom,ii]
+                                phi_dag[ind1,ind2] = phi_dag_sigma[iom,ii]
+                                sig_hh[ind1,ind2]  = sigma_hh[iom,ii]
                             else:
                                 eim[ind1,ind2] = Esum[ii]
                         if args.nambu:
-                            glc_hole = -np.conj(glc)  # G_hole(iω_n) = -G_n*(iω_n) by Matsubara symmetry
-                            gloc_nambu = np.block([[glc, flc], [np.conj(flc.T), glc_hole]])
+                            # All four local Nambu blocks come from the k-sum, none is fabricated.
+                            gloc_nambu = np.block([[glc, flc], [flc_hp, glc_hh]])
                             ginv_nambu = np.linalg.pinv(gloc_nambu)
-                            dlt = xomega*np.eye(cixdim[icix]) - eim - sig - ginv_nambu[:cixdim[icix],:cixdim[icix]]
-                            dlt_anom = -phi - ginv_nambu[:cixdim[icix],cixdim[icix]:]
+                            # Delta_hat = z_hat - E_hat - Sigma_hat - Gloc_hat^{-1}, with
+                            # z_hat = diag(z,z), E_hat = diag(eim,-eim) and
+                            # Sigma_hat = [[sig,phi],[phi_dag,sig_hh]].
+                            dlt      =  xomega*np.eye(cixdim[icix]) - eim - sig    - ginv_nambu[:cixdim[icix],:cixdim[icix]]
+                            dlt_anom =                                    - phi    - ginv_nambu[:cixdim[icix],cixdim[icix]:]
+                            dlt_hp   =                                  - phi_dag  - ginv_nambu[cixdim[icix]:,:cixdim[icix]]
+                            dlt_hh   =  xomega*np.eye(cixdim[icix]) + eim - sig_hh - ginv_nambu[cixdim[icix]:,cixdim[icix]:]
                         else:
                             ginv = np.linalg.inv(glc)
                             dlt = xomega*np.eye(cixdim[icix]) - eim - sig - ginv
@@ -488,6 +558,8 @@ def main(args):
                             delta[iom,ii] += dlt[ind1,ind2]/degs[ii]
                             if args.nambu:
                                 delta_anom[iom,ii] += dlt_anom[ind1,ind2]/degs[ii]
+                                delta_hp[iom,ii]   += dlt_hp[ind1,ind2]/degs[ii]
+                                delta_hh[iom,ii]   += dlt_hh[ind1,ind2]/degs[ii]
 
                 for icix in range(ncix):
                     if args.nambu:
@@ -501,17 +573,17 @@ def main(args):
                                 dl = delta[iom,icx_it[icix][it]]
                                 print(dl.real, dl.imag, end=' ', file=fo)
                             if args.nambu:
+                                # ph, hp and hh hybridization blocks from the genuine Nambu-Dyson
+                                # identity above, not reconstructed from the pp/ph blocks.
                                 for it in range(csize[icix]):
                                     dl = delta_anom[iom,icx_it[icix][it]]
                                     print(dl.real, dl.imag, end=' ', file=fo)
-                                # Δ_anom† = conj(Δ_anom): same Re, negated Im
                                 for it in range(csize[icix]):
-                                    dl = delta_anom[iom,icx_it[icix][it]]
-                                    print(dl.real, -dl.imag, end=' ', file=fo)
-                                # Δ_hh = -conj(Δ_pp): negated Re, same Im
+                                    dl = delta_hp[iom,icx_it[icix][it]]
+                                    print(dl.real, dl.imag, end=' ', file=fo)
                                 for it in range(csize[icix]):
-                                    dl = delta[iom,icx_it[icix][it]]
-                                    print(-dl.real, dl.imag, end=' ', file=fo)
+                                    dl = delta_hh[iom,icx_it[icix][it]]
+                                    print(dl.real, dl.imag, end=' ', file=fo)
                             print(file=fo)
 
         if store_Ak:
@@ -958,6 +1030,7 @@ if __name__ == "__main__":
     parser.add_argument('-f', dest='full_inversion', default=False, action='store_true', help='perform full inversion, which is slower but safer')
     parser.add_argument('-c', dest='cutoff', type=float, default=1.0, help='cutoff energy is taken from case.indmfl and increased by cutoff (1eV by default)')
     parser.add_argument('--nambu', dest='nambu', default=False, action='store_true', help='enable Nambu Dyson solver for superconductivity')
+    parser.add_argument('--strict-nambu', dest='strict_nambu', default=False, action='store_true', help='turn the Nambu symmetry warnings into hard errors (default: warn only)')
     args = parser.parse_args()
     main(args)
 

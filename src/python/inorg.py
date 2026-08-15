@@ -575,6 +575,34 @@ class IMP_INORG(object):
             #             print(f"# {dim}x{dim} complex impurity levels matrix for icix={icix}", file=fp)
 
 
+        # ---------------------------------------------------------------- #
+        # nb provenance, and a tripwire against a silent drop.               #
+        # 'nb' is the per-K bath-size vector.  A copy of this file predating  #
+        # the key drops it without a word and the solver falls back to        #
+        # AUTOMATIC bath splitting, which converges cleanly to a DIFFERENT    #
+        # physical setup -- an unequal X/Y split feeds spurious X/Y asymmetry #
+        # straight into Phi_d = (Phi_Y - Phi_X)/2.  Read PARAMS.norg back and #
+        # record which source the solver will actually use, so the run log    #
+        # settles the question with no guesswork.                             #
+        # ---------------------------------------------------------------- #
+        nb_written = None
+        with open(self.dir+self.PARAMS, 'r') as fp:
+            for line in fp:
+                tok = line.split('#')[0].split()
+                if tok and tok[0] == 'nb':
+                    nb_written = ' '.join(tok[1:])
+        if 'nb' in params:
+            if nb_written is None:
+                raise ValueError(
+                    "iNORG: requested nb=" + str(params['nb'][0]) + " was DROPPED -- no nb line in "
+                    + self.dir+self.PARAMS + ". This copy of inorg.py cannot pass nb through, so the "
+                    "solver would silently fall back to automatic bath splitting (a different "
+                    "physical setup, and an unequal X/Y split contaminates Phi_d). Refusing to run.")
+            print('iNORG: nb=[' + nb_written + '] source=' + self.PARAMS, file=self.fh_info)
+        else:
+            print('iNORG: nb source=auto (not requested in impurity params; solver splits baths automatically)',
+                  file=self.fh_info)
+
         Sigind = numpy.array(self.Sigind_shifted)
         Diagonal={}
         for i in range(len(Sigind)):
