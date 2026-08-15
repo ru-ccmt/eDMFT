@@ -439,17 +439,59 @@ class IMP_INORG(object):
         om = om[_mask]
         Delta = Delta[:, _mask]
 
-        # Strip sentinel row (high-frequency tail marker at ω >> physical mesh).
-        # merge_nambu_sigout appends a sentinel at ω=5000 for ssplit/sgather.
-        # If kept, the interpolation at line 578 expands to ~40000 Matsubara points
-        # instead of the physical ~500, causing bath fitting instability.
-        if len(om) > 1:
-            dw = om[1] - om[0]  # Matsubara spacing = 2π/β
-            gap = om[-1] - om[-2]
-            if gap > 10 * dw:  # sentinel has a huge gap from previous point
-                print(f'Stripping sentinel frequency: om[-1]={om[-1]:.1f} (gap={gap:.1f} >> dw={dw:.4f})')
-                om = om[:-1]
-                Delta = Delta[:, :-1]
+        # Strip the sentinel row (high-frequency tail marker at ω >> physical mesh).
+        # ssplit.py and merge_nambu_sigout both append it at the hard-coded frequency
+        # SENTINEL_OMEGA. If it survives, the interpolation further down expands to
+        # ~40000 Matsubara points instead of the physical ~500 and destabilises the
+        # bath fit.
+        #
+        # This test used to be the heuristic `gap > 10*dw` with dw = 2π/β, which deleted
+        # real data. Since om_n = (2n+1)π/β, BOTH gap and dw carry the same 1/β, so
+        # gap/dw is just the INDEX gap at the top of the geometric tail:
+        #
+        #     gap/dw  ~  N_full * ln(N_full/nom) / ntail        (β cancels EXACTLY)
+        #
+        # Do not read this as a large-β problem -- β is not in it. Verified against the
+        # real create_log_mesh: (N_full=767, nom=200, ntail=300) gives 3.00 at β=50, 200
+        # and 500 alike; (N_full=4101, nom=800, ntail=300) gives 22.0 at β=200 and at
+        # β=50 alike. The deck that hit this went from 3.0 to 22.0 by LENGTHENING ITS
+        # SEED with ntail unchanged, not by raising β. So the rule to remember is: a
+        # longer sig.inp with ntail left alone, at ANY temperature.
+        #
+        # When it misfires there is no sentinel to remove, so it deletes the real
+        # highest-frequency Delta point on every solve; the solver mesh is rebuilt from
+        # the shortened om[-1], sgather stamps the shorter axis back into sig.inp, and
+        # the next cycle starts shorter still. That cascade surfaces only hours in, as a
+        # fit_points index out of bounds -- and only when it happens to cross
+        # max(fit_points). A deck with a shorter fit_points list finishes NORMALLY with a
+        # quietly truncated self-energy axis. The crash was incidental; the silent
+        # per-cycle truncation is the defect.
+        # Match the sentinel by its known value instead; that is exact and mesh-independent.
+        SENTINEL_OMEGA = 5000.0
+        if len(om) > 1 and abs(om[-1] - SENTINEL_OMEGA) < 1e-6:
+            print('Stripping sentinel frequency: om[-1]=%.1f' % om[-1])
+            om = om[:-1]
+            Delta = Delta[:, :-1]
+
+        # The impurity frequency axis must never shrink between solves. A silent shrink
+        # is exactly how the defect above stayed invisible for one cycle at a time, so
+        # say it out loud rather than leaving it to be found in a stack trace.
+        _mesh_stamp = self.dir + '/.omega_mesh_len'
+        _prev_len = None
+        if os.path.isfile(_mesh_stamp):
+            try:
+                _prev_len = int(open(_mesh_stamp).read().split()[0])
+            except Exception:
+                _prev_len = None
+        if _prev_len is not None and len(om) < _prev_len:
+            print('WARNING: impurity frequency mesh SHRANK from %d to %d points since the previous '
+                  'solve. The self-energy axis is being truncated once per cycle and this compounds; '
+                  'check the sentinel strip and ntail before trusting the result.' % (_prev_len, len(om)))
+        try:
+            with open(_mesh_stamp, 'w') as _fs:
+                _fs.write('%d\n' % len(om))
+        except Exception:
+            pass
 
         ### If option to force zero self-energy for some orbitals
         # we have to be careful with Delta/Eimp and eventually replace
