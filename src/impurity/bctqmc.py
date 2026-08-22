@@ -59,7 +59,15 @@ def _json_ready(value):
         return [_json_ready(v) for v in value]
     if isinstance(value, ndarray):
         return [_json_ready(v) for v in value.tolist()]
-    if isinstance(value, (bool, str)) or value is None:
+    if isinstance(value, bool_):
+        # The module-level ``from numpy import *`` shadows the builtin ``bool``
+        # with ``numpy.bool_`` under numpy>=2.0, so a ``bool(...)`` upstream (e.g.
+        # context["nambu"]) can be a numpy boolean, which json.dump cannot
+        # serialize.  Coerce it back to a real Python bool -- this sanitizer's
+        # whole job -- before it reaches json.  (numpy<2 had no np.bool, so the
+        # builtin was used and this path was dormant.)
+        return builtins.bool(value)
+    if value is None or isinstance(value, (builtins.bool, str)):
         return value
     if isinstance(value, complex):
         return [float(value.real), float(value.imag)]
