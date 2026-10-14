@@ -2,7 +2,19 @@
 #define _nca_oca_imag_
 
 #include <blitz/array.h>
+#include <algorithm>
+#include <bit>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <climits>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <numeric>
+#include <type_traits>
 #include "read_cix.h"
+#include "oca_dlr_types.h"
 using namespace blitz;
 
 inline double intg_dh(int it, int Nlast)
@@ -321,19 +333,667 @@ double I_NCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
   return Phi_tot;
 }
 
-double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, Array<double,2>& F01t,
-	     bool cmpPhysG, double Q, double beta, const Array<double,1>& tau,
-	     const Spline1DMany& Gms, const Spline1DMany& Deltas,
-	     Cix& cix, json& pars, const vector<int>& G_importance, int OCA_cut_sum, MPIcls& mpi/*, double r_OCA_mesh*/)
+// Dense post-construction representation of one fully reduced OCA path.
+// unordered_map is very useful while discovering and accumulating paths, but
+// retaining its buckets/nodes wastes memory and gives poor traversal locality.
+// This record is also the natural basis for the forthcoming MPI wire format.
+struct OCACompactPath {
+  OCAKey key{};                       // {s1,s0,p3,p2,p1,p0}
+  std::array<double,5> weights{};    // {mm,nds1,nds0,anomalous1,anomalous0}
+  std::array<int,4> inner_index{};   // legacy precomputed convolution indices
+};
+
+// Everything produced by the CIX/operator walk and needed by either OCA
+// integrator.  The enumerator contains no time mesh, splines, AAA, or DLR
+// objects: it is a purely discrete description of the allowed diagrams.
+struct OCAEnumeration {
+  // The enumeration is reusable only while every discrete input which can
+  // remove or add a path remains unchanged.  Keeping this metadata beside
+  // the large tables makes cache validation explicit and cheap.
+  bool includes_physical=false;
+  int npseudo=0;
+  int nbath_unique=0;
+  int cut_sum=0;
+  vector<int> importance;
+  // Replicated mode stores every reduced path on every rank.  Distributed
+  // mode stores only the reduced bath-pair shards owned by this rank; the
+  // compact DLR plans and their numerical contractions remain sharded too.
+  bool paths_distributed=false;
+  // A distributed topology may be replicated inside small MPI worker groups.
+  // `topology_shard_count` is the number of disjoint path sets globally;
+  // ranks with equal rank%topology_shard_count hold the same set and divide
+  // its AAA poles.  Group-rank zero is the unique owner for disk-cache output
+  // and global plan-count diagnostics.
+  int topology_shard_count=1;
+  int topology_shard_id=0;
+  int topology_group_rank=0;
+  int topology_group_size=1;
+  unsigned long long global_nonzero_path_count=0;
+  double estimated_replicated_megabytes=0.0;
+
+  bool matches(bool cmpPhysG, const Cix& cix,
+               const vector<int>& G_importance,
+               int OCA_cut_sum) const
+  {
+    return includes_physical==cmpPhysG &&
+      npseudo==cix.Npseudo_unique &&
+      nbath_unique==cix.Nbath_unique_unique &&
+      cut_sum==OCA_cut_sum && importance==G_importance;
+  }
+
+  // Sorted contiguous paths replace the construction hash table and its two
+  // parallel arrays.  Sorting makes diagnostics and future MPI reductions
+  // deterministic while improving the legacy integration traversal.
+  vector<OCACompactPath> compact_paths;
+
+  // Legacy uniform-mesh integration reuses four kinds of inner pseudo pair.
+  vector<vector<TinyVector<int,4>>> unique_inner_states;
+
+  // Lightweight representation consumed by oca_dlr.h.  It is populated only
+  // when DLR production or diagnostics request it, avoiding duplicate storage
+  // in a normal legacy-only run.
+  vector<OCAPathRecord> paths;
+};
+
+// Stable signature for the optional on-disk path cache.  The cache stores
+// only the mesh-independent OCAPathRecord stream, never Eigen sparse-matrix
+// internals, so it remains portable across MPI sizes and plan layouts built
+// by the same executable/architecture.
+struct OCAPathCacheHeader {
+  char magic[8]={'O','C','A','D','L','R','P','1'};
+  std::uint32_t version=1;
+  std::uint32_t record_size=sizeof(OCAPathRecord);
+  std::uint64_t cix_hash=0;
+  std::uint64_t importance_hash=0;
+  std::uint64_t record_count=0;
+  std::int32_t npseudo=0;
+  std::int32_t nbath=0;
+  std::int32_t cut_sum=0;
+  std::int32_t includes_physical=0;
+};
+static_assert(std::is_trivially_copyable_v<OCAPathCacheHeader>);
+static_assert(std::is_trivially_copyable_v<OCAPathRecord>);
+
+inline std::uint64_t OCAFNV1a(const void* data,std::size_t bytes,
+                             std::uint64_t hash=1469598103934665603ULL)
 {
+  const auto* p=static_cast<const unsigned char*>(data);
+  for (std::size_t i=0;i<bytes;++i) {
+    hash^=p[i];
+    hash*=1099511628211ULL;
+  }
+  return hash;
+}
+
+inline std::uint64_t OCAFileHash(const std::string& filename)
+{
+  std::ifstream in(filename,std::ios::binary);
+  if (!in) return 0;
+  std::uint64_t hash=1469598103934665603ULL;
+  std::array<char,1<<15> buffer{};
+  while (in) {
+    in.read(buffer.data(),buffer.size());
+    const auto count=in.gcount();
+    if (count>0) hash=OCAFNV1a(buffer.data(),static_cast<std::size_t>(count),hash);
+  }
+  return hash;
+}
+
+inline std::uint64_t OCAImportanceHash(const vector<int>& importance)
+{
+  return OCAFNV1a(importance.data(),importance.size()*sizeof(int));
+}
+
+// Choose the smallest number of disjoint topology shards whose estimated
+// compiled plan fits the configured per-rank budget.  Every additional rank
+// is then useful as a pole worker sharing one of those shards.  Explicit
+// "replicated" and "distributed" retain their old meanings for controlled
+// comparisons; only "auto" selects the hybrid two-dimensional layout.
+inline int OCAChooseTopologyShardCount(const std::string& topology_mode,
+                                       double estimated_replicated_megabytes,
+                                       double max_replicated_megabytes,
+                                       int world_size)
+{
+  if (world_size<=1 || topology_mode=="replicated") return 1;
+  if (topology_mode=="distributed") return world_size;
+  const double needed=std::ceil(
+    estimated_replicated_megabytes/max_replicated_megabytes);
+  return std::max(1,std::min(world_size,static_cast<int>(needed)));
+}
+
+inline void OCASetTopologyGroupMetadata(OCAEnumeration& result,MPIcls& mpi)
+{
+  const int shards=std::max(1,result.topology_shard_count);
+  result.topology_shard_id=mpi.rank%shards;
+  result.topology_group_rank=mpi.rank/shards;
+  result.topology_group_size=1+(mpi.size-1-result.topology_shard_id)/shards;
+}
+
+#ifdef _MPI
+// Convert the unique rank-local path stream produced by enumeration or a
+// parallel cache read into the two-dimensional topology layout.  When there
+// are at least as many nonempty reduced bath pairs as shards, an entire
+// (s0,s1) pair remains on one shard, minimizing duplicate pseudo-pair catalogs.
+// Only when more shards are required than bath pairs are individual records
+// hash-partitioned, which is necessary to honor the memory bound.
+inline void DistributeOCAPathRecordsHybridMPI(
+    vector<OCAPathRecord>& paths,
+    int nbath,
+    int shard_count,
+    bool already_pair_partitioned,
+    MPIcls& mpi)
+{
+  if (mpi.size<=1 || shard_count<=1) return;
+  shard_count=std::min(shard_count,mpi.size);
+
+  vector<unsigned long long> local_pair_counts(nbath*nbath,0);
+  for (const auto& path:paths) {
+    if (path.s0<0 || path.s0>=nbath || path.s1<0 || path.s1>=nbath)
+      throw std::out_of_range("OCA path bath index exceeds hybrid shard table");
+    ++local_pair_counts[path.s0*nbath+path.s1];
+  }
+  vector<unsigned long long> global_pair_counts(local_pair_counts.size(),0);
+  MPI_Allreduce(local_pair_counts.data(),global_pair_counts.data(),
+                static_cast<int>(global_pair_counts.size()),
+                MPI_UNSIGNED_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
+  const int active_pairs=static_cast<int>(std::count_if(
+    global_pair_counts.begin(),global_pair_counts.end(),
+    [](unsigned long long count){return count!=0;}));
+
+  // Fresh enumeration with one shard per rank and enough bath pairs already
+  // has exactly this locality.  Avoid a second all-to-all in that common case.
+  const bool keep_existing=already_pair_partitioned &&
+    shard_count==mpi.size && shard_count<=active_pairs;
+  if (!keep_existing) {
+    vector<int> pair_shard(nbath*nbath,-1);
+    if (shard_count<=active_pairs) {
+      vector<int> order;
+      for (int pair=0;pair<nbath*nbath;++pair)
+        if (global_pair_counts[pair]!=0) order.push_back(pair);
+      std::stable_sort(order.begin(),order.end(),[&](int a,int b) {
+        return global_pair_counts[a]>global_pair_counts[b];
+      });
+      vector<unsigned long long> load(shard_count,0);
+      for (int pair:order) {
+        const int shard=static_cast<int>(
+          std::min_element(load.begin(),load.end())-load.begin());
+        pair_shard[pair]=shard;
+        load[shard]+=global_pair_counts[pair];
+      }
+    }
+
+    const auto destination_shard=[&](const OCAPathRecord& path) {
+      if (shard_count<=active_pairs)
+        return pair_shard[path.s0*nbath+path.s1];
+      std::uint64_t hash=1469598103934665603ULL;
+      hash=OCAFNV1a(path.pseudo.data(),path.pseudo.size()*sizeof(int),hash);
+      hash=OCAFNV1a(&path.s0,sizeof(path.s0),hash);
+      hash=OCAFNV1a(&path.s1,sizeof(path.s1),hash);
+      return static_cast<int>(hash%shard_count);
+    };
+
+    vector<int> send_counts(mpi.size,0),recv_counts(mpi.size,0);
+    for (const auto& path:paths) {
+      const int target=destination_shard(path); // shard leader world rank
+      if (send_counts[target]==INT_MAX)
+        throw std::overflow_error("OCA hybrid send count exceeds INT_MAX");
+      ++send_counts[target];
+    }
+    MPI_Alltoall(send_counts.data(),1,MPI_INT,
+                 recv_counts.data(),1,MPI_INT,MPI_COMM_WORLD);
+    vector<int> send_displacements(mpi.size),recv_displacements(mpi.size);
+    long long send_total=0,recv_total=0;
+    for (int rank=0;rank<mpi.size;++rank) {
+      if (send_total>INT_MAX || recv_total>INT_MAX)
+        throw std::overflow_error(
+          "OCA hybrid redistribution displacement exceeds INT_MAX");
+      send_displacements[rank]=static_cast<int>(send_total);
+      recv_displacements[rank]=static_cast<int>(recv_total);
+      send_total+=send_counts[rank];
+      recv_total+=recv_counts[rank];
+    }
+    if (send_total>INT_MAX || recv_total>INT_MAX)
+      throw std::overflow_error("OCA hybrid redistribution size exceeds INT_MAX");
+    vector<OCAPathRecord> send_buffer(paths.size());
+    vector<int> cursor=send_displacements;
+    for (const auto& path:paths)
+      send_buffer[cursor[destination_shard(path)]++]=path;
+    vector<OCAPathRecord> receive_buffer(static_cast<size_t>(recv_total));
+    MPI_Datatype record_type;
+    MPI_Type_contiguous(sizeof(OCAPathRecord),MPI_BYTE,&record_type);
+    MPI_Type_commit(&record_type);
+    MPI_Alltoallv(send_buffer.data(),send_counts.data(),send_displacements.data(),
+                  record_type,receive_buffer.data(),recv_counts.data(),
+                  recv_displacements.data(),record_type,MPI_COMM_WORLD);
+    MPI_Type_free(&record_type);
+    paths.swap(receive_buffer);
+  }
+
+  // World ranks 0..shard_count-1 are the leaders of the cyclic groups.  After
+  // the redistribution only those ranks own paths; broadcast each leader's
+  // shard to its pole workers without ever constructing the global topology.
+  MPI_Comm shard_comm=MPI_COMM_NULL;
+  const int shard_id=mpi.rank%shard_count;
+  MPI_Comm_split(MPI_COMM_WORLD,shard_id,mpi.rank,&shard_comm);
+  int shard_rank=0;
+  MPI_Comm_rank(shard_comm,&shard_rank);
+  unsigned long long shard_paths=shard_rank==0 ? paths.size() : 0;
+  MPI_Bcast(&shard_paths,1,MPI_UNSIGNED_LONG_LONG,0,shard_comm);
+  if (shard_paths>static_cast<unsigned long long>(INT_MAX)) {
+    MPI_Comm_free(&shard_comm);
+    throw std::overflow_error(
+      "CATASTROPHIC ERROR: one OCA topology shard exceeds INT_MAX paths");
+  }
+  if (shard_rank!=0) paths.resize(static_cast<size_t>(shard_paths));
+  MPI_Datatype record_type;
+  MPI_Type_contiguous(sizeof(OCAPathRecord),MPI_BYTE,&record_type);
+  MPI_Type_commit(&record_type);
+  MPI_Bcast(paths.data(),static_cast<int>(shard_paths),record_type,0,shard_comm);
+  MPI_Type_free(&record_type);
+  MPI_Comm_free(&shard_comm);
+}
+#endif
+
+inline bool LoadOCAPathCache(const std::string& filename,
+                             std::uint64_t cix_hash,
+                             bool cmpPhysG,
+                             const Cix& cix,
+                             const vector<int>& importance,
+                             int cut_sum,
+                             const std::string& topology_mode,
+                             double max_replicated_megabytes,
+                             MPIcls& mpi,
+                             OCAEnumeration& result)
+{
+  if (filename.empty() || cix_hash==0) return false;
+  OCAPathCacheHeader header;
+  bool valid=false;
+  if (mpi.rank==mpi.master) {
+    std::ifstream in(filename,std::ios::binary);
+    if (in) {
+      in.seekg(0,std::ios::end);
+      const std::uint64_t file_bytes=static_cast<std::uint64_t>(in.tellg());
+      in.seekg(0,std::ios::beg);
+      in.read(reinterpret_cast<char*>(&header),sizeof(header));
+      const char expected[8]={'O','C','A','D','L','R','P','1'};
+      valid=static_cast<bool>(in) &&
+        std::memcmp(header.magic,expected,8)==0 && header.version==1 &&
+        header.record_size==sizeof(OCAPathRecord) &&
+        header.cix_hash==cix_hash &&
+        header.importance_hash==OCAImportanceHash(importance) &&
+        header.npseudo==cix.Npseudo_unique &&
+        header.nbath==cix.Nbath_unique_unique &&
+        header.cut_sum==cut_sum &&
+        header.includes_physical==static_cast<int>(cmpPhysG) &&
+        header.record_count<=static_cast<std::uint64_t>(INT_MAX) &&
+        file_bytes==sizeof(OCAPathCacheHeader)+
+                    header.record_count*sizeof(OCAPathRecord);
+    }
+  }
+#ifdef _MPI
+  int valid_int=valid ? 1 : 0;
+  MPI_Bcast(&valid_int,1,MPI_INT,mpi.master,MPI_COMM_WORLD);
+  valid=valid_int!=0;
+  if (!valid) return false;
+  MPI_Bcast(&header,sizeof(header),MPI_BYTE,mpi.master,MPI_COMM_WORLD);
+#else
+  if (!valid) return false;
+#endif
+
+  result.includes_physical=cmpPhysG;
+  result.npseudo=cix.Npseudo_unique;
+  result.nbath_unique=cix.Nbath_unique_unique;
+  result.cut_sum=cut_sum;
+  result.importance=importance;
+  result.global_nonzero_path_count=header.record_count;
+  constexpr double compiled_plan_factor=4.5;
+  result.estimated_replicated_megabytes=compiled_plan_factor*
+    header.record_count*sizeof(OCACompactPath)/(1024.0*1024.0);
+  result.topology_shard_count=OCAChooseTopologyShardCount(
+    topology_mode,result.estimated_replicated_megabytes,
+    max_replicated_megabytes,mpi.size);
+  result.paths_distributed=result.topology_shard_count>1;
+  OCASetTopologyGroupMetadata(result,mpi);
+
+  std::uint64_t first=0,count=header.record_count;
+  if (result.paths_distributed) {
+    // Read one unique flat interval per world rank first.  The inexpensive
+    // hybrid redistribution below restores bath-pair locality and then
+    // replicates only the selected shard inside each pole-worker group.
+    const std::uint64_t base=header.record_count/mpi.size;
+    const std::uint64_t extra=header.record_count%mpi.size;
+    count=base+(static_cast<std::uint64_t>(mpi.rank)<extra ? 1 : 0);
+    first=base*mpi.rank+std::min<std::uint64_t>(mpi.rank,extra);
+  }
+  result.paths.resize(static_cast<std::size_t>(count));
+  const std::uint64_t data_offset=sizeof(OCAPathCacheHeader)+
+    first*sizeof(OCAPathRecord);
+#ifdef _MPI
+  MPI_File file=MPI_FILE_NULL;
+  if (MPI_File_open(MPI_COMM_WORLD,filename.c_str(),MPI_MODE_RDONLY,
+                    MPI_INFO_NULL,&file)!=MPI_SUCCESS)
+    throw std::runtime_error("failed to open OCA DLR path cache with MPI-IO");
+  MPI_Datatype record_type;
+  MPI_Type_contiguous(sizeof(OCAPathRecord),MPI_BYTE,&record_type);
+  MPI_Type_commit(&record_type);
+  MPI_File_read_at_all(file,static_cast<MPI_Offset>(data_offset),
+                       result.paths.data(),static_cast<int>(count),record_type,
+                       MPI_STATUS_IGNORE);
+  MPI_Type_free(&record_type);
+  MPI_File_close(&file);
+#else
+  std::ifstream in(filename,std::ios::binary);
+  in.seekg(static_cast<std::streamoff>(data_offset));
+  in.read(reinterpret_cast<char*>(result.paths.data()),
+          static_cast<std::streamsize>(count*sizeof(OCAPathRecord)));
+  if (!in) throw std::runtime_error("failed to read OCA DLR path cache");
+#endif
+#ifdef _MPI
+  if (result.paths_distributed)
+    DistributeOCAPathRecordsHybridMPI(
+      result.paths,result.nbath_unique,result.topology_shard_count,
+      false,mpi);
+#endif
+  if (mpi.rank==mpi.master)
+    (*mpi.out) << "OCA disk topology cache hit: file=" << filename
+               << " paths=" << header.record_count << " topology="
+               << (result.paths_distributed ? "hybrid-distributed" : "replicated")
+               << " topology_shards=" << result.topology_shard_count
+               << " workers_per_shard_range=["
+               << mpi.size/result.topology_shard_count << ","
+               << (mpi.size+result.topology_shard_count-1)/
+                    result.topology_shard_count << "]"
+               << std::endl;
+  return true;
+}
+
+inline void WriteOCAPathCache(const std::string& filename,
+                              std::uint64_t cix_hash,
+                              const OCAEnumeration& enumeration,
+                              MPIcls& mpi)
+{
+  if (filename.empty() || cix_hash==0) return;
+  OCAPathCacheHeader header;
+  header.cix_hash=cix_hash;
+  header.importance_hash=OCAImportanceHash(enumeration.importance);
+  header.npseudo=enumeration.npseudo;
+  header.nbath=enumeration.nbath_unique;
+  header.cut_sum=enumeration.cut_sum;
+  header.includes_physical=enumeration.includes_physical;
+
+  // Replicated enumeration is written by the master only.  Distributed
+  // enumeration contributes one disjoint record interval per rank.  MPI-IO
+  // records the intervals in rank order; a later run may repartition this
+  // flat stream over any different number of ranks.
+  std::uint64_t local_count=enumeration.paths.size();
+  if ((!enumeration.paths_distributed && mpi.rank!=mpi.master) ||
+      (enumeration.paths_distributed &&
+       enumeration.topology_group_rank!=0))
+    local_count=0;
+  std::uint64_t first=0,global_count=local_count;
+#ifdef _MPI
+  MPI_Exscan(&local_count,&first,1,MPI_UINT64_T,MPI_SUM,MPI_COMM_WORLD);
+  if (mpi.rank==mpi.master) first=0;
+  MPI_Allreduce(&local_count,&global_count,1,MPI_UINT64_T,MPI_SUM,
+                MPI_COMM_WORLD);
+#endif
+  header.record_count=global_count;
+  const std::string temporary=filename+".tmp";
+#ifdef _MPI
+  MPI_File file=MPI_FILE_NULL;
+  if (MPI_File_open(MPI_COMM_WORLD,temporary.c_str(),
+                    MPI_MODE_CREATE|MPI_MODE_WRONLY,MPI_INFO_NULL,
+                    &file)!=MPI_SUCCESS)
+    throw std::runtime_error("failed to create OCA DLR path cache with MPI-IO");
+  MPI_File_set_size(file,static_cast<MPI_Offset>(
+    sizeof(header)+global_count*sizeof(OCAPathRecord)));
+  if (mpi.rank==mpi.master)
+    MPI_File_write_at(file,0,&header,sizeof(header),MPI_BYTE,MPI_STATUS_IGNORE);
+  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Datatype record_type;
+  MPI_Type_contiguous(sizeof(OCAPathRecord),MPI_BYTE,&record_type);
+  MPI_Type_commit(&record_type);
+  const MPI_Offset offset=sizeof(header)+first*sizeof(OCAPathRecord);
+  MPI_File_write_at_all(file,offset,
+                        const_cast<OCAPathRecord*>(enumeration.paths.data()),
+                        static_cast<int>(local_count),record_type,
+                        MPI_STATUS_IGNORE);
+  MPI_Type_free(&record_type);
+  MPI_File_close(&file);
+  int rename_error=0;
+  if (mpi.rank==mpi.master)
+    rename_error=std::rename(temporary.c_str(),filename.c_str())!=0;
+  MPI_Bcast(&rename_error,1,MPI_INT,mpi.master,MPI_COMM_WORLD);
+  if (rename_error)
+    throw std::runtime_error("failed to publish OCA DLR path cache");
+  MPI_Barrier(MPI_COMM_WORLD);
+#else
+  std::ofstream out(temporary,std::ios::binary|std::ios::trunc);
+  out.write(reinterpret_cast<const char*>(&header),sizeof(header));
+  out.write(reinterpret_cast<const char*>(enumeration.paths.data()),
+            enumeration.paths.size()*sizeof(OCAPathRecord));
+  out.close();
+  if (!out || std::rename(temporary.c_str(),filename.c_str())!=0)
+    throw std::runtime_error("failed to publish OCA DLR path cache");
+#endif
+  if (mpi.rank==mpi.master)
+    (*mpi.out) << "OCA disk topology cache written: file=" << filename
+               << " paths=" << global_count << std::endl;
+}
+
+inline bool OCAPathWeightsAreZero(const std::array<double,5>& weights)
+{
+  return weights[0]==0.0 && weights[1]==0.0 && weights[2]==0.0 &&
+    weights[3]==0.0 && weights[4]==0.0;
+}
+
+// Reconstruct every legacy convolution index from the globally reduced path
+// records.  Local integer indices cannot be communicated between MPI ranks:
+// each rank discovered a different subset and therefore assigned different
+// insertion-order numbers.  Rebuilding after the global key reduction is
+// deterministic, linear in the final path count, and also discards inner
+// pairs belonging only to paths whose accumulated weights cancelled to zero.
+inline void RebuildOCAInnerCatalog(OCAEnumeration& result)
+{
+  result.unique_inner_states.assign(4,{});
+  std::array<unordered_map<TinyVector<int,4>,int,TV4Hash,TV4Equal>,4> index;
+  for (auto& map:index) map.reserve(result.compact_paths.size());
+
+  const auto add_inner=[&](int cut, TinyVector<int,4> state,
+                           bool needed_for_self_energy) {
+    // The fourth component is a usage flag rather than part of the identity.
+    // Hash only the three physical indices, exactly as the original code did
+    // by inserting the key with flag=1 and changing stored values to zero.
+    state[3]=1;
+    auto [it,inserted]=index[cut].try_emplace(
+      state,static_cast<int>(result.unique_inner_states[cut].size()));
+    if (inserted) {
+      state[3]=needed_for_self_energy ? 1 : 0;
+      result.unique_inner_states[cut].push_back(state);
+    } else if (needed_for_self_energy) {
+      result.unique_inner_states[cut][it->second][3]=1;
+    }
+    return it->second;
+  };
+
+  for (auto& path:result.compact_paths) {
+    path.inner_index={-1,-1,-1,-1};
+    const TinyVector<int,6> st=unpack6(path.key);
+    const int s1=st[0],s0=st[1];
+    const int p3=st[2],p2=st[3],p1=st[4],p0=st[5];
+    const bool self=path.weights[0]!=0.0;
+    if (self) {
+      path.inner_index[0]=add_inner(0,TinyVector<int,4>(p0,p1,s0,1),true);
+      path.inner_index[1]=add_inner(1,TinyVector<int,4>(p1,p2,s1,1),true);
+    }
+    // Physical G/F cuts need only the p2-p3 and p3-p0 inner pairs.  They are
+    // also required by every ordinary self-energy path.
+    path.inner_index[2]=add_inner(2,TinyVector<int,4>(p2,p3,s0,1),self);
+    path.inner_index[3]=add_inner(3,TinyVector<int,4>(p3,p0,s1,1),self);
+  }
+}
+
+#ifdef _MPI
+struct OCAWirePath {
+  OCAKey key{};
+  std::array<double,5> weights{};
+};
+static_assert(std::is_trivially_copyable_v<OCAWirePath>);
+
+// Gather rank-local path records without a root bottleneck.  The scheduler
+// assigns an entire reduced bath pair (s0,s1) to one rank.  Since (s0,s1) is
+// part of every packed key, two ranks can never generate the same key: all
+// duplicate contributions have already met in the producing rank's local
+// hash table.  We can consequently skip the former hash-owner Alltoallv and
+// directly Allgatherv the already unique records needed by every evaluator.
+inline vector<OCACompactPath> GatherOCAPathsMPI(
+  const vector<OCACompactPath>& local_paths,MPIcls& mpi)
+{
+  if (mpi.size==1) return local_paths;
+
+  if (local_paths.size()>static_cast<size_t>(INT_MAX))
+    throw std::overflow_error(
+      "CATASTROPHIC ERROR: one MPI rank generated more than INT_MAX OCA paths.");
+  vector<OCAWirePath> local_wire;
+  local_wire.reserve(local_paths.size());
+  for (const auto& path:local_paths) {
+    local_wire.push_back({path.key,path.weights});
+  }
+
+  const int local_count=static_cast<int>(local_wire.size());
+  vector<int> owned_counts(mpi.size),owned_displs(mpi.size);
+  MPI_Allgather(&local_count,1,MPI_INT,
+                owned_counts.data(),1,MPI_INT,MPI_COMM_WORLD);
+  long long global_total=0;
+  for (int rank=0;rank<mpi.size;++rank) {
+    if (global_total>INT_MAX)
+      throw std::overflow_error(
+        "CATASTROPHIC ERROR: OCA MPI Allgatherv displacement exceeds INT_MAX. "
+        "Chunked communication is required.");
+    owned_displs[rank]=static_cast<int>(global_total);
+    global_total+=owned_counts[rank];
+  }
+  if (global_total>INT_MAX)
+    throw std::overflow_error(
+      "CATASTROPHIC ERROR: global OCA path count exceeds INT_MAX. "
+      "Chunked communication is required.");
+  vector<OCAWirePath> global_wire(static_cast<size_t>(global_total));
+  MPI_Datatype wire_type;
+  MPI_Type_contiguous(static_cast<int>(sizeof(OCAWirePath)),MPI_BYTE,&wire_type);
+  MPI_Type_commit(&wire_type);
+  MPI_Allgatherv(local_wire.data(),local_count,wire_type,
+                 global_wire.data(),owned_counts.data(),owned_displs.data(),wire_type,
+                 MPI_COMM_WORLD);
+  MPI_Type_free(&wire_type);
+
+  vector<OCACompactPath> global_paths;
+  global_paths.reserve(global_wire.size());
+  for (const auto& wire:global_wire) {
+    OCACompactPath path;
+    path.key=wire.key;
+    path.weights=wire.weights;
+    path.inner_index={-1,-1,-1,-1};
+    global_paths.push_back(path);
+  }
+  std::sort(global_paths.begin(),global_paths.end(),
+            [](const OCACompactPath& a,const OCACompactPath& b) {
+              return a.key<b.key;
+            });
+  // A duplicate here would prove that the scheduling invariant was broken:
+  // equal packed keys necessarily have equal (s0,s1), and an entire pair must
+  // be owned by exactly one rank.  Never silently double-count such a bug.
+  for (size_t i=1;i<global_paths.size();++i)
+    if (global_paths[i-1].key==global_paths[i].key)
+      throw std::logic_error(
+        "CATASTROPHIC ERROR: duplicate OCA key crossed MPI ranks despite "
+        "reduced-bath-pair scheduling.");
+  return global_paths;
+}
+
+// Rebalance a non-replicated path stream over every MPI rank after the
+// bath-pair-owned enumeration.  Enumeration has at most Nbath^2 useful
+// owners, but integration may profit from more ranks.  Hash partitioning the
+// already compact records is a single O(number_of_paths) Alltoallv, keeps
+// exactly one copy globally, and makes all ranks useful during plan building
+// and every subsequent AAA-pole contraction.
+inline void RedistributeOCAPathRecordsMPI(vector<OCAPathRecord>& paths,
+                                          MPIcls& mpi)
+{
+  if (mpi.size<=1) return;
+  vector<int> send_counts(mpi.size,0),recv_counts(mpi.size,0);
+  const auto destination=[&](const OCAPathRecord& path) {
+    std::uint64_t hash=1469598103934665603ULL;
+    hash=OCAFNV1a(path.pseudo.data(),path.pseudo.size()*sizeof(int),hash);
+    hash=OCAFNV1a(&path.s0,sizeof(path.s0),hash);
+    hash=OCAFNV1a(&path.s1,sizeof(path.s1),hash);
+    return static_cast<int>(hash%mpi.size);
+  };
+  for (const auto& path:paths) {
+    const int target=destination(path);
+    if (send_counts[target]==INT_MAX)
+      throw std::overflow_error("OCA path redistribution count exceeds INT_MAX");
+    ++send_counts[target];
+  }
+  MPI_Alltoall(send_counts.data(),1,MPI_INT,
+               recv_counts.data(),1,MPI_INT,MPI_COMM_WORLD);
+  vector<int> send_displacements(mpi.size),recv_displacements(mpi.size);
+  long long send_total=0,recv_total=0;
+  for (int rank=0;rank<mpi.size;++rank) {
+    if (send_total>INT_MAX || recv_total>INT_MAX)
+      throw std::overflow_error(
+        "OCA path redistribution displacement exceeds INT_MAX");
+    send_displacements[rank]=static_cast<int>(send_total);
+    recv_displacements[rank]=static_cast<int>(recv_total);
+    send_total+=send_counts[rank];
+    recv_total+=recv_counts[rank];
+  }
+  if (send_total>INT_MAX || recv_total>INT_MAX)
+    throw std::overflow_error("OCA path redistribution size exceeds INT_MAX");
+  vector<OCAPathRecord> send_buffer(paths.size());
+  vector<int> cursor=send_displacements;
+  for (const auto& path:paths)
+    send_buffer[cursor[destination(path)]++]=path;
+  vector<OCAPathRecord> receive_buffer(static_cast<size_t>(recv_total));
+  MPI_Datatype record_type;
+  MPI_Type_contiguous(sizeof(OCAPathRecord),MPI_BYTE,&record_type);
+  MPI_Type_commit(&record_type);
+  MPI_Alltoallv(send_buffer.data(),send_counts.data(),send_displacements.data(),
+                record_type,receive_buffer.data(),recv_counts.data(),
+                recv_displacements.data(),record_type,MPI_COMM_WORLD);
+  MPI_Type_free(&record_type);
+  paths.swap(receive_buffer);
+
+  unsigned long long local=paths.size(),minimum=local,maximum=local,total=local;
+  MPI_Allreduce(&local,&minimum,1,MPI_UNSIGNED_LONG_LONG,MPI_MIN,MPI_COMM_WORLD);
+  MPI_Allreduce(&local,&maximum,1,MPI_UNSIGNED_LONG_LONG,MPI_MAX,MPI_COMM_WORLD);
+  MPI_Allreduce(&local,&total,1,MPI_UNSIGNED_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
+  if (mpi.rank==mpi.master)
+    (*mpi.out) << "OCA distributed-plan rebalance: rank_path_range=["
+               << minimum << "," << maximum << "] total=" << total
+               << std::endl;
+}
+#endif
+
+// Enumerate the OCA topology once, before selecting a numerical integrator.
+// Importance filtering, CIX selection rules, operator signs, and Bulla matrix
+// replacements therefore remain exactly common to legacy and DLR paths.
+inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
+				       Cix& cix,
+				       const vector<int>& G_importance,
+				       int OCA_cut_sum,
+				       bool build_legacy_catalog,
+				       bool export_path_records,
+				       const std::string& mpi_topology_mode,
+				       double max_replicated_megabytes,
+				       MPIcls& mpi)
+{
+  if (mpi_topology_mode!="auto" && mpi_topology_mode!="replicated" &&
+      mpi_topology_mode!="distributed")
+    throw std::invalid_argument(
+      "oca_dlr_mpi_topology must be \"auto\", \"replicated\", or "
+      "\"distributed\"");
   ////////////////////////////
-  // input :
-  //          Gms(Ntau,Npseudo)  -- input pseudoparticle splines propagators
-  //          Deltas(Ntau,Ns)    -- input hybridization with splines
-  //          tau(Ntau)          -- non-equidistant tau mesh
-  //
-  // output:
-  //          Sm(Npseudo,Ntau)  -- pseudoparticle self-energy
+  // Diagram convention:
   //                    nds1
   //               Fi[2*is1,p1] 
   //                  --->---
@@ -346,60 +1006,129 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
   //               Fi[2*is1+1,p3]
   //  states[] for four diagrams, where 0=|0>, 1=|up>, 2=|dn>, 3=|2>
   //  Ds[] 0=up, 1=dn
-  bool debug = false;
-  const double coef[]={17/48.,59/48.,43/48.,49./48.,1.0};// O(dh^4)
   const int Nd=4;
   Diag2Matrix diag2matrix(6, cix);
   Array<int,2> diag(2,2);     // OCA diagram
   diag = 0,2,1,3;             // OCA diagram
   Array<int,1> dirspin(2);    // dirspin=2*iorb1,2*iorb0
 
-  //int OCA_cut_sum = pars["OCA_cut_sum"].get<int>();
-  //std::array<double,2> OCA_cut({pars["OCA_cut1"].get<double>(),pars["OCA_cut2"].get<double>()});
-  if (fabs(beta-tau(tau.size()-1))>1e-7){ cerr<<"ERROR in I_OCA: last point in tau="<< tau(tau.size()-1)<<" should be beta="<<beta<<endl;}
-  // we need uniform mesh for OCA
-  int Nt = tau.size()*pars["r_OCA_mesh"].get<double>();//r_OCA_mesh;
-  double dh = beta/(Nt-1.0);
-  // functions on the uniform mesh, evaluated from splines
-  Array<double,2> Gm(Gms.size(),Nt), Delta(Deltas.size(),Nt);
-  int pos=0;
-  for (int it=0; it<Nt; ++it){
-    intpar ips = InterpLeft(dh*it, pos,tau);
-    for (int a=0; a<Gms.size(); ++a) Gm(a,it) = Gms(ips,a);
-    for (int b=0; b<Deltas.size(); ++b) Delta(b,it) = Deltas(ips,b);
+  using EnumerationClock=std::chrono::steady_clock;
+  const auto scheduling_start=EnumerationClock::now();
+
+  // Discover only the inexpensive outer work units before entering either
+  // combinatorial pass.  Both passes replay this exact ordering and consult
+  // task_owner, so a rank works on the same CIX blocks in both passes.
+  //
+  // The indivisible scheduling unit is a *reduced bath pair* (s0,s1), not an
+  // individual block.  Both bath indices are fields of pack6(), so all terms
+  // which can possibly reduce to the same packed path key are thereby kept on
+  // one rank.  The local unordered_map performs the complete reduction and
+  // the final MPI stage needs only an Allgatherv, with no duplicate-key
+  // Alltoallv.  For an f shell, 14 baths provide as many as 14*14=196 such
+  // independently schedulable groups.
+  struct EnumerationTaskCost {
+    size_t sequence=0;
+    long double cost=0.0;
+  };
+  struct EnumerationPairCost {
+    int s0=0;
+    int s1=0;
+    long double cost=0.0;
+    vector<size_t> tasks;
+  };
+  vector<EnumerationTaskCost> task_costs;
+  vector<EnumerationPairCost> pair_costs;
+  map<pair<int,int>,size_t> pair_lookup;
+  for (int iorb0=0;iorb0<cix.Nbath;++iorb0) {
+    const int s0=abs(cix.bath_sigind0(iorb0));
+    for (int iorb1=0;iorb1<cix.Nbath;++iorb1) {
+      const int s1=abs(cix.bath_sigind0(iorb1));
+      dirspin=2*iorb1,2*iorb0;
+      auto& allowed=diag2matrix.Cmp_matrix(diag,dirspin,cix);
+      for (const auto& [ib,alw]:allowed) {
+        const long double n0=alw[0].extent(0),n1=alw[1].extent(0);
+        const long double n2=alw[2].extent(0),n3=alw[3].extent(0);
+        if (n0==0 || n1==0 || n2==0 || n3==0) continue;
+        long double cost=n0*n1*n2*n3;
+        if (cmpPhysG) {
+          TinyVector<int,Nd> ibs;
+          ibs[0]=cix.Fbc(diag2matrix.op(0),ib);
+          ibs[1]=cix.Fbc(diag2matrix.op(1),ibs[0]);
+          ibs[2]=cix.Fbc(diag2matrix.op(2),ibs[1]);
+          ibs[3]=ib;
+          const NjmResult nx1=cix.Njm_ind(ibs[1],2*iorb1);
+          const NjmResult nx2=cix.Njm_ind(ibs[2],2*iorb0);
+          if (nx2.njm_c==2)
+            cost+=n0*n1*n2*cix.Block[ibs[2]].size()*cix.Block[ibs[3]].size();
+          if (nx1.njm_c==2)
+            cost+=n0*n1*n3*cix.Block[ibs[1]].size()*cix.Block[ibs[2]].size();
+        }
+        cost=std::max(cost,1.0L);
+        const size_t task_sequence=task_costs.size();
+        task_costs.push_back({task_sequence,cost});
+        const auto [pair_it,pair_inserted]=pair_lookup.try_emplace(
+          make_pair(s0,s1),pair_costs.size());
+        if (pair_inserted) pair_costs.push_back({s0,s1,0.0L,{}});
+        auto& group=pair_costs[pair_it->second];
+        group.cost+=cost;
+        group.tasks.push_back(task_sequence);
+      }
+    }
   }
-  /*
-  ofstream dout1("debug1.dat");
-  ofstream dout2("debug2.dat");
-  for (int it=0; it<Nt; ++it){
-    dout1 << (dh*it) << " ";
-    for (int a=0; a<cix.Npseudo_unique; ++a) dout1 << Gm(a,it) << " ";
-    for (int b=0; b<cix.Nbath_unique_unique; ++b) dout1 << Delta(b,it) << " ";
-    dout1 << endl;
+  vector<int> task_owner(task_costs.size(),0);
+  vector<long double> rank_load(std::max(mpi.size,1),0.0L);
+  vector<size_t> sorted_pairs(pair_costs.size());
+  std::iota(sorted_pairs.begin(),sorted_pairs.end(),0);
+  std::stable_sort(sorted_pairs.begin(),sorted_pairs.end(),
+                   [&](size_t a,size_t b) {
+                     return pair_costs[a].cost>pair_costs[b].cost;
+                   });
+  for (const size_t pair_index:sorted_pairs) {
+    const auto& group=pair_costs[pair_index];
+    const int owner=static_cast<int>(std::min_element(
+      rank_load.begin(),rank_load.end())-rank_load.begin());
+    for (const size_t task_sequence:group.tasks)
+      task_owner[task_sequence]=owner;
+    rank_load[owner]+=group.cost;
   }
-  for (int it=0; it<tau.size(); ++it){
-    dout2 << tau(it) << " ";
-    for (int a=0; a<cix.Npseudo_unique; ++a) dout2 << Gms(it,a) << " ";
-    for (int b=0; b<cix.Nbath_unique_unique; ++b) dout2 << Deltas(it,b) << " ";
-    dout2 << endl;
+  const long double total_load=
+    std::accumulate(rank_load.begin(),rank_load.end(),0.0L);
+  const auto [min_load_it,max_load_it]=
+    std::minmax_element(rank_load.begin(),rank_load.end());
+  const auto scheduling_end=EnumerationClock::now();
+  if (mpi.rank==mpi.master) {
+    const long double mean_load=total_load/std::max(mpi.size,1);
+    const int active_ranks=static_cast<int>(std::count_if(
+      rank_load.begin(),rank_load.end(),[](long double load){return load>0;}));
+    (*mpi.out) << "OCA enumeration scheduler: tasks=" << task_costs.size()
+               << " reduced_bath_pairs=" << pair_costs.size()
+               << " ranks=" << mpi.size
+               << " active_ranks=" << active_ranks
+               << " estimated_load_range=[" << static_cast<double>(*min_load_it)
+               << "," << static_cast<double>(*max_load_it) << "]"
+               << " max_over_mean="
+               << static_cast<double>(mean_load>0 ? *max_load_it/mean_load : 0)
+               << " scheduling_seconds="
+               << std::chrono::duration<double>(scheduling_end-scheduling_start).count()
+               << endl;
   }
-  */
-  for (int a=0; a<Gms.size(); ++a)
-    if (fabs(Gm(a,Nt-1)-Gms(tau.size()-1,a))>1e-8){ cerr<<"ERROR in I_OCA last point Gm("<<a<<","<<Nt-1<<")="<<Gm(a,Nt-1)<<" should be equal to Gms="<<Gms(tau.size()-1,a)<<endl;}
-  //vector<int> G_importance = ImportanceOfPseudo(Gms, cix, OCA_cut, false);//{0.1,0.5});
-  
-  //cout<<"G_importance="<< G_importance << endl;
-  
+  const auto pass1_start=EnumerationClock::now();
+
   // Data which store the components of the diagram, so that integration looks like a problem of a single orbital.
   int states_unique_size=0;
   {// This part is carbon-copy of the algorithm below, except that we only calculate the size of the hash-table states_unique.
     // You should not try to understand that, because we comment only the complete algorithm below. This is just stripped/off equivalent,
     // which does not compute anything except total size of the storage.
-    unordered_map<uint64_t,int> states_unique;
+    unordered_map<OCAKey,int,OCAKeyHash> states_unique;
     states_unique.max_load_factor(0.7f);
-    states_unique.reserve(cix.Natst*cix.Natst*cix.Nbath*cix.Nbath);
+    const long double reserve_share=total_load>0 ?
+      rank_load[mpi.rank]/total_load : 1.0L/std::max(mpi.size,1);
+    const long double global_reserve=static_cast<long double>(cix.Natst)*
+      cix.Natst*cix.Nbath*cix.Nbath;
+    states_unique.reserve(static_cast<size_t>(global_reserve*reserve_share)+1);
     // for each unique key in states_unique map (which uniquely specifies the diagram contribution) the value of the map gives index to array mm_nds, index0,.., index3
     int mm_nds_size=0; // contains the matrix elements for Phi, and Nds matrix elements for vertex F(omega) calculation. There are two Nds values, because of two hybridizations.
+    size_t task_cursor=0;
     // Below we find all contributions to the OCA Feynman diagram.
     for (int iorb0=0; iorb0<cix.Nbath; ++iorb0){ // over all baths for first hybridiation
       int s0 = abs(cix.bath_sigind0(iorb0));
@@ -409,6 +1138,8 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 	auto& allowed  = diag2matrix.Cmp_matrix(diag,dirspin,cix); // computes all allowed Green's functions that survice Pauli principle.
 	for (const auto& [ib, alw] : allowed){     // going over all allowed contributions from all blocks.
 	  if (alw[0].extent(0)>0 and alw[1].extent(0)>0 and alw[2].extent(0)>0 and alw[3].extent(0)>0){
+	    const size_t current_task=task_cursor++;
+	    if (task_owner[current_task]!=mpi.rank) continue;
 	    TinyVector<int,Nd> ibs;  // the four blocks for pseudo-particles (see figure below). ib is the index to the last block.
 	    ibs[0] = cix.Fbc(diag2matrix.op(0),ib);      // op(0) is computed before, and can be applied to ib to get ibs[0] (see figure)
 	    ibs[1] = cix.Fbc(diag2matrix.op(1),ibs[0]);  // op(1) is applied to ibs[0] to get ibs[1], etc...
@@ -480,7 +1211,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 		    int ii_sign3 = sign(_ii3_) * ii_sign2;
 		    TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
 		    //
-		    uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // we pack the two hybridizations (s1,s0) and atomic states into unique index-vector.
+		    OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // we pack the two hybridizations (s1,s0) and atomic states into unique index-vector.
 		    auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // try to insert st-vector as a new key and mm_nds.size() as the value.
 		    // If the key is not yet present, inserted=true and "it" points to its current place. If key is present, "it" points to its existing place.
 		    int iind = it->second;                    // The key st has value iind, either just inserted, or found from before
@@ -500,7 +1231,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 			int importance = G_importance[ii3] + imp_ii2 + imp_ii1 + imp_ii0;
 			if (importance > OCA_cut_sum ) continue;
 			TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
-			uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
+			OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
 			auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			int _iind_ = it->second; // in mm_nds and indexi, it is stored in _iind_
 			if (inserted) mm_nds_size += 1;
@@ -529,7 +1260,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 			int importance = G_importance[ii2] + imp_ii1 + imp_ii3 + imp_ii0;
 			if (importance > OCA_cut_sum ) continue;
 			TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
-			uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
+			OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
 			auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			int _iind_ = it->second; // in mm_nds and indexi, it is stored in _iind_
 			if (inserted) mm_nds_size += 1;
@@ -543,14 +1274,19 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 	}
       }
     }
+    if (task_cursor!=task_owner.size())
+      throw std::logic_error("OCA pass 1 task ordering disagrees with scheduler discovery");
     // Finally we know the size of the hash-table. Below we will go through the same algorithm once more and actually calculate matrix elements.
     states_unique_size = states_unique.size();
   }
-  (*mpi.out)<<"states_unique.size="<<states_unique_size<<endl;
+  const auto pass1_end=EnumerationClock::now();
+  (*mpi.out)<<"local_states_unique.size="<<states_unique_size
+            <<" rank="<<mpi.rank<<endl;
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  const auto pass2_start=EnumerationClock::now();
   
   //map<TinyVector<int,6>,int,Class1Compare> states_unique; // every unique term is stored in this map with indices {s1,s0,states[3],states[2],states[1], states[0]}
-  unordered_map<uint64_t,int> states_unique;
+  unordered_map<OCAKey,int,OCAKeyHash> states_unique;
   states_unique.reserve(states_unique_size);
   //states_unique.max_load_factor(0.7f);
   //states_unique.reserve(cix.Natst*cix.Natst*cix.Nbath*cix.Nbath);
@@ -568,11 +1304,19 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
   // unique_states_inside0, unique_states_inside1, unique_states_inside2, unique_states_inside3,
   // and to keep track of which contributions are unique, we also keep maps index_of_inside0, index_of_inside1, index_of_inside2, index_of_inside3.
   // In addition, index0, index1, index2 and index3 connect this partial contribution from the inside loop with the index of the entire contribution in states_unique.
-  vector<vector<TinyVector<int,4>>>  unique_states_inside(4);//0, unique_states_inside1, unique_states_inside2, unique_states_inside3; 
+  // These tables and their per-path indices are construction data for the
+  // legacy spline integrator only.  A pure DLR run compiles OCAPathRecords
+  // into its own sparse plans and must not pay their potentially enormous
+  // allocation and hash-insertion cost.
+  vector<vector<TinyVector<int,4>>> unique_states_inside;
+  if (build_legacy_catalog) unique_states_inside.resize(4);
   //vector<int> index0(states_unique_size,-1), index1(states_unique_size,-1), index2(states_unique_size,-1), index3(states_unique_size,-1);
-  vector<array<int,4>> indexi(states_unique_size,array<int,4>{-1,-1,-1,-1});
+  vector<array<int,4>> indexi;
+  if (build_legacy_catalog)
+    indexi.assign(states_unique_size,array<int,4>{-1,-1,-1,-1});
   {// index_of_inside can be temporary
     unordered_map<TinyVector<int,4>,int,TV4Hash,TV4Equal> index_of_inside0, index_of_inside1, index_of_inside2, index_of_inside3; // value → index
+    size_t task_cursor=0;
     // Below we find all contributions to the OCA Feynman diagram.
     for (int iorb0=0; iorb0<cix.Nbath; ++iorb0){ // over all baths for first hybridiation
       int s0 = abs(cix.bath_sigind0(iorb0));
@@ -590,6 +1334,8 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 	auto& allowed  = diag2matrix.Cmp_matrix(diag,dirspin,cix); // computes all allowed Green's functions that survice Pauli principle.
 	for (const auto& [ib, alw] : allowed){     // going over all allowed contributions from all blocks.
 	  if (alw[0].extent(0)>0 and alw[1].extent(0)>0 and alw[2].extent(0)>0 and alw[3].extent(0)>0){
+	    const size_t current_task=task_cursor++;
+	    if (task_owner[current_task]!=mpi.rank) continue;
 	    TinyVector<int,Nd> ibs;  // the four blocks for pseudo-particles (see figure below). ib is the index to the last block.
 	    ibs[0] = cix.Fbc(diag2matrix.op(0),ib);      // op(0) is computed before, and can be applied to ib to get ibs[0] (see figure)
 	    ibs[1] = cix.Fbc(diag2matrix.op(1),ibs[0]);  // op(1) is applied to ibs[0] to get ibs[1], etc...
@@ -682,7 +1428,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 		    double mm = mm3*ii_sign3;                    // total sign due to off-diagonal sign (ii_sign3) and matrix elements sign mm3
 		    TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
 		    //
-		    uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // we pack the two hybridizations (s1,s0) and atomic states into unique index-vector.
+		    OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // we pack the two hybridizations (s1,s0) and atomic states into unique index-vector.
 		    auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // try to insert st-vector as a new key and mm_nds.size() as the value.
 		    // If the key is not yet present, inserted=true and "it" points to its current place. If key is present, "it" points to its existing place.
 		    int iind = it->second;                    // The key st has value iind, either just inserted, or found from before
@@ -708,6 +1454,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 		    //              /  states[1],ibs[1],ii1   
 		    //      |--<---
 		    //      t2
+		    if (build_legacy_catalog) {
 		    TinyVector<int,4> sti0(states[0],states[1],s0,1);
 		    auto [it0, inserted0] = index_of_inside0.try_emplace(sti0, static_cast<int>(unique_states_inside[0].size()));
 		    if (inserted0) unique_states_inside[0].push_back(sti0); // first time we've seen this triple
@@ -780,6 +1527,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 		      if (indexi[iind][2]==-1) indexi[iind][2]=it2->second;
 		      if (indexi[iind][3]==-1) indexi[iind][3]=it3->second;
 		    }
+		    }
 		    // Below we are adding information needed for the two-particle vertex F(om) calculation.
 		    // The simplest case of njmc being proportional to psi^+ operator is handled here. This is the case for
 		    // one-dimensional block and sometimes other small blocks. But generically the two are not proportional, hence it
@@ -824,7 +1572,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 			double nds2 =  mmp*njm2(_b2_,_a3_);
 			if (nds2==0) continue;
 			TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
-			uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
+			OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
 			auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			int _iind_ = it->second; // in mm_nds and indexi, it is stored in _iind_
 			if (inserted){// not seen before, hence insert into mm_nds, index0, index1, index2, index3
@@ -832,6 +1580,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 			    mm_nds[mm_nds_size]=TinyVector<double,5>(0,0,0,0,nds2);
 			  }else
 			    mm_nds[mm_nds_size]=TinyVector<double,5>(0,0,nds2,0,0);
+			  if (build_legacy_catalog) {
 			  //index0[mm_nds_size]=-1; // should not be needed, hence we are not going to compute contribution of the inner loop.
 			  //index1[mm_nds_size]=-1; // should not be needed, because inner loop for G&F uses only index2 and index3.
 			  TinyVector<int,4> sti2(states[2],states[3],s0,1);// this inner loop is needed for G&F calculation
@@ -848,6 +1597,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 			    unique_states_inside[3].push_back(sti3); // first time we've seen this triple
 			  }
 			  indexi[mm_nds_size][3]=_it3_->second;
+			  }
 			  mm_nds_size += 1;
 			}else // we have seen it before, hence just add nds2 contribution.
 			  if (destroys_Cooper_pair_or_normal_down2)
@@ -902,7 +1652,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 			// it implements op(i) operator, giving proper mm matrix element. See commen for mm3 above.
 			double nds1 =  mmp*njm1(_b1_,_a2_); // Now adding njm1.
 			TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
-			uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
+			OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
 			auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			int _iind_ = it->second; // in mm_nds and indexi, it is stored in _iind_
 			if (inserted){ // not seen before, hence insert into mm_nds, index0, index1, index2, index3
@@ -910,6 +1660,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 			    mm_nds[mm_nds_size]=TinyVector<double,5>(0,0,0,nds1,0);
 			  else
 			    mm_nds[mm_nds_size]=TinyVector<double,5>(0,nds1,0,0,0);
+			  if (build_legacy_catalog) {
 			  //index0[mm_nds_size]=-1; // should not be needed, hence we are not going to compute contribution of the inner loop.
 			  //index1[mm_nds_size]=-1; // should not be needed, because inner loop for G&F uses only index2 and index3.
 			  TinyVector<int,4> sti2(states[2],states[3],s0,1); // this inner loop is needed for G&F calculation
@@ -926,6 +1677,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 			    unique_states_inside[3].push_back(sti3); // first time we've seen this triple
 			  }
 			  indexi[mm_nds_size][3] = _it3_->second;
+			  }
 			  mm_nds_size+=1;
 			}else // we have seen it before, hence just add nds1 contribution.
 			  if (destroys_Cooper_pair_or_normal_down1)
@@ -942,23 +1694,291 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 	}
       }
     }
+    if (task_cursor!=task_owner.size())
+      throw std::logic_error("OCA pass 2 task ordering disagrees with scheduler discovery");
   }
 
-  (*mpi.out)<<"Final mm_nds_size="<<mm_nds_size<<endl;
+  const auto pass2_end=EnumerationClock::now();
+  (*mpi.out)<<"local mm_nds_size="<<mm_nds_size
+            <<" rank="<<mpi.rank<<endl;
+  OCAEnumeration result;
+  result.includes_physical=cmpPhysG;
+  result.npseudo=cix.Npseudo_unique;
+  result.nbath_unique=cix.Nbath_unique_unique;
+  result.cut_sum=OCA_cut_sum;
+  result.importance=G_importance;
+
+  // Convert this rank's node-based construction map into one contiguous,
+  // key-sorted representation.  inner_index is deliberately not preserved:
+  // those insertion-order indices are local to a rank and are invalid after
+  // MPI combines paths found by different ranks.
+  const auto compact_start=EnumerationClock::now();
+  vector<OCACompactPath> local_paths;
+  local_paths.reserve(states_unique.size());
+  for (const auto& [_st_, iind] : states_unique) {
+    OCACompactPath path;
+    path.key=_st_;
+    for (int j=0; j<5; ++j) path.weights[j]=mm_nds[iind][j];
+    path.inner_index={-1,-1,-1,-1};
+    local_paths.push_back(path);
+  }
+  std::sort(local_paths.begin(),local_paths.end(),
+            [](const OCACompactPath& a,const OCACompactPath& b) {
+              return a.key<b.key;
+            });
+  // Every packed key contains its complete reduced bath pair, and the
+  // scheduler assigns that pair to exactly one rank.  Exact cancellations
+  // have therefore already met locally; no cross-rank reduction is needed.
+  local_paths.erase(
+    std::remove_if(local_paths.begin(),local_paths.end(),
+                   [](const OCACompactPath& path) {
+                     return OCAPathWeightsAreZero(path.weights);
+                   }),
+    local_paths.end());
+
+  unsigned long long global_nonzero=local_paths.size();
+#ifdef _MPI
+  if (mpi.size>1) {
+    const unsigned long long local_nonzero=local_paths.size();
+    MPI_Allreduce(&local_nonzero,&global_nonzero,1,MPI_UNSIGNED_LONG_LONG,
+                  MPI_SUM,MPI_COMM_WORLD);
+  }
+#endif
+  result.global_nonzero_path_count=global_nonzero;
+  // Measurements on the large SC benchmark show that pair catalogs, sparse
+  // triplets, and the two compiled plans together require about 4.5 times the
+  // compact path bytes at peak.  This conservative estimate selects the
+  // memory-safe path before any global Allgatherv allocation is attempted.
+  constexpr double compiled_plan_factor=4.5;
+  result.estimated_replicated_megabytes=
+    compiled_plan_factor*global_nonzero*sizeof(OCACompactPath)/(1024.0*1024.0);
+  // The spline integrator addresses one globally rebuilt inner catalog and
+  // consequently always requires replicated paths.  Diagnostics that run it
+  // retain the old exact behavior even if distributed DLR was requested.
+  result.topology_shard_count=build_legacy_catalog ? 1 :
+    OCAChooseTopologyShardCount(
+      mpi_topology_mode,result.estimated_replicated_megabytes,
+      max_replicated_megabytes,mpi.size);
+  result.paths_distributed=result.topology_shard_count>1;
+  OCASetTopologyGroupMetadata(result,mpi);
+
+  const auto merge_start=EnumerationClock::now();
+#ifdef _MPI
+  if (result.paths_distributed)
+    result.compact_paths=std::move(local_paths);
+  else
+    result.compact_paths=GatherOCAPathsMPI(local_paths,mpi);
+#else
+  result.compact_paths=std::move(local_paths);
+#endif
+
+  // All ranks now hold the same sorted, globally accumulated path list.
+  // Recreate compact convolution catalogs from physical indices only when
+  // the legacy spline integrator will consume them.  DLR builds independent
+  // sparse plans from OCAPathRecords and never reads this catalog.
+  if (build_legacy_catalog) RebuildOCAInnerCatalog(result);
+  const auto merge_end=EnumerationClock::now();
+
+  // A deterministic checksum and five independent weight sums make the
+  // forthcoming MPI enumeration easy to compare against this serial
+  // reference.  Hash double bit patterns, not formatted decimal values.
+  // XOR of per-record FNV hashes is independent of record order and MPI
+  // partition.  This makes replicated, bath-pair-sharded, and rebalanced
+  // enumerations directly comparable in the log.
+  uint64_t checksum=0;
+  constexpr uint64_t fnv_prime=1099511628211ULL;
+  std::array<long double,5> weight_sums{};
+  for (const auto& path : result.compact_paths) {
+    uint64_t record_hash=1469598103934665603ULL;
+    const auto checksum_word=[&](uint64_t word) {
+      record_hash^=word;
+      record_hash*=fnv_prime;
+    };
+    checksum_word(path.key.low);
+    checksum_word(path.key.high);
+    for (int j=0; j<5; ++j) {
+      checksum_word(std::bit_cast<uint64_t>(path.weights[j]));
+      weight_sums[j]+=path.weights[j];
+    }
+    checksum^=record_hash;
+  }
+#ifdef _MPI
+  if (result.paths_distributed && mpi.size>1) {
+    uint64_t global_checksum=0;
+    MPI_Allreduce(&checksum,&global_checksum,1,MPI_UINT64_T,MPI_BXOR,
+                  MPI_COMM_WORLD);
+    checksum=global_checksum;
+    std::array<long double,5> global_weight_sums{};
+    MPI_Allreduce(weight_sums.data(),global_weight_sums.data(),5,
+                  MPI_LONG_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    weight_sums=global_weight_sums;
+  }
+#endif
+
+  if (export_path_records){
+    // compact_paths is already the fully reduced set after symmetry and CIX
+    // selection rules.  Exporting here guarantees that the DLR evaluator and
+    // legacy integrator consume identical accumulated weights.
+    result.paths.reserve(result.compact_paths.size());
+    for (const auto& path : result.compact_paths){
+      const TinyVector<int,6> st=unpack6(path.key);
+      OCAPathRecord record;
+      // unpack6 stores baths first and pseudo states in reverse ring order.
+      // Convert once to the p0,p1,p2,p3 convention documented in
+      // OCAPathRecord and used by every compact cut table.
+      record.pseudo={st[5],st[4],st[3],st[2]};
+      record.s0=st[1];
+      record.s1=st[0];
+      record.weights=path.weights;
+      result.paths.push_back(record);
+    }
+#ifdef _MPI
+    if (result.paths_distributed) {
+      // Enumeration itself used all world ranks.  Consolidate those unique
+      // streams into the memory-selected number of topology shards, preserving
+      // whole reduced bath pairs whenever possible, then broadcast each shard
+      // only to the ranks that will divide its AAA poles.
+      const bool already_pair_partitioned=
+        result.topology_shard_count==mpi.size &&
+        mpi.size<=static_cast<int>(pair_costs.size());
+      DistributeOCAPathRecordsHybridMPI(
+        result.paths,result.nbath_unique,result.topology_shard_count,
+        already_pair_partitioned,mpi);
+    }
+#endif
+  }
+
+  // Only globally reduced compact paths and their reconstructed convolution
+  // catalog survive the function.  Construction hash nodes, buckets, local
+  // insertion indices, and local inner catalogs are released on return.
+  const auto compact_end=EnumerationClock::now();
+
+  double pass1_seconds=
+    std::chrono::duration<double>(pass1_end-pass1_start).count();
+  double pass2_seconds=
+    std::chrono::duration<double>(pass2_end-pass2_start).count();
+  double merge_seconds=
+    std::chrono::duration<double>(merge_end-merge_start).count();
+  double compact_seconds=
+    std::chrono::duration<double>(compact_end-compact_start).count();
+  unsigned long long local_count=states_unique.size();
+  unsigned long long local_count_sum=local_count;
+  unsigned long long local_count_min=local_count;
+  unsigned long long local_count_max=local_count;
+#ifdef _MPI
+  if (mpi.size>1) {
+    double local_times[4]={pass1_seconds,pass2_seconds,
+                           merge_seconds,compact_seconds};
+    double maximum_times[4]={};
+    MPI_Allreduce(local_times,maximum_times,4,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+    pass1_seconds=maximum_times[0];
+    pass2_seconds=maximum_times[1];
+    merge_seconds=maximum_times[2];
+    compact_seconds=maximum_times[3];
+    MPI_Allreduce(&local_count,&local_count_sum,1,MPI_UNSIGNED_LONG_LONG,
+                  MPI_SUM,MPI_COMM_WORLD);
+    MPI_Allreduce(&local_count,&local_count_min,1,MPI_UNSIGNED_LONG_LONG,
+                  MPI_MIN,MPI_COMM_WORLD);
+    MPI_Allreduce(&local_count,&local_count_max,1,MPI_UNSIGNED_LONG_LONG,
+                  MPI_MAX,MPI_COMM_WORLD);
+  }
+#endif
+  if (mpi.rank==mpi.master) {
+    (*mpi.out) << "OCA enumeration MPI: local_path_count_range=["
+               << local_count_min << "," << local_count_max << "]"
+               << " local_path_count_sum=" << local_count_sum
+               << " global_nonzero_paths=" << result.global_nonzero_path_count
+               << " topology="
+               << (result.paths_distributed ? "hybrid-distributed" : "replicated")
+               << " topology_shards=" << result.topology_shard_count
+               << " workers_per_shard_range=["
+               << mpi.size/result.topology_shard_count << ","
+               << (mpi.size+result.topology_shard_count-1)/
+                    result.topology_shard_count << "]"
+               << " estimated_replicated_mb="
+               << result.estimated_replicated_megabytes
+               << " checksum=0x"
+               << std::hex << checksum << std::dec << " weight_sums=[";
+    for (int j=0; j<5; ++j)
+      (*mpi.out) << (j ? "," : "") << static_cast<double>(weight_sums[j]);
+    (*mpi.out) << "] pass1_max_seconds=" << pass1_seconds
+               << " pass2_max_seconds=" << pass2_seconds
+               << " merge_max_seconds=" << merge_seconds
+               << " compact_max_seconds=" << compact_seconds
+               << endl;
+  }
+  return result;
+}
+
+// Legacy uniform-mesh OCA integrator.  All discrete diagram work has already
+// been done by EnumerateOCAPaths; this routine now contains numerical
+// integration only (plus consistency/debug checks on the supplied tables).
+inline double I_OCA(const OCAEnumeration& enumeration,
+		    Array<double,2>& Sm,
+		    Array<double,2>& G00t,
+		    Array<double,2>& F00t,
+		    Array<double,2>& F01t,
+		    bool cmpPhysG,
+		    double Q,
+		    double beta,
+		    const Array<double,1>& tau,
+		    const Spline1DMany& Gms,
+		    const Spline1DMany& Deltas,
+		    Cix& cix,
+		    json& pars,
+		    MPIcls& mpi,
+		    std::array<Array<double,2>,4>* cut_references=nullptr)
+{
+  bool debug=false;
+  const double coef[]={17/48.,59/48.,43/48.,49./48.,1.0}; // O(dh^4)
+  const int Nd=4;
+
+  const auto& compact_paths=enumeration.compact_paths;
+  const auto& unique_states_inside=enumeration.unique_inner_states;
+
+  if (fabs(beta-tau(tau.size()-1))>1e-7)
+    cerr << "ERROR in I_OCA: last point in tau=" << tau(tau.size()-1)
+         << " should be beta=" << beta << endl;
+
+  // Everything below this point is legacy-only.  In particular, pure DLR
+  // mode never allocates this uniform mesh and never evaluates the input
+  // splines on it.
+  const int Nt=tau.size()*pars["r_OCA_mesh"].get<double>();
+  const double dh=beta/(Nt-1.0);
+  Array<double,2> Gm(Gms.size(),Nt),Delta(Deltas.size(),Nt);
+  int pos=0;
+  for (int it=0; it<Nt; ++it){
+    const intpar ips=InterpLeft(dh*it,pos,tau);
+    for (int a=0; a<Gms.size(); ++a) Gm(a,it)=Gms(ips,a);
+    for (int b=0; b<Deltas.size(); ++b) Delta(b,it)=Deltas(ips,b);
+  }
+
+  // The uniform OCA mesh ends at beta.  A tiny discrepancy here is harmless
+  // interpolation roundoff; report only a meaningful mismatch and only once.
+  constexpr double endpoint_tolerance=1e-6;
+  if (mpi.rank==mpi.master){
+    for (int a=0; a<Gms.size(); ++a){
+      if (fabs(Gm(a,Nt-1)-Gms(tau.size()-1,a))>endpoint_tolerance)
+        cerr << "WARNING in I_OCA: last point Gm(" << a << "," << Nt-1
+             << ") differs from Gms by more than " << endpoint_tolerance
+             << endl;
+    }
+  }
+
   {
     int ijk=0;
-    for (const auto& [_st_, iind] : states_unique){
-      TinyVector<int,6> st = unpack6(_st_);
-      double mm = mm_nds[iind][0];
-      double nds1 = abs(mm_nds[iind][1])+abs(mm_nds[iind][3]);
-      double nds2 = abs(mm_nds[iind][2])+abs(mm_nds[iind][4]);
+    for (const auto& path : compact_paths){
+      TinyVector<int,6> st = unpack6(path.key);
+      double mm = path.weights[0];
+      double nds1 = abs(path.weights[1])+abs(path.weights[3]);
+      double nds2 = abs(path.weights[2])+abs(path.weights[4]);
       int s1 = st[0];
       int s0 = st[1];
       TinyVector<int,Nd> states(st[5],st[4],st[3],st[2]);
-      int index_of_0 = indexi[iind][0];
-      int index_of_1 = indexi[iind][1];
-      int index_of_2 = indexi[iind][2];
-      int index_of_3 = indexi[iind][3];
+      int index_of_0 = path.inner_index[0];
+      int index_of_1 = path.inner_index[1];
+      int index_of_2 = path.inner_index[2];
+      int index_of_3 = path.inner_index[3];
       if (mm!=0){
 	TinyVector<int,4> sti0 = unique_states_inside[0][index_of_0];
 	if (sti0[0]!=states[0] or sti0[1]!=states[1] or sti0[2]!=s0){
@@ -978,11 +1998,12 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 	cout<<"WARNING3 sti3="<<sti3<<" while states[3],states[0],s1="<<states[3]<<","<<states[0]<<","<<s1<<" and st="<<st<<endl;
       }
       if (index_of_2<0){
-	cout << "ERROR id[2]="<<index_of_2<<" at st="<<st<<" iind="<<iind<<" states="<<states<<" s0="<<s0<<" s1="<<s1<<endl;
+	cout << "ERROR id[2]="<<index_of_2<<" at st="<<st<<" compact_index="<<ijk<<" states="<<states<<" s0="<<s0<<" s1="<<s1<<endl;
       }
       if (index_of_3<0){
-	cout << "ERROR id[3]="<<index_of_3<<" at st="<<st<<" iind="<<iind<<" states="<<states<<" s0="<<s0<<" s1="<<s1<<endl;
+	cout << "ERROR id[3]="<<index_of_3<<" at st="<<st<<" compact_index="<<ijk<<" states="<<states<<" s0="<<s0<<" s1="<<s1<<endl;
       }
+      ++ijk;
     }
   }
   
@@ -1005,17 +2026,17 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
       fmt::print(cout,"#R3: {} ii3={} ii0={} s1={} pp={}\n", i, sti3[0]+1, sti3[1]+1, sti3[2], sti3[3]);
     }
     int ijk=0;
-    for (const auto& [_st_, iind] : states_unique){
-      TinyVector<int,6> st = unpack6(_st_);
-      double mm = mm_nds[iind][0];
-      double nds1 = mm_nds[iind][1];//abs(mm_nds[iind][1])+abs(mm_nds[iind][3]);
-      double nds2 = mm_nds[iind][2];//abs(mm_nds[iind][2])+abs(mm_nds[iind][4]);
-      if (fabs(mm_nds[iind][3])>1e-7 or fabs(mm_nds[iind][4])>1e-7) cout<<"ERROR expecting nds3="<<mm_nds[iind][3]<<" and nds4="<<mm_nds[iind][4]<<" to vanish"<<endl;
+    for (const auto& path : compact_paths){
+      TinyVector<int,6> st = unpack6(path.key);
+      double mm = path.weights[0];
+      double nds1 = path.weights[1];//abs(path.weights[1])+abs(path.weights[3]);
+      double nds2 = path.weights[2];//abs(path.weights[2])+abs(path.weights[4]);
+      if (fabs(path.weights[3])>1e-7 or fabs(path.weights[4])>1e-7) cout<<"ERROR expecting nds3="<<path.weights[3]<<" and nds4="<<path.weights[4]<<" to vanish"<<endl;
       int s1 = st[0];
       int s0 = st[1];
       TinyVector<int,Nd> states(st[5],st[4],st[3],st[2]);
-      int index_of_0 = indexi[iind][0];
-      int index_of_1 = indexi[iind][1];
+      int index_of_0 = path.inner_index[0];
+      int index_of_1 = path.inner_index[1];
       if (mm!=0){
 	TinyVector<int,4> sti0 = unique_states_inside[0][index_of_0];
 	if (sti0[0]!=states[0] or sti0[1]!=states[1] or sti0[2]!=s0){
@@ -1026,19 +2047,19 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 	  cout<<"WARNING1 sti1="<<sti1<<" while states[1],states[2],s1="<<states[1]<<","<<states[2]<<","<<s1<<" and st="<<st<<endl;
 	}
       }
-      int index_of_2 = indexi[iind][2];
+      int index_of_2 = path.inner_index[2];
       TinyVector<int,4> sti2 = unique_states_inside[2][index_of_2];
       if (sti2[0]!=states[2] or sti2[1]!=states[3] or sti2[2]!=s0){
 	cout<<"WARNING2 sti2="<<sti2<<" while states[2],states[3],s0="<<states[2]<<","<<states[3]<<","<<s0<<" and st="<<st<<endl;
       }
-      int index_of_3 = indexi[iind][3];
+      int index_of_3 = path.inner_index[3];
       TinyVector<int,4> sti3 = unique_states_inside[3][index_of_3];
       if (sti3[0]!=states[3] or sti3[1]!=states[0] or sti3[2]!=s1){
 	cout<<"WARNING3 sti3="<<sti3<<" while states[3],states[0],s1="<<states[3]<<","<<states[0]<<","<<s1<<" and st="<<st<<endl;
       }
       fmt::print(cout," {:6d} ii0={:<3d},ii1={:<3d},ii2={:<3d},ii3={:<3d},s0={:d},s1={:d}: mm={:2g} nds1={:3g},{:3g} nds0={:3g},{:3g}  index0={:4d} index1={:4d} index2={:4d} index3={:4d} ",
 		 ijk,st[5]+1,st[4]+1,st[3]+1,st[2]+1,st[1],st[0],
-		 mm, mm_nds[iind][1],mm_nds[iind][3],mm_nds[iind][2],mm_nds[iind][4],
+		 mm, path.weights[1],path.weights[3],path.weights[2],path.weights[4],
 		 index_of_0,index_of_1,index_of_2,index_of_3);
       ijk+=1;
       /*
@@ -1094,6 +2115,9 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
   fsec t_ins=zero_t, t_out=zero_t;
   // For convenience of more efficient MPI communication, we transpose pseudo Self-energy 
   Array<double,2> Smc(Nt,cix.Npseudo_unique);
+  std::array<Array<double,2>,4> Smc_cut;
+  if (cut_references)
+    for (auto& cut:Smc_cut){ cut.resize(Nt,cix.Npseudo_unique); cut=0; }
   double Phi=0;
 
   {  
@@ -1207,13 +2231,13 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 	auto t1 = high_resolution_clock::now();
 	t_ins += t1-t0;
       
-	for (auto const& [_st_, iind] : states_unique) {
-	  TinyVector<int,6> st = unpack6(_st_);
-	  double mm = -mm_nds[iind][0]; // minus comes from the crossing of hybridization lines
+	for (const auto& path : compact_paths) {
+	  TinyVector<int,6> st = unpack6(path.key);
+	  double mm = -path.weights[0]; // minus comes from the crossing of hybridization lines
 	  if (mm==0) continue;
 	  TinyVector<int,4> states(st[5],st[4],st[3],st[2]);
 	  int s0=st[1], s1=st[0];
-	  int ind0=indexi[iind][0], ind1=indexi[iind][1], ind2=indexi[iind][2], ind3=indexi[iind][3];
+	  int ind0=path.inner_index[0], ind1=path.inner_index[1], ind2=path.inner_index[2], ind3=path.inner_index[3];
 	  Smw=0;
 	  for (int it2=0; it2<=it3; it2++){
 	    if (it2==0 && it3==0) continue;
@@ -1225,10 +2249,20 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 	    Smw[3] += dy* dSmwi[3][ind3](it2) * Gm(states[1],it3-it2) * Delta(s0,m_t2);
 	  }
 	  int mit3 = Nt-1-it3;
-	  Smc(it3,states[3]) += Smw[0]*mm/cix.deg_pp(states[3]);
-	  Smc(it3,states[0]) += Smw[1]*mm/cix.deg_pp(states[0]);
-	  Smc(it3,states[1]) += Smw[2]*mm/cix.deg_pp(states[1]);
-	  Smc(it3,states[2]) += Smw[3]*mm/cix.deg_pp(states[2]);
+	  const double sigma_p3=Smw[0]*mm/cix.deg_pp(states[3]);
+	  Smc(it3,states[3]) += sigma_p3;
+	  const double sigma_p0=Smw[1]*mm/cix.deg_pp(states[0]);
+	  const double sigma_p1=Smw[2]*mm/cix.deg_pp(states[1]);
+	  const double sigma_p2=Smw[3]*mm/cix.deg_pp(states[2]);
+	  Smc(it3,states[0]) += sigma_p0;
+	  Smc(it3,states[1]) += sigma_p1;
+	  Smc(it3,states[2]) += sigma_p2;
+	  if (cut_references){
+	    Smc_cut[3](it3,states[3]) += sigma_p3;
+	    Smc_cut[0](it3,states[0]) += sigma_p0;
+	    Smc_cut[1](it3,states[1]) += sigma_p1;
+	    Smc_cut[2](it3,states[2]) += sigma_p2;
+	  }
 	  Phi += 0.25*dz*mm*(Smw[1]*Gm(states[0],mit3)+Smw[2]*Gm(states[1],mit3)+Smw[3]*Gm(states[2],mit3)+Smw[0]*Gm(states[3],mit3));
 	}
 	auto t2 = high_resolution_clock::now();
@@ -1240,6 +2274,8 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
       }
       if (mpi.size>1){
 	mpi.AllReduceSum_simple_array(Smc);
+	if (cut_references)
+	  for (auto& cut:Smc_cut) mpi.AllReduceSum_simple_array(cut);
 	mpi.AllReduceSum_rawdata(&Phi,1);
       }
     }
@@ -1293,16 +2329,16 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 	auto t1 = high_resolution_clock::now();    
 	t_ins += t1-t0;
 	double dz=dh*intg_dh(it2,Nt-1);
-	for (auto const& [_st_, iind] : states_unique) {
-	  TinyVector<int,6> st = unpack6(_st_);
-	  double mm = -mm_nds[iind][0];   // minus comes from the crossing of hybridization lines in all three terms below.
-	  double nds1  = -mm_nds[iind][1]; // this is for computing vertex F(omega) and 
-	  double nds1_ = -mm_nds[iind][3]; // this is for computing vertex F(omega) and 
-	  double nds0  = -mm_nds[iind][2]; // minus comes from the crossing of hybridization lines
-	  double nds0_ = -mm_nds[iind][4]; // minus comes from the crossing of hybridization lines
+	for (const auto& path : compact_paths) {
+	  TinyVector<int,6> st = unpack6(path.key);
+	  double mm = -path.weights[0];   // minus comes from the crossing of hybridization lines in all three terms below.
+	  double nds1  = -path.weights[1]; // this is for computing vertex F(omega) and 
+	  double nds1_ = -path.weights[3]; // this is for computing vertex F(omega) and 
+	  double nds0  = -path.weights[2]; // minus comes from the crossing of hybridization lines
+	  double nds0_ = -path.weights[4]; // minus comes from the crossing of hybridization lines
 	  TinyVector<int,4> states(st[5],st[4],st[3],st[2]);
 	  int s0=st[1], s1=st[0];
-	  int ind2=indexi[iind][2], ind3=indexi[iind][3];
+	  int ind2=path.inner_index[2], ind3=path.inner_index[3];
 	  TinyVector<double,2> tg00; tg00=0;
 	  // Below we have the integration over t3 and over all possible contributions, using precomputed parts
 	  // to avoid integration over t1.
@@ -1355,7 +2391,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 		F00tc(it2,s1) += tg00[1]*nds1;
 		F01tc(it2,s1) += tg00[1]*nds1_;
 	      }else{
-		cout<<"ERROR nds1="<<nds1<<" st="<<st<<" iind="<<iind<<" states="<<states<<" s0="<<s0<<" s1="<<s1<<endl;
+		cout<<"ERROR nds1="<<nds1<<" st="<<st<<" key="<<path.key<<" states="<<states<<" s0="<<s0<<" s1="<<s1<<endl;
 	      }
 	    }
 	    if (nds0!=0 or nds0_!=0){
@@ -1370,7 +2406,7 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
 		F00tc(it2,s0) += tg00[0]*nds0;
 		F01tc(it2,s0) += tg00[0]*nds0_;
 	      }else{
-		cout<<"ERROR nds0="<<nds0<<" st="<<st<<" iind="<<iind<<" states="<<states<<" s0="<<s0<<" s1="<<s1<<endl;
+		cout<<"ERROR nds0="<<nds0<<" st="<<st<<" key="<<path.key<<" states="<<states<<" s0="<<s0<<" s1="<<s1<<endl;
 	      }
 	    }
 	  }
@@ -1461,6 +2497,21 @@ double I_OCA(Array<double,2>& Sm, Array<double,2>& G00t, Array<double,2>& F00t, 
     for (int it=0; it<tau.extent(0); it++){
       intpar ips = InterpLeft(tau(it), pos,tau_uniform);
       for (int k=0; k<cix.Npseudo_unique; k++) Sm(k,it) = fSmc(ips,k);
+    }
+
+    if (cut_references){
+      for (int cut=0; cut<4; ++cut){
+        Spline1DMany fcut(Nt,cix.Npseudo_unique);
+        for (int k=0; k<cix.Npseudo_unique; ++k)
+          for (int it=0; it<Nt; ++it) fcut(it,k)=Smc_cut[cut](it,k);
+        fcut.splineIt(tau_uniform);
+        (*cut_references)[cut].resize(cix.Npseudo_unique,tau.extent(0));
+        pos=0;
+        for (int it=0; it<tau.extent(0); ++it){
+          const intpar ips=InterpLeft(tau(it),pos,tau_uniform);
+          for (int k=0; k<cix.Npseudo_unique; ++k) (*cut_references)[cut](k,it)=fcut(ips,k);
+        }
+      }
     }
   }
   

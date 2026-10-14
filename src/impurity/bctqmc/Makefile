@@ -10,7 +10,7 @@ include ../../Makefile.in
 #INC = -I/usr/local/include #-I/opt/homebrew/include  -I/usr/include 
 #LIBS = -framework Accelerate -L/opt/homebrew/lib -lgsl
 
-CFLAGS = $(PFLAGS) $(Fmpi_define) $(GSLINC) -std=c++20
+CFLAGS = $(PFLAGS) $(Fmpi_define) $(GSLINC) -I. -std=c++20
 LIBS = $(PLIBS)
 
 all : bctqmc

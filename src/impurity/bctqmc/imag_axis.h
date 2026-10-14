@@ -4,6 +4,15 @@
 #include "nca_oca_imag_axis.h"
 #include "imag_axis_spectra.h"
 #include "topologymove.h"
+#include "tca_paths.h"
+#include "aaa.h"
+#include "dlr.h"
+#include "imag_axis_dlr.h"
+#include "oca_dlr.h"
+#include "tca_dlr.h"
+
+#include <chrono>
+#include <memory>
 
 #define _TIMEIT_
 
@@ -28,6 +37,53 @@ public:
   SVDFunc svdf;
   const Cix& cix;
   vector<int> G_importance;  int OCA_cut_sum;
+  // Compact-diagram state.  These adapters are intentionally optional: the
+  // legacy spline/uniform-mesh OCA remains the production result until the
+  // comparisons below are accepted for all target problems.
+  bool aaa_adapter_enabled=false, dlr_adapter_enabled=false;
+
+  // AAA objects have distinct roles. aaa_result is the barycentric fit used
+  // to discover poles; aaa_hybridization is the real-pole partial-fraction
+  // expansion actually used by the diagram code.
+  edmft::aaa::Result aaa_result;
+  edmft::aaa::PoleExpansion aaa_hybridization;
+  // Optional lower-rank hybridization used only by approximate TCA.  OCA and
+  // the exact TCA audit always use aaa_hybridization above.
+  edmft::aaa::PoleExpansion tca_active_hybridization;
+
+  // The DLR basis depends only on beta, spectral width, and tolerance.  The
+  // workspace combines it with the current AAA hybridization and current
+  // pseudo propagators.  Plans contain only topology/sparse-index data and
+  // may therefore be cached across self-consistency iterations.
+  std::unique_ptr<edmft::dlr::FermionicBasis> dlr_basis;
+  std::unique_ptr<edmft::imag_dlr::Workspace> diagram_dlr_workspace;
+  std::unique_ptr<edmft::imag_dlr::Workspace> tca_active_dlr_workspace;
+  std::unique_ptr<edmft::oca_dlr::P3Plan> oca_dlr_p3_plan;
+  std::unique_ptr<edmft::oca_dlr::SelfEnergyPlan> oca_dlr_self_plan;
+  std::unique_ptr<edmft::oca_dlr::PhysicalPlan> oca_dlr_physical_plan;
+  // True when the cached plans contain only this MPI rank's reduced bath-pair
+  // shard.  The configured strings are retained so rereading PARAMS with a
+  // different distribution policy invalidates the old topology immediately.
+  bool oca_dlr_plans_distributed=false;
+  int oca_dlr_topology_shard_count=1;
+  std::string oca_dlr_cached_topology_setting;
+  double oca_dlr_cached_replication_budget=-1.0;
+  // Legacy integration needs the complete (and potentially very large)
+  // enumeration.  Retain it only for fixed-order runs.  Genuine higher-order
+  // Monte Carlo needs the memory more than it needs to avoid re-enumeration.
+  std::unique_ptr<OCAEnumeration> oca_legacy_enumeration;
+  Eigen::MatrixXd dlr_G_coefficients, dlr_g_coefficients;
+  // The active pseudo mask is chosen once from the OCA-converged propagators.
+  // The frozen correction is stored at DLR nodes, so its memory cost is only
+  // O(r*Npseudo), independent of the dense tau mesh.
+  std::vector<unsigned char> tca_active_pseudo_mask;
+  Eigen::MatrixXd tca_frozen_sigma_tail;
+  std::array<Eigen::MatrixXd,2> tca_frozen_sigma_tail_by_topology;
+  std::array<double,2> tca_frozen_phi_tail_by_topology{{0.0,0.0}};
+  bool tca_frozen_tail_ready=false;
+  double tca_cached_keep_weight=1.0;
+  double aaa_relative_rms_error=0.0, aaa_max_error=0.0;
+  double dlr_G_relative_error=0.0, dlr_g_relative_error=0.0;
   //using AnyAxis::AnyAxis; // <-- inherit constructors: All constructors of AnyAxis are also constructors of ImagAxis0
   //
   ImagAxis0(double _beta_, const Cix& _cix_, json& pars, MPIcls& mpi) :
@@ -43,6 +99,49 @@ public:
     svdf.SetUpFastInterp();
     // Now we check how well is the orthogonality obeyed after reorthogonalization
     if (mpi.rank==mpi.master) (*mpi.out)<<"Final overlap is smaller than "<<svdf.CheckOverlap()<<endl;
+
+    // OCA_solver is the user-facing production switch.  Selecting "dlr"
+    // implicitly enables both compact representations, so a PARAMS file needs
+    // only one setting.  The two *_adapter flags remain useful for building
+    // and diagnosing the representations while legacy OCA is still selected.
+    const std::string oca_solver=pars["OCA_solver"].get<std::string>();
+    if (oca_solver!="legacy" && oca_solver!="dlr")
+      throw std::invalid_argument(
+        "OCA_solver must be either \"legacy\" or \"dlr\", received \""+
+        oca_solver+"\"");
+    const std::string tca_solver=pars["TCA_solver"].get<std::string>();
+    if (tca_solver!="dlr" && tca_solver!="mc")
+      throw std::invalid_argument(
+        "TCA_solver must be either \"dlr\" or \"mc\", received \""+
+        tca_solver+"\"");
+    // Analytic TCA uses exactly the same AAA and DLR representations as OCA,
+    // even when a diagnostic run deliberately keeps legacy OCA selected.
+    const bool analytic_tca_requested=tca_solver=="dlr" &&
+      pars["N_min_order"].get<int>()==3 && pars["Norder"].get<int>()==3;
+    const bool production_dlr=oca_solver=="dlr" || analytic_tca_requested;
+    aaa_adapter_enabled = pars["aaa_adapter"].get<bool>() || production_dlr;
+    dlr_adapter_enabled = pars["dlr_adapter"].get<bool>() || production_dlr;
+    if (dlr_adapter_enabled){
+      // A nonpositive dlr_omega_max means "follow the solver cutoff".  The
+      // dimensionless difficulty printed below is Lambda=beta*omega_max;
+      // panel_order samples the temporary construction grid, while rank is
+      // the much smaller number of selected frequencies/time nodes.
+      double omega_max=pars["dlr_omega_max"].get<double>();
+      if (omega_max<=0.0) omega_max=pars["cutoffw"].get<double>();
+      edmft::dlr::Options opts;
+      opts.beta=beta;
+      opts.omega_max=omega_max;
+      opts.eps=pars["dlr_tolerance"].get<double>();
+      opts.panel_order=pars["dlr_panel_order"].get<int>();
+      dlr_basis=std::make_unique<edmft::dlr::FermionicBasis>(opts);
+      diagram_dlr_workspace=std::make_unique<edmft::imag_dlr::Workspace>();
+      if (mpi.rank==mpi.master)
+        (*mpi.out) << "DLR adapter enabled: beta=" << beta
+                   << " omega_max=" << omega_max
+                   << " Lambda=" << dlr_basis->lambda()
+                   << " tolerance=" << dlr_basis->tolerance()
+                   << " rank=" << dlr_basis->rank() << std::endl;
+    }
   };
   //void debug1(MPIcls& mpi){};
   int Coeff_size() const {return svdf.lmax;}
@@ -165,6 +264,7 @@ public:
     iom.reference(om);
     BuildSparseMatsubaraWeights(mpi);
     iDeltaw.reference(Deltaw);
+    if (aaa_adapter_enabled) PrepareAAAHybridization(Deltaw,om,pars,mpi);
     //
     tau.resize(pars["Ntau"]);
     GiveDoubleExpMesh(tau, tau_dh, beta, pars["Ntau"]);
@@ -219,6 +319,614 @@ public:
     }
     */
   }
+  // The CIX file stores independent hybridization channels, not necessarily
+  // a dense orbital matrix. Put those channels on the diagonal of an
+  // auxiliary matrix so matrix AAA chooses one common support/pole set
+  // without changing or guessing the physical CIX mapping.
+  void PrepareAAAHybridization(const Array<complex<double>,2>& Deltaw,
+                               const Array<double,1>& om,
+                               const json& pars, MPIcls& mpi)
+  {
+    using edmft::aaa::Complex;
+    using edmft::aaa::MatrixXcd;
+    // The solver stores independent scalar CIX channels.  Embedding them as
+    // diagonal matrices makes matrix AAA choose one common pole set, which is
+    // essential for batching channels later.  No off-diagonal physics is
+    // invented by this auxiliary matrix representation.
+    std::vector<Complex> z(om.extent(0));
+    std::vector<MatrixXcd> values;
+    values.reserve(om.extent(0));
+    for (int n=0; n<om.extent(0); ++n){
+      z[n]=Complex(0.0,om(n));
+      MatrixXcd fn=MatrixXcd::Zero(Deltaw.extent(0),Deltaw.extent(0));
+      for (int b=0; b<Deltaw.extent(0); ++b) fn(b,b)=Deltaw(b,n);
+      values.push_back(std::move(fn));
+    }
+
+    edmft::aaa::Options opts;
+    opts.tolerance=pars["aaa_tolerance"].get<double>();
+    opts.max_support_pairs=pars["aaa_max_support_pairs"].get<int>();
+    opts.relative_tolerance=true;
+    const std::string requested_mode=pars["aaa_fit_mode"].get<std::string>();
+    if (requested_mode!="auto" && requested_mode!="joint" &&
+        requested_mode!="balanced" && requested_mode!="channelwise")
+      throw std::invalid_argument(
+        "aaa_fit_mode must be \"auto\", \"joint\", \"balanced\", or "
+        "\"channelwise\"");
+
+    // The expensive SVD/eigensystem/L-BFGS work is deterministic and has no
+    // useful MPI decomposition.  Performing it independently on every rank
+    // merely multiplies startup time and may introduce last-bit differences
+    // between the pole tables.  Rank zero constructs one expansion below;
+    // the compact poles and diagonal residues are broadcast afterwards.
+    int selected_kind=0; // 1=joint, 2=scalar-pole union, 3=balanced joint
+    int support_count=0, raw_pole_count=0, refinement_iterations=0;
+    double barycentric_max_error=0.0;
+    std::string root_error;
+
+    // A channel whose norm is less than this fraction of the largest channel
+    // is treated as numerically zero.  This is deliberately an amplitude
+    // threshold (its square is used below for accumulated norms): a small but
+    // physical anomalous/Nambu bath is still normalized and protected, while
+    // roundoff in an exactly zero channel is not amplified into a fit target.
+    constexpr double channel_scale_floor_ratio=1.e-12;
+
+    const auto expansion_error=[&](const edmft::aaa::PoleExpansion& expansion) {
+      double error2=0.0,scale2=0.0,max_error=0.0;
+      for (int n=0; n<static_cast<int>(z.size()); ++n) {
+        const MatrixXcd d=expansion.evaluate(z[n])-values[n];
+        error2+=d.squaredNorm();
+        scale2+=values[n].squaredNorm();
+        max_error=std::max(max_error,d.norm());
+      }
+      return std::make_pair(
+        std::sqrt(error2/std::max(scale2,std::numeric_limits<double>::min())),
+        max_error);
+    };
+
+    // A global Frobenius error favors the largest normal-state bath elements.
+    // Measure every independent CIX channel in its own norm as well, so a
+    // smaller anomalous hybridization can veto a poor joint approximation.
+    // A negative result marks a channel that is zero at the scale above and
+    // is intentionally excluded from the worst-channel comparison.
+    const auto channel_relative_errors=[&](
+        const edmft::aaa::PoleExpansion& expansion) {
+      const int channel_count=Deltaw.extent(0);
+      std::vector<double> error2(channel_count,0.0);
+      std::vector<double> scale2(channel_count,0.0);
+      for (int n=0; n<static_cast<int>(z.size()); ++n) {
+        const MatrixXcd approximation=expansion.evaluate(z[n]);
+        for (int b=0; b<channel_count; ++b) {
+          const Complex d=approximation(b,b)-values[n](b,b);
+          error2[b]+=std::norm(d);
+          scale2[b]+=std::norm(values[n](b,b));
+        }
+      }
+      const double largest_scale2=*std::max_element(
+        scale2.begin(),scale2.end());
+      const double scale2_floor=largest_scale2*
+        channel_scale_floor_ratio*channel_scale_floor_ratio;
+      std::vector<double> relative(channel_count,-1.0);
+      for (int b=0; b<channel_count; ++b)
+        if (scale2[b]>std::max(scale2_floor,
+                              std::numeric_limits<double>::min()))
+          relative[b]=std::sqrt(error2[b]/scale2[b]);
+      return relative;
+    };
+
+    const auto worst_channel_error=[](const std::vector<double>& errors) {
+      double worst=0.0;
+      bool found=false;
+      for (double error:errors)
+        if (error>=0.0) {
+          worst=std::max(worst,error);
+          found=true;
+        }
+      return found ? worst : std::numeric_limits<double>::infinity();
+    };
+
+    if (mpi.rank==mpi.master) {
+      try {
+        const double pole_imag_tolerance=
+          pars["aaa_pole_imag_tolerance"].get<double>();
+        const bool refine=pars["aaa_refine_poles"].get<bool>();
+        double bound=pars["aaa_omega_bound"].get<double>();
+        if (bound<=0.0) bound=pars["cutoffw"].get<double>();
+
+        const auto finish_expansion=[&](
+            const std::vector<MatrixXcd>& fit_values,
+            const Eigen::VectorXd& initial_poles,
+            int& iterations) {
+          if (initial_poles.size()==0) return edmft::aaa::PoleExpansion{};
+          if (!refine)
+            return edmft::aaa::fit_residues(z,fit_values,initial_poles);
+          const double local_bound=std::max(
+            bound,1.05*initial_poles.cwiseAbs().maxCoeff());
+          auto report=edmft::aaa::refine_poles(
+            z,fit_values,initial_poles,-local_bound,local_bound,
+            pars["aaa_refine_max_iterations"].get<int>(),
+            pars["aaa_refine_gradient_tolerance"].get<double>());
+          iterations+=report.iterations;
+          return std::move(report.expansion);
+        };
+
+        edmft::aaa::PoleExpansion joint_expansion;
+        double joint_relative_error=std::numeric_limits<double>::infinity();
+        if (requested_mode!="balanced") {
+          aaa_result=edmft::aaa::fit(z,values,opts);
+          support_count=static_cast<int>(aaa_result.support_points.size());
+          raw_pole_count=aaa_result.poles.size();
+          barycentric_max_error=aaa_result.max_error_history.empty()
+            ? 0.0 : aaa_result.max_error_history.back();
+          Eigen::VectorXd poles=aaa_result.real_poles(pole_imag_tolerance);
+          int joint_iterations=0;
+          joint_expansion=finish_expansion(values,poles,joint_iterations);
+          refinement_iterations=joint_iterations;
+          if (joint_expansion.poles.size()>0)
+            joint_relative_error=expansion_error(joint_expansion).first;
+        }
+
+        // Balanced matrix AAA keeps a single denominator and hence a compact,
+        // well-conditioned real-pole set.  Channel normalization is used only
+        // while discovering/refining those poles.  The final residues are
+        // always fitted to the original, unscaled hybridization.
+        const bool try_balanced=requested_mode=="balanced" ||
+          (requested_mode=="auto" &&
+           joint_relative_error>pars["aaa_channelwise_trigger"].get<double>());
+        edmft::aaa::PoleExpansion balanced_expansion;
+        int balanced_support_count=0,balanced_raw_poles=0;
+        int balanced_iterations=0;
+        double balanced_barycentric_error=0.0;
+        if (try_balanced) {
+          std::vector<double> channel_scale(Deltaw.extent(0),0.0);
+          for (const auto& value:values)
+            for (int b=0; b<Deltaw.extent(0); ++b)
+              channel_scale[b]+=std::norm(value(b,b));
+          for (double& scale:channel_scale)
+            scale=std::sqrt(scale/std::max<size_t>(values.size(),1));
+          const double largest_channel_scale=*std::max_element(
+            channel_scale.begin(),channel_scale.end());
+          const double channel_scale_floor=std::max(
+            channel_scale_floor_ratio*largest_channel_scale,
+            std::numeric_limits<double>::min());
+          std::vector<MatrixXcd> balanced_values;
+          balanced_values.reserve(values.size());
+          for (const auto& value:values) {
+            MatrixXcd balanced=MatrixXcd::Zero(
+              Deltaw.extent(0),Deltaw.extent(0));
+            for (int b=0; b<Deltaw.extent(0); ++b)
+              balanced(b,b)=value(b,b)/
+                std::max(channel_scale[b],channel_scale_floor);
+            balanced_values.push_back(std::move(balanced));
+          }
+          auto balanced_result=edmft::aaa::fit(z,balanced_values,opts);
+          balanced_support_count=balanced_result.support_points.size();
+          balanced_raw_poles=balanced_result.poles.size();
+          balanced_barycentric_error=
+            balanced_result.max_error_history.empty()
+            ? 0.0 : balanced_result.max_error_history.back();
+          const Eigen::VectorXd poles=
+            balanced_result.real_poles(pole_imag_tolerance);
+          const auto scaled_expansion=finish_expansion(
+            balanced_values,poles,balanced_iterations);
+          if (scaled_expansion.poles.size()>0)
+            balanced_expansion=edmft::aaa::fit_residues(
+              z,values,scaled_expansion.poles);
+        }
+
+        // The scalar-union construction is intentionally available only when
+        // requested explicitly.  A large union can interpolate Matsubara data
+        // extremely well while being ill conditioned between sample points;
+        // it is useful for diagnosis but unsafe as an automatic fallback.
+        const bool try_channelwise=requested_mode=="channelwise";
+        edmft::aaa::PoleExpansion channel_expansion;
+        int channel_support_count=0,channel_raw_poles=0,channel_iterations=0;
+        double channel_barycentric_error=0.0;
+        if (try_channelwise) {
+          std::vector<double> channel_poles;
+          // Fit each physical scalar channel in its natural one-dimensional
+          // space.  This prevents a large normal component from controlling
+          // support selection for a much smaller anomalous component.
+          for (int b=0; b<Deltaw.extent(0); ++b) {
+            std::vector<MatrixXcd> scalar_values;
+            scalar_values.reserve(values.size());
+            for (const auto& value:values) {
+              MatrixXcd scalar(1,1);
+              scalar(0,0)=value(b,b);
+              scalar_values.push_back(std::move(scalar));
+            }
+            auto scalar_result=edmft::aaa::fit(z,scalar_values,opts);
+            channel_support_count+=scalar_result.support_points.size();
+            channel_raw_poles+=scalar_result.poles.size();
+            if (!scalar_result.max_error_history.empty())
+              channel_barycentric_error=std::max(
+                channel_barycentric_error,
+                scalar_result.max_error_history.back());
+            Eigen::VectorXd poles=scalar_result.real_poles(pole_imag_tolerance);
+            int scalar_iterations=0;
+            const auto scalar_expansion=
+              finish_expansion(scalar_values,poles,scalar_iterations);
+            channel_iterations+=scalar_iterations;
+            for (int l=0; l<scalar_expansion.poles.size(); ++l)
+              channel_poles.push_back(scalar_expansion.poles(l));
+          }
+
+          // Equivalent channels should produce identical poles analytically,
+          // but their independent finite-precision fits can differ slightly.
+          // Merge such copies before the final simultaneous residue fit.
+          std::sort(channel_poles.begin(),channel_poles.end());
+          std::vector<double> merged;
+          std::vector<int> multiplicity;
+          const double merge_tolerance=
+            pars["aaa_pole_merge_tolerance"].get<double>();
+          for (double pole:channel_poles) {
+            if (merged.empty() ||
+                std::abs(pole-merged.back())>
+                merge_tolerance*std::max({1.0,std::abs(pole),
+                                           std::abs(merged.back())})) {
+              merged.push_back(pole);
+              multiplicity.push_back(1);
+            } else {
+              const int count=++multiplicity.back();
+              merged.back()+= (pole-merged.back())/count;
+            }
+          }
+          Eigen::VectorXd union_poles(merged.size());
+          for (int l=0; l<union_poles.size(); ++l) union_poles(l)=merged[l];
+          if (union_poles.size()>0)
+            channel_expansion=edmft::aaa::fit_residues(z,values,union_poles);
+        }
+
+        const double balanced_relative_error=balanced_expansion.poles.size()>0
+          ? expansion_error(balanced_expansion).first
+          : std::numeric_limits<double>::infinity();
+        const double channel_relative_error=channel_expansion.poles.size()>0
+          ? expansion_error(channel_expansion).first
+          : std::numeric_limits<double>::infinity();
+        const std::vector<double> joint_channel_errors=
+          joint_expansion.poles.size()>0
+          ? channel_relative_errors(joint_expansion) : std::vector<double>{};
+        const std::vector<double> balanced_channel_errors=
+          balanced_expansion.poles.size()>0
+          ? channel_relative_errors(balanced_expansion)
+          : std::vector<double>{};
+        const double joint_worst_channel=
+          joint_channel_errors.empty()
+          ? std::numeric_limits<double>::infinity()
+          : worst_channel_error(joint_channel_errors);
+        const double balanced_worst_channel=
+          balanced_channel_errors.empty()
+          ? std::numeric_limits<double>::infinity()
+          : worst_channel_error(balanced_channel_errors);
+
+        // Preserve the existing global-error decision, but add a minimax
+        // safeguard for small physical channels.  Requiring a 5% reduction
+        // avoids changing pole sets because of last-bit differences between
+        // nearly equivalent fits.  In particular, auto may retain the compact
+        // joint fit only when it is also competitive channel by channel.
+        const bool balanced_improves_global=
+          balanced_relative_error<joint_relative_error;
+        const bool balanced_improves_worst_channel=
+          balanced_worst_channel<0.95*joint_worst_channel;
+        const bool balanced_auto_preferred=requested_mode=="auto" &&
+          (balanced_improves_global || balanced_improves_worst_channel);
+        const bool channelwise_safe=try_channelwise &&
+          channel_relative_error<joint_relative_error &&
+          channel_expansion.poles.size()<=
+            std::max(2*joint_expansion.poles.size(),
+                     joint_expansion.poles.size()+8);
+        if (channelwise_safe) {
+          aaa_hybridization=std::move(channel_expansion);
+          selected_kind=2;
+          support_count=channel_support_count;
+          raw_pole_count=channel_raw_poles;
+          refinement_iterations=channel_iterations;
+          barycentric_max_error=channel_barycentric_error;
+        } else if (try_balanced &&
+                   (requested_mode=="balanced" ||
+                    balanced_auto_preferred)) {
+          aaa_hybridization=std::move(balanced_expansion);
+          selected_kind=3;
+          support_count=balanced_support_count;
+          raw_pole_count=balanced_raw_poles;
+          refinement_iterations=balanced_iterations;
+          barycentric_max_error=balanced_barycentric_error;
+        } else {
+          aaa_hybridization=std::move(joint_expansion);
+          selected_kind=1;
+          if (try_channelwise)
+            (*mpi.out) << "WARN: rejected ill-conditioned channelwise AAA "
+                       << "candidate (joint_poles="
+                       << aaa_hybridization.poles.size()
+                       << ", channel_union_poles="
+                       << channel_expansion.poles.size()
+                       << ", joint_relative_rms=" << joint_relative_error
+                       << ", channel_relative_rms=" << channel_relative_error
+                       << ")" << std::endl;
+        }
+        if (requested_mode=="auto" && try_balanced) {
+          (*mpi.out) << "AAA auto per-channel relative RMS:";
+          const int diagnostic_channels=static_cast<int>(std::max(
+            joint_channel_errors.size(),balanced_channel_errors.size()));
+          for (int b=0; b<diagnostic_channels; ++b) {
+            const double joint_error=
+              b<static_cast<int>(joint_channel_errors.size())
+              ? joint_channel_errors[b]
+              : std::numeric_limits<double>::infinity();
+            const double balanced_error=
+              b<static_cast<int>(balanced_channel_errors.size())
+              ? balanced_channel_errors[b]
+              : std::numeric_limits<double>::infinity();
+            (*mpi.out) << " ch" << b << "=(joint="
+                       << joint_error << ",balanced="
+                       << balanced_error << ")";
+          }
+          (*mpi.out) << " worst=(joint=" << joint_worst_channel
+                     << ",balanced=" << balanced_worst_channel << ")"
+                     << " selected="
+                     << (selected_kind==3 ? "balanced" : "joint")
+                     << " reason="
+                     << (balanced_improves_global ? "global-error" :
+                         balanced_improves_worst_channel
+                           ? "worst-channel-safeguard" :
+                             "joint-remains-competitive")
+                     << std::endl;
+        }
+        if (aaa_hybridization.poles.size()>0) {
+          const auto errors=expansion_error(aaa_hybridization);
+          aaa_relative_rms_error=errors.first;
+          aaa_max_error=errors.second;
+        }
+      } catch (const std::exception& e) {
+        root_error=e.what();
+        aaa_hybridization=edmft::aaa::PoleExpansion{};
+      }
+    }
+
+    int header[7]={root_error.empty() ? 1 : -1,
+                   static_cast<int>(aaa_hybridization.poles.size()),
+                   Deltaw.extent(0),selected_kind,support_count,
+                   raw_pole_count,refinement_iterations};
+    double diagnostics[3]={barycentric_max_error,
+                           aaa_relative_rms_error,aaa_max_error};
+#ifdef _MPI
+    MPI_Bcast(header,7,MPI_INT,mpi.master,MPI_COMM_WORLD);
+    MPI_Bcast(diagnostics,3,MPI_DOUBLE,mpi.master,MPI_COMM_WORLD);
+#endif
+    if (header[0]<0) {
+      if (mpi.rank==mpi.master)
+        (*mpi.out) << "AAA construction failed: " << root_error << std::endl;
+      throw std::runtime_error("AAA construction failed on the master MPI rank");
+    }
+    selected_kind=header[3]; support_count=header[4];
+    raw_pole_count=header[5]; refinement_iterations=header[6];
+    barycentric_max_error=diagnostics[0];
+    aaa_relative_rms_error=diagnostics[1]; aaa_max_error=diagnostics[2];
+
+    // Broadcast only the physically used diagonal residue entries.  The
+    // auxiliary dense matrices are reconstructed locally and contain exact
+    // zero off-diagonal elements.
+    const int pole_count=header[1],channel_count=header[2];
+    std::vector<double> pole_buffer(pole_count);
+    std::vector<Complex> residue_buffer(
+      static_cast<size_t>(pole_count)*channel_count);
+    if (mpi.rank==mpi.master) {
+      for (int l=0; l<pole_count; ++l) {
+        pole_buffer[l]=aaa_hybridization.poles(l);
+        for (int b=0; b<channel_count; ++b)
+          residue_buffer[static_cast<size_t>(l)*channel_count+b]=
+            aaa_hybridization.residues[l](b,b);
+      }
+    }
+#ifdef _MPI
+    MPI_Bcast(pole_buffer.data(),pole_count,MPI_DOUBLE,mpi.master,MPI_COMM_WORLD);
+    MPI_Bcast(residue_buffer.data(),pole_count*channel_count,
+              MPI_C_DOUBLE_COMPLEX,mpi.master,MPI_COMM_WORLD);
+#endif
+    if (mpi.rank!=mpi.master) {
+      aaa_hybridization.poles.resize(pole_count);
+      aaa_hybridization.residues.assign(
+        pole_count,MatrixXcd::Zero(channel_count,channel_count));
+      for (int l=0; l<pole_count; ++l) {
+        aaa_hybridization.poles(l)=pole_buffer[l];
+        for (int b=0; b<channel_count; ++b)
+          aaa_hybridization.residues[l](b,b)=
+            residue_buffer[static_cast<size_t>(l)*channel_count+b];
+      }
+    }
+
+    if (pole_count==0) {
+      if (mpi.rank==mpi.master)
+        (*mpi.out) << "WARN: AAA adapter found no usable real poles; "
+                   << "the existing dense hybridization remains in use."
+                   << std::endl;
+      return;
+    }
+
+    // Build the optional TCA-only reduced pole table after the accurate AAA
+    // expansion has been agreed by every MPI rank.  Greedy deletion/refitting
+    // runs only on rank zero; broadcasting the result avoids both duplicated
+    // startup work and rank-dependent last-bit choices.  A target of zero, or
+    // a target no smaller than the accurate table, is an exact copy.
+    const int requested_tca_poles=pars["tca_active_aaa_poles"].get<int>();
+    const double requested_keep_weight=
+      pars["tca_pseudo_keep_weight"].get<double>();
+    if (requested_tca_poles<0)
+      throw std::invalid_argument("tca_active_aaa_poles must be nonnegative");
+    if (!(requested_keep_weight>0.0 && requested_keep_weight<=1.0))
+      throw std::invalid_argument(
+        "tca_pseudo_keep_weight must lie in (0,1]");
+    const int effective_tca_poles=requested_tca_poles==0
+      ? pole_count : std::min(requested_tca_poles,pole_count);
+    double tca_compression_diagnostics[2]={aaa_relative_rms_error,0.0};
+    int tca_compression_ok=1;
+    if (mpi.rank==mpi.master) {
+      try {
+        if (effective_tca_poles>0 && effective_tca_poles<pole_count) {
+          auto compressed=edmft::aaa::compress_poles_greedy(
+            z,values,aaa_hybridization,effective_tca_poles);
+          tca_active_hybridization=std::move(compressed.expansion);
+          tca_compression_diagnostics[0]=compressed.relative_rms_error;
+          tca_compression_diagnostics[1]=
+            compressed.worst_channel_relative_rms;
+        } else {
+          tca_active_hybridization=aaa_hybridization;
+          const auto channel_errors=channel_relative_errors(
+            tca_active_hybridization);
+          tca_compression_diagnostics[1]=
+            worst_channel_error(channel_errors);
+        }
+      } catch (const std::exception& e) {
+        tca_compression_ok=0;
+        (*mpi.out) << "TCA active AAA compression failed: " << e.what()
+                   << std::endl;
+      }
+    }
+#ifdef _MPI
+    MPI_Bcast(&tca_compression_ok,1,MPI_INT,mpi.master,MPI_COMM_WORLD);
+    MPI_Bcast(tca_compression_diagnostics,2,MPI_DOUBLE,mpi.master,
+              MPI_COMM_WORLD);
+#endif
+    if (!tca_compression_ok)
+      throw std::runtime_error(
+        "TCA active AAA compression failed on the master MPI rank");
+    const int tca_pole_count=effective_tca_poles;
+    std::vector<double> tca_pole_buffer(tca_pole_count);
+    std::vector<Complex> tca_residue_buffer(
+      static_cast<size_t>(tca_pole_count)*channel_count);
+    if (mpi.rank==mpi.master)
+      for (int l=0;l<tca_pole_count;++l) {
+        tca_pole_buffer[l]=tca_active_hybridization.poles(l);
+        for (int b=0;b<channel_count;++b)
+          tca_residue_buffer[static_cast<size_t>(l)*channel_count+b]=
+            tca_active_hybridization.residues[l](b,b);
+      }
+#ifdef _MPI
+    MPI_Bcast(tca_pole_buffer.data(),tca_pole_count,MPI_DOUBLE,mpi.master,
+              MPI_COMM_WORLD);
+    MPI_Bcast(tca_residue_buffer.data(),tca_pole_count*channel_count,
+              MPI_C_DOUBLE_COMPLEX,mpi.master,MPI_COMM_WORLD);
+#endif
+    if (mpi.rank!=mpi.master) {
+      tca_active_hybridization.poles.resize(tca_pole_count);
+      tca_active_hybridization.residues.assign(
+        tca_pole_count,MatrixXcd::Zero(channel_count,channel_count));
+      for (int l=0;l<tca_pole_count;++l) {
+        tca_active_hybridization.poles(l)=tca_pole_buffer[l];
+        for (int b=0;b<channel_count;++b)
+          tca_active_hybridization.residues[l](b,b)=
+            tca_residue_buffer[static_cast<size_t>(l)*channel_count+b];
+      }
+    }
+
+    if (mpi.rank==mpi.master)
+      (*mpi.out) << "AAA hybridization adapter: channels=" << channel_count
+                 << " mode=" << (selected_kind==2 ? "channelwise" :
+                                  selected_kind==3 ? "balanced" : "joint")
+                 << " support_points=" << support_count
+                 << " barycentric_max_error=" << barycentric_max_error
+                 << " raw_poles=" << raw_pole_count
+                 << " real_poles=" << pole_count
+                 << " refinement_iterations=" << refinement_iterations
+                 << " pole_fit_relative_rms=" << aaa_relative_rms_error
+                 << " pole_fit_max_error=" << aaa_max_error << std::endl;
+    if (diagram_dlr_workspace && aaa_hybridization.poles.size()>0)
+      diagram_dlr_workspace->prepare_hybridization(*dlr_basis,aaa_hybridization,
+                                                   cix.Nbath_unique_unique);
+    const bool active_workspace_requested=
+      tca_pole_count<pole_count || requested_keep_weight<1.0;
+    if (active_workspace_requested) {
+      tca_active_dlr_workspace=
+        std::make_unique<edmft::imag_dlr::Workspace>();
+      tca_active_dlr_workspace->prepare_hybridization(
+        *dlr_basis,tca_active_hybridization,cix.Nbath_unique_unique);
+      if (mpi.rank==mpi.master)
+        (*mpi.out) << "TCA active workspace: poles=" << tca_pole_count
+                   << "/" << pole_count
+                   << " pseudo_keep_weight=" << requested_keep_weight
+                   << " pole_fit_relative_rms="
+                   << tca_compression_diagnostics[0]
+                   << " worst_channel_relative_rms="
+                   << tca_compression_diagnostics[1] << std::endl;
+    }
+  }
+
+  Eigen::MatrixXd PseudoToDLRCoefficients(const Array<double,1>& dense_tau,
+                                           const Array<double,2>& values) const
+  {
+    if (!dlr_basis) throw std::logic_error("DLR adapter is not enabled");
+    if (dense_tau.extent(0)!=values.extent(1))
+      throw std::invalid_argument("PseudoToDLRCoefficients: tau/value size mismatch");
+    // Input pseudo functions remain on the solver's excellent dense spline
+    // mesh.  This least-squares projection is the boundary between that
+    // representation and compact diagram evaluation; Dyson is untouched.
+    Eigen::VectorXd etau(dense_tau.extent(0));
+    Eigen::MatrixXd evals(dense_tau.extent(0),values.extent(0));
+    for (int it=0; it<dense_tau.extent(0); ++it){
+      etau(it)=dense_tau(it);
+      for (int p=0; p<values.extent(0); ++p) evals(it,p)=values(p,it);
+    }
+    return dlr_basis->fit_values(etau,evals);
+  }
+
+  void DLRToPseudo(const Eigen::MatrixXd& coefficients,
+                   const Array<double,1>& dense_tau,
+                   Array<double,2>& values) const
+  {
+    if (!dlr_basis) throw std::logic_error("DLR adapter is not enabled");
+    if (coefficients.rows()!=dlr_basis->rank())
+      throw std::invalid_argument("DLRToPseudo: coefficient count differs from DLR rank");
+    values.resize(coefficients.cols(),dense_tau.extent(0));
+    for (int it=0; it<dense_tau.extent(0); ++it){
+      const auto row=dlr_basis->evaluate(dense_tau(it),coefficients);
+      for (int p=0; p<coefficients.cols(); ++p) values(p,it)=row(p);
+    }
+  }
+
+  void UpdateDLRPseudos(const Array<double,1>& dense_tau,
+                        const Array<double,2>& Gm,
+                        const Array<double,2>& gm,
+                        MPIcls& mpi)
+  {
+    if (!dlr_adapter_enabled) return;
+    dlr_G_coefficients=PseudoToDLRCoefficients(dense_tau,Gm);
+    dlr_g_coefficients=PseudoToDLRCoefficients(dense_tau,gm);
+    if (diagram_dlr_workspace && diagram_dlr_workspace->ready())
+      diagram_dlr_workspace->update_pseudos(dlr_G_coefficients);
+    // Round-trip both G and the shifted/scaled g used elsewhere in the solver
+    // even though OCA currently consumes G only.  Reporting this error at
+    // every update separates DLR representation error from diagram algebra
+    // or legacy quadrature error.
+    Array<double,2> Gcheck,gcheck;
+    DLRToPseudo(dlr_G_coefficients,dense_tau,Gcheck);
+    DLRToPseudo(dlr_g_coefficients,dense_tau,gcheck);
+    double Gerr2=0.0,Gscale2=0.0,gerr2=0.0,gscale2=0.0;
+    for (int p=0; p<Gm.extent(0); ++p)
+      for (int it=0; it<Gm.extent(1); ++it){
+        Gerr2+=std::pow(Gcheck(p,it)-Gm(p,it),2);
+        Gscale2+=std::pow(Gm(p,it),2);
+      }
+    for (int p=0; p<gm.extent(0); ++p)
+      for (int it=0; it<gm.extent(1); ++it){
+        gerr2+=std::pow(gcheck(p,it)-gm(p,it),2);
+        gscale2+=std::pow(gm(p,it),2);
+      }
+    dlr_G_relative_error=std::sqrt(Gerr2/std::max(Gscale2,std::numeric_limits<double>::min()));
+    dlr_g_relative_error=std::sqrt(gerr2/std::max(gscale2,std::numeric_limits<double>::min()));
+    if (mpi.rank==mpi.master)
+      (*mpi.out) << "DLR pseudo adapter: rank=" << dlr_basis->rank()
+                 << " G_relative_rms=" << dlr_G_relative_error
+                 << " g_relative_rms=" << dlr_g_relative_error << std::endl;
+  }
+
+  bool HasAAAHybridization() const { return aaa_hybridization.poles.size()>0; }
+  bool HasDLRPseudos() const { return dlr_G_coefficients.size()>0; }
+  const edmft::aaa::PoleExpansion& AAAHybridization() const { return aaa_hybridization; }
+  const edmft::dlr::FermionicBasis& DLRBasis() const {
+    if (!dlr_basis) throw std::logic_error("DLR adapter is not enabled");
+    return *dlr_basis;
+  }
+
   auto ReadPseudoSig00(string Sfilename, MPIcls& mpi){
     bool debug = true;
     auto retval = _ReadPseudoSig00_<double>(Sfilename, cix.Npseudo_unique, mpi);
@@ -292,15 +1000,24 @@ public:
     return r;
   }
   
-  vector<int> ImportanceOfPseudo(const Array<double,1>& , const Array<double,2>& , std::array<double,2> cut={0.1,0.5}, bool debug=false)
-  //vector<int> ImportanceOfPseudo(std::array<double,2> cut={0.1,0.5}, bool debug=false)
+  vector<int> ImportanceOfPseudo(const Array<double,1>& pseudo_tau,
+                                 const Array<double,2>& pseudo_G,
+                                 std::array<double,2> cut={0.1,0.5},
+                                 bool debug=false)
   {
-    if (Gms.size()!=cix.Npseudo_unique){ cerr << "ERROR in ImportanceOfPseudo: Gms.size="<<Gms.size()<<" should be Npseudo_unique="<<cix.Npseudo_unique<<endl;}
+    if (pseudo_G.extent(0)!=cix.Npseudo_unique ||
+        pseudo_G.extent(1)!=pseudo_tau.extent(0))
+      throw std::invalid_argument(
+        "ImportanceOfPseudo: pseudo Green function/tau dimensions mismatch");
   
     Array<double,1> Gwidth(cix.Npseudo_unique);
-    int middle = Gms.x_.extent(0)/2;
-    // just taking |G(beta/2)| as the marker of PP importance. It's simple and reasonable, and is simply related to G(omega=0)
-    for (int ipp=0; ipp<cix.Npseudo_unique; ++ipp) Gwidth(ipp) = fabs(Gms(middle,ipp));
+    const int middle=pseudo_tau.extent(0)/2;
+    // Use the original dense pseudo mesh directly.  The mesh is symmetric and
+    // its middle point represents beta/2, so constructing Gms splines merely
+    // to rank |G_p(beta/2)| was unnecessary.  This keeps DLR-only OCA entirely
+    // independent of the legacy pseudo spline representation.
+    for (int ipp=0; ipp<cix.Npseudo_unique; ++ipp)
+      Gwidth(ipp)=fabs(pseudo_G(ipp,middle));
   
     std::vector<int> idx(cix.Npseudo_unique);
     std::iota(idx.begin(), idx.end(), 0); // 0..N-1
@@ -328,21 +1045,1105 @@ public:
   }
   double OCA(Array<double,2>& dSm, Array<double,2>& G00t, Array<double,2>& F00t, Array<double,2>& F01t,
 	     bool cmpPhysG, double Q, const Array<double,1>& tau, const Array<double,2>& Gm, Cix& cix, json& pars, MPIcls& mpi){
-    /*
-    std::array<double,2> OCA_cut({pars["OCA_cut1"].get<double>(),pars["OCA_cut2"].get<double>()});
-    if ((OCA_cut[0]-1.0)<-1e-5 or (OCA_cut[1]-1)<-1e-5){
-      G_importance = ImportanceOfPseudo(tau,Gm,OCA_cut, false);
-      OCA_cut_sum = pars["OCA_cut_sum"].get<int>();
-      if (mpi.rank==mpi.master){
-	cout<<"G_importance="<< G_importance <<endl;
-	cout<<"OCA_cut_sum="<<OCA_cut_sum<<endl;
-      }
-    }else{
-      OCA_cut_sum = 10;
-    }
+    /* Algorithm visual summary:
+
+       Current dense pseudo G
+             │
+             ├── fit pseudo G directly to DLR coefficients
+             ├── compute G_importance directly on the dense mesh
+             │
+             ▼
+       EnumerateOCAPaths (unless a fixed-order cache is reusable)
+             │
+             ├── pass 1: count unique CIX paths
+             ├── pass 2: accumulate matrix-element weights
+             └── one shared, mesh-independent enumeration
+                         │
+               ┌─────────┴─────────┐
+               ▼                   ▼
+       legacy requested       DLR requested
+       I_OCA(enumeration)     build SelfEnergyPlan + PhysicalPlan
+       uniform mesh +                    │
+       spline integration                ▼
+                               one pole-major loop:
+                               shared pair convolutions
+                                  ├── four cuts → Sigma_OCA
+                                  ├── two cuts  → G,F00,F01
+                                  └── Sigma*G identity → Phi_OCA
+
+                               MPI execution:
+                               poles → independent teams
+                               pair columns → team Allgatherv
+                               cut/physical blocks → team ranks
+                               compact DLR nodes → world Allreduce
+
+       Diagnostic mode follows both branches; OCA_solver determines which
+       result is copied back to the self-consistency loop.
     */
-    return I_OCA(dSm,G00t,F00t,F01t,
-		 cmpPhysG,Q,beta,tau,Gms,Deltas,cix,pars,G_importance,OCA_cut_sum,mpi);
+    const std::string oca_solver=pars["OCA_solver"].get<std::string>();
+    if (oca_solver!="legacy" && oca_solver!="dlr")
+      throw std::invalid_argument(
+        "OCA_solver must be either \"legacy\" or \"dlr\", received \""+
+        oca_solver+"\"");
+    const bool use_dlr=oca_solver=="dlr";
+
+    // Diagnostic mode sends the shared enumeration through both numerical
+    // branches and compares them on precisely the same external tau mesh.
+    // With legacy
+    // selected, diagnostics never overwrite the legacy output.  With DLR
+    // selected, the compact arrays become the returned production output;
+    // enabling diagnostics merely adds the legacy calculation and comparison.
+    const bool dlr_diagnostic=pars["oca_dlr_diagnostic"].get<bool>();
+    const bool evaluate_dlr=use_dlr || dlr_diagnostic;
+    // In production DLR mode a diagnostic request means "compute both and
+    // compare, but return DLR".  Without diagnostics the legacy integrator is
+    // not called at all; only the shared mesh-independent enumerator runs.
+    const bool run_legacy=!use_dlr || dlr_diagnostic;
+    const bool dlr_cut_diagnostic=dlr_diagnostic && pars["oca_dlr_cut_diagnostic"].get<bool>();
+
+    // pars["Norder"] is N_max_order in the driver.  Equal minimum and maximum
+    // orders describe a fixed-order calculation.  In particular, order two
+    // may still run a small complementary-OCA Monte Carlo, but retaining OCA
+    // topology there is the intended speed/memory compromise.  When a range
+    // of orders is sampled, all persistent OCA storage is released so the
+    // substantially larger higher-order MC has the memory available.
+    const bool retain_oca_topology=
+      pars["N_min_order"].get<int>()==pars["Norder"].get<int>();
+
+    const bool topology_mpi_enabled=
+      pars["oca_dlr_mpi"].get<bool>() && mpi.size>1;
+    const std::string requested_topology_setting=
+      pars["oca_dlr_mpi_topology"].get<std::string>();
+    // A serial evaluator cannot consume rank-local topology: forcing the
+    // replicated path when oca_dlr_mpi is disabled keeps that switch a true
+    // numerical-communication switch rather than silently dropping diagrams.
+    const std::string topology_setting=topology_mpi_enabled
+      ? requested_topology_setting : "replicated";
+    const double replication_budget=
+      pars["oca_dlr_max_replicated_mb"].get<double>();
+    if (requested_topology_setting!="auto" &&
+        requested_topology_setting!="replicated" &&
+        requested_topology_setting!="distributed")
+      throw std::invalid_argument(
+        "oca_dlr_mpi_topology must be \"auto\", \"replicated\", or "
+        "\"distributed\"");
+    if (!(replication_budget>0.0))
+      throw std::invalid_argument("oca_dlr_max_replicated_mb must be positive");
+    if (oca_dlr_cached_topology_setting!=topology_setting ||
+        oca_dlr_cached_replication_budget!=replication_budget) {
+      oca_dlr_p3_plan.reset();
+      oca_dlr_self_plan.reset();
+      oca_dlr_physical_plan.reset();
+      oca_dlr_topology_shard_count=1;
+      oca_dlr_cached_topology_setting=topology_setting;
+      oca_dlr_cached_replication_budget=replication_budget;
+    }
+
+    // Drop objects that the selected numerical path cannot use.  This also
+    // handles changing OCA_solver while parameters are reread between
+    // iterations.
+    if (!run_legacy) oca_legacy_enumeration.reset();
+    if (!evaluate_dlr) {
+      oca_dlr_p3_plan.reset();
+      oca_dlr_self_plan.reset();
+      oca_dlr_physical_plan.reset();
+    }
+    if (!dlr_cut_diagnostic) oca_dlr_p3_plan.reset();
+    if (!retain_oca_topology) {
+      oca_legacy_enumeration.reset();
+      oca_dlr_p3_plan.reset();
+      oca_dlr_self_plan.reset();
+      oca_dlr_physical_plan.reset();
+    }
+
+    // Invalid objects are destroyed before enumeration starts.  For a large
+    // cluster this matters: otherwise an obsolete plan/map and its
+    // replacement can coexist at the peak and nearly double memory use.
+    const auto self_plan_matches=[&]() {
+      return oca_dlr_self_plan &&
+        oca_dlr_self_plan->matches(
+          cix.Npseudo_unique,cix.Nbath_unique_unique,
+          G_importance,OCA_cut_sum);
+    };
+    const auto physical_plan_matches=[&]() {
+      return oca_dlr_physical_plan &&
+        oca_dlr_physical_plan->matches(
+          cix.Npseudo_unique,cix.Nbath_unique_unique,
+          G_importance,OCA_cut_sum);
+    };
+    const auto p3_plan_matches=[&]() {
+      return oca_dlr_p3_plan &&
+        oca_dlr_p3_plan->matches(
+          cix.Npseudo_unique,cix.Nbath_unique_unique,
+          G_importance,OCA_cut_sum);
+    };
+    if (evaluate_dlr && !self_plan_matches()) oca_dlr_self_plan.reset();
+    if (evaluate_dlr && !physical_plan_matches()) oca_dlr_physical_plan.reset();
+    if (dlr_cut_diagnostic && !p3_plan_matches()) oca_dlr_p3_plan.reset();
+    if (run_legacy && oca_legacy_enumeration &&
+        !oca_legacy_enumeration->matches(
+          cmpPhysG,cix,G_importance,OCA_cut_sum))
+      oca_legacy_enumeration.reset();
+
+    const bool self_ready=evaluate_dlr && self_plan_matches();
+    const bool physical_ready=!cmpPhysG ||
+      (physical_plan_matches() && self_ready &&
+       edmft::oca_dlr::CombinedEvaluator::compatible(
+         *oca_dlr_self_plan,*oca_dlr_physical_plan));
+    const bool p3_ready=!dlr_cut_diagnostic || p3_plan_matches();
+    const bool need_dlr_paths=evaluate_dlr &&
+      (!self_ready || !physical_ready || !p3_ready);
+    const bool legacy_ready=run_legacy && oca_legacy_enumeration;
+    const bool need_enumeration=need_dlr_paths ||
+      (run_legacy && !legacy_ready);
+    if (!need_enumeration && mpi.rank==mpi.master)
+      (*mpi.out) << "OCA topology cache hit: retained="
+                 << (run_legacy ? "legacy-enumeration" : "dlr-plans")
+                 << std::endl;
+    if (dlr_diagnostic && mpi.rank==mpi.master && diagram_dlr_workspace &&
+        diagram_dlr_workspace->ready()) {
+      const auto& nodes=diagram_dlr_workspace->basis().time_nodes();
+      const auto& delta_plus=diagram_dlr_workspace->delta_plus();
+      const auto& delta_minus=diagram_dlr_workspace->delta_minus();
+      for (int s=0; s<cix.Nbath_unique_unique; ++s) {
+        double error2=0.0,scale2=0.0,max_error=0.0;
+        for (int k=0; k<nodes.size(); ++k) {
+          int pos=0;
+          const intpar ip=InterpLeft(nodes(k),pos,tau);
+          pos=0;
+          const intpar im=InterpLeft(beta-nodes(k),pos,tau);
+          const double reference_plus=Deltas(ip,s);
+          const double reference_minus=Deltas(im,s);
+          // FourierOfDelta stores the opposite sign from the standard
+          // fermionic Lehmann kernel used by AAA/DLR.  OCA contains two
+          // hybridization lines, so this convention cancels in the diagram.
+          const double dp=delta_plus(k,s)+reference_plus;
+          const double dm=delta_minus(k,s)+reference_minus;
+          error2+=dp*dp+dm*dm;
+          scale2+=reference_plus*reference_plus+reference_minus*reference_minus;
+          max_error=std::max({max_error,std::abs(dp),std::abs(dm)});
+        }
+        (*mpi.out) << "AAA hybridization time diagnostic: channel=" << s
+                   << " relative_rms="
+                   << std::sqrt(error2/std::max(scale2,std::numeric_limits<double>::min()))
+                   << " max_abs=" << max_error << std::endl;
+      }
+    }
+    // Enumeration is independent of the numerical integration method.  A
+    // fixed-order legacy calculation retains the full tables.  DLR retains
+    // only its compiled plans: the raw hash maps and path records are merely
+    // construction material and are never cached for DLR-only production.
+    std::unique_ptr<OCAEnumeration> temporary_enumeration;
+    OCAEnumeration* legacy_enumeration=nullptr;
+    std::vector<OCAPathRecord> paths;
+    if (need_enumeration) {
+      auto fresh=std::make_unique<OCAEnumeration>();
+      const bool use_disk_cache=need_dlr_paths && !run_legacy &&
+        retain_oca_topology && pars["oca_dlr_disk_cache"].get<bool>();
+      const std::string cache_base=
+        pars["oca_dlr_cache_file"].get<std::string>();
+      // Self-energy-only and measurement iterations contain different path
+      // weights/pair requirements; keep both files instead of making them
+      // overwrite and invalidate one another on alternating iterations.
+      const std::string cache_file=cache_base.empty() ? std::string{} :
+        cache_base+(cmpPhysG ? ".physical" : ".self");
+      std::uint64_t cix_hash=0;
+      // Avoid a metadata/read storm on a shared filesystem: only the master
+      // hashes the CIX contents, then distributes the cache signature.
+      if (use_disk_cache && mpi.rank==mpi.master)
+        cix_hash=OCAFileHash(pars["cix"].get<std::string>());
+#ifdef _MPI
+      if (use_disk_cache)
+        MPI_Bcast(&cix_hash,1,MPI_UINT64_T,mpi.master,MPI_COMM_WORLD);
+#endif
+      bool loaded_cache=false;
+      if (use_disk_cache)
+        loaded_cache=LoadOCAPathCache(
+          cache_file,cix_hash,cmpPhysG,cix,G_importance,OCA_cut_sum,
+          topology_setting,replication_budget,mpi,*fresh);
+      if (!loaded_cache) {
+        *fresh=EnumerateOCAPaths(
+          cmpPhysG,cix,G_importance,OCA_cut_sum,run_legacy,need_dlr_paths,
+          topology_setting,replication_budget,mpi);
+        if (use_disk_cache) WriteOCAPathCache(cache_file,cix_hash,*fresh,mpi);
+      }
+      oca_dlr_plans_distributed=fresh->paths_distributed;
+      oca_dlr_topology_shard_count=fresh->topology_shard_count;
+      if (need_dlr_paths) paths=std::move(fresh->paths);
+      if (run_legacy && retain_oca_topology) {
+        oca_legacy_enumeration=std::move(fresh);
+        legacy_enumeration=oca_legacy_enumeration.get();
+      } else if (run_legacy) {
+        temporary_enumeration=std::move(fresh);
+        legacy_enumeration=temporary_enumeration.get();
+      }
+      // In DLR-only mode `fresh` dies here after its compact path records have
+      // been moved out, releasing the much larger legacy maps before plan
+      // construction begins.
+    } else if (run_legacy) {
+      legacy_enumeration=oca_legacy_enumeration.get();
+    }
+
+    std::array<Array<double,2>,4> cut_references;
+    double legacy_phi=0.0;
+    if (run_legacy) {
+      if (!legacy_enumeration)
+        throw std::logic_error("OCA legacy evaluation has no enumeration");
+      legacy_phi=I_OCA(*legacy_enumeration,dSm,G00t,F00t,F01t,
+                       cmpPhysG,Q,beta,tau,Gms,Deltas,cix,pars,mpi,
+                       dlr_cut_diagnostic ? &cut_references : nullptr);
+    } else {
+      // DLR will overwrite the requested outputs below.  Zero-initialize all
+      // arrays now so an iteration without physical measurements also has a
+      // well-defined state, without entering any legacy spline code.
+      dSm.resize(cix.Npseudo_unique,tau.extent(0));
+      dSm=0.0;
+      G00t.resize(cix.Nbath_unique,tau.extent(0));
+      F00t.resize(cix.Nbath_unique,tau.extent(0));
+      F01t.resize(cix.Nbath_unique,tau.extent(0));
+      G00t=0.0;
+      F00t=0.0;
+      F01t=0.0;
+      if (mpi.rank==mpi.master)
+        (*mpi.out) << "OCA DLR: topology ready; "
+                   << "legacy integrator not called" << std::endl;
+    }
+
+    // A non-retained legacy enumeration is no longer needed after I_OCA.
+    // Release it before allocating DLR pair catalogs and contraction matrices.
+    temporary_enumeration.reset();
+    double selected_phi=legacy_phi;
+    if (evaluate_dlr){
+      if (!diagram_dlr_workspace || !diagram_dlr_workspace->ready() ||
+          !diagram_dlr_workspace->has_pseudos()) {
+        throw std::logic_error(
+          "OCA DLR evaluation requested without prepared AAA hybridization "
+          "and DLR pseudo-particle data");
+      } else {
+        // Legacy self-energy cuts divide by the degeneracy of their output
+        // pseudo state.  Physical cuts instead receive Q/bath normalization
+        // below, matching the two separate legacy code paths.
+        std::vector<double> degeneracy(cix.Npseudo_unique);
+        for (int p=0; p<cix.Npseudo_unique; ++p) degeneracy[p]=cix.deg_pp(p);
+        if (dlr_cut_diagnostic){
+          if (!oca_dlr_p3_plan ||
+              !oca_dlr_p3_plan->matches(cix.Npseudo_unique,cix.Nbath_unique_unique,
+                                        G_importance,OCA_cut_sum)) {
+            oca_dlr_p3_plan=std::make_unique<edmft::oca_dlr::P3Plan>();
+            oca_dlr_p3_plan->build(paths,cix.Npseudo_unique,cix.Nbath_unique_unique,
+                                   G_importance,OCA_cut_sum);
+          }
+          const Eigen::MatrixXd compact=oca_dlr_p3_plan->evaluate(
+            *diagram_dlr_workspace,degeneracy,tau);
+          double error2=0.0,scale2=0.0,max_error=0.0;
+          for (int p=0; p<cix.Npseudo_unique; ++p)
+            for (int it=0; it<tau.extent(0); ++it) {
+              const double d=compact(p,it)-cut_references[3](p,it);
+              error2+=d*d;
+              scale2+=cut_references[3](p,it)*cut_references[3](p,it);
+              max_error=std::max(max_error,std::abs(d));
+            }
+          if (mpi.rank==mpi.master)
+            (*mpi.out) << "OCA DLR p3 diagnostic: paths=" << oca_dlr_p3_plan->nonzero_path_count()
+                       << " inner_pairs=" << oca_dlr_p3_plan->inner_pair_count()
+                       << " outer_pairs=" << oca_dlr_p3_plan->outer_pair_count()
+                       << " relative_rms="
+                       << std::sqrt(error2/std::max(scale2,std::numeric_limits<double>::min()))
+                       << " max_abs=" << max_error << std::endl;
+        }
+
+        // Building a plan performs only hash deduplication and sparse-matrix
+        // assembly.  When physical quantities are requested, build both plans
+        // before numerical evaluation so one pole-major loop can feed every
+        // self-energy and physical cut from the same pair convolutions.
+        const auto plan_start=std::chrono::steady_clock::now();
+        if (!oca_dlr_self_plan ||
+            !oca_dlr_self_plan->matches(cix.Npseudo_unique,cix.Nbath_unique_unique,
+                                        G_importance,OCA_cut_sum)) {
+          oca_dlr_self_plan=std::make_unique<edmft::oca_dlr::SelfEnergyPlan>();
+          oca_dlr_self_plan->build(paths,cix.Npseudo_unique,cix.Nbath_unique_unique,
+                                   G_importance,OCA_cut_sum);
+        }
+        if (cmpPhysG) {
+          if (!oca_dlr_physical_plan ||
+              !oca_dlr_physical_plan->matches(
+                cix.Npseudo_unique,cix.Nbath_unique_unique,
+                G_importance,OCA_cut_sum)) {
+            oca_dlr_physical_plan=
+              std::make_unique<edmft::oca_dlr::PhysicalPlan>();
+            oca_dlr_physical_plan->build(
+              paths,cix.Npseudo_unique,cix.Nbath_unique_unique,
+              G_importance,OCA_cut_sum);
+          }
+
+          // cmpPhysG can be false on inexpensive intermediate iterations and
+          // true only on measurement iterations.  A cached self plan built in
+          // the former case does not contain physical-only Bulla pairs.  On
+          // the first measurement iteration rebuild it from the current path
+          // list so both sparse plans use exactly the same pair numbering.
+          if (!edmft::oca_dlr::CombinedEvaluator::compatible(
+                *oca_dlr_self_plan,*oca_dlr_physical_plan)) {
+            oca_dlr_self_plan->build(
+              paths,cix.Npseudo_unique,cix.Nbath_unique_unique,
+              G_importance,OCA_cut_sum);
+          }
+        }
+        const auto plan_end=std::chrono::steady_clock::now();
+        // Every required plan now owns its compact topology.  Path records are
+        // construction-only data; release their capacity before the numerical
+        // evaluator allocates its potentially large intermediate matrices.
+        std::vector<OCAPathRecord>().swap(paths);
+        std::array<Eigen::MatrixXd,4> compact_cuts;
+        Eigen::MatrixXd compact_all;
+        edmft::oca_dlr::PhysicalResult compact_physical;
+        const auto eval_start=std::chrono::steady_clock::now();
+        // Both measurement and inexpensive self-energy-only iterations use
+        // the same pole-range/additive-accumulator path.  Passing a null
+        // physical plan simply omits G/F00/F01 storage and contractions.  A
+        // MPI execution below assigns pole ranges to teams, subdivides a pole
+        // when a team contains several ranks, and reduces compact nodes before
+        // final interpolation.  The serial and parallel paths therefore share
+        // one numerical implementation.
+        const edmft::oca_dlr::PhysicalPlan* physical_for_iteration=
+          cmpPhysG ? oca_dlr_physical_plan.get() : nullptr;
+        edmft::oca_dlr::CombinedResult combined;
+        edmft::oca_dlr::ParallelLayout parallel_layout;
+#ifdef _MPI
+        const bool parallel_dlr=
+          pars["oca_dlr_mpi"].get<bool>() && mpi.size>1;
+        if (parallel_dlr) {
+          if (oca_dlr_plans_distributed)
+            combined=edmft::oca_dlr::CombinedEvaluator::evaluate_sharded_mpi(
+              *oca_dlr_self_plan,physical_for_iteration,
+              *diagram_dlr_workspace,degeneracy,tau,MPI_COMM_WORLD,
+              oca_dlr_topology_shard_count,
+              pars["oca_dlr_mpi_teams"].get<int>(),
+              &parallel_layout,
+              dlr_cut_diagnostic ? &compact_cuts : nullptr);
+          else
+            combined=edmft::oca_dlr::CombinedEvaluator::evaluate_mpi(
+              *oca_dlr_self_plan,physical_for_iteration,
+              *diagram_dlr_workspace,degeneracy,tau,
+              MPI_COMM_WORLD,pars["oca_dlr_mpi_teams"].get<int>(),
+              &parallel_layout,
+              dlr_cut_diagnostic ? &compact_cuts : nullptr);
+        } else
+#endif
+        {
+          combined=edmft::oca_dlr::CombinedEvaluator::evaluate(
+            *oca_dlr_self_plan,physical_for_iteration,
+            *diagram_dlr_workspace,degeneracy,tau,
+            dlr_cut_diagnostic ? &compact_cuts : nullptr);
+          parallel_layout.world_size=mpi.size;
+          parallel_layout.owned_poles=diagram_dlr_workspace->pole_count();
+        }
+        compact_all=std::move(combined.sigma);
+        if (cmpPhysG)
+          compact_physical=std::move(combined.physical);
+        const auto eval_end=std::chrono::steady_clock::now();
+
+        // Phi is recovered from its skeleton homogeneity identity.  Every OCA
+        // Phi diagram has four pseudo lines, so cutting all of them gives
+        //
+        //   Phi_OCA = (1/4Q) sum_p deg_p int_0^beta
+        //                        Sigma_p(tau) G_p(beta-tau) d tau.
+        //
+        // compact_all already contains the sum of all four cuts and includes
+        // the 1/deg_p convention of the solver self-energy.  Multiplying the
+        // degeneracy back here reproduces the legacy Phi normalization.  This
+        // final one-dimensional integral uses the accurate existing dense
+        // pseudo mesh; the costly nested OCA integration remains eliminated.
+        double compact_phi=0.0;
+        if (tau_dh.extent(0)!=tau.extent(0))
+          throw std::logic_error("OCA DLR Phi quadrature mesh mismatch");
+        for (int p=0; p<cix.Npseudo_unique; ++p)
+          for (int it=0; it<tau.extent(0); ++it)
+            compact_phi += 0.25*degeneracy[p]*tau_dh(it)*
+              compact_all(p,it)*Gm(p,tau.extent(0)-1-it);
+        compact_phi/=Q;
+        if (use_dlr) selected_phi=compact_phi;
+
+        if (dlr_cut_diagnostic && mpi.rank==mpi.master){
+          for (int cut=0; cut<4; ++cut){
+            double cut_error2=0.0,cut_scale2=0.0,cut_max=0.0;
+            for (int p=0; p<cix.Npseudo_unique; ++p)
+              for (int it=0; it<tau.extent(0); ++it){
+                const double d=compact_cuts[cut](p,it)-cut_references[cut](p,it);
+                cut_error2+=d*d;
+                cut_scale2+=cut_references[cut](p,it)*cut_references[cut](p,it);
+                cut_max=std::max(cut_max,std::abs(d));
+              }
+            (*mpi.out) << "OCA DLR cut p" << cut << ": relative_rms="
+                       << std::sqrt(cut_error2/std::max(cut_scale2,std::numeric_limits<double>::min()))
+                       << " max_abs=" << cut_max << std::endl;
+          }
+        }
+        unsigned long long plan_counts[3]={
+          static_cast<unsigned long long>(oca_dlr_self_plan->nonzero_path_count()),
+          static_cast<unsigned long long>(oca_dlr_self_plan->forward_pair_count()),
+          static_cast<unsigned long long>(oca_dlr_self_plan->backward_pair_count())};
+        double plan_seconds=
+          std::chrono::duration<double>(plan_end-plan_start).count();
+        double evaluate_seconds=
+          std::chrono::duration<double>(eval_end-eval_start).count();
+#ifdef _MPI
+        if (mpi.size>1) {
+          double local_seconds[2]={plan_seconds,evaluate_seconds};
+          double maximum_seconds[2]={};
+          MPI_Allreduce(local_seconds,maximum_seconds,2,MPI_DOUBLE,MPI_MAX,
+                        MPI_COMM_WORLD);
+          plan_seconds=maximum_seconds[0];
+          evaluate_seconds=maximum_seconds[1];
+          if (oca_dlr_plans_distributed) {
+            // A hybrid shard is replicated among its pole workers.  Count each
+            // compiled plan only on the cyclic-group leader (world ranks
+            // 0..topology_shard_count-1), otherwise diagnostics would multiply
+            // global paths and pair catalogs by the workers per shard.
+            if (mpi.rank>=oca_dlr_topology_shard_count)
+              std::fill(std::begin(plan_counts),std::end(plan_counts),0ULL);
+            unsigned long long global_counts[3]={};
+            MPI_Allreduce(plan_counts,global_counts,3,MPI_UNSIGNED_LONG_LONG,
+                          MPI_SUM,MPI_COMM_WORLD);
+            std::copy(std::begin(global_counts),std::end(global_counts),
+                      std::begin(plan_counts));
+          }
+        }
+#endif
+        if (mpi.rank==mpi.master) {
+          (*mpi.out) << "OCA DLR self-energy: selected="
+                     << (use_dlr ? "dlr" : "legacy")
+                     << " evaluator="
+                     << (cmpPhysG ? "combined-pole-loop" : "self-only")
+                     << " topology="
+                     << (oca_dlr_plans_distributed
+                           ? "hybrid-distributed" : "replicated")
+                     << " paths=" << plan_counts[0]
+                     << " pair_instances=[" << plan_counts[1]
+                     << "," << plan_counts[2] << "]"
+                     << " plan_seconds=" << plan_seconds
+                     << " evaluate_seconds=" << evaluate_seconds
+                     << " topology_shards="
+                     << parallel_layout.topology_shard_count
+                     << " workers_per_shard_range=["
+                     << parallel_layout.min_topology_group_size << ","
+                     << parallel_layout.max_topology_group_size << "]"
+                     << " pole_teams_per_shard=" << parallel_layout.team_count
+                     << " pole_team_size_range=[" << parallel_layout.min_team_size
+                     << "," << parallel_layout.max_team_size << "]"
+                     << " Phi=" << compact_phi << std::endl;
+        }
+        if (dlr_diagnostic) {
+          double error2=0.0,scale2=0.0,max_error=0.0;
+          for (int p=0; p<cix.Npseudo_unique; ++p)
+            for (int it=0; it<tau.extent(0); ++it) {
+              const double d=compact_all(p,it)-dSm(p,it);
+              error2+=d*d;
+              scale2+=dSm(p,it)*dSm(p,it);
+              max_error=std::max(max_error,std::abs(d));
+            }
+          if (mpi.rank==mpi.master)
+            (*mpi.out) << "OCA DLR all-cuts diagnostic: relative_rms="
+                       << std::sqrt(error2/std::max(
+                            scale2,std::numeric_limits<double>::min()))
+                       << " max_abs=" << max_error
+                       << " legacy_Phi=" << legacy_phi
+                       << " dlr_Phi=" << compact_phi << std::endl;
+        }
+
+        if (use_dlr) {
+          // Convert Eigen's [pseudo,time] result to the Blitz array consumed
+          // by Update_Sm.  This is the actual production switch: from this
+          // point onward the self-consistency loop sees the compact result.
+          dSm.resize(cix.Npseudo_unique,tau.extent(0));
+          for (int p=0; p<cix.Npseudo_unique; ++p)
+            for (int it=0; it<tau.extent(0); ++it)
+              dSm(p,it)=compact_all(p,it);
+        }
+
+        // The physical Green function and Bulla numerators are only evaluated
+        // on iterations on which the legacy solver computed their reference
+        // values.  The path list then also contains records whose ordinary
+        // OCA matrix element is zero but whose N_jm (Bulla) matrix element is
+        // nonzero; PhysicalPlan must retain those records for F00/F01.
+        if (cmpPhysG) {
+          // CombinedEvaluator produced these values during the same pole loop
+          // as compact_all; no tilted propagators or pair convolutions are
+          // recomputed here.
+          const edmft::oca_dlr::PhysicalResult& physical=compact_physical;
+
+          // Reproduce exactly the normalization and channel reconstruction at
+          // the end of legacy I_OCA.  The compact plan intentionally returns
+          // the unnormalized independent channels so it remains independent
+          // of CIX storage conventions.
+          Array<double,1> bath_degeneracy(cix.Nbath_unique_unique);
+          bath_degeneracy=0.0;
+          for (int iorb=0; iorb<cix.Nbath; ++iorb)
+            bath_degeneracy(std::abs(cix.bath_sigind0(iorb)))+=1.0;
+          Array<int,1> sigind(cix.Nbath_unique);
+          Array<bool,1> superconducting(cix.Nbath_unique);
+          superconducting=false;
+          for (int iorb=0; iorb<cix.Nbath; ++iorb) {
+            const int ib=cix.bath_sigind(iorb);
+            sigind(ib)=cix.bath_sigind0(iorb);
+            superconducting(ib)=cix.SC_bath(iorb);
+          }
+
+          std::array<double,3> observable_error2{0.0,0.0,0.0};
+          std::array<double,3> observable_scale2{0.0,0.0,0.0};
+          std::array<double,3> observable_max{0.0,0.0,0.0};
+          for (int ib=0; ib<cix.Nbath_unique; ++ib) {
+            const int s=std::abs(sigind(ib));
+            const double bath_sign=sigind(ib)<0 ? -1.0 : 1.0;
+            const double normalizer=1.0/(bath_degeneracy(s)*Q);
+            const double bulla_factor=superconducting(ib) ? 2.0 : 1.0;
+            for (int it=0; it<tau.extent(0); ++it) {
+              const std::array<double,3> compact_value{
+                physical.g(s,it)*normalizer*bath_sign,
+                physical.f00(s,it)*normalizer*bulla_factor*bath_sign,
+                physical.f01(s,it)*normalizer*bulla_factor*bath_sign};
+              // Read all references before production DLR mode overwrites the
+              // Blitz arrays.  In enumeration-only mode diagnostics are off,
+              // so the zero placeholders returned by I_OCA are never treated
+              // as references.
+              const std::array<double,3> reference_value{
+                G00t(ib,it),F00t(ib,it),F01t(ib,it)};
+              if (dlr_diagnostic) {
+                for (int observable=0; observable<3; ++observable) {
+                  const double d=compact_value[observable]-reference_value[observable];
+                  observable_error2[observable]+=d*d;
+                  observable_scale2[observable]+=
+                    reference_value[observable]*reference_value[observable];
+                  observable_max[observable]=std::max(
+                    observable_max[observable],std::abs(d));
+                }
+              }
+              if (use_dlr) {
+                G00t(ib,it)=compact_value[0];
+                F00t(ib,it)=compact_value[1];
+                F01t(ib,it)=compact_value[2];
+              }
+            }
+          }
+          if (mpi.rank==mpi.master) {
+            constexpr const char* names[3]={"G","F00","F01"};
+            (*mpi.out) << "OCA DLR physical: selected="
+                       << (use_dlr ? "dlr" : "legacy")
+                       << " records="
+                       << oca_dlr_physical_plan->nonzero_record_count()
+                       << " forward_pairs="
+                       << oca_dlr_physical_plan->forward_pair_count()
+                       << " backward_pairs="
+                       << oca_dlr_physical_plan->backward_pair_count()
+                       << " evaluation=shared-pole-loop"
+                       << std::endl;
+            if (dlr_diagnostic)
+              for (int observable=0; observable<3; ++observable)
+                (*mpi.out) << "OCA DLR physical " << names[observable]
+                           << ": relative_rms="
+                           << std::sqrt(observable_error2[observable]/
+                                std::max(observable_scale2[observable],
+                                         std::numeric_limits<double>::min()))
+                           << " max_abs=" << observable_max[observable]
+                           << std::endl;
+          }
+        }
+      }
+    }
+    if (!retain_oca_topology) {
+      // Higher-order MC follows this call.  Do not let OCA topology compete
+      // with its diagram and measurement storage.  Fixed-order calculations
+      // retain these plans (or the legacy enumeration) for the next iteration.
+      oca_dlr_p3_plan.reset();
+      oca_dlr_self_plan.reset();
+      oca_dlr_physical_plan.reset();
+      oca_legacy_enumeration.reset();
+    }
+    return selected_phi;
+  }
+
+  // Complete analytic third order (TCA): both Phi topologies, all six
+  // pseudo-particle cuts, and—on measurement iterations—all three physical
+  // hybridization cuts.  No scalar diagram catalog is materialized; every
+  // fixed bath/orientation sector is contracted in atomic block matrices.
+  double TCA(Array<double,2>& dSm,
+             Array<double,2>& G00t,
+             Array<double,2>& F00t,
+             Array<double,2>& F01t,
+             bool cmpPhysG,
+             double Q,
+             const Array<double,1>& output_tau,
+             const Array<double,2>& Gm,
+             Cix& cix,
+             json& pars,
+             MPIcls& mpi)
+  {
+    if (pars["TCA_solver"].get<std::string>()!="dlr")
+      throw std::logic_error("analytic TCA called while TCA_solver is not dlr");
+    if (!diagram_dlr_workspace || !diagram_dlr_workspace->ready() ||
+        !diagram_dlr_workspace->has_pseudos())
+      throw std::logic_error(
+        "analytic TCA requires prepared AAA hybridization and DLR pseudos");
+    if (!(Q>0.0)) throw std::invalid_argument("TCA requires positive Q");
+
+    std::vector<double> degeneracy(cix.Npseudo_unique);
+    for (int p=0;p<cix.Npseudo_unique;++p) degeneracy[p]=cix.deg_pp(p);
+    const double progress_seconds=
+      pars["tca_progress_seconds"].get<double>();
+    if (progress_seconds<0.0)
+      throw std::invalid_argument("tca_progress_seconds must be nonnegative");
+    const auto begin=std::chrono::steady_clock::now();
+    edmft::tca_dlr::SelfEnergyNodeResult compact;
+    const int root_sum_min_baths=
+      pars["tca_root_sum_min_baths"].get<int>();
+    if (root_sum_min_baths<1)
+      throw std::invalid_argument("tca_root_sum_min_baths must be positive");
+    const bool root_sum=pars["tca_root_sum"].get<bool>() &&
+                        cix.Nbath>=root_sum_min_baths;
+    const bool store_self_diagnostics=
+      pars["tca_store_self_diagnostics"].get<bool>();
+    const bool topology_b_self_c3=pars["tca_self_c3"].get<bool>();
+    const std::string tca_mpi_scheduler=
+      pars["tca_dlr_mpi_scheduler"].get<std::string>();
+    if (tca_mpi_scheduler!="dynamic" && tca_mpi_scheduler!="static")
+      throw std::invalid_argument(
+        "tca_dlr_mpi_scheduler must be 'dynamic' or 'static'");
+    const bool dynamic_tca_mpi=tca_mpi_scheduler=="dynamic";
+    const int tca_mpi_micro_batch=
+      pars["tca_dlr_mpi_micro_batch"].get<int>();
+    if (tca_mpi_micro_batch<0)
+      throw std::invalid_argument(
+        "tca_dlr_mpi_micro_batch must be nonnegative");
+    if (mpi.rank==mpi.master && pars["tca_root_sum"].get<bool>() &&
+        !root_sum && mpi.out)
+      (*mpi.out) << "TCA DLR bath summation: using fixed-bath plans because "
+                 << "Nbath=" << cix.Nbath << " < tca_root_sum_min_baths="
+                 << root_sum_min_baths << std::endl;
+    // Keep the exact evaluator in one callable so the same code is used for
+    // the accurate baseline/audit and for the cheaper active workspace.  The
+    // physical Green/Bulla functions are requested only from the accurate
+    // workspace; they are evaluated once, on the final measurement step.
+    const auto evaluate_workspace=[&](
+        const edmft::imag_dlr::Workspace& workspace,
+        bool evaluate_physical) {
+      edmft::tca_dlr::SelfEnergyNodeResult result;
+      if (root_sum) {
+#ifdef _MPI
+        if (pars["tca_dlr_mpi"].get<bool>() && mpi.size>1)
+          result=edmft::tca_dlr::FullSummedRootSelfEnergyEvaluator::evaluate_mpi(
+            cix,workspace,degeneracy,MPI_COMM_WORLD,
+            store_self_diagnostics,
+            mpi.out,progress_seconds,topology_b_self_c3,
+            dynamic_tca_mpi,tca_mpi_micro_batch);
+        else
+#endif
+          result=edmft::tca_dlr::FullSummedRootSelfEnergyEvaluator::evaluate_serial(
+            cix,workspace,degeneracy,store_self_diagnostics,
+            mpi.out,progress_seconds,topology_b_self_c3);
+
+        // The physical-line grouping is a separate contraction: the cut line
+        // becomes the measured external channel rather than an unexpanded
+        // Delta.  The caller decides whether the final measurement uses the
+        // full workspace (an exact audit) or the same pole-capped workspace
+        // used during self-consistency.
+        if (evaluate_physical) {
+          edmft::tca_dlr::SelfEnergyNodeResult physical;
+#ifdef _MPI
+          if (pars["tca_dlr_mpi"].get<bool>() && mpi.size>1)
+            physical=edmft::tca_dlr::FullSummedPhysicalEvaluator::evaluate_mpi(
+              cix,workspace,MPI_COMM_WORLD,
+              mpi.out,progress_seconds,dynamic_tca_mpi,
+              tca_mpi_micro_batch);
+          else
+#endif
+            physical=edmft::tca_dlr::FullSummedPhysicalEvaluator::evaluate_serial(
+              cix,workspace,mpi.out,progress_seconds);
+          result.g=std::move(physical.g);
+          result.f00=std::move(physical.f00);
+          result.f01=std::move(physical.f01);
+          result.physical_enabled=true;
+        }
+      } else {
+        if (topology_b_self_c3 && mpi.rank==mpi.master && mpi.out)
+          (*mpi.out) << "TCA DLR topology-B self C3 candidate is available "
+                     << "only with tca_root_sum=true at this stage; using the "
+                     << "six-cut fixed-bath reference" << std::endl;
+#ifdef _MPI
+        if (pars["tca_dlr_mpi"].get<bool>() && mpi.size>1)
+          result=edmft::tca_dlr::FullSelfEnergyEvaluator::evaluate_mpi(
+            cix,workspace,degeneracy,MPI_COMM_WORLD,
+            store_self_diagnostics,evaluate_physical,
+            mpi.out,progress_seconds);
+        else
+#endif
+          result=edmft::tca_dlr::FullSelfEnergyEvaluator::evaluate_serial(
+            cix,workspace,degeneracy,
+            store_self_diagnostics,evaluate_physical,
+            mpi.out,progress_seconds);
+      }
+      return result;
+    };
+
+    const double keep_weight=pars["tca_pseudo_keep_weight"].get<double>();
+    if (!(keep_weight>0.0 && keep_weight<=1.0))
+      throw std::invalid_argument(
+        "tca_pseudo_keep_weight must lie in (0,1]");
+    const bool approximate_workspace_available=
+      tca_active_dlr_workspace && tca_active_dlr_workspace->ready();
+    // Topology/cut diagnostics are intended as exact algebra tests.  Running
+    // them through a frozen correction would require storing twelve extra
+    // tail matrices and obscures their purpose, so diagnostic runs stay exact.
+    const bool use_active=approximate_workspace_available &&
+                          !store_self_diagnostics;
+    edmft::tca_dlr::SelfEnergyNodeResult active_compact;
+    bool have_active_compact=false;
+    bool using_frozen_tail=false;
+    bool exact_audit=false;
+    bool had_frozen_tail=false;
+
+    if (use_active) {
+      // Select the active pseudo set once from the OCA-converged propagators.
+      // deg_p is included because it is restored in the Phi trace.  Keeping
+      // the mask fixed across TCA iterations is essential: otherwise changes
+      // caused by a moving cutoff would contaminate the self-consistency map.
+      if (tca_active_pseudo_mask.empty() ||
+          keep_weight!=tca_cached_keep_weight) {
+        std::vector<std::pair<double,int>> importance;
+        importance.reserve(cix.Npseudo_unique);
+        double total=0.0;
+        for (int p=0;p<cix.Npseudo_unique;++p) {
+          double weight=0.0;
+          for (int it=0;it<output_tau.extent(0);++it)
+            weight+=tau_dh(it)*std::abs(Gm(p,it));
+          weight*=degeneracy[p];
+          total+=weight;
+          importance.emplace_back(weight,p);
+        }
+        std::sort(importance.begin(),importance.end(),
+          [](const auto& left,const auto& right) {
+            return left.first>right.first;
+          });
+        tca_active_pseudo_mask.assign(cix.Npseudo_unique,0);
+        double retained=0.0;
+        int active_count=0;
+        for (const auto& [weight,pseudo]:importance) {
+          if (active_count>0 && retained>=keep_weight*total) break;
+          tca_active_pseudo_mask[pseudo]=1;
+          retained+=weight;
+          ++active_count;
+        }
+        tca_cached_keep_weight=keep_weight;
+        tca_frozen_tail_ready=false;
+        int active_blocks=0;
+        for (int block=0;block<cix.Nblock;++block) {
+          bool block_active=false;
+          const int n=cix.Block[block].size();
+          for (int i=0;i<n && !block_active;++i)
+            for (int j=0;j<n && !block_active;++j) {
+              const int label=cix.Sgm_symmetry[block](i,j);
+              block_active=label!=0 &&
+                tca_active_pseudo_mask[std::abs(label)-1];
+            }
+          active_blocks+=block_active ? 1 : 0;
+        }
+        if (mpi.rank==mpi.master && mpi.out)
+          (*mpi.out) << "TCA active pseudo space: active=" << active_count
+                     << "/" << cix.Npseudo_unique
+                     << " active_blocks=" << active_blocks
+                     << "/" << cix.Nblock
+                     << " requested_weight=" << keep_weight
+                     << " retained_weight="
+                     << (total>0.0 ? retained/total : 1.0) << std::endl;
+      }
+
+      Eigen::MatrixXd active_coefficients=dlr_G_coefficients;
+      for (int p=0;p<cix.Npseudo_unique;++p)
+        if (!tca_active_pseudo_mask[p])
+          active_coefficients.col(p).setZero();
+      tca_active_dlr_workspace->update_pseudos(active_coefficients);
+      if (mpi.rank==mpi.master && mpi.out)
+        (*mpi.out) << "TCA active self evaluation: poles="
+                   << tca_active_dlr_workspace->pole_count() << "/"
+                   << diagram_dlr_workspace->pole_count() << std::endl;
+      const bool freeze_tail=pars["tca_freeze_weak_tail"].get<bool>();
+      const bool final_exact_audit=
+        pars["tca_final_exact_audit"].get<bool>();
+      exact_audit=(cmpPhysG && final_exact_audit) ||
+                  (freeze_tail && !tca_frozen_tail_ready);
+      // When the final exact audit is disabled, evaluate the physical
+      // contractions in the active TCA workspace as well.  OCA is unaffected:
+      // it always keeps the full hybridization pole expansion.
+      active_compact=evaluate_workspace(
+        *tca_active_dlr_workspace,cmpPhysG && !exact_audit);
+      have_active_compact=true;
+      // The cut propagator is absent from the internal chain.  Explicitly
+      // zeroing its inactive output column completes the restriction that all
+      // six pseudo-particle lines of the parent Phi diagram are active.
+      for (int p=0;p<cix.Npseudo_unique;++p)
+        if (!tca_active_pseudo_mask[p]) {
+          active_compact.sigma.col(p).setZero();
+          for (auto& value:active_compact.sigma_by_topology)
+            value.col(p).setZero();
+        }
+
+      had_frozen_tail=tca_frozen_tail_ready;
+      if (exact_audit) {
+        if (mpi.rank==mpi.master && mpi.out)
+          (*mpi.out) << "TCA exact "
+                     << (tca_frozen_tail_ready ? "final audit" :
+                                                   "tail calibration")
+                     << ": evaluating full self-energy"
+                     << (cmpPhysG ? " and physical functions" : "")
+                     << std::endl;
+        compact=evaluate_workspace(*diagram_dlr_workspace,cmpPhysG);
+        const Eigen::MatrixXd new_tail=compact.sigma-active_compact.sigma;
+        if (tca_frozen_tail_ready && mpi.rank==mpi.master && mpi.out) {
+          const double full_scale=std::max(
+            compact.sigma.norm(),std::numeric_limits<double>::min());
+          const double tail_scale=std::max(
+            tca_frozen_sigma_tail.norm(),
+            std::numeric_limits<double>::min());
+          const double relative_full=
+            (new_tail-tca_frozen_sigma_tail).norm()/full_scale;
+          const double relative_tail=
+            (new_tail-tca_frozen_sigma_tail).norm()/tail_scale;
+          (*mpi.out) << "TCA frozen-tail audit: change/full="
+                     << relative_full << " change/old_tail="
+                     << relative_tail << " tolerance="
+                     << pars["tca_approx_audit_tolerance"].get<double>()
+                     << (relative_full>
+                           pars["tca_approx_audit_tolerance"].get<double>()
+                           ? " WARNING" : " accepted") << std::endl;
+        }
+        tca_frozen_sigma_tail=new_tail;
+        for (int topology=0;topology<2;++topology)
+          tca_frozen_sigma_tail_by_topology[topology]=
+            compact.sigma_by_topology[topology]-
+            active_compact.sigma_by_topology[topology];
+      } else if (freeze_tail) {
+        compact=active_compact;
+        compact.sigma+=tca_frozen_sigma_tail;
+        for (int topology=0;topology<2;++topology)
+          compact.sigma_by_topology[topology]+=
+            tca_frozen_sigma_tail_by_topology[topology];
+        using_frozen_tail=true;
+      } else {
+        compact=active_compact;
+      }
+    } else {
+      compact=evaluate_workspace(*diagram_dlr_workspace,cmpPhysG);
+    }
+    const auto end=std::chrono::steady_clock::now();
+
+    const auto& basis=diagram_dlr_workspace->basis();
+    const auto to_dense=[&](const Eigen::MatrixXd& nodes) {
+      const Eigen::MatrixXd coefficients=basis.values_to_coefficients(nodes);
+      Eigen::MatrixXd dense(nodes.cols(),output_tau.extent(0));
+      for (int it=0;it<output_tau.extent(0);++it)
+        dense.col(it)=basis.evaluate(output_tau(it),coefficients).transpose();
+      return dense;
+    };
+    const Eigen::MatrixXd sigma=to_dense(compact.sigma);
+    dSm.resize(cix.Npseudo_unique,output_tau.extent(0));
+    for (int p=0;p<cix.Npseudo_unique;++p)
+      for (int it=0;it<output_tau.extent(0);++it)
+        dSm(p,it)=sigma(p,it);
+
+    // A third-order Phi ring contains six pseudo propagators.  Summing its
+    // six functional cuts and closing once with G therefore counts Phi six
+    // times.  The dense symmetric solver mesh is retained only for this final
+    // inexpensive one-dimensional normalization integral.
+    if (tau_dh.extent(0)!=output_tau.extent(0) ||
+        Gm.extent(1)!=output_tau.extent(0))
+      throw std::logic_error("TCA Phi quadrature mesh mismatch");
+    double phi=0.0;
+    std::array<double,2> phi_by_topology{{0.0,0.0}};
+    std::array<Eigen::MatrixXd,2> sigma_by_topology{{
+      to_dense(compact.sigma_by_topology[0]),
+      to_dense(compact.sigma_by_topology[1])}};
+    std::array<std::array<Eigen::MatrixXd,6>,2> sigma_cut_by_topology;
+    if (store_self_diagnostics)
+      for (int topology=0;topology<2;++topology)
+        for (int cut=0;cut<6;++cut)
+          sigma_cut_by_topology[topology][cut]=
+            to_dense(compact.cuts_by_topology[topology][cut]);
+    for (int p=0;p<cix.Npseudo_unique;++p)
+      for (int it=0;it<output_tau.extent(0);++it)
+        for (int topology=0;topology<2;++topology)
+          phi_by_topology[topology]+=(1.0/6.0)*degeneracy[p]*tau_dh(it)*
+            sigma_by_topology[topology](p,it)*
+            Gm(p,output_tau.extent(0)-1-it);
+    phi=phi_by_topology[0]+phi_by_topology[1];
+    phi/=Q;
+    for (double& value:phi_by_topology) value/=Q;
+
+    // Sigma and Phi are related by closing a cut with the *current* G.  If a
+    // weak Sigma tail is frozen, recomputing that closure would nevertheless
+    // make its Phi contribution drift with G.  Freeze the reported Phi tail
+    // explicitly as well.  This is a controlled numerical approximation, not
+    // a claim that the frozen finite-step map remains exactly Phi-derivable;
+    // the final full audit restores the exact diagrammatic result.
+    if (have_active_compact) {
+      std::array<double,2> active_phi{{0.0,0.0}};
+      for (int topology=0;topology<2;++topology) {
+        const Eigen::MatrixXd active_sigma=
+          to_dense(active_compact.sigma_by_topology[topology]);
+        for (int p=0;p<cix.Npseudo_unique;++p)
+          for (int it=0;it<output_tau.extent(0);++it)
+            active_phi[topology]+=(1.0/6.0)*degeneracy[p]*tau_dh(it)*
+              active_sigma(p,it)*
+              Gm(p,output_tau.extent(0)-1-it)/Q;
+      }
+      if (exact_audit && pars["tca_freeze_weak_tail"].get<bool>()) {
+        std::array<double,2> new_phi_tail{{
+          phi_by_topology[0]-active_phi[0],
+          phi_by_topology[1]-active_phi[1]}};
+        if (had_frozen_tail && mpi.rank==mpi.master && mpi.out) {
+          const double old_tail_norm=std::hypot(
+            tca_frozen_phi_tail_by_topology[0],
+            tca_frozen_phi_tail_by_topology[1]);
+          const double change=std::hypot(
+            new_phi_tail[0]-tca_frozen_phi_tail_by_topology[0],
+            new_phi_tail[1]-tca_frozen_phi_tail_by_topology[1]);
+          (*mpi.out) << "TCA frozen-Phi audit: change/old_tail="
+                     << change/std::max(
+                          old_tail_norm,std::numeric_limits<double>::min())
+                     << std::endl;
+        }
+        tca_frozen_phi_tail_by_topology=new_phi_tail;
+        tca_frozen_tail_ready=true;
+      } else if (using_frozen_tail) {
+        for (int topology=0;topology<2;++topology)
+          phi_by_topology[topology]=active_phi[topology]+
+            tca_frozen_phi_tail_by_topology[topology];
+        phi=phi_by_topology[0]+phi_by_topology[1];
+      }
+    }
+
+    // The diagnostic files deliberately use the same dense tau mesh and
+    // pseudo ordering as aStval.3.  They can therefore be compared directly
+    // with a saved six-cut or reduced run without reconstructing DLR data.
+    std::array<std::array<double,6>,2> phi_by_topology_cut{};
+    if (store_self_diagnostics) {
+      for (int p=0;p<cix.Npseudo_unique;++p)
+        for (int it=0;it<output_tau.extent(0);++it)
+          for (int topology=0;topology<2;++topology)
+            for (int cut=0;cut<6;++cut)
+              phi_by_topology_cut[topology][cut]+=
+                (1.0/6.0)*degeneracy[p]*tau_dh(it)*
+                sigma_cut_by_topology[topology][cut](p,it)*
+                Gm(p,output_tau.extent(0)-1-it)/Q;
+
+      if (mpi.rank==mpi.master) {
+        const auto save_dense=[&](const std::string& filename,
+                                  const Eigen::MatrixXd& dense) {
+          Array<double,2> values(
+            cix.Npseudo_unique,output_tau.extent(0));
+          for (int p=0;p<cix.Npseudo_unique;++p)
+            for (int it=0;it<output_tau.extent(0);++it)
+              values(p,it)=dense(p,it);
+          Print_Pseudo(filename,values,pars);
+        };
+        constexpr const char* topology_name[2]={"A","B"};
+        for (int topology=0;topology<2;++topology) {
+          save_dense("aStval.3.topology"s+topology_name[topology],
+                     sigma_by_topology[topology]);
+          Eigen::MatrixXd reconstructed=Eigen::MatrixXd::Zero(
+            compact.sigma.rows(),compact.sigma.cols());
+          for (int cut=0;cut<6;++cut) {
+            reconstructed+=compact.cuts_by_topology[topology][cut];
+            save_dense("aStval.3.topology"s+topology_name[topology]+
+                         ".cut"+std::to_string(cut),
+                       sigma_cut_by_topology[topology][cut]);
+          }
+          const double scale=std::max(
+            1.e-300,compact.sigma_by_topology[topology].norm());
+          (*mpi.out) << "TCA DLR self diagnostic topology="
+                     << topology_name[topology]
+                     << " cut_sum_relative="
+                     << (reconstructed-
+                         compact.sigma_by_topology[topology]).norm()/scale
+                     << " Phi_by_cut=[";
+          for (int cut=0;cut<6;++cut)
+            (*mpi.out) << (cut ? "," : "")
+                       << phi_by_topology_cut[topology][cut];
+          (*mpi.out) << "] Phi_cut_sum="
+                     << std::accumulate(
+                          phi_by_topology_cut[topology].begin(),
+                          phi_by_topology_cut[topology].end(),0.0)
+                     << std::endl;
+        }
+      }
+    }
+
+    G00t.resize(cix.Nbath_unique,output_tau.extent(0)); G00t=0.0;
+    F00t.resize(cix.Nbath_unique,output_tau.extent(0)); F00t=0.0;
+    F01t.resize(cix.Nbath_unique,output_tau.extent(0)); F01t=0.0;
+    if (cmpPhysG) {
+      const Eigen::MatrixXd g=to_dense(compact.g);
+      const Eigen::MatrixXd f00=to_dense(compact.f00);
+      const Eigen::MatrixXd f01=to_dense(compact.f01);
+      Array<double,1> bath_degeneracy(cix.Nbath_unique_unique);
+      bath_degeneracy=0.0;
+      for (int orbital=0;orbital<cix.Nbath;++orbital)
+        bath_degeneracy(std::abs(cix.bath_sigind0(orbital)))+=1.0;
+      Array<int,1> sigind(cix.Nbath_unique);
+      Array<bool,1> superconducting(cix.Nbath_unique);
+      superconducting=false;
+      for (int orbital=0;orbital<cix.Nbath;++orbital) {
+        const int ib=cix.bath_sigind(orbital);
+        sigind(ib)=cix.bath_sigind0(orbital);
+        superconducting(ib)=cix.SC_bath(orbital);
+      }
+      for (int ib=0;ib<cix.Nbath_unique;++ib) {
+        const int s=std::abs(sigind(ib));
+        const double sign=sigind(ib)<0 ? -1.0 : 1.0;
+        const double normalizer=sign/(bath_degeneracy(s)*Q);
+        const double bulla=superconducting(ib) ? 2.0 : 1.0;
+        for (int it=0;it<output_tau.extent(0);++it) {
+          G00t(ib,it)=normalizer*g(s,it);
+          F00t(ib,it)=normalizer*bulla*f00(s,it);
+          F01t(ib,it)=normalizer*bulla*f01(s,it);
+        }
+      }
+    }
+
+    double seconds=std::chrono::duration<double>(end-begin).count();
+#ifdef _MPI
+    if (mpi.size>1) {
+      double maximum=0.0;
+      MPI_Allreduce(&seconds,&maximum,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+      seconds=maximum;
+    }
+#endif
+    if (mpi.rank==mpi.master)
+      (*mpi.out) << "TCA DLR: " << (root_sum ? "self_groups=" : "plans=")
+                 << compact.candidate_plans
+                 << " nonempty_topologies=["
+                 << compact.nonempty_plans_by_topology[0] << ","
+                 << compact.nonempty_plans_by_topology[1] << "]"
+                 << " physical=" << (cmpPhysG ? "yes" : "no")
+                 << " mpi=" << (pars["tca_dlr_mpi"].get<bool>() ? "on" : "off")
+                 << " self_mode="
+                 << (!use_active ? "exact" :
+                     exact_audit ? "exact-audit" :
+                     using_frozen_tail ? "active+frozen-tail" :
+                                         "active-only")
+                 << " active_pseudos="
+                 << (use_active
+                       ? std::count(tca_active_pseudo_mask.begin(),
+                                    tca_active_pseudo_mask.end(),
+                                    static_cast<unsigned char>(1))
+                       : cix.Npseudo_unique)
+                 << "/" << cix.Npseudo_unique
+                 << " poles="
+                 << (use_active ? tca_active_dlr_workspace->pole_count() :
+                                  diagram_dlr_workspace->pole_count())
+                 << "/" << diagram_dlr_workspace->pole_count()
+                 << " evaluate_seconds=" << seconds
+                 << " Phi_by_topology=[" << phi_by_topology[0] << ","
+                 << phi_by_topology[1] << "]"
+                 << " Phi=" << phi << std::endl;
+    return phi;
   }
 
   void SplineG(const Array<double,1>& pptau, Array<double,2>& Gm, Array<double,2>& gm)

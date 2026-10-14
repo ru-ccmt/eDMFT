@@ -29,14 +29,13 @@ public:
     // that channel.
     //
     // The pseudo/density-matrix estimate (nd, density_matrix0) is numerically
-    // more stable than the Matsubara-summed occupancy (nf, density_matrix), so
-    // we expose the stable quantity under the legacy nf/mom header names used
-    // by the Python post-processing, while still preserving the frequency-sum
-    // estimate under nd/density_matrix.
-    sout << "# nf="<<nd<<" mu="<<mu<<" T="<<1.0/beta<<" TrSigmaG="<<TrSigmaG<<" Epot="<<Epot<<" Ekin="<<Ekin
+    // more stable than the Matsubara-summed occupancy (nf, density_matrix).
+    // Print both explicitly: nd is the pseudo-particle count and nf is the
+    // Green-function Matsubara sum.
+    sout << "# nd="<<nd<<" mu="<<mu<<" T="<<1.0/beta<<" TrSigmaG="<<TrSigmaG<<" Epot="<<Epot<<" Ekin="<<Ekin
 	 << " mom=["<<density_matrix0(0)*deg_bath(0);
     for (int a=1; a<density_matrix0.extent(0); ++a) sout<<","<<density_matrix0(a)*deg_bath(a);
-    sout<<"] Fimp="<<Fimp<<" nd="<<nf<<" density_matrix=["<<density_matrix(0)*deg_bath(0);
+    sout<<"] Fimp="<<Fimp<<" nf="<<nf<<" density_matrix=["<<density_matrix(0)*deg_bath(0);
     for (int a=1; a<density_matrix.extent(0); ++a) sout<<","<<density_matrix(a)*deg_bath(a);
     sout<<"] "<<endl;
     

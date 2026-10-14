@@ -603,7 +603,7 @@ double R_OCA(Array<double,2>& Smt, Array<complex<double>,2>& Gc, Array<complex<d
   { // This part is carbon-copy of the algorithm below, except that we only calculate the size of the hash-table states_unique.
     // You should not try to understand that, because we comment only the complete algorithm below. This is just stripped/off equivalent,
     // which does not compute anything except total size of the storage.
-    unordered_map<uint64_t,int> states_unique;
+    unordered_map<OCAKey,int,OCAKeyHash> states_unique;
     states_unique.max_load_factor(0.7f);
     states_unique.reserve(cix.Natst*cix.Natst*cix.Nbath*cix.Nbath);
     int mm_nds_size=0;
@@ -695,7 +695,7 @@ double R_OCA(Array<double,2>& Smt, Array<complex<double>,2>& Gc, Array<complex<d
 		    //double mm = mm3*ii_sign3;                    // total sign due to off-diagonal sign (ii_sign3) and matrix elements sign mm3
 		    TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
 		    //
-		    uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // we pack the two hybridizations (s1,s0) and atomic states into unique index-vector.
+		    OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // we pack the two hybridizations (s1,s0) and atomic states into unique index-vector.
 		    auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // try to insert st-vector as a new key and mm_nds.size() as the value.
 		    // If the key is not yet present, inserted=true and "it" points to its current place. If key is present, "it" points to its existing place.
 		    int iind = it->second;                    // The key st has value iind, either just inserted, or found from before
@@ -715,7 +715,7 @@ double R_OCA(Array<double,2>& Smt, Array<complex<double>,2>& Gc, Array<complex<d
 			int importance = G_importance[ii3] + imp_ii2 + imp_ii1 + imp_ii0;
 			if (importance > OCA_cut_sum ) continue;
 			TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
-			uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0] ); // all atributes of diagram contribution.
+			OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0] ); // all atributes of diagram contribution.
 			auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			int _iind_ = it->second; // in mm_nds and indexi, it is stored in _iind_
 			if (inserted) mm_nds_size += 1;
@@ -744,7 +744,7 @@ double R_OCA(Array<double,2>& Smt, Array<complex<double>,2>& Gc, Array<complex<d
 			int importance = G_importance[ii2] + imp_ii1 + imp_ii3 + imp_ii0;
 			if (importance > OCA_cut_sum ) continue;
 			TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
-			uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0] ); // all atributes of diagram contribution.
+			OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0] ); // all atributes of diagram contribution.
 			auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			if (inserted) mm_nds_size += 1;
 		      }
@@ -768,7 +768,7 @@ double R_OCA(Array<double,2>& Smt, Array<complex<double>,2>& Gc, Array<complex<d
     // Data which store the components of the diagram, so that integration looks like a problem of a single orbital.
     //map<TinyVector<int,6>,int,Class1Compare> states_unique; // every unique term is stored in this map with indices {s1,s0,states[3],states[2],states[1], states[0]}
     //// or uncomment below for faster unordered_map, which does not sort the contributions.
-    unordered_map<uint64_t,int> states_unique;
+    unordered_map<OCAKey,int,OCAKeyHash> states_unique;
     states_unique.reserve(states_unique_size);
     //
     // for each unique key in states_unique map (which uniquely specifies the diagram contribution) the value of the map gives index to array mm_nds, index0,.., index3
@@ -903,7 +903,7 @@ double R_OCA(Array<double,2>& Smt, Array<complex<double>,2>& Gc, Array<complex<d
 		      double mm = mm3*ii_sign3;                    // total sign due to off-diagonal sign (ii_sign3) and matrix elements sign mm3
 		      TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
 		      //
-		      uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // we pack the two hybridizations (s1,s0) and atomic states into unique index-vector.
+		      OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // we pack the two hybridizations (s1,s0) and atomic states into unique index-vector.
 		      auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // try to insert st-vector as a new key and mm_nds.size() as the value.
 		      // If the key is not yet present, inserted=true and "it" points to its current place. If key is present, "it" points to its existing place.
 		      int iind = it->second;                    // The key st has value iind, either just inserted, or found from before
@@ -1042,7 +1042,7 @@ double R_OCA(Array<double,2>& Smt, Array<complex<double>,2>& Gc, Array<complex<d
 			  double nds2 =  mmp*njm2(_b2_,_a3_);
 			  if (nds2==0) continue;
 			  TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
-			  uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0] ); // all atributes of diagram contribution.
+			  OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0] ); // all atributes of diagram contribution.
 			  auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			  int _iind_ = it->second; // in mm_nds and indexi, it is stored in _iind_
 			  if (inserted){// not seen before, hence insert into mm_nds, index0, index1, index2, index3
@@ -1108,7 +1108,7 @@ double R_OCA(Array<double,2>& Smt, Array<complex<double>,2>& Gc, Array<complex<d
 			  // it implements op(i) operator, giving proper mm matrix element. See comment for mm3 above.
 			  double nds1 =  mmp*njm1(_b1_,_a2_); // Now adding njm1.
 			  TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
-			  uint64_t st = pack6(s1, s0, states[3], states[2], states[1], states[0] ); // all atributes of diagram contribution.
+			  OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0] ); // all atributes of diagram contribution.
 			  auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			  int _iind_ = it->second; // in mm_nds and indexi, it is stored in _iind_
 			  if (inserted){ // not seen before, hence insert into mm_nds, index0, index1, index2, index3

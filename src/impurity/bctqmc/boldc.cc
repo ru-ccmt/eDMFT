@@ -890,7 +890,7 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
   BathBlocks bb = cix.FindBlocks();
   (*mpi.out) << bb << endl;
   
-  double t_nca=0, t_oca=0, t_mc=0;
+  double t_nca=0, t_oca=0, t_tca=0, t_mc=0;
   bool cmpPhysG=false;
   bool next_break= (1==pars["Nitt"].get<int>()); // if Nitt==1, we break after first iteration
   if (next_break)
@@ -901,7 +901,14 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
   int include_oca=0; bool cOCA_needed=false;
   Array<double,1> Phi_tot(N_max_order); Phi_tot=0;
   for (itt=0; itt<pars["Nitt"]; itt++){
+    // These values are printed in the per-iteration summary below.  Reset
+    // them here so they describe this step rather than an accumulated total.
+    // Use elapsed wall time: process CPU time is misleading for MPI work
+    // because ranks spend part of each collective contraction waiting.
+    t_nca=t_oca=t_tca=t_mc=0.0;
     RereadParameters(pars);
+    const bool analytic_tca=ImagAxis && N_min_order==3 && N_max_order==3 &&
+      pars["TCA_solver"].get<std::string>()=="dlr";
     if (next_break) cmpPhysG=true;
     
     auto [nd,Q,lambda0,Fimp,Epot,TrSigmaG,followPeak,density_matrix0,Prob]=ra.DeterminePseudos(Gm,gm,Sm,xn,
@@ -910,13 +917,13 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
       int ist = next_break ? 0 : itt+1;
       ra.Print_Pseudo(pars["PPG"].get<string>()+to_string(ist), Gm, pars);
     }
-    auto _tst_ = get_cpu_time();
+    auto _tst_ = std::chrono::steady_clock::now();
 
     Phi_tot(0) = ra.NCA(Smt, G00, F00, F01,
 			cmpPhysG, Q, xn, Gm, cix, mpi);
 
-    auto _tst1_ = get_cpu_time();
-    t_nca += _tst1_ - _tst_;
+    auto _tst1_ = std::chrono::steady_clock::now();
+    t_nca = std::chrono::duration<double>(_tst1_-_tst_).count();
     //if (mpi.rank==mpi.master) ra.Print_Pseudo("Smt_NCA."+to_string(itt+1), Smt, pars);
 
     if (mpi.rank==mpi.master){
@@ -926,7 +933,13 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     Sm_new.resize(cix.Npseudo_unique,xn.size()); Sm_new=0;
     ra.Update_Sm(Sm_new,Smt,xn,cix,mpi);
 
-    if (N_max_order>N_min_order or (N_min_order>=2 and N_max_order>=2)) ra.SplineG(xn,Gm,gm); // relevant only for imaginary axis
+    if (N_max_order>N_min_order or (N_min_order>=2 and N_max_order>=2)){
+      // DLR fitting consumes the original dense pseudo mesh directly.  Delay
+      // construction of legacy splines until after we know whether legacy OCA
+      // or the higher-order Monte Carlo machinery actually needs them.
+      if constexpr (ImagAxis) ra.UpdateDLRPseudos(xn,Gm,gm,mpi);
+      else ra.SplineG(xn,Gm,gm);
+    }
     
     if (N_min_order>=2 and N_max_order>=2){
       std::array<double,2> OCA_cut({pars["OCA_cut1"].get<double>(),pars["OCA_cut2"].get<double>()});
@@ -943,11 +956,24 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
 	ra.OCA_cut_sum = 10;
 	cOCA_needed = false;
       }
-      auto _tst_ = get_cpu_time();
+
+      if constexpr (ImagAxis) {
+        const std::string oca_solver=pars["OCA_solver"].get<std::string>();
+        const bool legacy_oca_needed=
+          oca_solver=="legacy" || pars["oca_dlr_diagnostic"].get<bool>();
+        const bool higher_order_needs_splines=
+          (!analytic_tca && N_max_order>N_min_order) ||
+          (N_max_order==2 && cOCA_needed) ||
+          (N_min_order==3 && N_max_order==3 && !analytic_tca);
+        if (legacy_oca_needed || higher_order_needs_splines)
+          ra.SplineG(xn,Gm,gm);
+      }
+
+      auto _tst_ = std::chrono::steady_clock::now();
       Phi_tot(1) = ra.OCA(Smt,dG00,dF00,dF01,
 			  cmpPhysG, Q, xn, Gm, cix, pars, mpi);
-      auto _tst1_ = get_cpu_time();
-      t_oca += _tst1_ - _tst_;
+      auto _tst1_ = std::chrono::steady_clock::now();
+      t_oca = std::chrono::duration<double>(_tst1_-_tst_).count();
       if (mpi.rank==mpi.master){
 	ra.Print_Pseudo("aStval.2", Smt, pars);
 	if (cmpPhysG) ra.Print_Physical("ag00.2", dG00, dF00, dF01);
@@ -960,10 +986,45 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
       }
       include_oca=1;
     }
+
+    // A fixed third-order imaginary-axis calculation is now entirely
+    // analytic: NCA and OCA are evaluated above, and TCA adds the two Phi^3
+    // topologies here.  Other order ranges retain the generic Monte Carlo
+    // machinery below.
+    if constexpr (ImagAxis) {
+      if (analytic_tca) {
+        auto _tst_=std::chrono::steady_clock::now();
+        Phi_tot(2)=ra.TCA(Smt,dG00,dF00,dF01,
+                          cmpPhysG,Q,xn,Gm,cix,pars,mpi);
+        auto _tst1_=std::chrono::steady_clock::now();
+        t_tca=std::chrono::duration<double>(_tst1_-_tst_).count();
+        if (mpi.rank==mpi.master) {
+          ra.Print_Pseudo("aStval.3",Smt,pars);
+          if (cmpPhysG) ra.Print_Physical("ag00.3",dG00,dF00,dF01);
+        }
+        ra.Update_Sm(Sm_new,Smt,xn,cix,mpi);
+        if (cmpPhysG) {
+          G00+=dG00;
+          F00+=dF00;
+          F01+=dF01;
+        }
+        include_oca=2;
+      }
+    }
     
-    (*mpi.out)<<setw(3)<<itt<<") Phi="<<Phi_tot(Range(0,include_oca))<<"  t(NCA)="<<t_nca<<" t(OCA)="<<t_oca<<endl;mpi.out->flush();
+    // TCA can take many minutes, for which a raw number of seconds is hard
+    // to parse at a glance.  Preserve the stable `t(TCA)=` log prefix while
+    // selecting a human-scale unit.
+    const std::string t_tca_text=t_tca>=60.0
+      ? fmt::format("{:.2f}min",t_tca/60.0)
+      : fmt::format("{:.3f}s",t_tca);
+    (*mpi.out)<<setw(3)<<itt<<") Phi="<<Phi_tot(Range(0,include_oca))
+              <<"  t(NCA)="<<t_nca<<"s t(OCA)="<<t_oca<<"s"
+              <<" t(TCA)="<<t_tca_text<<endl;mpi.out->flush();
     
-    if (N_max_order>N_min_order or (N_max_order==2 and cOCA_needed)){ // even when N_max_order==2 but OCA is not complete
+    if ((!analytic_tca && N_max_order>N_min_order) ||
+        (N_max_order==2 && cOCA_needed) ||
+        (N_min_order==3 && N_max_order==3 && !analytic_tca)){ // fixed TCA may explicitly request the generic MC reference
       TinyVector<int,3> recalc_weight_t;
       if (pars["recalc_weight"].get<double>()>0){
 	double recalc_weight = pars["recalc_weight"];
@@ -976,12 +1037,12 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
       if (next_break){pars["Ms"] = pars["Ms"].get<double>()*pars["multiples_last_step"].get<double>();}
 
       Array<double,1> Phi_n;
-      auto _tst_ = get_cpu_time();
+      auto _tst_ = std::chrono::steady_clock::now();
       CurrentMC6<Axis1,ImagAxis>(Phi_n,Smt,dG00,dF00,dF01,
 				 ra, cix, xn,Gm,gm,drand, pars, recalc_weight_t, cmpPhysG, Phi_tot(N_min_order-1), mpi);
       
-      auto _tst1_ = get_cpu_time();
-      t_mc += _tst1_ - _tst_;
+      auto _tst1_ = std::chrono::steady_clock::now();
+      t_mc = std::chrono::duration<double>(_tst1_-_tst_).count();
       Phi_tot(Range(N_min_order-1,N_max_order-1)) = Phi_n;
       ra.Update_Sm(Sm_new,Smt,xn,cix,mpi);
       if (cmpPhysG){
@@ -1190,6 +1251,62 @@ int main(int argc, char *argv[])
   pars_i["Sdyson_Bulla_alpha"] = 1.0;                // alpha<=1 moves the blend to lower frequency; reduce when MC noise is present.
   pars_i["Sdyson_Bulla_cutoff_fraction"] = 0.6;      // largest clean blend end is alpha*cutoff_fraction*omega_Nyquist.
   pars_i["Sdyson_Bulla_start_ratio"] = 0.6;          // blend starts at start_ratio*w_end.
+  // OCA_solver is the production integration switch.  "dlr" automatically
+  // enables the AAA hybridization and DLR pseudo adapters; the explicit
+  // adapter flags are useful when testing those representations while
+  // retaining legacy OCA.  oca_dlr_diagnostic computes both integrations and
+  // compares them, but OCA_solver still determines which result is returned.
+  pars_i["OCA_solver"] = "dlr";                     // "dlr" (default) or "legacy"
+  pars_i["TCA_solver"] = "dlr";                     // fixed N_min_order=Norder=3: "dlr" analytic TCA or "mc" reference
+  pars_i["aaa_adapter"] = false;
+  pars_i["aaa_tolerance"] = 1.e-10;
+  pars_i["aaa_max_support_pairs"] = 25;
+  pars_i["aaa_pole_imag_tolerance"] = 1.e-7;
+  pars_i["aaa_refine_poles"] = true;
+  pars_i["aaa_omega_bound"] = 0.0;                   // <=0 uses cutoffw
+  pars_i["aaa_refine_max_iterations"] = 200;
+  pars_i["aaa_refine_gradient_tolerance"] = 1.e-10;
+  // "auto" first tries the compact matrix-valued AAA fit and changes to a
+  // channel-resolved fit only when the real-pole projection is inaccurate.
+  // The latter is important for superconducting baths whose independent
+  // normal/anomalous channels need not share an easily discoverable AAA
+  // denominator.  The final union of real poles is still common to all
+  // channels, so the OCA pole-major evaluator remains unchanged.
+  pars_i["aaa_fit_mode"] = "auto";                  // "auto", "joint", "balanced", or diagnostic "channelwise"
+  pars_i["aaa_channelwise_trigger"] = 1.e-8;        // relative RMS error of the joint real-pole fit
+  pars_i["aaa_pole_merge_tolerance"] = 1.e-7;       // relative tolerance when merging channel pole sets
+  pars_i["dlr_adapter"] = false;
+  pars_i["dlr_tolerance"] = 1.e-10;
+  pars_i["dlr_omega_max"] = 0.0;                    // <=0 uses cutoffw
+  pars_i["dlr_panel_order"] = 24;                   // fine-grid quadrature/order used to construct the basis, not final rank
+  pars_i["oca_dlr_mpi"] = true;                     // distribute compact OCA over MPI pole teams
+  pars_i["oca_dlr_mpi_teams"] = 0;                  // 0 chooses min(AAA poles, workers per topology shard); a positive value sets pole teams per shard
+  pars_i["oca_dlr_mpi_topology"] = "auto";          // "auto", "replicated", or "distributed"
+  pars_i["oca_dlr_max_replicated_mb"] = 1024.0;      // auto chooses ceil(full-plan MB / budget) topology shards, then uses remaining ranks as pole workers
+  pars_i["oca_dlr_disk_cache"] = true;               // reuse mesh-independent OCA paths across solver invocations
+  pars_i["oca_dlr_cache_file"] = ".oca_dlr_paths.cache";
+  pars_i["oca_dlr_diagnostic"] = false;             // compare compact all-cut self-energy with reference OCA
+  pars_i["oca_dlr_cut_diagnostic"] = false;         // additionally compare each cut (small tests; expensive)
+  pars_i["tca_dlr_mpi"] = true;                     // distribute independent TCA contraction groups over MPI ranks
+  pars_i["tca_dlr_mpi_scheduler"] = "dynamic";      // "dynamic" uses balanced bulk plus a dispatched micro-batch tail; "static" retains deterministic mixed ownership
+  pars_i["tca_dlr_mpi_micro_batch"] = 0;             // pole pairs per dynamic task; 0 automatically targets about 32 tasks per rank
+  pars_i["tca_root_sum"] = true;                    // sum the unexpanded-line bath inside the block contraction
+  pars_i["tca_root_sum_min_baths"] = 6;             // below this, compact fixed-bath plans are faster despite their cubic bath count
+  pars_i["tca_progress_seconds"] = 60.0;             // rank-0 heartbeat interval; 0 disables TCA progress/ETA output
+  pars_i["tca_store_self_diagnostics"] = false;      // save topology/cut-resolved aStval.3 files for symmetry analysis
+  pars_i["tca_self_c3"] = true;                      // validated default: two representative topology-B cuts over all eight directions, with 3/2 multiplicity (24*Nbath^2 total self groups)
+  // Accuracy preset for the analytic third-order solver.  This controls only
+  // TCA: OCA always retains the accurate full AAA pole expansion.  "custom"
+  // leaves the two low-level controls below untouched for expert experiments.
+  pars_i["tca_accuracy"] = "modest";                // "veryhigh"=all, "high"=16, "modest"=10, "low"=6, or "custom"
+  // Low-level controls selected by tca_accuracy (or set directly with
+  // tca_accuracy="custom").  A positive active-pole count constructs a
+  // second, cheaper AAA workspace used by TCA only.
+  pars_i["tca_active_aaa_poles"] = 0;                // 0 keeps every AAA pole; e.g. 16 reduces the quadratic pole-pair work
+  pars_i["tca_final_exact_audit"] = true;             // true restores all AAA poles for the final TCA self/physical evaluation
+  pars_i["tca_pseudo_keep_weight"] = 1.0;            // retain this cumulative fraction of deg_p*integral|G_p(tau)|; 1 is exact
+  pars_i["tca_freeze_weak_tail"] = false;            // freeze full-active TCA at the first (OCA-converged) iteration
+  pars_i["tca_approx_audit_tolerance"] = 1.e-2;      // warning threshold for the final exact tail-change audit
   // 2) Read PARAMS file (with comments removed) and parse once
   if (inp2.str().empty()) {
     std::cerr << "PARAMS not present or empty\n";
@@ -1212,6 +1329,39 @@ int main(int argc, char *argv[])
     pars.merge_patch(pars_i);
 
   MergeKnownKeys(pars, patch);
+
+  // Resolve the user-facing TCA accuracy preset before constructing Axis0:
+  // PrepareAAAHybridization() reads these low-level values while building the
+  // full OCA table and the independent, possibly compressed, TCA table.
+  // Keeping one pole count throughout an iteration sequence makes each preset
+  // reproducible and avoids changing the fixed point on the final iteration.
+  if (!RealAxisQ) {
+    const std::string tca_accuracy=pars["tca_accuracy"].get<std::string>();
+    if (tca_accuracy=="veryhigh") {
+      pars["tca_active_aaa_poles"]=0;  // all available poles (currently 23 in the validated tests)
+      pars["tca_final_exact_audit"]=true;
+    } else if (tca_accuracy=="high") {
+      pars["tca_active_aaa_poles"]=16;
+      pars["tca_final_exact_audit"]=false;
+    } else if (tca_accuracy=="modest") {
+      pars["tca_active_aaa_poles"]=10;
+      pars["tca_final_exact_audit"]=false;
+    } else if (tca_accuracy=="low") {
+      pars["tca_active_aaa_poles"]=6;
+      pars["tca_final_exact_audit"]=false;
+    } else if (tca_accuracy!="custom") {
+      throw std::invalid_argument(
+        "tca_accuracy must be one of veryhigh, high, modest, low, or custom");
+    }
+    if (mpi->rank==mpi->master) {
+      (*mpi->out) << "TCA accuracy preset: " << tca_accuracy
+                  << " requested_tca_poles="
+                  << pars["tca_active_aaa_poles"].get<int>()
+                  << " final_exact_audit="
+                  << (pars["tca_final_exact_audit"].get<bool>() ? "yes" : "no")
+                  << std::endl;
+    }
+  }
 
   if (pars["fastFilesystem"] and mpi->rank!=mpi->master){
     delete mpi->out;
@@ -1310,6 +1460,20 @@ int main(int argc, char *argv[])
     }else{
       Bcast_Sindex(cix, mpi);
     }
+  }
+
+  // OCA path keys are packed into a two-word OCAKey.  Validate dimensions once,
+  // immediately after Sindex has established the final pseudo-propagator
+  // numbering, rather than paying for checks in every innermost pack6 call.
+  // A violation must be fatal: silently masking an oversized index would
+  // merge physically distinct diagrams under the same key.
+  if (pars["N_min_order"].get<int>()>=2 && pars["Norder"].get<int>()>=2) {
+    ValidatePack6Dimensions(cix.Nbath_unique_unique,cix.Npseudo_unique);
+    if (mpi->rank==mpi->master)
+      (*mpi->out) << "OCA packed-key capacity check: baths="
+                  << cix.Nbath_unique_unique << "/" << pack6_bath_capacity
+                  << " pseudo=" << cix.Npseudo_unique << "/"
+                  << pack6_pseudo_capacity << " -- OK" << endl;
   }
   
   if (RealAxisQ)

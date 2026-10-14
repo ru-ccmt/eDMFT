@@ -2,7 +2,11 @@
 #define MY_UTIL
 
 #include <vector>
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
 #include <stdexcept>
+#include <string>
 #include <blitz/array.h>
 
 namespace bl = blitz;
@@ -565,24 +569,100 @@ struct TV6Eq {
 #endif /* NO_ARG_CHECK */
 
 
-static inline uint64_t pack6(int s0, int s1, int st0, int st1, int st2, int st3){
-  return (uint64_t(s0)      & 0x3FULL)        |
-         ((uint64_t(s1)     & 0x3FULL)  <<  6)|
-         ((uint64_t(st0)    & 0x3FFULL) << 12)|
-         ((uint64_t(st1)    & 0x3FFULL) << 22)|
-         ((uint64_t(st2)    & 0x3FFULL) << 32)|
-         ((uint64_t(st3)    & 0x3FFULL) << 42);
-}
-static inline bl::TinyVector<int,6> unpack6(uint64_t x)
+// OCA path identity needs two bath indices and four pseudo-particle indices.
+// Large f-shell calculations can have far more than the 8192 pseudo indices
+// which fitted in the former uint64_t layout, so the key is represented by
+// two explicit 64-bit words.  The layout is intentionally simple:
+//
+//   low word:  bath0[8], bath1[8], pseudo0[24], pseudo1[24]
+//   high word: pseudo2[24], pseudo3[24], 16 unused bits
+//
+// This supports 256 bath indices and 16,777,216 pseudo indices without using
+// compiler-specific 128-bit integer arithmetic.  OCAKey remains trivially
+// copyable, which is required by the MPI byte-record transport.
+struct OCAKey {
+  uint64_t low=0;
+  uint64_t high=0;
+
+  constexpr bool operator==(const OCAKey& other) const noexcept {
+    return low==other.low && high==other.high;
+  }
+  constexpr bool operator!=(const OCAKey& other) const noexcept {
+    return !(*this==other);
+  }
+  constexpr bool operator<(const OCAKey& other) const noexcept {
+    return high<other.high || (high==other.high && low<other.low);
+  }
+};
+
+// SplitMix64 finalizer applied to both words.  std::unordered_map otherwise
+// has no standard hash for a user-defined two-word integer.
+struct OCAKeyHash {
+  size_t operator()(const OCAKey& key) const noexcept {
+    auto mix=[](uint64_t x) {
+      x=(x^(x>>30))*0xbf58476d1ce4e5b9ULL;
+      x=(x^(x>>27))*0x94d049bb133111ebULL;
+      return x^(x>>31);
+    };
+    return static_cast<size_t>(mix(key.low)^mix(key.high+0x9e3779b97f4a7c15ULL));
+  }
+};
+
+inline std::ostream& operator<<(std::ostream& out,const OCAKey& key)
 {
-  const uint64_t mask6  = 0x3FULL;   // 6 bits
-  const uint64_t mask10 = 0x3FFULL;  // 10 bits
-  int s0  =  x        & mask6;
-  int s1  = (x >>  6) & mask6;
-  int st0 = (x >> 12) & mask10;
-  int st1 = (x >> 22) & mask10;
-  int st2 = (x >> 32) & mask10;
-  int st3 = (x >> 42) & mask10;
+  return out << "{" << key.high << "," << key.low << "}";
+}
+
+// The global input validation below is deliberately separate from pack6:
+// pack6 is called in the innermost enumeration loops, where six range checks
+// per contribution would be needlessly expensive.
+inline constexpr int pack6_bath_bits=8;
+inline constexpr int pack6_pseudo_bits=24;
+inline constexpr int pack6_bath_capacity=1<<pack6_bath_bits;
+inline constexpr int pack6_pseudo_capacity=1<<pack6_pseudo_bits;
+static_assert(2*pack6_bath_bits+4*pack6_pseudo_bits<=128,
+              "pack6 layout must fit in OCAKey's two uint64_t words");
+
+inline void ValidatePack6Dimensions(int bath_count, int pseudo_count)
+{
+  if (bath_count<0 || bath_count>pack6_bath_capacity)
+    throw std::overflow_error(
+      "CATASTROPHIC ERROR: OCA packed key has 8 bits for a bath index "
+      "(largest representable index 255), but the input requires "+
+      std::to_string(bath_count)+" bath indices (largest index "+
+      std::to_string(bath_count-1)+"). Refusing to continue because packed "
+      "OCA keys would collide.");
+  if (pseudo_count<0 || pseudo_count>pack6_pseudo_capacity)
+    throw std::overflow_error(
+      "CATASTROPHIC ERROR: OCA packed key has 24 bits for a pseudo-particle "
+      "index (largest representable index 16777215), but Sindex requires "+
+      std::to_string(pseudo_count)+" pseudo propagators (largest index "+
+      std::to_string(pseudo_count-1)+"). Refusing to continue because packed "
+      "OCA keys would collide.");
+}
+
+static inline OCAKey pack6(int s0, int s1, int st0, int st1, int st2, int st3){
+  constexpr uint64_t mask8=0xFFULL;
+  constexpr uint64_t mask24=0xFFFFFFULL;
+  OCAKey key;
+  key.low=(uint64_t(s0)&mask8) |
+    ((uint64_t(s1)&mask8)<<8) |
+    ((uint64_t(st0)&mask24)<<16) |
+    ((uint64_t(st1)&mask24)<<40);
+  key.high=(uint64_t(st2)&mask24) |
+    ((uint64_t(st3)&mask24)<<24);
+  return key;
+}
+static inline bl::TinyVector<int,6> unpack6(const OCAKey& key)
+{
+  constexpr uint64_t mask8=0xFFULL;
+  constexpr uint64_t mask24=0xFFFFFFULL;
+  int s0=key.low&mask8;
+  int s1=(key.low>>8)&mask8;
+  int st0=(key.low>>16)&mask24;
+  int st1=(key.low>>40)&mask24;
+  int st2=key.high&mask24;
+  int st3=(key.high>>24)&mask24;
   return bl::TinyVector<int,6>(s0, s1, st0, st1, st2, st3);
 }
 
