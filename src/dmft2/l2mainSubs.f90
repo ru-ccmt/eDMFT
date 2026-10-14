@@ -1795,7 +1795,8 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
      ENDDO
   endif
   
-  Qcheckbands=.TRUE.
+  Qcheckbands=.FALSE. ! .TRUE.  ! 2026 We changed this because Matsubara sum can mix different green's functions of bands, and hence clipping of density
+  ! of eigenvalues can be problematic. The issue was found by Benjamin Bacq.
   def = 0.02
   itmax = 500
   fatol = 1e-10
