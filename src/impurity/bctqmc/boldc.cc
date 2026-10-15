@@ -1363,10 +1363,10 @@ int main(int argc, char *argv[])
     }
   }
 
-  if (pars["fastFilesystem"] and mpi->rank!=mpi->master){
-    delete mpi->out;
-    mpi->out = new ofstream("debug."s+to_string(mpi->rank));
-  }
+  //if (pars["fastFilesystem"] and mpi->rank!=mpi->master){
+  //  delete mpi->out;
+  //  mpi->out = new ofstream("debug."s+to_string(mpi->rank));
+  //}
   (*mpi->out)<<"I am rank="<<mpi->rank<<" of size="<<mpi->size<<endl;
   
   
