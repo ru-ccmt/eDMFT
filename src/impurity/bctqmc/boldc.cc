@@ -1280,6 +1280,11 @@ int main(int argc, char *argv[])
   pars_i["dlr_omega_max"] = 0.0;                    // <=0 uses cutoffw
   pars_i["dlr_panel_order"] = 24;                   // fine-grid quadrature/order used to construct the basis, not final rank
   pars_i["oca_dlr_mpi"] = true;                     // distribute compact OCA over MPI pole teams
+  // Opt-in diagnostics compare compute with collective waiting. Whole-pole
+  // mode activates one worker per pole team and uses the fast batched kernel;
+  // other ranks rejoin at the result reduction and remain available for TCA.
+  pars_i["oca_dlr_profile"] = false;
+  pars_i["oca_dlr_whole_poles"] = true;             // default: fast batched whole-pole evaluation; false is the diagnostic shared-pole path
   pars_i["oca_dlr_mpi_teams"] = 0;                  // 0 chooses min(AAA poles, workers per topology shard); a positive value sets pole teams per shard
   pars_i["oca_dlr_mpi_topology"] = "auto";          // "auto", "replicated", or "distributed"
   pars_i["oca_dlr_max_replicated_mb"] = 1024.0;      // auto chooses ceil(full-plan MB / budget) topology shards, then uses remaining ranks as pole workers

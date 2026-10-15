@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <chrono>
+#include <ostream>
 #include <limits>
 #include <numeric>
 #include <stdexcept>
@@ -917,6 +919,70 @@ struct ParallelLayout {
   int owned_poles=0;
 };
 
+// Opt-in wall-clock profiling. Timers do not insert barriers: collective
+// times therefore include both communication and waiting for other ranks.
+// Sums are rank-seconds, not elapsed seconds; independent phase maxima need
+// not occur on the same rank and must not be added as a critical-path total.
+struct EvaluationProfile {
+  enum Phase { Setup, Dress, PairCompute, PairGather, SelfSparse, SelfDLR,
+               SelfConvolution, SelfAccumulate, ReflectCompute, ReflectGather,
+               Physical, Reduction, Finalize, Total, Count };
+  using Clock=std::chrono::steady_clock;
+  std::array<double,Count> seconds{};
+  double gather_calls=0, gather_table_bytes=0;
+  bool active=false;
+  struct Timer {
+    EvaluationProfile* profile;
+    Phase phase;
+    Clock::time_point start;
+    Timer(EvaluationProfile* p,Phase f):profile(p),phase(f) {
+      if (profile) start=Clock::now();
+    }
+    void stop() {
+      if (profile) {
+        profile->seconds[phase]+=
+          std::chrono::duration<double>(Clock::now()-start).count();
+        profile=nullptr;
+      }
+    }
+    ~Timer() { stop(); }
+  };
+#ifdef _MPI
+  void report(MPI_Comm comm,std::ostream* out,bool whole_poles) const {
+    std::array<double,Count> sums{},maxima{},active_seconds{},active_maxima{};
+    if (active) active_seconds=seconds;
+    MPI_Reduce(seconds.data(),sums.data(),Count,MPI_DOUBLE,MPI_SUM,0,comm);
+    MPI_Reduce(seconds.data(),maxima.data(),Count,MPI_DOUBLE,MPI_MAX,0,comm);
+    MPI_Reduce(active_seconds.data(),active_maxima.data(),Count,
+               MPI_DOUBLE,MPI_MAX,0,comm);
+    double local[3]={active ? 1.0 : 0.0,gather_calls,gather_table_bytes};
+    double global[3]={};
+    MPI_Reduce(local,global,3,MPI_DOUBLE,MPI_SUM,0,comm);
+    int rank=0,size=1;
+    MPI_Comm_rank(comm,&rank);
+    MPI_Comm_size(comm,&size);
+    if (rank!=0 || !out) return;
+    static constexpr const char* names[Count]={
+      "setup","pole_dressing","pair_compute","pair_allgather",
+      "self_sparse","self_values_to_coefficients","self_convolution",
+      "self_accumulate","reflection_compute","reflection_allgather",
+      "physical_contract","result_allreduce","final_interpolation","total"};
+    (*out) << "OCA DLR profile: mode="
+           << (whole_poles ? "whole-poles" : "shared-poles")
+           << " active_ranks=" << global[0] << "/" << size
+           << " gather_participations=" << global[1]
+           << " gathered_table_MiB_sum=" << global[2]/(1024.0*1024.0)
+           << " (table storage summed over participants, not wire traffic)"
+           << std::endl;
+    for (int i=0;i<Count;++i)
+      (*out) << "OCA DLR profile phase=" << names[i]
+             << " max_seconds=" << maxima[i]
+             << " max_active_seconds=" << active_maxima[i]
+             << " sum_rank_seconds=" << sums[i] << std::endl;
+  }
+#endif
+};
+
 // Additive result on the representative DLR time nodes.
 //
 // This is deliberately the boundary between expensive diagram work and the
@@ -1009,6 +1075,7 @@ struct NodeAccumulator {
 // beta-T.  Thus this loop replaces six pair-family evaluations by two.
 class CombinedEvaluator {
   struct TeamContext {
+    EvaluationProfile* profile=nullptr;
     int rank=0;
     int size=1;
 #ifdef _MPI
@@ -1192,8 +1259,15 @@ public:
       int topology_shard_count,
       int requested_pole_team_count=0,
       ParallelLayout* layout=nullptr,
-      std::array<MatrixXd,4>* cut_results=nullptr)
+      std::array<MatrixXd,4>* cut_results=nullptr,
+      bool whole_poles=false,
+      bool profile_enabled=false,
+      std::ostream* profile_output=nullptr)
   {
+    EvaluationProfile profile;
+    auto* timing=profile_enabled ? &profile : nullptr;
+    EvaluationProfile::Timer total_timer(timing,EvaluationProfile::Total);
+    EvaluationProfile::Timer setup_timer(timing,EvaluationProfile::Setup);
     int world_rank=0,world_size=1;
     MPI_Comm_rank(world,&world_rank);
     MPI_Comm_size(world,&world_size);
@@ -1221,6 +1295,16 @@ public:
     MPI_Comm_rank(pole_team_comm,&pole_team.rank);
     MPI_Comm_size(pole_team_comm,&pole_team.size);
 
+    // A whole-pole worker is the leader of its existing team. Other ranks
+    // retain zero accumulators and wait at the final result reduction. This
+    // preserves topology shards and restores all ranks for subsequent TCA.
+    const bool active=!whole_poles || pole_team.rank==0;
+    if (whole_poles) {
+      pole_team.rank=0;
+      pole_team.size=1; // selects the original large batched numerical path
+    }
+    pole_team.profile=timing;
+    profile.active=active;
     if (layout) {
       *layout=ParallelLayout{};
       layout->world_size=world_size;
@@ -1234,16 +1318,17 @@ public:
       layout->team_id=pole_team_id;
       layout->team_rank=pole_team.rank;
       layout->team_size=pole_team.size;
-      layout->min_team_size=shard_size/pole_team_count;
-      layout->max_team_size=(shard_size+pole_team_count-1)/pole_team_count;
-      layout->owned_poles=pole_team_id<pole_count
+      layout->min_team_size=whole_poles ? 1 : shard_size/pole_team_count;
+      layout->max_team_size=whole_poles ? 1 : (shard_size+pole_team_count-1)/pole_team_count;
+      layout->owned_poles=active && pole_team_id<pole_count
         ? 1+(pole_count-1-pole_team_id)/pole_team_count : 0;
     }
     NodeAccumulator accumulator=make_accumulator(
       local_self,workspace,local_physical!=nullptr,cut_results!=nullptr);
     try {
       validate(local_self,local_physical,workspace,pseudo_degeneracy,accumulator);
-      accumulate_sequence(local_self,local_physical,workspace,
+      setup_timer.stop();
+      if (active) accumulate_sequence(local_self,local_physical,workspace,
                           pseudo_degeneracy,pole_team_id,pole_count,
                           pole_team_count,pole_team,accumulator);
     } catch (...) {
@@ -1251,10 +1336,20 @@ public:
       MPI_Comm_free(&shard_comm);
       throw;
     }
-    MPI_Comm_free(&pole_team_comm);
-    MPI_Comm_free(&shard_comm);
-    allreduce_accumulator(accumulator,world);
-    return finalize(local_self,workspace,accumulator,output_tau,cut_results);
+    {
+      EvaluationProfile::Timer timer(timing,EvaluationProfile::Reduction);
+      MPI_Comm_free(&pole_team_comm);
+      MPI_Comm_free(&shard_comm);
+      allreduce_accumulator(accumulator,world);
+    }
+    CombinedResult result;
+    {
+      EvaluationProfile::Timer timer(timing,EvaluationProfile::Finalize);
+      result=finalize(local_self,workspace,accumulator,output_tau,cut_results);
+    }
+    total_timer.stop();
+    if (profile_enabled) profile.report(world,profile_output,whole_poles);
+    return result;
   }
 
   // Distributed production entry point.
@@ -1275,71 +1370,18 @@ public:
       MPI_Comm world,
       int requested_team_count=0,
       ParallelLayout* layout=nullptr,
-      std::array<MatrixXd,4>* cut_results=nullptr)
+      std::array<MatrixXd,4>* cut_results=nullptr,
+      bool whole_poles=false,
+      bool profile_enabled=false,
+      std::ostream* profile_output=nullptr)
   {
-    int world_rank=0,world_size=1;
-    MPI_Comm_rank(world,&world_rank);
-    MPI_Comm_size(world,&world_size);
-    if (world_size==1) {
-      if (layout) {
-        *layout=ParallelLayout{};
-        layout->world_size=1;
-        layout->topology_group_size=1;
-        layout->owned_poles=workspace.pole_count();
-      }
-      return evaluate(self,physical,workspace,pseudo_degeneracy,output_tau,
-                      cut_results);
-    }
-
-    const int pole_count=workspace.pole_count();
-    const int automatic_teams=std::max(1,std::min(pole_count,world_size));
-    const int team_count=requested_team_count<=0
-      ? automatic_teams
-      : std::max(1,std::min({requested_team_count,pole_count,world_size}));
-    const int team_id=world_rank%team_count;
-    MPI_Comm team_comm=MPI_COMM_NULL;
-    MPI_Comm_split(world,team_id,world_rank,&team_comm);
-
-    TeamContext team;
-    team.communicator=team_comm;
-    MPI_Comm_rank(team_comm,&team.rank);
-    MPI_Comm_size(team_comm,&team.size);
-
-    if (layout) {
-      layout->world_size=world_size;
-      layout->topology_shard_count=1;
-      layout->topology_shard_id=0;
-      layout->topology_group_rank=world_rank;
-      layout->topology_group_size=world_size;
-      layout->min_topology_group_size=world_size;
-      layout->max_topology_group_size=world_size;
-      layout->team_count=team_count;
-      layout->team_id=team_id;
-      layout->team_rank=team.rank;
-      layout->team_size=team.size;
-      layout->min_team_size=world_size/team_count;
-      layout->max_team_size=(world_size+team_count-1)/team_count;
-      layout->owned_poles=team_id<pole_count
-        ? 1+(pole_count-1-team_id)/team_count : 0;
-    }
-
-    NodeAccumulator accumulator=make_accumulator(
-      self,workspace,physical!=nullptr,cut_results!=nullptr);
-    try {
-      validate(self,physical,workspace,pseudo_degeneracy,accumulator);
-      accumulate_sequence(self,physical,workspace,pseudo_degeneracy,
-                          team_id,pole_count,team_count,team,accumulator);
-    } catch (...) {
-      MPI_Comm_free(&team_comm);
-      throw;
-    }
-    MPI_Comm_free(&team_comm);
-
-    // No pair matrix crosses team boundaries.  The only world-wide
-    // communication is this small sum over final representative-node data.
-    allreduce_accumulator(accumulator,world);
-    return finalize(self,workspace,accumulator,output_tau,cut_results);
+    // The replicated layout is exactly the one-shard case. Keep a single
+    // implementation of ownership, profiling, and final reductions.
+    return evaluate_sharded_mpi(self,physical,workspace,pseudo_degeneracy,
+      output_tau,world,1,requested_team_count,layout,cut_results,
+      whole_poles,profile_enabled,profile_output);
   }
+
 #endif
 
 private:
@@ -1414,6 +1456,7 @@ private:
       int catalog_index,
       const TeamContext& team)
   {
+    EvaluationProfile::Timer compute(team.profile,EvaluationProfile::PairCompute);
     const auto& basis=workspace.basis();
     const auto& catalog=self.pair_catalogs_[catalog_index];
     const int r=workspace.rank();
@@ -1461,9 +1504,17 @@ private:
       counts[worker]=(e-b)*r;
       displacements[worker]=b*r;
     }
+    compute.stop();
+    if (team.profile) {
+      team.profile->gather_calls+=1;
+      team.profile->gather_table_bytes+=double(pair_values.size())*sizeof(double);
+    }
+    EvaluationProfile::Timer gather(team.profile,EvaluationProfile::PairGather);
     MPI_Allgatherv(local_values.data(),static_cast<int>(local_values.size()),
                    MPI_DOUBLE,pair_values.data(),counts.data(),
                    displacements.data(),MPI_DOUBLE,team.communicator);
+    gather.stop();
+    EvaluationProfile::Timer unpack(team.profile,EvaluationProfile::PairCompute);
     return pair_values.transpose();
 #else
     throw std::logic_error("multi-rank OCA requested without MPI support");
@@ -1475,6 +1526,7 @@ private:
       const MatrixXd& pair_transposed,
       const TeamContext& team)
   {
+    EvaluationProfile::Timer compute(team.profile,EvaluationProfile::ReflectCompute);
     if (team.size==1)
       return basis.reflect_transposed_values(pair_transposed);
 #ifdef _MPI
@@ -1496,9 +1548,17 @@ private:
       counts[worker]=(e-b)*r;
       displacements[worker]=b*r;
     }
+    compute.stop();
+    if (team.profile) {
+      team.profile->gather_calls+=1;
+      team.profile->gather_table_bytes+=double(reflected_values.size())*sizeof(double);
+    }
+    EvaluationProfile::Timer gather(team.profile,EvaluationProfile::ReflectGather);
     MPI_Allgatherv(local_values.data(),static_cast<int>(local_values.size()),
                    MPI_DOUBLE,reflected_values.data(),counts.data(),
                    displacements.data(),MPI_DOUBLE,team.communicator);
+    gather.stop();
+    EvaluationProfile::Timer unpack(team.profile,EvaluationProfile::ReflectCompute);
     return reflected_values.transpose();
 #else
     throw std::logic_error("multi-rank OCA requested without MPI support");
@@ -1516,6 +1576,7 @@ private:
       const TeamContext& team,
       NodeAccumulator& accumulator)
   {
+    EvaluationProfile::Timer schedule(team.profile,EvaluationProfile::Setup);
     const auto& basis=workspace.basis();
     const int r=workspace.rank();
 
@@ -1555,13 +1616,16 @@ private:
       physical_owner=greedy_owners(costs,team.size);
     }
 
+    schedule.stop();
     for (int l=first_pole; l<last_pole; l+=pole_stride) {
       // Stable kernel dressing is formed once on each cooperating rank.  It
       // is only r-by-Npseudo; distributing it would cost more than recomputing
       // it and would add a collective before both pair catalogs.
+      EvaluationProfile::Timer dressing(team.profile,EvaluationProfile::Dress);
       const int tilt_sign=workspace.poles()(l)>0.0 ? +1 : -1;
       const MatrixXd tilted=workspace.tilted_pseudo_coefficients(
         self.all_pseudos_,l,tilt_sign);
+      dressing.stop();
 
       // Each rank computes a contiguous slice of pair columns.  Team-local
       // Allgatherv assembles the two complete [pair,time] tables needed by
@@ -1595,6 +1659,7 @@ private:
         if (team.size==1) {
           // Preserve the large batched serial path when pole parallelism is
           // sufficient.  This is faster than many tiny outer-block solves.
+          EvaluationProfile::Timer sparse(team.profile,EvaluationProfile::SelfSparse);
           MatrixXd h_transposed=MatrixXd::Zero(cp.outer_pairs.size(),r);
           for (int expanded=0; expanded<self.channel_count_; ++expanded) {
             const double residue=workspace.residues()(expanded,l);
@@ -1609,12 +1674,16 @@ private:
               h_transposed.noalias() += residue*contribution;
             }
           }
+          sparse.stop();
+          EvaluationProfile::Timer transform(team.profile,EvaluationProfile::SelfDLR);
           const MatrixXd h_values=h_transposed.transpose();
           const MatrixXd h_coefficients=
             basis.values_to_coefficients(h_values);
+          transform.stop();
           for (int outer=0; outer<self.pseudo_count_; ++outer) {
             const auto& ids=cp.outer_by_first[outer];
             if (ids.empty()) continue;
+            EvaluationProfile::Timer conv(team.profile,EvaluationProfile::SelfConvolution);
             MatrixXd rhs(r,ids.size());
             for (int j=0; j<static_cast<int>(ids.size()); ++j)
               rhs.col(j)=h_coefficients.col(ids[j]);
@@ -1623,6 +1692,8 @@ private:
               : VectorXd(tilted.col(outer));
             const MatrixXd values=
               basis.time_ordered_convolution_values(lhs,rhs);
+            conv.stop();
+            EvaluationProfile::Timer add(team.profile,EvaluationProfile::SelfAccumulate);
             add_self_values(cp,cut,outer,ids.front(),values,external,
                             pseudo_degeneracy,accumulator);
           }
@@ -1637,6 +1708,7 @@ private:
               continue;
             const int row_first=ids.front();
             const int row_count=static_cast<int>(ids.size());
+            EvaluationProfile::Timer sparse(team.profile,EvaluationProfile::SelfSparse);
             MatrixXd h_transposed=MatrixXd::Zero(row_count,r);
             for (int expanded=0; expanded<self.channel_count_; ++expanded) {
               const double residue=workspace.residues()(expanded,l);
@@ -1653,14 +1725,20 @@ private:
                 h_transposed.noalias() += residue*contribution;
               }
             }
+            sparse.stop();
+            EvaluationProfile::Timer transform(team.profile,EvaluationProfile::SelfDLR);
             const MatrixXd h_values=h_transposed.transpose();
             const MatrixXd h_coefficients=
               basis.values_to_coefficients(h_values);
+            transform.stop();
+            EvaluationProfile::Timer conv(team.profile,EvaluationProfile::SelfConvolution);
             const VectorXd lhs=nonpositive
               ? VectorXd(workspace.pseudo_coefficients().col(outer))
               : VectorXd(tilted.col(outer));
             const MatrixXd values=
               basis.time_ordered_convolution_values(lhs,h_coefficients);
+            conv.stop();
+            EvaluationProfile::Timer add(team.profile,EvaluationProfile::SelfAccumulate);
             add_self_values(cp,cut,outer,row_first,values,external,
                             pseudo_degeneracy,accumulator);
           }
@@ -1677,6 +1755,7 @@ private:
         reflected[1]=reflect_pair_transposed(
           basis,pair_transposed[1],team);
 
+        EvaluationProfile::Timer physical_timer(team.profile,EvaluationProfile::Physical);
         for (int task_id=0;
              task_id<static_cast<int>(physical_tasks.size()); ++task_id) {
           if (physical_owner[task_id]!=team.rank) continue;

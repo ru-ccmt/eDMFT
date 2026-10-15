@@ -1419,14 +1419,18 @@ public:
               oca_dlr_topology_shard_count,
               pars["oca_dlr_mpi_teams"].get<int>(),
               &parallel_layout,
-              dlr_cut_diagnostic ? &compact_cuts : nullptr);
+              dlr_cut_diagnostic ? &compact_cuts : nullptr,
+              pars["oca_dlr_whole_poles"].get<bool>(),
+              pars["oca_dlr_profile"].get<bool>(),mpi.out);
           else
             combined=edmft::oca_dlr::CombinedEvaluator::evaluate_mpi(
               *oca_dlr_self_plan,physical_for_iteration,
               *diagram_dlr_workspace,degeneracy,tau,
               MPI_COMM_WORLD,pars["oca_dlr_mpi_teams"].get<int>(),
               &parallel_layout,
-              dlr_cut_diagnostic ? &compact_cuts : nullptr);
+              dlr_cut_diagnostic ? &compact_cuts : nullptr,
+              pars["oca_dlr_whole_poles"].get<bool>(),
+              pars["oca_dlr_profile"].get<bool>(),mpi.out);
         } else
 #endif
         {
