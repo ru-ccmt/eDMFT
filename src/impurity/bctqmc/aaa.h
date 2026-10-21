@@ -12,12 +12,14 @@
 #include "bblas.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <complex>
 #include <limits>
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include "aaa_memory.h"
 
 extern "C" {
   void FNAME(zggev)(const char* jobvl, const char* jobvr, const int* n,
@@ -49,6 +51,9 @@ struct Options {
   // same objects: poles are zeros of the barycentric denominator.
   int max_support_pairs = 25;
   bool relative_tolerance = true;
+  // Optional initialization diagnostics. The MPI adapter supplies this only
+  // on its master rank; standalone numerical users remain silent by default.
+  std::ostream* diagnostics = nullptr;
 };
 
 struct PoleExpansion {
@@ -220,6 +225,46 @@ inline std::vector<MatrixXcd> unflatten_residues(const MatrixXcd& c, int nr, int
   return out;
 }
 
+// A matrix-valued fit can contain many identically zero elements. Their
+// optimal residues are zero, so removing these right-hand sides changes
+// neither the least-squares objective nor its pole derivative. In particular,
+// this is NOT an amplitude cutoff: even a 1e-16 anomalous channel is retained.
+// Determine activity AFTER constructing the Hermitian frequency partners;
+// this also handles a nonzero off-diagonal entry and its transposed partner.
+struct ActiveSamples {
+  MatrixXcd values;
+  std::vector<int> elements;
+  int rows=0, cols=0;
+
+  explicit ActiveSamples(const std::vector<MatrixXcd>& f)
+    : rows(f[0].rows()), cols(f[0].cols())
+  {
+    for (int i=0; i<rows; ++i)
+      for (int j=0; j<cols; ++j) {
+        bool active=false;
+        for (const auto& sample:f)
+          if (sample(i,j)!=Complex(0,0)) { active=true; break; }
+        if (active) elements.push_back(i*cols+j);
+      }
+    // Keep one zero RHS for an all-zero input, avoiding special empty-matrix
+    // paths in Eigen/L-BFGS-B. This does not introduce a nonzero residue.
+    if (elements.empty()) elements.push_back(0);
+    values.resize(f.size(),elements.size());
+    for (int e=0; e<static_cast<int>(elements.size()); ++e)
+      for (int n=0; n<static_cast<int>(f.size()); ++n)
+        values(n,e)=f[n](elements[e]/cols,elements[e]%cols);
+  }
+
+  std::vector<MatrixXcd> residues(const MatrixXcd& c) const
+  {
+    std::vector<MatrixXcd> out(c.rows(),MatrixXcd::Zero(rows,cols));
+    for (int l=0; l<c.rows(); ++l)
+      for (int e=0; e<c.cols(); ++e)
+        out[l](elements[e]/cols,elements[e]%cols)=c(l,e);
+    return out;
+  }
+};
+
 inline MatrixXcd design_matrix(const std::vector<Complex>& z, const VectorXd& poles)
 {
   MatrixXcd a(z.size(),poles.size());
@@ -227,6 +272,52 @@ inline MatrixXcd design_matrix(const std::vector<Complex>& z, const VectorXd& po
     for (int l=0; l<a.cols(); ++l) a(n,l)=1.0/(z[n]-poles(l));
   return a;
 }
+
+// Variable-projection objective used by the real-pole refinement. QR is
+// deliberately retained: forming normal equations would square the condition
+// number of the Cauchy matrix. At the optimal residues C, R=B-A*C is orthogonal
+// to A, eliminating dC/dp from d||R||/dp.
+struct PoleObjective {
+  const std::vector<Complex>& z;
+  const MatrixXcd& b;
+  std::ostream* diagnostics=nullptr;
+  int evaluations=0;
+  using Clock=std::chrono::steady_clock;
+  Clock::time_point start=Clock::now(), last_progress=start;
+
+  double operator()(const VectorXd& p, VectorXd& grad)
+  {
+    const MatrixXcd a=design_matrix(z,p);
+    const MatrixXcd c=a.colPivHouseholderQr().solve(b);
+    const MatrixXcd residual=b-a*c;
+    const double residual_norm=residual.norm();
+    grad.resize(p.size());
+    VectorXcd da(z.size());
+    for (int l=0; l<p.size(); ++l) {
+      for (int n=0; n<static_cast<int>(z.size()); ++n)
+        da(n)=1.0/((z[n]-p(l))*(z[n]-p(l)));
+      // Contract the frequency index first. Eigen's dot conjugates its LEFT
+      // operand, giving sum_n conj(R_ne)*da_n. This is the old gradient
+      // exactly, without constructing an n_frequency x n_element matrix dr
+      // for each pole. Only the floating-point summation order changes.
+      Complex contraction=0;
+      for (int e=0; e<c.cols(); ++e)
+        contraction+=c(l,e)*residual.col(e).dot(da);
+      grad(l)=residual_norm>std::numeric_limits<double>::min()
+        ? -contraction.real()/residual_norm : 0.0;
+    }
+    ++evaluations;
+    const auto now=Clock::now();
+    if (diagnostics && std::chrono::duration<double>(now-last_progress).count()>=30.) {
+      // Evaluations include line-search trials; they are not accepted steps.
+      (*diagnostics) << "AAA refinement progress: evaluations=" << evaluations
+                     << " elapsed_seconds=" << std::chrono::duration<double>(now-start).count()
+                     << " trial_objective=" << residual_norm << std::endl;
+      last_progress=now;
+    }
+    return residual_norm;
+  }
+};
 
 } // namespace detail
 
@@ -241,6 +332,37 @@ inline Result fit(const std::vector<Complex>& z_positive,
   const int nr=f_positive[0].rows(), nc=f_positive[0].cols(), nelem=nr*nc;
   const MatrixXcd fflat=detail::flatten_samples(samples.f);
   MatrixXcd fitflat=MatrixXcd::Zero(n,nelem);
+  // Remove ONLY identically zero matrix elements from the least-squares
+  // rows. The impurity adapter embeds B independent scalar baths in a BxB
+  // diagonal matrix, so B*(B-1) elements would otherwise add nothing but
+  // zeros to every Loewner column. Do not use a magnitude threshold: small
+  // anomalous channels must survive unchanged. Scan the conjugate-extended
+  // samples as well, so a general matrix's transposed partner is retained.
+  // Keep the original matrix layout in fflat, fitflat and Result; callers,
+  // Hermitian conjugation, norms and channel diagnostics are unaffected.
+  std::vector<int> active_elements;
+  for (int e=0; e<nelem; ++e)
+    if ((fflat.col(e).array()!=Complex(0.0,0.0)).any())
+      active_elements.push_back(e);
+  // A completely zero input still needs a nonempty homogeneous SVD problem
+  // to construct the (zero-valued) barycentric result.
+  if (active_elements.empty()) active_elements.push_back(0);
+  const Eigen::Index nactive=active_elements.size();
+  // Reserve one maximum-sized backing buffer for the whole greedy search.
+  // Reallocating progressively larger matrices at every support count can
+  // leave their freed pages retained by the system allocator until much
+  // later. A block view changes only the logical shape, never the allocation.
+  const int max_support=2*std::min(opts.max_support_pairs,nhalf);
+  MatrixXd real_workspace(2*static_cast<Eigen::Index>(std::max(n-2,0))*nactive,
+                          max_support);
+  if (opts.diagnostics) {
+    *opts.diagnostics << "AAA fit workspace: positive_samples=" << nhalf
+      << " matrix_elements=" << nelem << " active_elements=" << nactive
+      << " construction=direct-real-reused-inplace-qr"
+      << " reserved_mib=" << double(real_workspace.size())*sizeof(double)/(1024.0*1024.0)
+      << std::endl;
+    detail::print_memory(opts.diagnostics,"fit-start");
+  }
   std::vector<bool> chosen(n,false);
   std::vector<int> support, remaining;
   Result result;
@@ -268,29 +390,67 @@ inline Result fit(const std::vector<Complex>& z_positive,
     // is rectangular: only min(rows,columns)=m singular values exist.  The
     // right singular vector belonging to the smallest singular value gives
     // the unit-norm weights that minimize ||A w||_2.
-    const int m=support.size(), k=m/2, nrows=remaining.size()*nelem;
-    MatrixXcd apart(nrows,m);
-    for (int q=0; q<static_cast<int>(remaining.size()); ++q) {
-      const int ii=remaining[q];
-      for (int e=0; e<nelem; ++e)
-        for (int j=0; j<m; ++j) {
-          const int sj=support[j];
-          apart(q*nelem+e,j)=(fflat(ii,e)-fflat(sj,e))/(samples.z[ii]-samples.z[sj]);
-        }
-    }
-    MatrixXcd transformed(nrows,2*k);
-    for (int j=0; j<k; ++j) {
-      transformed.col(j)=apart.col(2*j)+apart.col(2*j+1);
-      transformed.col(k+j)=Complex(0.0,1.0)*(apart.col(2*j)-apart.col(2*j+1));
-    }
+    const int m=support.size(), k=m/2;
+    const Eigen::Index nrows=static_cast<Eigen::Index>(remaining.size())*nactive;
     // Parameterize conjugate weights by k complex numbers and rewrite the
     // complex least-squares problem as a real one.  This imposes the symmetry
     // exactly rather than hoping an unconstrained SVD rediscovers it.
-    MatrixXd areal(2*nrows,2*k);
-    areal.topRows(nrows)=transformed.real();
-    areal.bottomRows(nrows)=transformed.imag();
-    Eigen::JacobiSVD<MatrixXd> svd(areal,Eigen::ComputeThinV);
-    const VectorXd wr=svd.matrixV().col(2*k-1);
+    auto areal=real_workspace.topLeftCorner(2*nrows,2*k);
+    // Form Re/Im of A_plus+A_minus and i*(A_plus-A_minus) directly.
+    // The former implementation retained both the complex Loewner matrix
+    // and a second complex transformed copy alongside areal and QR storage.
+    // Neither is needed. Column-pair-major traversal writes contiguous
+    // columns, with exactly the same conjugate-weight parameterization.
+    for (int j=0; j<k; ++j) {
+      const int sp=support[2*j], sm=support[2*j+1];
+      for (Eigen::Index q=0; q<static_cast<Eigen::Index>(remaining.size()); ++q) {
+        const int ii=remaining[q];
+        const Complex dp=samples.z[ii]-samples.z[sp];
+        const Complex dm=samples.z[ii]-samples.z[sm];
+        for (Eigen::Index a=0; a<nactive; ++a) {
+          const int e=active_elements[a];
+          const Complex ap=(fflat(ii,e)-fflat(sp,e))/dp;
+          const Complex am=(fflat(ii,e)-fflat(sm,e))/dm;
+          const Complex left=ap+am, right=Complex(0.0,1.0)*(ap-am);
+          const Eigen::Index row=q*nactive+a;
+          areal(row,j)=left.real();
+          areal(nrows+row,j)=left.imag();
+          areal(row,k+j)=right.real();
+          areal(nrows+row,k+j)=right.imag();
+        }
+      }
+    }
+    if (opts.diagnostics) {
+      *opts.diagnostics << "AAA fit SVD: support_points=" << m
+        << " rows=" << areal.rows() << " columns=" << m
+        << " matrix_mib=" << double(areal.size())*sizeof(double)/(1024.0*1024.0)
+        << std::endl;
+      detail::print_memory(opts.diagnostics,"before-svd");
+    }
+    // Keep the stable pivoted QR -> small SVD solve, but perform the tall QR
+    // IN PLACE. Eigen's direct JacobiSVD otherwise owns a second tall copy,
+    // whose shape changes at each support count. For A*P=Q*R, the minimizing
+    // right vector of A is P*v_min(R); no Q or left singular vectors are
+    // needed. Never form A^T*A, which squares the condition number.
+    VectorXd wr;
+    if (areal.rows()>=m) {
+      const double scale=areal.cwiseAbs().maxCoeff();
+      if (!std::isfinite(scale)) throw std::runtime_error("nonfinite AAA Loewner matrix");
+      if (scale>0.0) areal/=scale;
+      Eigen::ColPivHouseholderQR<Eigen::Ref<MatrixXd>> qr(areal);
+      const MatrixXd r=qr.matrixQR().topLeftCorner(m,m).template triangularView<Eigen::Upper>();
+      Eigen::JacobiSVD<MatrixXd> svd(r,Eigen::ComputeFullV);
+      wr=qr.colsPermutation()*svd.matrixV().col(m-1);
+    } else if (areal.rows()>0) {
+      // Very small data sets can have fewer unused rows than supports.
+      // Full V includes the nullspace in this wide-matrix corner case.
+      Eigen::JacobiSVD<MatrixXd> svd(areal,Eigen::ComputeFullV);
+      wr=svd.matrixV().col(m-1);
+    } else {
+      // All samples are now supports: any nonzero weights interpolate them.
+      wr=VectorXd::Zero(m); wr.head(k).setOnes();
+    }
+    detail::print_memory(opts.diagnostics,"after-svd");
     result.weights.resize(m);
     for (int j=0; j<k; ++j) {
       result.weights(2*j)=Complex(wr(j),wr(k+j));
@@ -320,6 +480,7 @@ inline Result fit(const std::vector<Complex>& z_positive,
     if (err<=threshold || static_cast<int>(support.size())>=n) break;
   }
   result.poles=detail::generalized_poles(result.support_points,result.weights);
+  detail::print_memory(opts.diagnostics,"fit-done");
   return result;
 }
 
@@ -329,14 +490,14 @@ inline PoleExpansion fit_residues(const std::vector<Complex>& z_positive,
 {
   if (poles.size()==0) return {};
   const auto samples=detail::make_symmetric_samples(z_positive,f_positive);
-  const MatrixXcd b=detail::flatten_samples(samples.f);
+  const detail::ActiveSamples active(samples.f);
   const MatrixXcd a=detail::design_matrix(samples.z,poles);
   // Once pole locations are fixed the residues enter linearly.  Solve all
   // matrix elements together; every column shares the same Cauchy matrix A.
-  const MatrixXcd c=a.colPivHouseholderQr().solve(b);
+  const MatrixXcd c=a.colPivHouseholderQr().solve(active.values);
   PoleExpansion out;
   out.poles=poles;
-  out.residues=detail::unflatten_residues(c,f_positive[0].rows(),f_positive[0].cols());
+  out.residues=active.residues(c);
   // With real poles and conjugate-paired samples the residues are Hermitian.
   // Enforce that exact structure at roundoff level.
   if (f_positive[0].rows()==f_positive[0].cols())
@@ -347,6 +508,8 @@ inline PoleExpansion fit_residues(const std::vector<Complex>& z_positive,
 struct RefinementReport {
   PoleExpansion expansion;
   int iterations=0;
+  int evaluations=0;
+  double seconds=0.0;
   double objective=0.0;
   double relative_rms_error=0.0;
   double max_error=0.0;
@@ -372,7 +535,8 @@ inline CompressionReport compress_poles_greedy(
     const std::vector<MatrixXcd>& f_positive,
     const PoleExpansion& source,
     int target_poles,
-    double channel_scale_floor_ratio=1.e-12)
+    double channel_scale_floor_ratio=1.e-12,
+    bool preserve_both_frequency_signs=false)
 {
   detail::validate_samples(z_positive,f_positive);
   if (source.poles.size()==0)
@@ -469,6 +633,14 @@ inline CompressionReport compress_poles_greedy(
     CompressionReport best;
     VectorXd best_poles;
     for (int removed=0;removed<poles.size();++removed) {
+      // FCA can request one pole on each side of zero. This optional guard
+      // never changes the existing TCA compression policy. It protects both
+      // signs only when present in the source and when the budget permits.
+      if (preserve_both_frequency_signs && target_poles>=2 &&
+          (poles.array()<0.0).any() && (poles.array()>0.0).any()) {
+        if (poles(removed)<0.0 && (poles.array()<0.0).count()==1) continue;
+        if (poles(removed)>0.0 && (poles.array()>0.0).count()==1) continue;
+      }
       VectorXd candidate_poles(poles.size()-1);
       for (int source_index=0,target_index=0;
            source_index<poles.size();++source_index)
@@ -498,42 +670,27 @@ inline RefinementReport refine_poles(const std::vector<Complex>& z_positive,
                                      double lower_bound,
                                      double upper_bound,
                                      int max_iterations=200,
-                                     double gradient_tolerance=1e-10)
+                                     double gradient_tolerance=1e-10,
+                                     std::ostream* diagnostics=nullptr)
 {
   if (initial_poles.size()==0) return {};
   if (!(lower_bound<upper_bound)) throw std::invalid_argument("AAA pole bounds must be ordered");
+  const auto start=std::chrono::steady_clock::now();
+  detail::print_memory(diagnostics,"refinement-start");
   const auto samples=detail::make_symmetric_samples(z_positive,f_positive);
-  const MatrixXcd b=detail::flatten_samples(samples.f);
+  const detail::ActiveSamples active(samples.f);
+  if (diagnostics)
+    (*diagnostics) << "AAA refinement start: poles=" << initial_poles.size()
+                   << " samples=" << samples.z.size()
+                   << " active_elements=" << active.values.cols()
+                   << " full_elements=" << active.rows*active.cols << std::endl;
 
   // AAA itself does not guarantee real poles.  We retain the real candidates
   // and optimize their real positions with box-constrained L-BFGS-B.  For
   // each trial pole vector the optimal residues are eliminated by a linear
   // least-squares solve (variable projection), so the nonlinear optimizer
   // sees only one scalar variable per pole.
-  struct Objective {
-    const std::vector<Complex>& z;
-    const MatrixXcd& b;
-    double operator()(const VectorXd& p, VectorXd& grad) const
-    {
-      const MatrixXcd a=detail::design_matrix(z,p);
-      const MatrixXcd c=a.colPivHouseholderQr().solve(b);
-      const MatrixXcd residual=b-a*c;
-      const double residual_norm=residual.norm();
-      grad.resize(p.size());
-      for (int l=0; l<p.size(); ++l) {
-        // d[1/(z-p_l)]/dp_l = +1/(z-p_l)^2.  Because the residues are the
-        // least-squares optimum, the variable-projection orthogonality makes
-        // the omitted derivative of c vanish in the objective gradient.
-        VectorXcd da(z.size());
-        for (int n=0; n<static_cast<int>(z.size()); ++n) da(n)=1.0/((z[n]-p(l))*(z[n]-p(l)));
-        const MatrixXcd dr=da*c.row(l);
-        const double half_norm2_gradient=-(residual.conjugate().array()*dr.array()).sum().real();
-        grad(l)=residual_norm>std::numeric_limits<double>::min() ?
-                half_norm2_gradient/residual_norm : 0.0;
-      }
-      return residual_norm;
-    }
-  } objective{samples.z,b};
+  detail::PoleObjective objective{samples.z,active.values,diagnostics};
 
   LBFGSpp::LBFGSBParam<double> param;
   param.epsilon=gradient_tolerance;
@@ -549,6 +706,7 @@ inline RefinementReport refine_poles(const std::vector<Complex>& z_positive,
   RefinementReport report;
   report.expansion=fit_residues(z_positive,f_positive,initial_poles);
   report.iterations=iterations;
+  report.evaluations=objective.evaluations;
   report.objective=fx;
   double scale2=0.0,err2=0.0,maxerr=0.0;
   for (int i=0; i<static_cast<int>(z_positive.size()); ++i) {
@@ -558,6 +716,13 @@ inline RefinementReport refine_poles(const std::vector<Complex>& z_positive,
   }
   report.relative_rms_error=std::sqrt(err2/std::max(scale2,std::numeric_limits<double>::min()));
   report.max_error=maxerr;
+  report.seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
+  if (diagnostics)
+    (*diagnostics) << "AAA refinement done: iterations=" << report.iterations
+                   << " evaluations=" << report.evaluations
+                   << " seconds=" << report.seconds
+                   << " relative_rms=" << report.relative_rms_error << std::endl;
+  detail::print_memory(diagnostics,"refinement-done");
   return report;
 }
 

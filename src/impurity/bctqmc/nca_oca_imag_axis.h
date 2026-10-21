@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <climits>
+#include <functional>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -977,6 +978,16 @@ inline void RedistributeOCAPathRecordsMPI(vector<OCAPathRecord>& paths,
 // Enumerate the OCA topology once, before selecting a numerical integrator.
 // Importance filtering, CIX selection rules, operator signs, and Bulla matrix
 // replacements therefore remain exactly common to legacy and DLR paths.
+// A bounded consumer receives partial key sums, NOT complete diagrams. It must
+// combine equal full keys (including both bath indices) before evaluating them.
+// Only DLR production uses this hook; the original two-pass path remains intact.
+// The map and weight vector have fixed capacity; no global count pass is needed.
+struct OCABoundedEnumeration {
+  size_t max_paths=100000;
+  bool distributed=true;
+  std::function<void(const std::vector<OCACompactPath>&)> consume;
+};
+
 inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
 				       Cix& cix,
 				       const vector<int>& G_importance,
@@ -985,8 +996,12 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
 				       bool export_path_records,
 				       const std::string& mpi_topology_mode,
 				       double max_replicated_megabytes,
-				       MPIcls& mpi)
+                                       MPIcls& mpi,
+                                       const OCABoundedEnumeration* bounded=nullptr)
 {
+  if (bounded && (build_legacy_catalog || !bounded->consume ||
+      bounded->max_paths==0 || bounded->max_paths>static_cast<size_t>(INT_MAX)))
+    throw std::invalid_argument("invalid bounded OCA enumeration options");
   if (mpi_topology_mode!="auto" && mpi_topology_mode!="replicated" &&
       mpi_topology_mode!="distributed")
     throw std::invalid_argument(
@@ -1116,7 +1131,7 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
 
   // Data which store the components of the diagram, so that integration looks like a problem of a single orbital.
   int states_unique_size=0;
-  {// This part is carbon-copy of the algorithm below, except that we only calculate the size of the hash-table states_unique.
+  if (!bounded) {// This part is carbon-copy of the algorithm below, except that we only calculate the size of the hash-table states_unique.
     // You should not try to understand that, because we comment only the complete algorithm below. This is just stripped/off equivalent,
     // which does not compute anything except total size of the storage.
     unordered_map<OCAKey,int,OCAKeyHash> states_unique;
@@ -1139,7 +1154,7 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
 	for (const auto& [ib, alw] : allowed){     // going over all allowed contributions from all blocks.
 	  if (alw[0].extent(0)>0 and alw[1].extent(0)>0 and alw[2].extent(0)>0 and alw[3].extent(0)>0){
 	    const size_t current_task=task_cursor++;
-	    if (task_owner[current_task]!=mpi.rank) continue;
+	    if ((!bounded || bounded->distributed) && task_owner[current_task]!=mpi.rank) continue;
 	    TinyVector<int,Nd> ibs;  // the four blocks for pseudo-particles (see figure below). ib is the index to the last block.
 	    ibs[0] = cix.Fbc(diag2matrix.op(0),ib);      // op(0) is computed before, and can be applied to ib to get ibs[0] (see figure)
 	    ibs[1] = cix.Fbc(diag2matrix.op(1),ibs[0]);  // op(1) is applied to ibs[0] to get ibs[1], etc...
@@ -1280,8 +1295,11 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
     states_unique_size = states_unique.size();
   }
   const auto pass1_end=EnumerationClock::now();
-  (*mpi.out)<<"local_states_unique.size="<<states_unique_size
-            <<" rank="<<mpi.rank<<endl;
+  if (!bounded)
+    (*mpi.out)<<"local_states_unique.size="<<states_unique_size
+              <<" rank="<<mpi.rank<<endl;
+  else
+    states_unique_size=static_cast<int>(bounded->max_paths);
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   const auto pass2_start=EnumerationClock::now();
   
@@ -1293,6 +1311,28 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
   // for each unique key in states_unique map (which uniquely specifies the diagram contribution) the value of the map gives index to array mm_nds, index0,.., index3
   int mm_nds_size=0;
   vector<TinyVector<double,5>> mm_nds(states_unique_size); // contains the matrix elements for Phi, and Nds matrix elements for vertex F(omega) calculation. There are two Nds values, because of two hybridizations.
+  // Flush only between complete insert/update operations. A later occurrence
+  // of the same key can appear in another flush; the disk reducer reunites it.
+  // Do not evaluate a flush directly: cancellation must precede plan building.
+  const auto flush_bounded=[&]() {
+    if (!bounded || states_unique.empty()) return;
+    vector<OCACompactPath> records;
+    records.reserve(states_unique.size());
+    for (const auto& [key,index]:states_unique) {
+      OCACompactPath record;
+      record.key=key;
+      for (int j=0;j<5;++j) record.weights[j]=mm_nds[index][j];
+      if (!OCAPathWeightsAreZero(record.weights)) records.push_back(record);
+    }
+    bounded->consume(records);
+    states_unique.clear(); // retain fixed bucket capacity for the next chunk
+    mm_nds_size=0;
+  };
+  const auto prepare_bounded_insert=[&](const OCAKey& key) {
+    if (bounded && states_unique.size()>=bounded->max_paths &&
+        states_unique.find(key)==states_unique.end())
+      flush_bounded();
+  };
   // mm_nds[0] = mm    for diagram
   // mm_nds[1] = nds1  first hybridization Nds matrix element
   // mm_nds[2] = nds2  second hybridization Nds matrix element
@@ -1335,7 +1375,7 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
 	for (const auto& [ib, alw] : allowed){     // going over all allowed contributions from all blocks.
 	  if (alw[0].extent(0)>0 and alw[1].extent(0)>0 and alw[2].extent(0)>0 and alw[3].extent(0)>0){
 	    const size_t current_task=task_cursor++;
-	    if (task_owner[current_task]!=mpi.rank) continue;
+	    if ((!bounded || bounded->distributed) && task_owner[current_task]!=mpi.rank) continue;
 	    TinyVector<int,Nd> ibs;  // the four blocks for pseudo-particles (see figure below). ib is the index to the last block.
 	    ibs[0] = cix.Fbc(diag2matrix.op(0),ib);      // op(0) is computed before, and can be applied to ib to get ibs[0] (see figure)
 	    ibs[1] = cix.Fbc(diag2matrix.op(1),ibs[0]);  // op(1) is applied to ibs[0] to get ibs[1], etc...
@@ -1429,6 +1469,7 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
 		    TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
 		    //
 		    OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // we pack the two hybridizations (s1,s0) and atomic states into unique index-vector.
+		    prepare_bounded_insert(st);
 		    auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // try to insert st-vector as a new key and mm_nds.size() as the value.
 		    // If the key is not yet present, inserted=true and "it" points to its current place. If key is present, "it" points to its existing place.
 		    int iind = it->second;                    // The key st has value iind, either just inserted, or found from before
@@ -1573,6 +1614,7 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
 			if (nds2==0) continue;
 			TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
 			OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
+			prepare_bounded_insert(st);
 			auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			int _iind_ = it->second; // in mm_nds and indexi, it is stored in _iind_
 			if (inserted){// not seen before, hence insert into mm_nds, index0, index1, index2, index3
@@ -1653,6 +1695,7 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
 			double nds1 =  mmp*njm1(_b1_,_a2_); // Now adding njm1.
 			TinyVector<int,4> states(ii0, ii1, ii2, ii3); // atomic states indices between [0,...cix.Npseudo_unique-1] array.
 			OCAKey st = pack6(s1, s0, states[3], states[2], states[1], states[0]); // all atributes of diagram contribution.
+			prepare_bounded_insert(st);
 			auto [it, inserted] = states_unique.try_emplace(st, mm_nds_size); // Did we see that contribution before?
 			int _iind_ = it->second; // in mm_nds and indexi, it is stored in _iind_
 			if (inserted){ // not seen before, hence insert into mm_nds, index0, index1, index2, index3
@@ -1698,6 +1741,12 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
       throw std::logic_error("OCA pass 2 task ordering disagrees with scheduler discovery");
   }
 
+  if (bounded) {
+    flush_bounded();
+    // No path gather, plan construction, or collective is allowed here.
+    // Each rank independently spools its owned reduced bath pairs.
+    return OCAEnumeration{};
+  }
   const auto pass2_end=EnumerationClock::now();
   (*mpi.out)<<"local mm_nds_size="<<mm_nds_size
             <<" rank="<<mpi.rank<<endl;
@@ -1722,6 +1771,9 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
     path.inner_index={-1,-1,-1,-1};
     local_paths.push_back(path);
   }
+  // Packed records now own the values: release construction copies early.
+  decltype(states_unique)().swap(states_unique);
+  decltype(mm_nds)().swap(mm_nds);
   std::sort(local_paths.begin(),local_paths.end(),
             [](const OCACompactPath& a,const OCACompactPath& b) {
               return a.key<b.key;
@@ -1861,7 +1913,7 @@ inline OCAEnumeration EnumerateOCAPaths(bool cmpPhysG,
     std::chrono::duration<double>(merge_end-merge_start).count();
   double compact_seconds=
     std::chrono::duration<double>(compact_end-compact_start).count();
-  unsigned long long local_count=states_unique.size();
+  unsigned long long local_count=static_cast<unsigned long long>(mm_nds_size);
   unsigned long long local_count_sum=local_count;
   unsigned long long local_count_min=local_count;
   unsigned long long local_count_max=local_count;

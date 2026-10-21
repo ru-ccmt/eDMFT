@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <chrono>
 #include <limits>
 #include <numbers>
 #include <stdexcept>
@@ -212,6 +213,11 @@ public:
   double omega_max() const { return omega_max_; }
   double lambda() const { return lambda_; }
   double tolerance() const { return eps_; }
+  // Conservative gate for the optional coefficient-chain optimization.
+  // A small residual is necessary, not a general conditioning guarantee.
+  // Tight interpolation tolerances were less stable in the SC stress tests;
+  // retain the node/solve route there even if the caller requests chaining.
+  bool coefficient_convolution_available() const { return coefficient_convolution_ok_; }
   const VectorXd& dimensionless_frequencies() const { return omega_dimensionless_; }
   const VectorXd& frequencies() const { return omega_physical_; }
   const VectorXd& relative_time_nodes() const { return time_relative_; }
@@ -569,7 +575,7 @@ public:
   // and its convolution Hilbert transform.  The atomic products themselves
   // remain separate because their dimensions and multiplication order vary.
   std::vector<std::vector<MatrixXd>>
-  time_ordered_convolution_values_right_prepared_batch(
+  time_ordered_convolution_values_right_prepared_batch_reference(
       const std::vector<const std::vector<MatrixXd>*>& f_values,
       const std::vector<const std::vector<MatrixXd>*>& g,
       const std::vector<const std::vector<MatrixXd>*>& hg,
@@ -664,6 +670,177 @@ public:
             values[item][l](i,j)=
               values_flat(l,output_offset[item]+i*nc[item]+j);
     }
+    return values;
+  }
+
+  // Optional caller-owned workspace. No basis-global mutable buffers: MPI
+  // workers and independent evaluators never alias this storage. Matrices
+  // are reused for repeated shapes; rank-by-M size is bounded by the caller's
+  // existing batch cap. No physics data survive a task via this workspace.
+  struct ConvolutionScratch {
+    bool profile=false;
+    double pack_seconds=0,transform_seconds=0,product_seconds=0,unpack_seconds=0;
+    std::vector<int> nr,nk,nc;
+    std::vector<Eigen::Index> input_offset,output_offset;
+    MatrixXd f_value_flat,f_flat,hf_flat,diagonal_flat,off_diagonal_flat,values_flat;
+    MatrixXd f_l,hf_l,diagonal,off_diagonal;
+  };
+  std::vector<std::vector<MatrixXd>>
+  time_ordered_convolution_values_right_prepared_batch(
+      const std::vector<const std::vector<MatrixXd>*>& f_values,
+      const std::vector<const std::vector<MatrixXd>*>& g,
+      const std::vector<const std::vector<MatrixXd>*>& hg,
+      bool reflect_output=false,ConvolutionScratch* scratch=nullptr,
+      const std::vector<const std::vector<MatrixXd>*>* left_hilbert=nullptr,
+      bool input_coefficients=false,bool output_coefficients=false) const
+  {
+    // With left_hilbert, f_values already contains coefficients. This lets
+    // callers transform a common prefix BEFORE sparse bath branching. Both
+    // coefficient arrays then undergo the same time-independent operator.
+    if (output_coefficients && (reflect_output || !coefficient_convolution_available()))
+      throw std::invalid_argument("DLR coefficient output unavailable or incompatible with reflection");
+    if (!scratch && !left_hilbert && !input_coefficients && !output_coefficients)
+      return time_ordered_convolution_values_right_prepared_batch_reference(
+      f_values,g,hg,reflect_output);
+    const int count=static_cast<int>(f_values.size());
+    if (static_cast<int>(g.size())!=count ||
+        static_cast<int>(hg.size())!=count)
+      throw std::invalid_argument(
+        "DLR batched prepared convolution: batch sizes differ");
+    if (count==0) return {};
+    if (left_hilbert && left_hilbert->size()!=f_values.size())
+      throw std::invalid_argument("DLR prepared left: batch sizes differ");
+
+    ConvolutionScratch local;
+    auto& buffers=scratch ? *scratch : local;
+    auto stamp=std::chrono::steady_clock::time_point{};
+    const auto mark=[&]() { if (buffers.profile) stamp=std::chrono::steady_clock::now(); };
+    const auto elapsed=[&](double& value) {
+      if (buffers.profile) value+=std::chrono::duration<double>(std::chrono::steady_clock::now()-stamp).count();
+    };
+    mark();
+    auto& nr=buffers.nr; auto& nk=buffers.nk; auto& nc=buffers.nc;
+    nr.resize(count); nk.resize(count); nc.resize(count);
+    auto& input_offset=buffers.input_offset; auto& output_offset=buffers.output_offset;
+    input_offset.assign(count+1,0); output_offset.assign(count+1,0);
+    for (int item=0;item<count;++item) {
+      if (f_values[item]==nullptr || g[item]==nullptr || hg[item]==nullptr ||
+          static_cast<int>(f_values[item]->size())!=rank() ||
+          static_cast<int>(g[item]->size())!=rank() ||
+          static_cast<int>(hg[item]->size())!=rank())
+        throw std::invalid_argument(
+          "DLR batched prepared convolution: coefficient count != rank");
+      nr[item]=(*f_values[item])[0].rows();
+      nk[item]=(*f_values[item])[0].cols();
+      nc[item]=(*g[item])[0].cols();
+      if (left_hilbert && (!(*left_hilbert)[item] ||
+          (*left_hilbert)[item]->size()!=static_cast<std::size_t>(rank())))
+        throw std::invalid_argument("DLR prepared left: coefficient count differs");
+      if ((*g[item])[0].rows()!=nk[item] ||
+          (*hg[item])[0].rows()!=nk[item] ||
+          (*hg[item])[0].cols()!=nc[item])
+        throw std::invalid_argument(
+          "DLR batched prepared convolution: incompatible matrices");
+      for (int l=0;l<rank();++l)
+        if ((*f_values[item])[l].rows()!=nr[item] ||
+            (*f_values[item])[l].cols()!=nk[item] ||
+            (*g[item])[l].rows()!=nk[item] ||
+            (*g[item])[l].cols()!=nc[item] ||
+            (*hg[item])[l].rows()!=nk[item] ||
+            (*hg[item])[l].cols()!=nc[item])
+          throw std::invalid_argument(
+            "DLR batched prepared convolution: matrix dimensions vary");
+      input_offset[item+1]=input_offset[item]+nr[item]*nk[item];
+      output_offset[item+1]=output_offset[item]+nr[item]*nc[item];
+    }
+
+    auto& f_value_flat=buffers.f_value_flat;
+    f_value_flat.resize(rank(),input_offset.back());
+    // Flat matrices are column-major: write one contiguous DLR column at a
+    // time instead of making rank strided passes across the entire batch.
+    for (int item=0;item<count;++item)
+      for (int i=0;i<nr[item];++i)
+        for (int j=0;j<nk[item];++j)
+          for (int l=0;l<rank();++l)
+            f_value_flat(l,input_offset[item]+i*nk[item]+j)=
+              (*f_values[item])[l](i,j);
+    elapsed(buffers.pack_seconds); mark();
+    auto& f_flat=buffers.f_flat;
+    auto& hf_flat=buffers.hf_flat;
+    hf_flat.resize(rank(),input_offset.back());
+    if (left_hilbert) {
+      f_flat.swap(f_value_flat);
+      for (int item=0;item<count;++item) for (int l=0;l<rank();++l) {
+        const auto& h=(*(*left_hilbert)[item])[l];
+        if (h.rows()!=nr[item] || h.cols()!=nk[item])
+          throw std::invalid_argument("DLR prepared left: matrix dimensions differ");
+        for (int i=0;i<nr[item];++i) for (int j=0;j<nk[item];++j)
+          hf_flat(l,input_offset[item]+i*nk[item]+j)=h(i,j);
+      }
+    } else {
+      if (input_coefficients) f_flat.swap(f_value_flat);
+      else f_flat=lu_.solve(f_value_flat);
+      hf_flat.noalias()=thilb_*f_flat;
+    }
+
+    elapsed(buffers.transform_seconds); mark();
+    auto& diagonal_flat=buffers.diagonal_flat;
+    auto& off_diagonal_flat=buffers.off_diagonal_flat;
+    diagonal_flat.resize(rank(),output_offset.back());
+    off_diagonal_flat.resize(rank(),output_offset.back());
+    for (int item=0;item<count;++item) {
+      auto& f_l=buffers.f_l; auto& hf_l=buffers.hf_l;
+      f_l.resize(nr[item],nk[item]); hf_l.resize(nr[item],nk[item]);
+      auto& diagonal=buffers.diagonal; auto& off_diagonal=buffers.off_diagonal;
+      for (int l=0;l<rank();++l) {
+        for (int i=0;i<nr[item];++i)
+          for (int j=0;j<nk[item];++j) {
+            const Eigen::Index column=input_offset[item]+i*nk[item]+j;
+            f_l(i,j)=f_flat(l,column);
+            hf_l(i,j)=hf_flat(l,column);
+          }
+        diagonal.noalias()=f_l*(*g[item])[l];
+        off_diagonal.noalias()=hf_l*(*g[item])[l]+f_l*(*hg[item])[l];
+        for (int i=0;i<nr[item];++i)
+          for (int j=0;j<nc[item];++j) {
+            const Eigen::Index column=output_offset[item]+i*nc[item]+j;
+            diagonal_flat(l,column)=diagonal(i,j);
+            off_diagonal_flat(l,column)=off_diagonal(i,j);
+          }
+      }
+    }
+
+    elapsed(buffers.product_seconds); mark();
+    auto& values_flat=buffers.values_flat;
+    values_flat.resize(rank(),output_offset.back());
+    // With coefficient output, B*M=T gives h=beta*(M*D+O).
+    // The off-diagonal term is ALREADY in the DLR basis. Do not apply B
+    // and then solve it away at the next convolution. Matrix products in
+    // D and O retain their noncommuting atomic order. The final convolution
+    // still uses the existing node/reflected formula at the boundary.
+    if (output_coefficients)
+      values_flat.noalias()=beta_*(ttcf2cf_*diagonal_flat+off_diagonal_flat);
+    else if (reflect_output)
+      values_flat.noalias()=beta_*(
+        reflected_ttcf2it_*diagonal_flat+
+        reflected_cf2it_*off_diagonal_flat);
+    else
+      values_flat.noalias()=beta_*(
+        ttcf2it_*diagonal_flat+cf2it_*off_diagonal_flat);
+
+    elapsed(buffers.transform_seconds); mark();
+    std::vector<std::vector<MatrixXd>> values(count);
+    for (int item=0;item<count;++item) {
+      // Every element below is assigned. Avoid a redundant zero-fill pass.
+      values[item].resize(rank());
+      for (auto& node:values[item]) node.resize(nr[item],nc[item]);
+      for (int i=0;i<nr[item];++i)
+        for (int j=0;j<nc[item];++j)
+          for (int l=0;l<rank();++l)
+            values[item][l](i,j)=
+              values_flat(l,output_offset[item]+i*nc[item]+j);
+    }
+    elapsed(buffers.unpack_seconds);
     return values;
   }
 
@@ -813,6 +990,19 @@ private:
     reflected_cf2it_.resize(rank(),rank());
     reflected_ttcf2it_.noalias()=reflection_values_*ttcf2it_;
     reflected_cf2it_.noalias()=reflection_values_*cf2it_;
+    // One rank-by-rank solve per basis, not an explicit inverse. This adds
+    // O(rank^2) storage and no bath- or pseudo-dependent cache. Ordinary
+    // convolution formulas above are unchanged when the new flags are off.
+    coefficient_convolution_ok_=false;
+    // Complete SC bath sums are more sensitive than isolated fixed-bath
+    // chains. The validated production regime is 1e-7 or looser; tighter
+    // bases retain the node projection at every stage automatically.
+    if (eps_>=1.e-7) {
+      ttcf2cf_=lu_.solve(ttcf2it_);
+      const double residual=(cf2it_*ttcf2cf_-ttcf2it_).norm();
+      coefficient_convolution_ok_=ttcf2cf_.allFinite() && std::isfinite(residual) &&
+        residual<=1.e-12*std::max(1.e-300,ttcf2it_.norm());
+    } else ttcf2cf_.resize(0,0);
   }
 
   double beta_,omega_max_,eps_,lambda_;
@@ -820,6 +1010,8 @@ private:
   VectorXd time_relative_,time_physical_;
   MatrixXd cf2it_,reflection_values_,thilb_,ttcf2it_;
   MatrixXd reflected_cf2it_,reflected_ttcf2it_;
+  MatrixXd ttcf2cf_;
+  bool coefficient_convolution_ok_=false;
   Eigen::PartialPivLU<MatrixXd> lu_;
   Eigen::PartialPivLU<MatrixXcd> zlu_;
 };

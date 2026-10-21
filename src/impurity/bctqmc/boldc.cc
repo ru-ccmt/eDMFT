@@ -27,6 +27,7 @@ MPIcls *mpi;
 #include "fmt/ostream.h"
 #include "readinput.h"
 #include "json.hpp"
+#include "analytic_orders.h"
 std::ostream* xout;
 #include "skeletons.h"
 //#include "whybrid.h"
@@ -84,6 +85,24 @@ void CurrentMC6(Array<double,1>& Phi_tot, Array<double,2>& Sm, Array<T,2>& G00, 
   double rescale=p["rescale"];
   int N_steps = p["Ms"];
   int minorder=p["N_min_order"], maxorder=p["Norder"];
+  // Only the master consumes Phi_lowest_order after the reductions; some
+  // analytic evaluators need not return the same scalar on worker ranks.
+  // Broadcast the validity decision so no worker can enter MC while the
+  // master rejects an absent normalization. This also guards future callers.
+  bool valid_anchor = mpi.rank==mpi.master &&
+    edmft::orders::valid_reference(Phi_lowest_order);
+  mpi.bcast_one_boolean(valid_anchor);
+  if (!valid_anchor) {
+    if (mpi.rank==mpi.master)
+      (*mpi.out)<<"MC normalization error: analytic Phi at order "<<minorder
+                <<" is zero or nonfinite; MC was not started"<<endl;
+    mpi.Abort();
+    throw std::runtime_error("MC requires a finite, nonzero analytic normalization");
+  }
+  if (mpi.rank==mpi.master)
+    (*mpi.out)<<"MC normalization anchor: order="<<minorder
+              <<" Phi="<<Phi_lowest_order<<" sampling_orders=["
+              <<minorder<<","<<maxorder<<"]"<<endl;
   double min_weight = p["min_weight"];
   bool cOCA_needed = (ImagAxis && minorder==2 && ra0.OCA_cut_sum<10);
   /*
@@ -703,8 +722,29 @@ void CurrentMC6(Array<double,1>& Phi_tot, Array<double,2>& Sm, Array<T,2>& G00, 
     }
   }
 
+  // Preserve sampled_data above before checking the measured denominator,
+  // so an undersampled/cancelled reference sector does not destroy raw data.
+  // All ranks agree on failure before any later collective is entered.
+  bool valid_measurements=false;
+  if (mpi.rank==mpi.master) {
+    const double denominator=cOCA_needed ? Phi_cOCA : Phi_accumulate(0);
+    const double denominatorf=cOCA_needed ? Phi_cOCAf : Phi_accumulatef(0);
+    valid_measurements=std::isfinite(Q) && Q>0.0 &&
+      edmft::orders::valid_reference(denominator) &&
+      edmft::orders::valid_reference(Phi_lowest_order*Q/denominator) &&
+      (!cmpPhysG || (edmft::orders::valid_reference(denominatorf) &&
+        edmft::orders::valid_reference(Phi_lowest_order*Q/denominatorf)));
+  }
+  mpi.bcast_one_boolean(valid_measurements);
+  if (!valid_measurements) {
+    if (mpi.rank==mpi.master)
+      (*mpi.out)<<"MC normalization error: invalid sampled reference or factor; "
+                <<"raw measurements preserved in sampled_data"<<endl;
+    mpi.Abort();
+    throw std::runtime_error("invalid MC normalization denominator/factor");
+  }
   if (mpi.rank==mpi.master){
-    double factor = Phi_lowest_order*Q/Phi_accumulate(0);   // normalization from NCA or OCA
+    double factor = Phi_lowest_order*Q/Phi_accumulate(0);   // analytic reference at N_min_order
     double factorf = cmpPhysG ? Phi_lowest_order*Q/Phi_accumulatef(0) : 0.0;   // normalization from NCA
     if (cOCA_needed){
       factor = Phi_lowest_order*Q/Phi_cOCA;   // normalization from NCA or OCA
@@ -827,6 +867,10 @@ template<class Axis0, class Axis1, typename T, bool ImagAxis, class RNG>
 void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
   double beta = pars["beta"];
   int N_max_order=pars["Norder"], N_min_order=pars["N_min_order"];
+  // Validate before constructing expensive representations or sampling.
+  edmft::orders::make_plan(ImagAxis,N_min_order,N_max_order,
+    ImagAxis ? pars["TCA_solver"].get<std::string>() : "",
+    ImagAxis ? pars["FCA_solver"].get<std::string>() : "");
   {
     int two_2_i = 1;
     for (int i=0; i<Skeletons::Freq.extent(0); ++i){
@@ -890,7 +934,7 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
   BathBlocks bb = cix.FindBlocks();
   (*mpi.out) << bb << endl;
   
-  double t_nca=0, t_oca=0, t_tca=0, t_mc=0;
+  double t_nca=0, t_oca=0, t_tca=0, t_fca=0, t_mc=0;
   bool cmpPhysG=false;
   bool next_break= (1==pars["Nitt"].get<int>()); // if Nitt==1, we break after first iteration
   if (next_break)
@@ -905,10 +949,22 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     // them here so they describe this step rather than an accumulated total.
     // Use elapsed wall time: process CPU time is misleading for MPI work
     // because ranks spend part of each collective contraction waiting.
-    t_nca=t_oca=t_tca=t_mc=0.0;
+    t_nca=t_oca=t_tca=t_fca=t_mc=0.0;
     RereadParameters(pars);
-    const bool analytic_tca=ImagAxis && N_min_order==3 && N_max_order==3 &&
-      pars["TCA_solver"].get<std::string>()=="dlr";
+    // Orders determine allocated MC storage and prepared workspaces. Do not
+    // silently mix a new PARAMS order range with this iteration's old state.
+    if (pars["N_min_order"].get<int>()!=N_min_order ||
+        pars["Norder"].get<int>()!=N_max_order)
+      throw std::invalid_argument("changing N_min_order/Norder requires restarting the solver");
+    const auto order_plan=edmft::orders::make_plan(
+      ImagAxis,N_min_order,N_max_order,
+      ImagAxis ? pars["TCA_solver"].get<std::string>() : "",
+      ImagAxis ? pars["FCA_solver"].get<std::string>() : "");
+    const bool analytic_tca=order_plan.tca;
+    const bool analytic_fca=order_plan.fca;
+    // Recompute every analytic anchor from this iteration's propagators;
+    // never accidentally normalize against a previous iteration's Phi.
+    Phi_tot=0.0;
     if (next_break) cmpPhysG=true;
     
     auto [nd,Q,lambda0,Fimp,Epot,TrSigmaG,followPeak,density_matrix0,Prob]=ra.DeterminePseudos(Gm,gm,Sm,xn,
@@ -962,9 +1018,7 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
         const bool legacy_oca_needed=
           oca_solver=="legacy" || pars["oca_dlr_diagnostic"].get<bool>();
         const bool higher_order_needs_splines=
-          (!analytic_tca && N_max_order>N_min_order) ||
-          (N_max_order==2 && cOCA_needed) ||
-          (N_min_order==3 && N_max_order==3 && !analytic_tca);
+          order_plan.sample_higher_orders || (N_max_order==2 && cOCA_needed);
         if (legacy_oca_needed || higher_order_needs_splines)
           ra.SplineG(xn,Gm,gm);
       }
@@ -987,15 +1041,15 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
       include_oca=1;
     }
 
-    // A fixed third-order imaginary-axis calculation is now entirely
-    // analytic: NCA and OCA are evaluated above, and TCA adds the two Phi^3
-    // topologies here.  Other order ranges retain the generic Monte Carlo
-    // machinery below.
+    // Analytic terms through N_min_order are added exactly once. If higher
+    // orders are requested, MC also visits the anchor order to normalize,
+    // but InterpolateOnRightMesh excludes that sector from its correction.
     if constexpr (ImagAxis) {
       if (analytic_tca) {
         auto _tst_=std::chrono::steady_clock::now();
         Phi_tot(2)=ra.TCA(Smt,dG00,dF00,dF01,
-                          cmpPhysG,Q,xn,Gm,cix,pars,mpi);
+                          cmpPhysG,Q,xn,Gm,cix,pars,mpi,
+                          order_plan.sample_higher_orders);
         auto _tst1_=std::chrono::steady_clock::now();
         t_tca=std::chrono::duration<double>(_tst1_-_tst_).count();
         if (mpi.rank==mpi.master) {
@@ -1010,6 +1064,23 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
         }
         include_oca=2;
       }
+      // FCA is either the final analytic term or the reference for MC at
+      // fifth and higher orders. Its presence must not suppress MC below.
+      if (analytic_fca) {
+        const auto start=std::chrono::steady_clock::now();
+        Phi_tot(3)=ra.FCA(Smt,dG00,dF00,dF01,cmpPhysG,Q,xn,Gm,cix,pars,mpi,
+                          order_plan.sample_higher_orders);
+        t_fca=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
+        if (mpi.rank==mpi.master) {
+          // FCA already saved aStval.4 before starting its physical phase.
+          // Do not rewrite it here: the early checkpoint is the final self
+          // result and is also usable if physical evaluation is interrupted.
+          if (cmpPhysG) ra.Print_Physical("ag00.4",dG00,dF00,dF01);
+        }
+        ra.Update_Sm(Sm_new,Smt,xn,cix,mpi);
+        if (cmpPhysG) { G00+=dG00; F00+=dF00; F01+=dF01; }
+        include_oca=3;
+      }
     }
     
     // TCA can take many minutes, for which a raw number of seconds is hard
@@ -1020,11 +1091,12 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
       : fmt::format("{:.3f}s",t_tca);
     (*mpi.out)<<setw(3)<<itt<<") Phi="<<Phi_tot(Range(0,include_oca))
               <<"  t(NCA)="<<t_nca<<"s t(OCA)="<<t_oca<<"s"
-              <<" t(TCA)="<<t_tca_text<<endl;mpi.out->flush();
+              <<" t(TCA)="<<t_tca_text;
+    if (analytic_fca) (*mpi.out)<<" t(FCA)="
+      <<(t_fca>=60.0 ? fmt::format("{:.2f}min",t_fca/60.0) : fmt::format("{:.3f}s",t_fca));
+    (*mpi.out)<<endl;mpi.out->flush();
     
-    if ((!analytic_tca && N_max_order>N_min_order) ||
-        (N_max_order==2 && cOCA_needed) ||
-        (N_min_order==3 && N_max_order==3 && !analytic_tca)){ // fixed TCA may explicitly request the generic MC reference
+    if (order_plan.sample_higher_orders || (N_max_order==2 && cOCA_needed)){
       TinyVector<int,3> recalc_weight_t;
       if (pars["recalc_weight"].get<double>()>0){
 	double recalc_weight = pars["recalc_weight"];
@@ -1257,7 +1329,42 @@ int main(int argc, char *argv[])
   // retaining legacy OCA.  oca_dlr_diagnostic computes both integrations and
   // compares them, but OCA_solver still determines which result is returned.
   pars_i["OCA_solver"] = "dlr";                     // "dlr" (default) or "legacy"
-  pars_i["TCA_solver"] = "dlr";                     // fixed N_min_order=Norder=3: "dlr" analytic TCA or "mc" reference
+  pars_i["TCA_solver"] = "dlr";                     // analytic TCA for N_min_order>=3; MC TCA references use N_min_order<=2
+  pars_i["FCA_solver"] = "dlr";                     // analytic FCA for N_min_order=4, including an MC normalization for Norder>4
+  pars_i["fca_aaa_poles"] = 0;                      // 0=all accurate AAA poles; positive value caps an independent FCA-only fit
+  pars_i["fca_dlr_mpi"] = true;                     // dynamic (topology,cut,directions,pole-triple) dispatch
+  pars_i["fca_progress_seconds"] = 60.0;
+  pars_i["fca_store_self_diagnostics"] = true;       // all eight outputs retained, including equivalent cuts
+  pars_i["fca_reduce_cuts"] = true;                  // exact rooted-geometry rotational orbits; false retains the reference
+  pars_i["fca_physical_reuse"] = true;               // shared prefixes and early sums of baths internal to one physical arc
+  pars_i["fca_physical_coeff_chain"] = true;         // intermediate physical arcs in coefficients; false restores node route
+  pars_i["fca_physical_cache_resume"] = true;        // start from deepest available ordinary-arc prefix
+  pars_i["fca_physical_cache_retain"] = true;        // favor late bath-summed prefixes within the existing cache cap
+  pars_i["fca_physical_ef_shared"] = true;           // stream matching E/F prefixes across each crossing-bath pair
+  pars_i["fca_physical_ef_presum"] = true;          // closed E inputs before final convolution; E/F boundary reuse
+  pars_i["fca_physical_ef_boundary"] = false;       // opt-in E/F boundary weights: preparation can outweigh reuse
+  pars_i["fca_self_direction_sum"] = true;          // evaluate both anchor arrows, sum at closure before common tail
+  pars_i["fca_self_reuse"] = true;                   // share prefix and sum before common suffix; false selects reference
+  pars_i["fca_self_adaptive_anchor"] = true;         // choose bounded-state streamed line, or an unstreamed <=Nbath^2 chain
+  pars_i["fca_reuse_prepared"] = true;               // identical edge decorations share prepared PP coefficients/block caches
+  pars_i["fca_root_plans"] = true;                  // bounded lazy atomic-block connection plans and cached root weights
+  pars_i["fca_indexed_states"] = true;              // direct-address active bath states (at most two variable bath labels)
+  pars_i["fca_convolution_scratch"] = true;         // task-local reusable DLR/packing work buffers
+  pars_i["fca_self_pole_sum"] = true;              // sum one pole at line closure; share prefix/suffix
+  pars_i["fca_self_pole_sum_min_poles"] = 3;       // avoid measured two-pole SC grouping regression; 1 forces it
+  pars_i["fca_shared_branch_transforms"] = true;   // transform once before time-independent bath branching
+  pars_i["fca_extended_branch_transforms"] = false; // experimental shared-family/physical extension; no established speedup
+  pars_i["fca_shared_boundary"] = true; // share physical boundary weights across compatible right arcs
+  pars_i["fca_physical_final_sum"] = true; // combine B/C tails before their common final convolution
+  pars_i["fca_boundary_cache_mb"] = 64.0; // per live left arc; excess uses previous boundary contractions
+  pars_i["fca_prepared_cache_mb"] = 128.0;         // per-rank cross-task dressed PP cache; 0 restores task-local preparation
+  pars_i["fca_shared_prefix"] = false;            // experimental streamed q=4 family; false keeps the established evaluator
+  pars_i["fca_physical_shared"] = false;         // share physical convolution arcs across compatible cuts
+  pars_i["fca_physical_shared_mb"] = 128.0;      // retained short-prefix cache per rank; excludes live chains/scratch
+  pars_i["fca_shared_prefix_mb"] = 256.0;         // retained prefix/continuation accounting cap; separate from scratch/cache
+  pars_i["fca_self_prefix_mb"] = 64.0;               // extra retained prefix cap, not total memory; overflow uses reference
+  pars_i["fca_physical_cache_mb"] = 64.0;            // per-rank/per-task prefix cache budget; 0 disables caching, not early sums
+  pars_i["fca_profile"] = true;                      // per-topology worker timings and physical operation counters
   pars_i["aaa_adapter"] = false;
   pars_i["aaa_tolerance"] = 1.e-10;
   pars_i["aaa_max_support_pairs"] = 25;
@@ -1272,11 +1379,13 @@ int main(int argc, char *argv[])
   // normal/anomalous channels need not share an easily discoverable AAA
   // denominator.  The final union of real poles is still common to all
   // channels, so the OCA pole-major evaluator remains unchanged.
-  pars_i["aaa_fit_mode"] = "auto";                  // "auto", "joint", "balanced", or diagnostic "channelwise"
+  // One channel-balanced fit protects small anomalous components and avoids
+  // auto's joint+balanced trial pair. Explicit "auto" retains that comparison.
+  pars_i["aaa_fit_mode"] = "balanced";              // "auto", "joint", "balanced", or diagnostic "channelwise"
   pars_i["aaa_channelwise_trigger"] = 1.e-8;        // relative RMS error of the joint real-pole fit
   pars_i["aaa_pole_merge_tolerance"] = 1.e-7;       // relative tolerance when merging channel pole sets
   pars_i["dlr_adapter"] = false;
-  pars_i["dlr_tolerance"] = 1.e-10;
+  pars_i["dlr_tolerance"] = 1.e-7;
   pars_i["dlr_omega_max"] = 0.0;                    // <=0 uses cutoffw
   pars_i["dlr_panel_order"] = 24;                   // fine-grid quadrature/order used to construct the basis, not final rank
   pars_i["oca_dlr_mpi"] = true;                     // distribute compact OCA over MPI pole teams
@@ -1284,6 +1393,18 @@ int main(int argc, char *argv[])
   // mode activates one worker per pole team and uses the fast batched kernel;
   // other ranks rejoin at the result reduction and remain available for TCA.
   pars_i["oca_dlr_profile"] = false;
+  // Exact memory optimizations. Scratch is a per-rank outer-contraction
+  // target, not a total solver limit. Zero + stream_pairs=false restores
+  // the original full-table numerical evaluation for comparisons.
+  pars_i["oca_dlr_self_scratch_mb"] = 64.0;
+  pars_i["oca_dlr_stream_pairs"] = true;
+  // Exact bounded physical OCA. Auto selects it for >=4096 unique pseudos;
+  // smaller cases retain the full-plan fast path. Scratch should be local DISK
+  // on a cluster, not a RAM-backed /tmp or a slow shared filesystem.
+  pars_i["oca_dlr_physical_mode"] = "auto"; // auto, batched, full (fallback)
+  pars_i["oca_dlr_backend"] = "matrix"; // matrix (default, enumeration-free) or paths (previous evaluator)
+  pars_i["oca_dlr_physical_batch_paths"] = 100000; // max unique keys per hash/plan batch
+  pars_i["oca_dlr_batch_directory"] = ""; // empty: system temporary directory
   pars_i["oca_dlr_whole_poles"] = true;             // default: fast batched whole-pole evaluation; false is the diagnostic shared-pole path
   pars_i["oca_dlr_mpi_teams"] = 0;                  // 0 chooses min(AAA poles, workers per topology shard); a positive value sets pole teams per shard
   pars_i["oca_dlr_mpi_topology"] = "auto";          // "auto", "replicated", or "distributed"
@@ -1341,7 +1462,28 @@ int main(int argc, char *argv[])
   // Keeping one pole count throughout an iteration sequence makes each preset
   // reproducible and avoids changing the fixed point on the final iteration.
   if (!RealAxisQ) {
-    const std::string tca_accuracy=pars["tca_accuracy"].get<std::string>();
+    const auto& accuracy_value=pars["tca_accuracy"];
+    // Validate before get<string>(), so both misspelled presets and wrong
+    // JSON types receive the same actionable input error rather than an
+    // uncaught exception (and potentially one core dump per MPI rank).
+    const std::string tca_accuracy=accuracy_value.is_string()
+      ? accuracy_value.get<std::string>() : std::string{};
+    if (tca_accuracy!="veryhigh" && tca_accuracy!="high" &&
+        tca_accuracy!="modest" && tca_accuracy!="low" &&
+        tca_accuracy!="custom") {
+      if (mpi->rank==mpi->master) {
+        const std::string message="ERROR in PARAMS: tca_accuracy="+
+          accuracy_value.dump()+
+          ". Expected one of: veryhigh, high, modest, low, custom.";
+        std::cerr << message << std::endl;
+        (*mpi->out) << message << std::endl;
+      }
+      // All ranks validate the same input before any diagram work. Destroy
+      // MPIcls on every rank to close the log and collectively finalize MPI;
+      // return a failure status without throwing or calling MPI_Abort.
+      delete mpi;
+      return EXIT_FAILURE;
+    }
     if (tca_accuracy=="veryhigh") {
       pars["tca_active_aaa_poles"]=0;  // all available poles (currently 23 in the validated tests)
       pars["tca_final_exact_audit"]=true;
@@ -1354,9 +1496,6 @@ int main(int argc, char *argv[])
     } else if (tca_accuracy=="low") {
       pars["tca_active_aaa_poles"]=6;
       pars["tca_final_exact_audit"]=false;
-    } else if (tca_accuracy!="custom") {
-      throw std::invalid_argument(
-        "tca_accuracy must be one of veryhigh, high, modest, low, or custom");
     }
     if (mpi->rank==mpi->master) {
       (*mpi->out) << "TCA accuracy preset: " << tca_accuracy

@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstring>
 #include <chrono>
+#include <cmath>
 #include <ostream>
 #include <limits>
 #include <numeric>
@@ -240,7 +241,10 @@ class SelfEnergyPlan {
     // the external/output pseudo self-energy index.
     std::vector<std::array<int,2>> outer_pairs;
     std::vector<std::vector<int>> outer_by_first;
-    std::vector<SparseMatrix<double>> contractions;
+    // Row-major storage lets the bounded evaluator visit a contiguous slice
+    // of output rows without rescanning every nonzero for every batch. This
+    // replaces the old storage, rather than retaining a second sparse copy.
+    std::vector<Eigen::SparseMatrix<double,Eigen::RowMajor>> contractions;
   };
 
 public:
@@ -588,9 +592,11 @@ class PhysicalPlan {
     // One sparse contraction for every (expanded bath, cut/output bath)
     // combination and for each observable.  Rows index the left pair and
     // columns index the right pair.
-    std::vector<SparseMatrix<double>> g;
-    std::vector<SparseMatrix<double>> f00;
-    std::vector<SparseMatrix<double>> f01;
+    // Row-major permits bounded row contractions without rescanning/copying
+    // the whole sparse matrix for each row batch.
+    std::vector<SparseMatrix<double,Eigen::RowMajor>> g;
+    std::vector<SparseMatrix<double,Eigen::RowMajor>> f00;
+    std::vector<SparseMatrix<double,Eigen::RowMajor>> f01;
   };
 
 public:
@@ -709,7 +715,7 @@ public:
 
       const int rows=pair_catalogs_[bp.left_catalog].pairs.size();
       const int cols=pair_catalogs_[bp.right_catalog].pairs.size();
-      const auto finish=[&](std::vector<SparseMatrix<double>>& matrices,
+      const auto finish=[&](auto& matrices,
                             const std::vector<std::vector<Triplet<double>>>& trips) {
         matrices.resize(trips.size());
         for (int i=0; i<static_cast<int>(trips.size()); ++i) {
@@ -802,7 +808,7 @@ public:
     // Apply all atomic matrix-element sums for one physical branch.  C is a
     // sparse map from right-pair ids to left-pair ids.  For every DLR time
     // node, sum_left L(left,T) [C R(beta-T)](left).
-    const auto contract=[&](const std::vector<SparseMatrix<double>>& matrices,
+    const auto contract=[&](const auto& matrices,
                             const MatrixXd& left,
                             const MatrixXd& right_reflected,
                             int pole,
@@ -1073,9 +1079,31 @@ struct NodeAccumulator {
 // Those are exactly the two families already needed by the four pseudo cuts.
 // Physical cuts use the same values, one directly at T and one reflected to
 // beta-T.  Thus this loop replaces six pair-family evaluations by two.
+// Per-rank self-energy scratch target, not a cap on the entire solver. Pair
+// catalogs, sparse plans, input propagators and MPI buffers are separate.
+// Zero restores the original full-outer-table evaluator. Disabling streaming
+// as well gives the old two-pair-table lifetime for reference comparisons.
+struct SelfMemoryOptions {
+  double scratch_mb=64.0;
+  bool stream_pairs=true;
+
+  int batch_rows(int rank) const {
+    if (rank<=0) throw std::invalid_argument("OCA DLR rank must be positive");
+    if (!std::isfinite(scratch_mb) || scratch_mb<0.0)
+      throw std::invalid_argument("oca_dlr_self_scratch_mb must be finite and nonnegative");
+    // Allow twelve rank-by-batch matrices: contraction and transform copies,
+    // plus the existing convolution routine's intermediate dense products.
+    // At least one row is necessary even for an exceptionally small target.
+    const double rows=scratch_mb*1048576.0/(12.0*sizeof(double)*rank);
+    return static_cast<int>(std::max(1.0,std::min(rows,
+      double(std::numeric_limits<int>::max()))));
+  }
+};
+
 class CombinedEvaluator {
   struct TeamContext {
     EvaluationProfile* profile=nullptr;
+    SelfMemoryOptions memory;
     int rank=0;
     int size=1;
 #ifdef _MPI
@@ -1143,13 +1171,15 @@ public:
       const std::vector<double>& pseudo_degeneracy,
       int first_pole,
       int last_pole,
-      NodeAccumulator& accumulator)
+      NodeAccumulator& accumulator,
+      const SelfMemoryOptions& memory=SelfMemoryOptions{})
   {
     if (first_pole<0 || last_pole<first_pole ||
         last_pole>workspace.pole_count())
       throw std::out_of_range("invalid OCA DLR AAA-pole range");
     validate(self,physical,workspace,pseudo_degeneracy,accumulator);
     TeamContext serial;
+    serial.memory=memory;
     accumulate_sequence(self,physical,workspace,pseudo_degeneracy,
                         first_pole,last_pole,1,serial,accumulator);
   }
@@ -1216,7 +1246,8 @@ public:
       const imag_dlr::Workspace& workspace,
       const std::vector<double>& pseudo_degeneracy,
       const blitz::Array<double,1>& output_tau,
-      std::array<MatrixXd,4>* cut_results=nullptr)
+      std::array<MatrixXd,4>* cut_results=nullptr,
+      const SelfMemoryOptions& memory=SelfMemoryOptions{})
   {
     if (physical && !compatible(self,*physical))
       throw std::invalid_argument(
@@ -1224,7 +1255,7 @@ public:
     NodeAccumulator accumulator=make_accumulator(
       self,workspace,physical!=nullptr,cut_results!=nullptr);
     accumulate_poles(self,physical,workspace,pseudo_degeneracy,
-                     0,workspace.pole_count(),accumulator);
+                     0,workspace.pole_count(),accumulator,memory);
     return finalize(self,workspace,accumulator,output_tau,cut_results);
   }
 
@@ -1234,10 +1265,11 @@ public:
       const imag_dlr::Workspace& workspace,
       const std::vector<double>& pseudo_degeneracy,
       const blitz::Array<double,1>& output_tau,
-      std::array<MatrixXd,4>* cut_results=nullptr)
+      std::array<MatrixXd,4>* cut_results=nullptr,
+      const SelfMemoryOptions& memory=SelfMemoryOptions{})
   {
     return evaluate(self,&physical,workspace,pseudo_degeneracy,output_tau,
-                    cut_results);
+                    cut_results,memory);
   }
 
 #ifdef _MPI
@@ -1262,7 +1294,8 @@ public:
       std::array<MatrixXd,4>* cut_results=nullptr,
       bool whole_poles=false,
       bool profile_enabled=false,
-      std::ostream* profile_output=nullptr)
+      std::ostream* profile_output=nullptr,
+      const SelfMemoryOptions& memory=SelfMemoryOptions{})
   {
     EvaluationProfile profile;
     auto* timing=profile_enabled ? &profile : nullptr;
@@ -1291,6 +1324,7 @@ public:
     MPI_Comm pole_team_comm=MPI_COMM_NULL;
     MPI_Comm_split(shard_comm,pole_team_id,shard_rank,&pole_team_comm);
     TeamContext pole_team;
+    pole_team.memory=memory;
     pole_team.communicator=pole_team_comm;
     MPI_Comm_rank(pole_team_comm,&pole_team.rank);
     MPI_Comm_size(pole_team_comm,&pole_team.size);
@@ -1373,13 +1407,14 @@ public:
       std::array<MatrixXd,4>* cut_results=nullptr,
       bool whole_poles=false,
       bool profile_enabled=false,
-      std::ostream* profile_output=nullptr)
+      std::ostream* profile_output=nullptr,
+      const SelfMemoryOptions& memory=SelfMemoryOptions{})
   {
     // The replicated layout is exactly the one-shard case. Keep a single
     // implementation of ownership, profiling, and final reductions.
     return evaluate_sharded_mpi(self,physical,workspace,pseudo_degeneracy,
       output_tau,world,1,requested_team_count,layout,cut_results,
-      whole_poles,profile_enabled,profile_output);
+      whole_poles,profile_enabled,profile_output,memory);
   }
 
 #endif
@@ -1565,6 +1600,72 @@ private:
 #endif
   }
 
+  // Evaluate one cut in contiguous output-row batches. Rows are sorted by
+  // (outer propagator w, output q). A batch may span several w values or split
+  // one exceptionally large w group: transform columns independently, then
+  // convolve each equal-w subrange and immediately add it to compact Sigma.
+  // Bath/pole/cut summation order is unchanged. No extra pair convolution is
+  // introduced; only the lifetime of the outer contraction tables changes.
+  static void accumulate_self_batched(
+      const SelfEnergyPlan& self,
+      const SelfEnergyPlan::CutPlan& cp,
+      int cut, int pole, bool nonpositive,
+      const imag_dlr::Workspace& workspace,
+      const MatrixXd& pair_values, const MatrixXd& tilted,
+      const MatrixXd& local_delta, const VectorXd& external,
+      const std::vector<double>& pseudo_degeneracy,
+      const TeamContext& team, NodeAccumulator& accumulator)
+  {
+    const auto& basis=workspace.basis();
+    const int r=workspace.rank();
+    const int limit=team.memory.batch_rows(r);
+    const int rows=static_cast<int>(cp.outer_pairs.size());
+    for (int first=0; first<rows;) {
+      const int count=std::min(limit,rows-first);
+      MatrixXd coefficients;
+      {
+        EvaluationProfile::Timer sparse(team.profile,EvaluationProfile::SelfSparse);
+        MatrixXd h=MatrixXd::Zero(count,r);
+        // The temporary contraction is only count-by-r, even when the
+        // complete sparse plan has millions of outer pairs.
+        for (int expanded=0; expanded<self.channel_count_; ++expanded) {
+          const double residue=workspace.residues()(expanded,pole);
+          if (residue==0.0) continue;
+          for (int local=0; local<self.channel_count_; ++local) {
+            const auto& contraction=cp.contractions[
+              expanded*self.channel_count_+local];
+            if (contraction.nonZeros()==0) continue;
+            MatrixXd contribution=contraction.middleRows(first,count)*pair_values;
+            contribution.array().rowwise() *= local_delta.col(local).transpose().array();
+            h.noalias() += residue*contribution;
+          }
+        }
+        sparse.stop();
+        EvaluationProfile::Timer transform(team.profile,EvaluationProfile::SelfDLR);
+        const MatrixXd values=h.transpose();
+        coefficients=basis.values_to_coefficients(values);
+      } // Release h and its transposed node values before convolution scratch.
+
+      for (int begin=0; begin<count;) {
+        const int outer=cp.outer_pairs[first+begin][0];
+        int end=begin+1;
+        while (end<count && cp.outer_pairs[first+end][0]==outer) ++end;
+        EvaluationProfile::Timer conv(team.profile,EvaluationProfile::SelfConvolution);
+        const MatrixXd rhs=coefficients.middleCols(begin,end-begin);
+        const VectorXd lhs=nonpositive
+          ? VectorXd(workspace.pseudo_coefficients().col(outer))
+          : VectorXd(tilted.col(outer));
+        const MatrixXd values=basis.time_ordered_convolution_values(lhs,rhs);
+        conv.stop();
+        EvaluationProfile::Timer add(team.profile,EvaluationProfile::SelfAccumulate);
+        add_self_values(cp,cut,outer,first+begin,values,external,
+                        pseudo_degeneracy,accumulator);
+        begin=end;
+      }
+      first+=count;
+    }
+  }
+
   static void accumulate_sequence(
       const SelfEnergyPlan& self,
       const PhysicalPlan* physical,
@@ -1579,6 +1680,11 @@ private:
     EvaluationProfile::Timer schedule(team.profile,EvaluationProfile::Setup);
     const auto& basis=workspace.basis();
     const int r=workspace.rank();
+
+    // Validate even when the requested pole range is empty. Streaming is
+    // restricted to self-only calls: physical cuts need both pair families.
+    team.memory.batch_rows(r);
+    const bool stream_pairs=team.memory.stream_pairs && !physical;
 
     // Intra-pole self-energy tasks are whole equal-w outer blocks.  A block
     // contains every q paired with one outer propagator, preserving the
@@ -1631,13 +1737,24 @@ private:
       // Allgatherv assembles the two complete [pair,time] tables needed by
       // sparse contractions; no pair data is communicated between teams.
       std::array<MatrixXd,2> pair_transposed;
-      for (int ci=0; ci<2; ++ci)
-        pair_transposed[ci]=build_pair_transposed(
-          self,workspace,tilted,l,ci,team);
+      if (!stream_pairs)
+        for (int ci=0; ci<2; ++ci)
+          pair_transposed[ci]=build_pair_transposed(
+            self,workspace,tilted,l,ci,team);
+      int live_catalog=-1;
 
       for (int cut=0; cut<4; ++cut) {
         const auto& cp=self.cuts_[cut];
         const int ci=cp.sigma>0 ? 0 : 1;
+        if (stream_pairs && ci!=live_catalog) {
+          // Cuts 0,1 use catalog 1; cuts 2,3 use catalog 0. Free the old
+          // allocation BEFORE building the next family, including MPI pair
+          // gather buffers. All ranks in a team follow this identical order.
+          if (live_catalog>=0) pair_transposed[live_catalog].resize(0,0);
+          pair_transposed[ci]=build_pair_transposed(
+            self,workspace,tilted,l,ci,team);
+          live_catalog=ci;
+        }
         const bool nonpositive=cp.sigma*workspace.poles()(l)<=0.0;
         const MatrixXd& local_delta=cp.local_orientation>0
           ? workspace.delta_plus() : workspace.delta_minus();
@@ -1656,7 +1773,11 @@ private:
           external.setConstant(1.0/k0);
         }
 
-        if (team.size==1) {
+        if (team.size==1 && team.memory.scratch_mb>0.0) {
+          accumulate_self_batched(self,cp,cut,l,nonpositive,workspace,
+            pair_transposed[ci],tilted,local_delta,external,
+            pseudo_degeneracy,team,accumulator);
+        } else if (team.size==1) {
           // Preserve the large batched serial path when pole parallelism is
           // sufficient.  This is faster than many tiny outer-block solves.
           EvaluationProfile::Timer sparse(team.profile,EvaluationProfile::SelfSparse);
@@ -1746,41 +1867,41 @@ private:
       }
 
       if (physical) {
-        // Reflection itself is split by pair rows, then team-gathered.  This
-        // avoids repeating an r-by-r multiplication for every pair on every
-        // cooperating rank.
-        std::array<MatrixXd,2> reflected;
-        reflected[0]=reflect_pair_transposed(
-          basis,pair_transposed[0],team);
-        reflected[1]=reflect_pair_transposed(
-          basis,pair_transposed[1],team);
-
-        EvaluationProfile::Timer physical_timer(team.profile,EvaluationProfile::Physical);
-        for (int task_id=0;
-             task_id<static_cast<int>(physical_tasks.size()); ++task_id) {
-          if (physical_owner[task_id]!=team.rank) continue;
-          const auto& task=physical_tasks[task_id];
-          const auto& branch=physical->branches_[task.branch];
-          const auto& matrices=task.observable==0 ? branch.g
-            : task.observable==1 ? branch.f00 : branch.f01;
-          const auto& contraction=matrices[task.matrix_id];
-          const int expanded=task.matrix_id/self.channel_count_;
-          const int output=task.matrix_id%self.channel_count_;
-          const double prefactor=-workspace.residues()(expanded,l)/
-            (workspace.poles()(l)>=0.0
-               ? workspace.kernel_zero_plus()(l)
-               : workspace.kernel_zero_minus()(l));
-          if (prefactor==0.0) continue;
-          const MatrixXd& left=task.branch==0
-            ? pair_transposed[1] : pair_transposed[0];
-          const MatrixXd& right=task.branch==0
-            ? reflected[0] : reflected[1];
-          const MatrixXd mapped=contraction*right;
-          MatrixXd& target=task.observable==0 ? accumulator.g_nodes
-            : task.observable==1 ? accumulator.f00_nodes
-                                 : accumulator.f01_nodes;
-          target.col(output).array() += prefactor*
-            (left.array()*mapped.array()).colwise().sum().transpose();
+        // Only one reflected family is live. Tasks of branch b use catalog b
+        // reflected and the opposite catalog unreflected. Row batches bound
+        // the sparse-times-dense temporary independently of the pair count.
+        for (int branch_id=0;branch_id<2;++branch_id) {
+          const MatrixXd right=reflect_pair_transposed(
+            basis,pair_transposed[branch_id],team);
+          EvaluationProfile::Timer physical_timer(team.profile,EvaluationProfile::Physical);
+          const MatrixXd& left=pair_transposed[1-branch_id];
+          for (int task_id=0;task_id<static_cast<int>(physical_tasks.size());++task_id) {
+            if (physical_owner[task_id]!=team.rank) continue;
+            const auto& task=physical_tasks[task_id];
+            if (task.branch!=branch_id) continue;
+            const auto& branch=physical->branches_[task.branch];
+            const auto& matrices=task.observable==0 ? branch.g
+              : task.observable==1 ? branch.f00 : branch.f01;
+            const auto& contraction=matrices[task.matrix_id];
+            const int expanded=task.matrix_id/self.channel_count_;
+            const int output=task.matrix_id%self.channel_count_;
+            const double prefactor=-workspace.residues()(expanded,l)/
+              (workspace.poles()(l)>=0.0
+                 ? workspace.kernel_zero_plus()(l)
+                 : workspace.kernel_zero_minus()(l));
+            if (prefactor==0.0) continue;
+            MatrixXd& target=task.observable==0 ? accumulator.g_nodes
+              : task.observable==1 ? accumulator.f00_nodes : accumulator.f01_nodes;
+            const int batch=team.memory.scratch_mb>0.0
+              ? team.memory.batch_rows(workspace.rank())
+              : std::max(1,static_cast<int>(contraction.rows()));
+            for (int first=0;first<contraction.rows();first+=batch) {
+              const int count=std::min(batch,static_cast<int>(contraction.rows())-first);
+              const MatrixXd mapped=contraction.middleRows(first,count)*right;
+              target.col(output).array() += prefactor*
+                (left.middleRows(first,count).array()*mapped.array()).colwise().sum().transpose();
+            }
+          }
         }
       }
     }
@@ -1809,7 +1930,9 @@ private:
     }
   }
 
+public:
 #ifdef _MPI
+  // One final reduction phase; local disk batches never enter collectives.
   static void allreduce_accumulator(NodeAccumulator& accumulator,
                                     MPI_Comm communicator)
   {

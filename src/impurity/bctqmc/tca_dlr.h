@@ -1615,12 +1615,31 @@ public:
   // multiple-RHS batches.  Thus each chunk pays for one DLR interpolation
   // solve and two basis GEMMs, while the cap keeps memory bounded for large
   // f-shell Hilbert spaces.
+  struct ConvolutionScratch {
+    struct Item {
+      int state=0;
+      BlockKey key;
+      const MatrixFunction* values=nullptr;
+      const MatrixFunction* coefficients=nullptr;
+      const MatrixFunction* hilbert=nullptr;
+      std::size_t flat_size=0;
+      const MatrixFunction* left_hilbert=nullptr;
+    };
+    std::vector<Item> items;
+    std::vector<const MatrixFunction*> value_batch,coefficient_batch,hilbert_batch,left_hilbert_batch;
+    std::vector<SparseFunction> output;
+    dlr::FermionicBasis::ConvolutionScratch dlr_buffers;
+  };
   static void ConvolveRightPseudoPreparedBatch(
       std::vector<SparseFunction>& functions,const Cix& cix,
       const imag_dlr::Workspace& workspace,
       const PreparedPseudoCoefficients& prepared,
-      bool reflect_output=false)
+      bool reflect_output=false,ConvolutionScratch* scratch=nullptr,
+      const std::vector<SparseFunction>* left_hilbert=nullptr,
+      bool input_coefficients=false,bool output_coefficients=false)
   {
+    if (left_hilbert && left_hilbert->size()!=functions.size())
+      throw std::logic_error("TCA prepared left: state count mismatch");
     const MatrixXd& unique_coefficients=
       prepared.use_workspace_coefficients
         ? workspace.pseudo_coefficients() : prepared.dressed;
@@ -1633,15 +1652,10 @@ public:
       throw std::logic_error("TCA prepared pseudo block-cache mismatch");
     }
 
-    struct Item {
-      int state=0;
-      BlockKey key;
-      const MatrixFunction* values=nullptr;
-      const MatrixFunction* coefficients=nullptr;
-      const MatrixFunction* hilbert=nullptr;
-      std::size_t flat_size=0;
-    };
-    std::vector<Item> items;
+    ConvolutionScratch local;
+    auto& buffers=scratch ? *scratch : local;
+    auto& items=buffers.items;
+    items.clear();
     for (int state=0;state<static_cast<int>(functions.size());++state)
       for (const auto& [key,values]:functions[state]) {
         const int block=key.second;
@@ -1665,11 +1679,18 @@ public:
           static_cast<std::size_t>(values[0].rows())*right[0].cols();
         items.push_back({state,key,&values,&right,
                          &prepared.hilbert_blocks[block],
-                         std::max(input_size,output_size)});
+                         std::max(input_size,output_size),
+                         left_hilbert ? &(*left_hilbert)[state].at(key) : nullptr});
       }
-    if (items.empty()) return;
+    if (items.empty()) {
+      // All right blocks vanished: the convolution is ZERO, not the input.
+      // In particular, a prepared-left input must never escape as node data.
+      for (auto& function:functions) function.clear();
+      return;
+    }
 
-    std::vector<SparseFunction> output(functions.size());
+    auto& output=buffers.output;
+    output.clear(); output.resize(functions.size());
     // Six or seven rank-by-M temporaries coexist inside the DLR kernel.  A
     // cap of 32768 scalar matrix entries is about 50 MiB at rank 32 and also
     // leaves enough columns for efficient level-3 BLAS on small blocks.
@@ -1682,9 +1703,12 @@ public:
         flat_entries+=items[last].flat_size;
         ++last;
       }
-      std::vector<const MatrixFunction*> value_batch;
-      std::vector<const MatrixFunction*> coefficient_batch;
-      std::vector<const MatrixFunction*> hilbert_batch;
+      auto& value_batch=buffers.value_batch;
+      auto& coefficient_batch=buffers.coefficient_batch;
+      auto& hilbert_batch=buffers.hilbert_batch;
+      auto& left_hilbert_batch=buffers.left_hilbert_batch;
+      value_batch.clear(); coefficient_batch.clear(); hilbert_batch.clear();
+      left_hilbert_batch.clear();
       value_batch.reserve(last-first);
       coefficient_batch.reserve(last-first);
       hilbert_batch.reserve(last-first);
@@ -1692,16 +1716,24 @@ public:
         value_batch.push_back(items[item].values);
         coefficient_batch.push_back(items[item].coefficients);
         hilbert_batch.push_back(items[item].hilbert);
+        if (left_hilbert) left_hilbert_batch.push_back(items[item].left_hilbert);
       }
       auto convolved=
         workspace.basis().time_ordered_convolution_values_right_prepared_batch(
-          value_batch,coefficient_batch,hilbert_batch,reflect_output);
+          value_batch,coefficient_batch,hilbert_batch,reflect_output,
+          scratch ? &buffers.dlr_buffers : nullptr,
+          left_hilbert ? &left_hilbert_batch : nullptr,
+          input_coefficients,output_coefficients);
       for (std::size_t item=first;item<last;++item)
         Add(output[items[item].state],items[item].key,
             std::move(convolved[item-first]));
       first=last;
     }
     functions.swap(output);
+    output.clear(); // do not retain the previous input matrices in scratch
+    items.clear();
+    buffers.value_batch.clear(); buffers.coefficient_batch.clear(); buffers.hilbert_batch.clear();
+    buffers.left_hilbert_batch.clear();
   }
 
   static void AccumulateCut(
@@ -2159,6 +2191,9 @@ private:
     return result;
   }
 
+public:
+  // Order-independent boundary helpers shared with the FCA reference
+  // evaluator. Exposing them does not alter the TCA evaluation path.
   static bool IsF01Channel(const Cix& cix,int orbital)
   {
     const bool destroys_pair=
