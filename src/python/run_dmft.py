@@ -653,6 +653,27 @@ if __name__ == '__main__':
     inl = indmffile.Indmfl(w2k.case) # case.indmfl file
     inl.read()                       # case.indmfl read
 
+    # An imaginary-axis run needs a Matsubara self-energy.  The first column
+    # of the first non-comment row in sig.inp is its frequency mesh; a negative
+    # starting frequency indicates a real-axis self-energy.  Check this before
+    # launching LAPW or dmft1, which otherwise leaves case.scfdmft1 empty and
+    # fails later with an unhelpful NoneType error during impurity setup.
+    if inl.matsubara and os.path.isfile('sig.inp'):
+        with open('sig.inp', 'r') as fsig:
+            for line in fsig:
+                data = line.split('#', 1)[0].strip()
+                if not data:
+                    continue
+                first_omega = float(data.split()[0])
+                if first_omega < 0:
+                    message = ('ERROR: '+w2k.case+'.indmfl selects Matsubara mode, '
+                               'but sig.inp starts at frequency '+str(first_omega)+'. '
+                               'Replace sig.inp with an imaginary-axis self-energy.')
+                    print(message, file=fh_info)
+                    print(message, file=sys.stderr)
+                    sys.exit(1)
+                break
+
     print('inl.emin={:s}, inl.emax={:s} inl.hybr_emin={:f} inl.hybr_emax={:f}'.format(str(inl.emin),str(inl.emax),inl.hybr_emin,inl.hybr_emax), file=fh_info)
     # If FM or AFM withouth SO, we read also case.indmfldn file
     inldn = None
