@@ -1584,17 +1584,18 @@ REAL*8 FUNCTION FreeE0(Energy, Temperature)
 END FUNCTION FreeE0
 
 
-REAL*8 FUNCTION Density(EF)
+! Evaluate only the k-points owned by this rank.  The chemical-potential search
+! combines these scalar contributions; it never needs the eigenvalue arrays on
+! the master rank (except in the explicit mode='e' band-data export).
+REAL*8 FUNCTION Density_local(EF)
   USE defs, ONLY: PI, IMAG
-  USE com,  ONLY: elecn
-  USE muzero,ONLY: w_sum, w_gamma, w_norm1, nkp, w_nomega, w_npomega, wgh, abom, zEk, nemm, wprint, wmatsubara, n0_om, w_omega, jomq, nomq, iomq, w_beta, womq, wprint, wprint1, Qcheckbands
+  USE muzero,ONLY: w_sum, w_gamma, w_norm1, nkp, w_nomega, w_npomega, wgh, abom, zEk, nemm, wmatsubara, n0_om, w_omega, jomq, nomq, iomq, w_beta, womq, wprint1, Qcheckbands
   USE dmfts, ONLY: Temperature
   IMPLICIT NONE
   REAL*8, intent(in)    :: EF
   ! functions
   REAL*8 :: ferm
   ! locals
-  REAL*8,PARAMETER :: Ry2eV= 13.60569253d0 
   REAL*8    :: cc, zw0, wkp, ek0, Om, drest, ci, fer
   INTEGER   :: ikp, num, num0, iom, nemin, DM_nemin, DM_nemax, j0, j1, j2, i, nbands
   COMPLEX*16:: cE, ccn, cek, e0, e1, e2, ca, cb, omn, csum1, csum
@@ -1691,10 +1692,48 @@ REAL*8 FUNCTION Density(EF)
         enddo
      enddo
   ENDIF
-  if (wprint) WRITE(*,'(A,f13.8,A,f14.8,A,f10.4,A,f14.8)') 'EF[eV]=', EF*Ry2eV, ' Density=', zw0, ' N=', elecn, ' EF[Ry]=', EF
-  Density = zw0-elecn
+  Density_local = zw0
   RETURN
+END FUNCTION Density_local
+
+! Brent and the gap-candidate search run on the master.  Each trial EF is
+! broadcast to the workers, which evaluate their local bands in
+! Serve_Density_requests.  Only one real occupancy per rank is reduced.
+REAL*8 FUNCTION Density(EF)
+  USE com, ONLY: elecn
+  USE muzero, ONLY: wprint
+  USE com_mpi, ONLY: Bcast_Density_request, Reduce_Density_sum
+  IMPLICIT NONE
+  REAL*8, intent(in) :: EF
+  REAL*8, PARAMETER :: Ry2eV=13.60569253d0
+  REAL*8 :: trial_EF, local_charge, total_charge, Density_local
+  LOGICAL :: evaluate
+
+  trial_EF = EF
+  evaluate = .TRUE.
+  CALL Bcast_Density_request(trial_EF, evaluate)
+  local_charge = Density_local(trial_EF)
+  CALL Reduce_Density_sum(local_charge, total_charge)
+  if (wprint) WRITE(*,'(A,f13.8,A,f14.8,A,f10.4,A,f14.8)') &
+       'EF[eV]=', EF*Ry2eV, ' Density=', total_charge, ' N=', elecn, ' EF[Ry]=', EF
+  Density = total_charge-elecn
 END FUNCTION Density
+
+SUBROUTINE Serve_Density_requests()
+  USE com_mpi, ONLY: Bcast_Density_request, Reduce_Density_sum
+  IMPLICIT NONE
+  REAL*8 :: trial_EF, local_charge, total_charge, Density_local
+  LOGICAL :: evaluate
+
+  do
+     trial_EF = 0.d0
+     evaluate = .FALSE.
+     CALL Bcast_Density_request(trial_EF, evaluate)
+     if (.NOT.evaluate) exit
+     local_charge = Density_local(trial_EF)
+     CALL Reduce_Density_sum(local_charge, total_charge)
+  enddo
+END SUBROUTINE Serve_Density_requests
 
 module Fermi
   contains
@@ -1742,9 +1781,9 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
   INTEGER     :: ikp, nemin, nemax, DM_nemin, DM_nemax, n0!, num
   REAL*8      :: E(nume), emist, Kn(3)
   COMPLEX*16  :: gtot(nomega)
-  LOGICAL     :: more_kpoints, Tcompute
+  LOGICAL     :: more_kpoints, Tcompute, density_request
   INTEGER     :: jatom, isize, nbands, itape, is, i, iorb, icix, ip, it, iom, itmax, fh_EF, iikp, ind, iband
-  REAL*8      :: tEF, t1c, t2c, t1w, t2w, dd, dd2, dEF, Ea, Eb, fatol, xatol, xrtol, twgh, dsm, wkp, zw0, EFnew, rx
+  REAL*8      :: tEF, t1c, t2c, t1w, t2w, dd, dd2, dEF, Ea, Eb, fatol, xatol, xrtol, twgh, dsm, wkp, zw0, EFnew, rx, density_request_EF
   LOGICAL     :: Need_EF_update
   INTEGER, ALLOCATABLE :: indHa(:,:)
   INTEGER     :: dNHa, ncandidates
@@ -2074,7 +2113,10 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
   ! weib(i) <- sum(weib)
   ! gtot(iom) <- sum(gtot)
   
-  CALL Reduce_MPI1(pr_procr, nomega, max_nume)
+  ! The ordinary EF search sums one local occupancy per rank for each trial.
+  ! Only mode='e' writes the full frequency-dependent eigenvalue dataset and
+  ! therefore still needs to gather zEk, Ek, weights, and band bounds.
+  if (mode.EQ.'e') CALL Reduce_MPI1(pr_procr, nomega, max_nume)
   IF (recomputeEF.GT.1) CALL Reduce_MPI1b(nomega, Ebmax, Ebmin, weib, gtot, max_nume+dNHa)
 
   if (mode.EQ.'e') then
@@ -2089,10 +2131,10 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
      return
   endif
      
+  ! All ranks must use the same Matsubara/real-axis occupancy formula.
+  wmatsubara = matsubara
   !wprint1=.false.
   if (myrank.EQ.master) then
-     wmatsubara = matsubara
-
      Need_EF_update=.True.
      
      if (recomputeEF.gt.1) then
@@ -2208,7 +2250,12 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
      OPEN(fh_EF,file=Efilename,status='unknown',form='formatted')
      WRITE(fh_EF,'(f25.16)') EF*Ry2eV
      CLOSE(fh_EF)
-     
+     ! Release workers waiting for another Density trial before the EF bcast.
+     density_request_EF = 0.d0
+     density_request = .FALSE.
+     CALL Bcast_Density_request(density_request_EF, density_request)
+  else
+     CALL Serve_Density_requests()
   endif
 
 

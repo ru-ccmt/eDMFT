@@ -321,6 +321,34 @@ CONTAINS
     if (ierr.ne.0) print *, 'ERROR in MPI_BCAST 1', ierr
   END SUBROUTINE Bcast_MPI
 
+  ! Broadcast a trial chemical potential or the end-of-search signal.
+  ! Workers keep their eigenvalues and k-point weights locally.
+  SUBROUTINE Bcast_Density_request(EF, evaluate)
+    IMPLICIT NONE
+    REAL*8, intent(inout) :: EF
+    LOGICAL, intent(inout) :: evaluate
+    REAL*8 :: request(2)
+
+    if (myrank.eq.master) then
+       request(1) = 0.d0
+       if (evaluate) request(1) = 1.d0
+       request(2) = EF
+    endif
+    CALL MPI_BCAST(request, 2, MPI_DOUBLE_PRECISION, master, MPI_COMM_WORLD, ierr)
+    if (ierr.ne.0) print *, 'ERROR in MPI_BCAST density request', ierr
+    evaluate = (request(1).ne.0.d0)
+    EF = request(2)
+  END SUBROUTINE Bcast_Density_request
+
+  SUBROUTINE Reduce_Density_sum(local_charge, total_charge)
+    IMPLICIT NONE
+    REAL*8, intent(in) :: local_charge
+    REAL*8, intent(out) :: total_charge
+
+    CALL MPI_REDUCE(local_charge, total_charge, 1, MPI_DOUBLE_PRECISION, MPI_SUM, master, MPI_COMM_WORLD, ierr)
+    if (ierr.ne.0) print *, 'ERROR in MPI_REDUCE density', ierr
+  END SUBROUTINE Reduce_Density_sum
+
   SUBROUTINE Reduce_MPI(xwt, etot, ftot, ftot0, gloc, w_RHOLM, DM, Gdloc, fsph, fnsp, fsph2, Edimp, Nds, w_xwt1, w_xwteh, w_xwtel, w_xwt1h, w_xwt1l, sumfft, tloc, nomega, NRAD, LM_MAX, nat, natm, iff1, iff2, iff3, ift1, ift2, ift3, maxdim, ncix, ntcix, nip, Qforce)
     IMPLICIT NONE
     REAL*8, intent(inout)     :: xwt, etot, ftot, ftot0
@@ -702,6 +730,19 @@ CONTAINS
     IMPLICIT NONE
     REAL*8, intent(inout) :: EF
   END SUBROUTINE Bcast_MPI
+
+  SUBROUTINE Bcast_Density_request(EF, evaluate)
+    IMPLICIT NONE
+    REAL*8, intent(inout) :: EF
+    LOGICAL, intent(inout) :: evaluate
+  END SUBROUTINE Bcast_Density_request
+
+  SUBROUTINE Reduce_Density_sum(local_charge, total_charge)
+    IMPLICIT NONE
+    REAL*8, intent(in) :: local_charge
+    REAL*8, intent(out) :: total_charge
+    total_charge = local_charge
+  END SUBROUTINE Reduce_Density_sum
 
   SUBROUTINE Gather_procs(pr_procr, pr_procs, nprocs)
     IMPLICIT NONE
