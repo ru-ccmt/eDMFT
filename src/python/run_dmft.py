@@ -396,7 +396,8 @@ def SGather(ROOT, fh_info, p, m_extn=''):
         cmd += ' -m '+str(p['mix_sigma'])
     if m_extn: cmd += ' -l '+m_extn
     print('#<sgather>: ', cmd, file=fh_info)
-    info=subprocess.call(cmd,shell=True,stdout=fh_info,stderr=fh_info)
+    fh_info.flush()
+    subprocess.check_call(cmd,shell=True,stdout=fh_info,stderr=fh_info)
 
 def SJoin(ROOT, fh_info, p, m_extn=''):    
     cmd = ROOT+'/sjoin.py -m '+str(p['mix_delta'])

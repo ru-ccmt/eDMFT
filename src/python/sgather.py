@@ -5,7 +5,8 @@ import optparse
 import utils
 from indmffile import Indmfl, ParsIndmfi
 #from scipy import *
-from numpy import array,zeros,loadtxt,savetxt,shape
+from numpy import array,zeros,loadtxt,savetxt,shape,allclose,diff,isfinite
+from scipy.interpolate import make_interp_spline
 from functools import reduce
 
 #def union(data):
@@ -206,14 +207,30 @@ if __name__=='__main__':
             
         rSigma_old = loadtxt(options.osig).transpose()
         
-        # The number of frequencies should be the same, but sometimes some frequencies are mising in the new iteration. Than mix just existing frequencies
-        nom_new = shape(rSigma)[1]
         print('shape sigma old', shape(rSigma_old))
         print('shape sigma new', shape(rSigma))
-        
+        if rSigma_old.shape[0] != rSigma.shape[0]:
+            raise ValueError('Cannot mix self-energies with different numbers of components')
+        om_old = rSigma_old[0]
+        if (len(om_old) < 2 or not isfinite(rSigma_old).all()
+                or not isfinite(om).all() or not (diff(om_old) > 0).all()
+                or not (diff(om) > 0).all()):
+            raise ValueError('Self-energy mixing requires finite data and increasing frequency meshes')
+
+        sigma_old = rSigma_old[1:]
+        if (len(om_old) != len(om)
+                or not allclose(om_old, om, rtol=1e-10, atol=1e-12)):
+            # Match sinterp.py: interpolate each real/imaginary component in
+            # frequency, with spline extrapolation for new endpoint frequencies.
+            # A temperature change can change both the spacing and mesh length.
+            print('Interpolating old self-energy onto the new frequency mesh')
+            sigma_old = make_interp_spline(
+                om_old, sigma_old, k=min(3, len(om_old)-1), axis=1)(om)
+
         rs_oo[:] = options.mix*rs_oo[:]  + (1-options.mix)*array(s_oo)
         rEdc[:]  = options.mix*rEdc[:]   + (1-options.mix)*array(Edc)
-        rSigma = options.mix*rSigma[:,:] + (1-options.mix)*rSigma_old[:,:nom_new]
+        # The frequency row belongs to the new mesh and must never be mixed.
+        rSigma[1:] = options.mix*rSigma[1:] + (1-options.mix)*sigma_old
 
     
     print('osig=', options.osig)
