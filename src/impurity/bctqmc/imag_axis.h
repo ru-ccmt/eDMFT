@@ -16,6 +16,7 @@
 #include "analytic_orders.h"
 
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <memory>
 
@@ -65,6 +66,9 @@ public:
   std::unique_ptr<edmft::imag_dlr::Workspace> tca_active_dlr_workspace;
   // FCA owns a separate fit; changing its pole count cannot affect OCA/TCA.
   // Its unexpanded root and three expanded lines ALL use this same fit.
+  // Low-accuracy FCA may also own a looser DLR basis.  Never share its pseudo
+  // coefficients with OCA/TCA: coefficient rows refer to different kernels.
+  std::unique_ptr<edmft::dlr::FermionicBasis> fca_dlr_basis;
   std::unique_ptr<edmft::imag_dlr::Workspace> fca_dlr_workspace;
   std::unique_ptr<edmft::oca_dlr::P3Plan> oca_dlr_p3_plan;
   std::unique_ptr<edmft::oca_dlr::SelfEnergyPlan> oca_dlr_self_plan;
@@ -898,11 +902,20 @@ public:
   {
     if (pars["N_min_order"].get<int>()!=4 || pars["Norder"].get<int>()<4 ||
         pars["FCA_solver"].get<std::string>()!="dlr") return;
+    const std::string accuracy=pars["fca_accuracy"].get<std::string>();
+    if (accuracy!="standard" && accuracy!="veryhigh" && accuracy!="high" &&
+        accuracy!="modest" && accuracy!="low" && accuracy!="custom")
+      throw std::invalid_argument("invalid fca_accuracy preset");
     const int pole_cap=pars["fca_aaa_poles"].get<int>();
     if (pole_cap<0) throw std::invalid_argument("fca_aaa_poles must be nonnegative");
-    // Mixed runs need the full normalization fit, so do not spend time
-    // constructing a compressed table that FCA would bypass anyway.
-    const int requested=pars["Norder"].get<int>()>4 ? 0 : pole_cap;
+    const double requested_eps=pars["fca_dlr_tolerance"].get<double>();
+    if (!(requested_eps>=0.0) || !std::isfinite(requested_eps))
+      throw std::invalid_argument("fca_dlr_tolerance must be finite and nonnegative");
+    // With fifth-order (or higher) MC, fourth-order FCA is the normalization
+    // anchor.  Approximate FCA poles or pseudo coefficients would rescale all
+    // sampled higher orders, so force the full pole table AND shared DLR basis.
+    const bool mc_anchor=pars["Norder"].get<int>()>4;
+    const int requested=mc_anchor ? 0 : pole_cap;
     const int count=requested==0 ? aaa_hybridization.poles.size() :
       std::min<int>(requested,aaa_hybridization.poles.size());
     edmft::aaa::PoleExpansion fit;
@@ -944,8 +957,32 @@ public:
     fit.residues.assign(count,Eigen::MatrixXcd::Zero(channels,channels));
     for (int l=0;l<count;++l) for (int s=0;s<channels;++s)
       fit.residues[l](s,s)=residues[l*channels+s];
+    // FCA can fit the current dense-mesh pseudo Green's functions to its own
+    // basis without changing OCA/TCA or Dyson.  A requested tolerance of zero
+    // (legacy "standard" or "custom") reuses the shared basis.  Reuse it also
+    // when the FCA tolerance equals the shared tolerance: this avoids an
+    // unnecessary duplicate basis and coefficient fit.  The resulting rank
+    // depends on beta and omega_max; the SC test happened to give rank 22 at
+    // 1e-4 and rank 37 at 1e-7, but these are not universal fixed ranks.
+    const bool separate_basis=!mc_anchor && requested_eps>0.0 &&
+      requested_eps!=dlr_basis->tolerance();
+    if (separate_basis) {
+      edmft::dlr::Options opts;
+      opts.beta=beta;
+      opts.omega_max=dlr_basis->omega_max();
+      opts.eps=requested_eps;
+      opts.panel_order=pars["dlr_panel_order"].get<int>();
+      fca_dlr_basis=std::make_unique<edmft::dlr::FermionicBasis>(opts);
+    } else fca_dlr_basis.reset();
     fca_dlr_workspace=std::make_unique<edmft::imag_dlr::Workspace>();
-    fca_dlr_workspace->prepare_hybridization(*dlr_basis,fit,channels);
+    fca_dlr_workspace->prepare_hybridization(
+      fca_dlr_basis ? *fca_dlr_basis : *dlr_basis,fit,channels);
+    if (mpi.rank==mpi.master)
+      (*mpi.out)<<"FCA DLR accuracy: requested="<<accuracy
+                <<" active="<<(mc_anchor ? "full-MC-anchor" : accuracy)
+                <<" tolerance="<<fca_dlr_workspace->basis().tolerance()
+                <<" rank="<<fca_dlr_workspace->rank()
+                <<" (OCA/TCA rank="<<dlr_basis->rank()<<")"<<std::endl;
   }
 
   Eigen::MatrixXd PseudoToDLRCoefficients(const Array<double,1>& dense_tau,
@@ -2390,13 +2427,24 @@ public:
     if (!fca_dlr_workspace || !diagram_dlr_workspace || !(Q>0.0))
       throw std::logic_error("FCA requires initialized DLR workspaces and positive Q");
     const auto start=std::chrono::steady_clock::now();
-    fca_dlr_workspace->update_pseudos(diagram_dlr_workspace->pseudo_coefficients());
+    if (fca_dlr_basis && !mc_reference) {
+      // Fit the current dense Dyson propagators to the FCA basis.  Copying
+      // rank-37 coefficients into a rank-22 workspace would be meaningless.
+      Eigen::VectorXd fit_tau(output_tau.extent(0));
+      Eigen::MatrixXd fit_values(output_tau.extent(0),Gm.extent(0));
+      for (int it=0;it<output_tau.extent(0);++it) {
+        fit_tau(it)=output_tau(it);
+        for (int p=0;p<Gm.extent(0);++p) fit_values(it,p)=Gm(p,it);
+      }
+      fca_dlr_workspace->update_pseudos(fca_dlr_basis->fit_values(fit_tau,fit_values));
+    } else if (!fca_dlr_basis)
+      fca_dlr_workspace->update_pseudos(diagram_dlr_workspace->pseudo_coefficients());
     // As for TCA, do not normalize MC with a deliberately low-pole FCA fit.
     // The full workspace already holds this iteration's pseudo coefficients.
     const auto& workspace=mc_reference ? *diagram_dlr_workspace : *fca_dlr_workspace;
     if (mc_reference && mpi.rank==mpi.master)
       (*mpi.out)<<"FCA MC reference: full AAA poles="<<workspace.pole_count()
-                <<" (fca_aaa_poles cap bypassed)"<<std::endl;
+                <<" (FCA pole and DLR-rank approximations bypassed)"<<std::endl;
     const bool diagnostics=pars["fca_store_self_diagnostics"].get<bool>();
     const auto& basis=workspace.basis();
     const auto dense=[&](const Eigen::MatrixXd& nodes) {
@@ -2496,6 +2544,7 @@ public:
       options.physical_ef_boundary=pars["fca_physical_ef_boundary"].get<bool>();
       options.self_direction_sum=pars["fca_self_direction_sum"].get<bool>();
       options.self_reuse=pars["fca_self_reuse"].get<bool>();
+      options.self_coeff_chain=pars["fca_self_coeff_chain"].get<bool>();
       options.self_adaptive_anchor=pars["fca_self_adaptive_anchor"].get<bool>();
       options.reuse_prepared=pars["fca_reuse_prepared"].get<bool>();
       options.root_plans=pars["fca_root_plans"].get<bool>();
@@ -2535,6 +2584,11 @@ public:
         throw std::invalid_argument("fca_self_prefix_mb must be finite and nonnegative, within size_t range");
       options.self_prefix_bytes=static_cast<std::size_t>(prefix_mb*(1024.*1024.));
       options.profile=pars["fca_profile"].get<bool>();
+      options.live_profile=pars["fca_live_profile"].get<bool>();
+      options.bath_sector_profile=pars["fca_bath_sector_profile"].get<bool>();
+      options.tt_probe_task=pars["fca_tt_probe_task"].get<int>();
+      options.tt_probe_bath=pars["fca_tt_probe_bath"].get<int>();
+      options.tt_probe_pole=pars["fca_tt_probe_pole"].get<int>();
       const double cache_mb=pars["fca_physical_cache_mb"].get<double>();
       if (!std::isfinite(cache_mb) || cache_mb<0 ||
           cache_mb>std::numeric_limits<std::size_t>::max()/(1024.*1024.))

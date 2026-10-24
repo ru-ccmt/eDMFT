@@ -16,6 +16,10 @@
 #include <limits>
 #include <list>
 #include <cstring>
+#include <fstream>
+#include <iomanip>
+#include <type_traits>
+#include <set>
 
 namespace edmft::fca_dlr {
 using Eigen::MatrixXd;
@@ -44,12 +48,16 @@ struct Options {
   bool physical_ef_presum=true; // combine closed E inputs and share E/F boundary weights
   bool physical_ef_boundary=false; // optional: small families may not amortize weight preparation
   bool self_reuse=true;
+  // Retain ordinary self-energy chains in DLR coefficients between vertices.
+  // The root and final boundary still use time-node values. A basis-level
+  // stability gate falls back to the previous node path when needed.
+  bool self_coeff_chain=true;
   bool self_adaptive_anchor=true;
   bool reuse_prepared=true;
   bool root_plans=true;
   bool indexed_states=true;
   bool convolution_scratch=true;
-  bool self_pole_sum=true;
+  bool self_pole_sum=false;
   bool self_direction_sum=true; // sum BOTH arrows at closure; no symmetry assumption
   int self_pole_sum_min_poles=3;
   bool shared_branch_transforms=true;
@@ -75,6 +83,18 @@ struct Options {
   std::size_t self_prefix_bytes=64ULL*1024*1024;
   std::size_t physical_cache_bytes=64ULL*1024*1024;
   bool profile=false;
+  // Stream per-task cost and gross contribution norms to rank zero while
+  // the calculation is running. This is diagnostic only: no diagrams are cut.
+  bool live_profile=false;
+  // Opt-in bath-resolved screening pilot for ordinary FCA pseudo-self-energy
+  // chains. It measures the streamed bath before that bath is summed into the
+  // common suffix; no contribution is removed from the calculation.
+  bool bath_sector_profile=false;
+  // Diagnostic only: inspect one shared-self task without changing its result.
+  // The selected worker writes singular spectra at vertices 2, 3, and 4.
+  int tt_probe_task=-1;
+  int tt_probe_bath=-1; // -1 selects the first nonzero streamed bath
+  int tt_probe_pole=-1; // -1 selects the first nonzero streamed pole
 };
 struct PhysicalProfile {
   double convolution_functions=0,convolution_batches=0,cache_hits=0;
@@ -86,6 +106,9 @@ struct PhysicalProfile {
   std::size_t cache_peak_bytes=0;
 };
 struct SelfProfile {
+  struct BathSector {
+    double visits=0,seconds=0,prescore=0,intermediate_norm=0;
+  };
   double convolution_functions=0,convolution_batches=0,root_functions=0;
   double prepared_unique=0,prepared_reused=0,prefix_fallbacks=0;
   int anchor=-1;
@@ -93,6 +116,10 @@ struct SelfProfile {
   double root_seconds=0,vertex_seconds=0,convolution_seconds=0;
   double pack_seconds=0,transform_seconds=0,product_seconds=0,unpack_seconds=0;
   double pole_groups=0,shared_branch_inputs=0,shared_transform_seconds=0;
+  std::vector<BathSector> bath_sectors;
+  // Flat [bath][source block][target block] scores, allocated only for the
+  // opt-in pilot and only when its dense table fits the fixed safety cap.
+  std::vector<double> bath_block_prefix,bath_block_intermediate;
 };
 
 struct PreparedCacheProfile {
@@ -105,7 +132,19 @@ struct SharedPrefixProfile {
   double shared_branch_inputs=0;
   std::size_t peak_bytes=0;
   int fallbacks=0;
+  std::vector<SelfProfile::BathSector> bath_sectors;
+  std::vector<double> bath_block_prefix,bath_block_intermediate;
 };
+
+// The SC cluster uses 12 baths and 30 atomic blocks: 10800 entries per
+// family, < 0.2 MiB for both scores. Large f-shell spaces skip this optional
+// block breakdown rather than multiplying that storage by hundreds of ranks.
+inline constexpr std::size_t bath_block_score_limit=100000;
+inline std::size_t bath_block_entries(int baths,int blocks) {
+  if (baths<=0 || blocks<=0) return 0;
+  const long double count=static_cast<long double>(baths)*blocks*blocks;
+  return count<=bath_block_score_limit ? static_cast<std::size_t>(count) : 0;
+}
 struct PhysicalSharedProfile {
   double convolution_functions=0,cache_hits=0,left_reuses=0,cache_bypasses=0,cache_evictions=0;
   double shared_branch_inputs=0,branch_transform_hits=0;
@@ -207,6 +246,121 @@ public:
   }
   void emplace(const State& key,Function value) { (*this)[key]=std::move(value); }
 };
+
+// A diagnostic Schmidt spectrum of the open-bath histories against EVERYTHING
+// carried by their matrix-valued pseudo-propagator functions.  This does not
+// truncate or otherwise change the FCA evaluator.  Form the small row Gram
+// matrix instead of materializing a potentially enormous dense history-by-
+// (block,time,matrix-entry) tensor.  In the SC cluster a fixed streamed bath
+// leaves at most Nbath^2=144 rows, so this is bounded even when the functions
+// themselves contain many atomic blocks.
+//
+// The metric is physical L2 imaginary time, NOT Euclidean DLR coefficients:
+// the dyadic quadrature resolves the sharp endpoint kernels, and the cached
+// DLR node solve maps the node-valued shared-family functions into that
+// quadrature.  Every missing sparse block is treated as an exact zero.
+template<class StateMap>
+void write_tt_probe_spectrum(std::ostream& out,const StateMap& states,
+                             const dlr::FermionicBasis& basis,
+                             int vertex,int arrow,int pole,int bath,
+                             double stage_seconds)
+{
+  const auto begin=std::chrono::steady_clock::now();
+  std::vector<const Function*> rows;
+  std::set<std::pair<int,int>> blocks;
+  for (const auto& [state,function]:states) if (!function.empty()) {
+    rows.push_back(&function);
+    for (const auto& [key,values]:function) if (!values.empty()) blocks.insert(key);
+  }
+  const int n=static_cast<int>(rows.size()),r=basis.rank();
+  if (n==0) {
+    out<<vertex<<','<<arrow<<','<<pole<<','<<bath
+       <<",0,0,0,0,0,0,0,"<<stage_seconds<<",0\n";
+    out.flush();
+    return;
+  }
+
+  // Reuse the same endpoint-resolving quadrature construction as the DLR
+  // basis.  sqrt(beta) converts its dimensionless weights to d(tau).
+  const auto fine=dlr::detail::make_fine_grid(basis.lambda(),24);
+  MatrixXd evaluation(fine.time_relative.size(),r);
+  for (int q=0;q<evaluation.rows();++q)
+    for (int l=0;l<r;++l)
+      evaluation(q,l)=std::sqrt(basis.beta())*fine.sqrt_time_weights(q)*
+        dlr::kernel_relative(fine.time_relative(q),basis.dimensionless_frequencies()(l));
+  // self_prefix_family's states are values at the representative DLR nodes.
+  const MatrixXd identity=MatrixXd::Identity(r,r);
+  const MatrixXd inverse_nodes=basis.values_to_coefficients(identity);
+  const MatrixXd physical=evaluation*inverse_nodes;
+  const MatrixXd metric=physical.transpose()*physical;
+  Eigen::SelfAdjointEigenSolver<MatrixXd> metric_eig(metric);
+  if (metric_eig.info()!=Eigen::Success) throw std::runtime_error("FCA TT probe time metric eigensolve failed");
+  MatrixXd metric_sqrt=metric_eig.eigenvectors().transpose();
+  for (int l=0;l<r;++l)
+    metric_sqrt.row(l)*=std::sqrt(std::max(0.0,metric_eig.eigenvalues()(l)));
+
+  MatrixXd gram=MatrixXd::Zero(n,n);
+  // Tile matrix elements so neither a dense atomic-space tensor nor a
+  // second full copy of all sparse functions is ever allocated.
+  constexpr int tile_size=8;
+  for (const auto& key:blocks) {
+    int nr=-1,nc=-1;
+    for (const Function* row:rows) {
+      const auto it=row->find(key);
+      if (it==row->end()) continue;
+      if (static_cast<int>(it->second.size())!=r)
+        throw std::logic_error("FCA TT probe function has wrong DLR rank");
+      nr=it->second[0].rows(); nc=it->second[0].cols(); break;
+    }
+    if (nr<0 || nc<0) continue;
+    for (int first=0;first<nr*nc;first+=tile_size) {
+      const int tile=std::min(tile_size,nr*nc-first);
+      MatrixXd transformed=MatrixXd::Zero(n,r*tile);
+      for (int u=0;u<n;++u) {
+        const auto it=rows[u]->find(key);
+        if (it==rows[u]->end()) continue;
+        const auto& values=it->second;
+        MatrixXd flat(r,tile);
+        for (int t=0;t<r;++t) {
+          if (values[t].rows()!=nr || values[t].cols()!=nc)
+            throw std::logic_error("FCA TT probe sparse block shape mismatch");
+          for (int e=0;e<tile;++e)
+            flat(t,e)=values[t]((first+e)/nc,(first+e)%nc);
+        }
+        const MatrixXd weighted=metric_sqrt*flat;
+        for (int t=0;t<r;++t)
+          for (int e=0;e<tile;++e) transformed(u,t*tile+e)=weighted(t,e);
+      }
+      gram.noalias()+=transformed*transformed.transpose();
+    }
+  }
+  Eigen::SelfAdjointEigenSolver<MatrixXd> eig(gram);
+  if (eig.info()!=Eigen::Success) throw std::runtime_error("FCA TT probe Gram eigensolve failed");
+  // The row-normalized spectrum reveals whether a small raw rank comes from
+  // genuine shared histories or merely from a few much larger amplitudes.
+  MatrixXd unit=gram;
+  for (int u=0;u<n;++u) for (int v=0;v<n;++v) {
+    const double denom=std::sqrt(std::max(0.0,gram(u,u))*std::max(0.0,gram(v,v)));
+    unit(u,v)=denom>0.0 ? gram(u,v)/denom : 0.0;
+  }
+  Eigen::SelfAdjointEigenSolver<MatrixXd> unit_eig(unit);
+  if (unit_eig.info()!=Eigen::Success) throw std::runtime_error("FCA TT probe unit-Gram eigensolve failed");
+  const double total=std::max(0.0,eig.eigenvalues().sum());
+  const double unit_total=std::max(0.0,unit_eig.eigenvalues().sum());
+  double remainder=total,unit_remainder=unit_total;
+  const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-begin).count();
+  for (int j=0;j<n;++j) {
+    const double value=std::max(0.0,eig.eigenvalues()(n-1-j));
+    const double unit_value=std::max(0.0,unit_eig.eigenvalues()(n-1-j));
+    remainder=std::max(0.0,remainder-value);
+    unit_remainder=std::max(0.0,unit_remainder-unit_value);
+    out<<vertex<<','<<arrow<<','<<pole<<','<<bath<<','<<n<<','<<blocks.size()<<','<<(j+1)<<','
+       <<std::sqrt(value)<<','<<(total>0.0 ? std::sqrt(remainder/total) : 0.0)<<','
+       <<std::sqrt(unit_value)<<','<<(unit_total>0.0 ? std::sqrt(unit_remainder/unit_total) : 0.0)<<','
+       <<stage_seconds<<','<<seconds<<'\n';
+  }
+  out.flush(); // useful even if a long SC run is stopped after the probe
+}
 
 // Lifetime: one E/F family and ONE pair of crossing-bath labels. The key is
 // the complete numeric/operation history of a prefix, not a topology hash.
@@ -657,6 +811,39 @@ class Evaluator {
     return result;
   }
 
+  // Apply the same small DLR-time linear map to every atomic matrix entry.
+  // This is a multiple-RHS GEMM, not one transform per block or bath state.
+  // In coefficient-chain mode the map B^{-1} diag(vertex) B dresses a vertex
+  // while staying in coefficients; B itself is used only at the root, whose
+  // hybridization is sampled at the selected time nodes.
+  Function transform_time(const Function& input,const MatrixXd& map) const {
+    Eigen::Index entries=0;
+    for (const auto& [key,values]:input) entries+=values[0].size();
+    MatrixXd flat(w.rank(),entries);
+    Eigen::Index offset=0;
+    for (const auto& [key,values]:input) {
+      const int nr=values[0].rows(),nc=values[0].cols();
+      for (int i=0;i<nr;++i) for (int j=0;j<nc;++j)
+        for (int l=0;l<w.rank();++l)
+          flat(l,offset+i*nc+j)=values[l](i,j);
+      offset+=nr*nc;
+    }
+    const MatrixXd transformed=map*flat;
+    Function output;
+    offset=0;
+    for (const auto& [key,values]:input) {
+      const int nr=values[0].rows(),nc=values[0].cols();
+      auto& result=output[key]; result.resize(w.rank());
+      for (int l=0;l<w.rank();++l) {
+        result[l].resize(nr,nc);
+        for (int i=0;i<nr;++i) for (int j=0;j<nc;++j)
+          result[l](i,j)=transformed(l,offset+i*nc+j);
+      }
+      offset+=nr*nc;
+    }
+    return output;
+  }
+
   // A prepared edge also owns lazy block caches. Sharing the object, rather
   // than copying its matrices, shares those caches as well. Exact equality of
   // the sampled decoration is sufficient; no approximate frequency grouping
@@ -988,7 +1175,7 @@ public:
   std::vector<MatrixXd> self_prefix_family(const std::vector<fca::CutOrbit>& family,
                       int directions,const std::array<int,2>& fixed,
                       const Options& options,SharedPrefixProfile* profile=nullptr,
-                      bool sum_directions=false) const {
+                      bool sum_directions=false,std::ostream* tt_probe=nullptr) const {
     if (family.empty()) return {};
     for (const auto& member:family)
       if (!prefix_family_member(member)) throw std::invalid_argument("incompatible FCA prefix family");
@@ -997,6 +1184,10 @@ public:
     };
     const auto fallback=[&]() {
       if (profile) ++profile->fallbacks;
+      if (tt_probe) {
+        (*tt_probe)<<"# shared-prefix memory/reuse fallback; no checkpoint spectrum for this task\n";
+        tt_probe->flush();
+      }
       auto output=zeros();
       for (std::size_t k=0;k<family.size();++k) {
         const auto original=fca::self_cut(family[k].topology,family[k].representative,{{0,0,0,0}});
@@ -1033,6 +1224,12 @@ public:
     // Put allocations inside the try scope: a budget fallback must RELEASE
     // the prefix/branch accumulators before starting the old evaluator.
     try {
+      if (profile && options.bath_sector_profile)
+        profile->bath_sectors.resize(cix.Nbath);
+      if (profile && options.bath_sector_profile && bath_block_entries(cix.Nbath,cix.Nblock)) {
+        profile->bath_block_prefix.assign(bath_block_entries(cix.Nbath,cix.Nblock),0.);
+        profile->bath_block_intermediate.assign(bath_block_entries(cix.Nbath,cix.Nblock),0.);
+      }
       std::vector<fca::Cut> cuts;
       for (const auto& member:family) {
         auto cut=prefix_family_cut(member);
@@ -1131,6 +1328,9 @@ public:
         return next;
       };
       std::array<int,3> pole{{0,fixed[0],fixed[1]}};
+      int selected_probe_pole=options.tt_probe_pole;
+      int selected_probe_bath=options.tt_probe_bath;
+      int recorded_probe_slices=0;
       for (int a=0;a<(sum_directions ? 2 : 1);++a) {
       for (auto& cut:cuts) cut.split[0].d=(directions&1)^a;
       for (int l=0;l<w.pole_count();++l) {
@@ -1148,12 +1348,51 @@ public:
         }
         for (int bath=0;bath<cix.Nbath;++bath) {
           if (residue(bath,l)==0.) continue;
+          // Auto-select once and retain the same slice for both arrows.
+          if (tt_probe && selected_probe_pole<0) selected_probe_pole=l;
+          if (tt_probe && l==selected_probe_pole && selected_probe_bath<0)
+            selected_probe_bath=bath;
+          const bool record_probe=tt_probe && l==selected_probe_pole && bath==selected_probe_bath;
+          if (record_probe) ++recorded_probe_slices;
+          double prescore=0,intermediate_squared=0;
+          std::chrono::steady_clock::time_point sector_start;
           States prefix;
           prefix[{{-1,-1,-1}}]=Engine::PseudoValues(pseudos,decorations[0].edge[0]);
+          if (profile && options.bath_sector_profile) {
+            const auto& op=operators[Engine::Opposite(2*bath+cuts[0].split[0].d)];
+            for (const auto& [state,h]:prefix) for (const auto& [key,values]:h) {
+              if (key.second<0 || key.second>=int(op.by_source.size())) continue;
+              const int index=op.by_source[key.second];
+              if (index<0) continue;
+              double prefix_squared=0;
+              for (const auto& value:values) prefix_squared+=value.squaredNorm();
+              const double score=std::sqrt(prefix_squared)*op.entries[index].matrix.norm();
+              prescore+=score;
+              if (!profile->bath_block_prefix.empty() && key.first>=0 &&
+                  key.first<cix.Nblock && key.second<cix.Nblock)
+                profile->bath_block_prefix[(std::size_t(bath)*cix.Nblock+key.first)*cix.Nblock+
+                  key.second]+=std::abs(residue(bath,l))*score;
+            }
+            prescore*=std::abs(residue(bath,l));
+            sector_start=std::chrono::steady_clock::now();
+          }
           guard(&prefix);
+          auto previous_vertex=std::chrono::steady_clock::now();
+          int last_vertex=0;
           for (int v=1;v<=4 && !prefix.empty();++v) {
             prefix=advance(prefix,v,cuts[0],decorations[0],pole,bath);
             guard(&prefix); convolve(prefix,v,prepared[0],true); guard(&prefix);
+            last_vertex=v;
+            const auto finished_vertex=std::chrono::steady_clock::now();
+            if (record_probe && v>=2)
+              write_tt_probe_spectrum(*tt_probe,prefix,w.basis(),v,a,l,bath,
+                std::chrono::duration<double>(finished_vertex-previous_vertex).count());
+            // Exclude the diagnostic SVD from the next vertex's timing.
+            previous_vertex=std::chrono::steady_clock::now();
+          }
+          if (record_probe && prefix.empty() && last_vertex<4) {
+            (*tt_probe)<<"# selected prefix became empty before vertex 4; later checkpoint absent\n";
+            tt_probe->flush();
           }
           for (std::size_t k=0;k<family.size();++k) {
             States tail;
@@ -1170,13 +1409,36 @@ public:
             for (auto& [state,h]:tail) {
               for (auto& [key,values]:h) for (auto& matrix:values)
                 matrix*=decorations[k].inverse_denominator;
+              if (profile && options.bath_sector_profile)
+                for (const auto& [key,values]:h) {
+                  double block_squared=0;
+                  for (const auto& value:values) block_squared+=value.squaredNorm();
+                  intermediate_squared+=block_squared;
+                  if (!profile->bath_block_intermediate.empty() && key.first>=0 &&
+                      key.first<cix.Nblock && key.second>=0 && key.second<cix.Nblock)
+                    profile->bath_block_intermediate[
+                      (std::size_t(bath)*cix.Nblock+key.first)*cix.Nblock+key.second]+=
+                        std::sqrt(block_squared);
+                }
               Engine::AddFunction(merged[k][state],std::move(h));
             }
             tail.clear(); guard(&prefix);
           }
+          if (profile && options.bath_sector_profile) {
+            auto& sector=profile->bath_sectors[bath];
+            ++sector.visits;
+            sector.seconds+=std::chrono::duration<double>(
+              std::chrono::steady_clock::now()-sector_start).count();
+            sector.prescore+=prescore;
+            sector.intermediate_norm+=std::sqrt(intermediate_squared);
+          }
         }
       }
       } // both anchor arrows have closed before the shared suffix
+      if (tt_probe && recorded_probe_slices==0) {
+        (*tt_probe)<<"# selected bath/pole has zero residue in this task\n";
+        tt_probe->flush();
+      }
       auto output=zeros();
       for (std::size_t k=0;k<family.size();++k) {
         auto states=std::move(merged[k]);
@@ -1195,6 +1457,12 @@ public:
       }
       return output;
     } catch (const BudgetExceeded&) {
+      // The abandoned partial family must not be counted as completed work.
+      if (profile) {
+        profile->bath_sectors.clear();
+        profile->bath_block_prefix.clear();
+        profile->bath_block_intermediate.clear();
+      }
       return fallback();
     }
   }
@@ -1272,6 +1540,24 @@ public:
     auto cut=fca::self_cut(topology,cut_edge,{{0,0,0,0}});
     for (int j=0;j<3;++j) cut.split[j].d=(directions>>j)&1;
     Decorations d=decorate(w,cut,pole,false);
+    // A coefficient chain is meaningful only when the small DLR solve used
+    // for coefficient output passed the basis's stability gate. All retained
+    // states have the same representation after a given backbone edge.
+    const bool chain=options.self_coeff_chain &&
+      w.basis().coefficient_convolution_available();
+    std::array<MatrixXd,8> vertex_coefficient_map;
+    std::array<bool,8> vertex_has_factor{};
+    const auto refresh_vertex_maps=[&]() {
+      if (!chain) return;
+      const auto& B=w.basis().coefficients_to_values_matrix();
+      for (int v=2;v<7;++v) if (v!=cut.q) {
+        vertex_has_factor[v]=!(d.vertex[v].array()==1.).all();
+        if (vertex_has_factor[v])
+          vertex_coefficient_map[v]=w.basis().values_to_coefficients(
+            (d.vertex[v].asDiagonal()*B).eval());
+      }
+    };
+    refresh_vertex_maps();
     int anchor=bath_anchor(topology,cut_edge,options);
     if (summed_pole>=0) anchor=summed_pole;
     if (summed_direction>=0) anchor=summed_direction;
@@ -1283,6 +1569,12 @@ public:
     };
     Engine::ConvolutionScratch scratch;
     scratch.dlr_buffers.profile=profile!=nullptr;
+    if (profile && options.bath_sector_profile)
+      profile->bath_sectors.resize(cix.Nbath);
+    if (profile && options.bath_sector_profile && bath_block_entries(cix.Nbath,cix.Nblock)) {
+      profile->bath_block_prefix.assign(bath_block_entries(cix.Nbath,cix.Nblock),0.);
+      profile->bath_block_intermediate.assign(bath_block_entries(cix.Nbath,cix.Nblock),0.);
+    }
     std::vector<State> reusable_keys;
     std::vector<Function> reusable_batch;
     auto pending_hilbert=make_states();
@@ -1326,7 +1618,9 @@ public:
       if (profile) { profile->convolution_functions+=batch.size(); ++profile->convolution_batches; }
       Engine::ConvolveRightPseudoPreparedBatch(batch,cix,w,*prepared[edge],false,
                                                options.convolution_scratch ? &scratch : nullptr,
-                                               pending_coefficients ? &left_hilbert : nullptr);
+                                               pending_coefficients ? &left_hilbert : nullptr,
+                                               chain && edge>1 && edge!=cut.q,
+                                               chain && edge<6);
       pending_hilbert.clear(); pending_coefficients=false;
       states.clear();
       for (std::size_t k=0;k<keys.size();++k)
@@ -1341,7 +1635,15 @@ public:
       if (vertex==cut.q) {
         for (const auto& [state,h]:states) {
           if (profile) ++profile->root_functions;
-          auto value=options.root_plans ? planned_root(h) : root_contract(h);
+          // The root bath is a pointwise function of time. Convert its input
+          // back to representative time values before the root contraction.
+          Function node_input;
+          const Function* input=&h;
+          if (chain && vertex>1) {
+            node_input=transform_time(h,w.basis().coefficients_to_values_matrix());
+            input=&node_input;
+          }
+          auto value=options.root_plans ? planned_root(*input) : root_contract(*input);
           if (!value.empty()) next.emplace(state,std::move(value));
         }
       } else {
@@ -1356,10 +1658,20 @@ public:
         // Closing vertices deliberately keep the old node-level bath sum.
         // Cap the extra coefficient/Hilbert storage conservatively; large
         // atomic spaces fall back to the original batched node transforms.
-        const bool share=opening && vertex<7 &&
+        const bool share=!chain && opening && vertex<7 &&
           (j==anchor ? anchor_prepared : share_worthwhile(states,j));
         pending_coefficients=share;
         for (const auto& [state,h]:states) {
+          // B^{-1} diag(d_v) B performs precisely the node dressing followed
+          // by interpolation that the old path would do at the next
+          // convolution. The bath operator is time independent and therefore
+          // commutes with this transform; do it before bath branching.
+          Function dressed;
+          const Function* coefficient_input=&h;
+          if (chain && vertex>1 && vertex<7 && vertex_has_factor[vertex]) {
+            dressed=transform_time(h,vertex_coefficient_map[vertex]);
+            coefficient_input=&dressed;
+          }
           Function coefficients,hilbert;
           const Function* cf=nullptr; const Function* hf=nullptr;
           if (share && j==anchor) {
@@ -1386,7 +1698,9 @@ public:
             const int op=2*bath+line.d;
             const auto& op_matrix=operators[opening ? Engine::Opposite(op) : op];
             auto value=share ? Engine::MultiplyRight(*cf,op_matrix,ones) :
-              Engine::MultiplyRight(h,op_matrix,(weight*d.vertex[vertex]).eval());
+              (chain && vertex>1 && vertex<7) ?
+                Engine::MultiplyRight(*coefficient_input,op_matrix,(weight*ones).eval()) :
+                Engine::MultiplyRight(h,op_matrix,(weight*d.vertex[vertex]).eval());
             if (value.empty()) continue;
             State target=state; target[j]=opening ? bath : -1;
             Engine::AddFunction(next[target],std::move(value));
@@ -1436,12 +1750,13 @@ public:
         if (summed_pole>=0) pole[summed_pole]=l;
         if (summed_pole>=0 || summed_direction>=0) {
           d=decorate(w,cut,pole,false);
+          refresh_vertex_maps();
           prepared=prepare_edges(d,7,-1,options,profile);
         }
         // The streamed bath is also a branch: keep its transformed prefix
         // once per pole rather than solving it anew in every bath iteration.
         // Endpoint dressing changes with this pole, so do NOT cache across l.
-        anchor_prepared=share_worthwhile(states,anchor);
+        anchor_prepared=!chain && share_worthwhile(states,anchor);
         if (anchor_prepared) {
           const auto begin=std::chrono::steady_clock::now();
           for (const auto& [state,h]:states) {
@@ -1458,6 +1773,29 @@ public:
         }
         for (int bath=0;bath<cix.Nbath && !states.empty();++bath) {
           if (residue(bath,pole[anchor])==0.0) continue;
+          // Cheap screening proxy: residue times the norms of geometrically
+          // compatible prefix blocks and the opening operator. This is NOT
+          // the final diagram contribution and is not an error bound.
+          double prescore=0;
+          std::chrono::steady_clock::time_point sector_start;
+          if (profile && options.bath_sector_profile) {
+            sector_start=std::chrono::steady_clock::now();
+            const auto& op=operators[Engine::Opposite(2*bath+cut.split[anchor].d)];
+            for (const auto& [state,h]:states) for (const auto& [key,values]:h) {
+              if (key.second<0 || key.second>=int(op.by_source.size())) continue;
+              const int index=op.by_source[key.second];
+              if (index<0) continue;
+              double prefix_squared=0;
+              for (const auto& value:values) prefix_squared+=value.squaredNorm();
+              const double score=std::sqrt(prefix_squared)*op.entries[index].matrix.norm();
+              prescore+=score;
+              if (!profile->bath_block_prefix.empty() && key.first>=0 &&
+                  key.first<cix.Nblock && key.second<cix.Nblock)
+                profile->bath_block_prefix[(std::size_t(bath)*cix.Nblock+key.first)*cix.Nblock+
+                  key.second]+=std::abs(residue(bath,pole[anchor]))*score;
+            }
+            prescore*=std::abs(residue(bath,pole[anchor]));
+          }
           auto middle=make_states();
           for (int v=opening;v<=closing;++v) {
             middle=advance(v==opening ? states : middle,v,bath);
@@ -1466,10 +1804,30 @@ public:
           }
           // The pole normalization used to be applied after the whole chain.
           // It MUST enter before summing different poles at this endpoint.
+          double intermediate_squared=0;
           for (auto& [state,h]:middle) {
             if (summed_pole>=0 || summed_direction>=0) for (auto& [key,values]:h)
               for (auto& value:values) value*=d.inverse_denominator;
+            if (profile && options.bath_sector_profile)
+              for (const auto& [key,values]:h) {
+                double block_squared=0;
+                for (const auto& value:values) block_squared+=value.squaredNorm();
+                intermediate_squared+=block_squared;
+                if (!profile->bath_block_intermediate.empty() && key.first>=0 &&
+                    key.first<cix.Nblock && key.second>=0 && key.second<cix.Nblock)
+                  profile->bath_block_intermediate[
+                    (std::size_t(bath)*cix.Nblock+key.first)*cix.Nblock+key.second]+=
+                      std::sqrt(block_squared);
+              }
             Engine::AddFunction(merged[state],std::move(h));
+          }
+          if (profile && options.bath_sector_profile) {
+            auto& sector=profile->bath_sectors[bath];
+            ++sector.visits;
+            sector.seconds+=std::chrono::duration<double>(
+              std::chrono::steady_clock::now()-sector_start).count();
+            sector.prescore+=prescore;
+            sector.intermediate_norm+=std::sqrt(intermediate_squared);
           }
         }
         anchor_coefficients.clear(); anchor_hilbert.clear(); anchor_prepared=false;
@@ -2455,32 +2813,102 @@ public:
   }
 };
 
-// A task is one (topology, cut, arrow sector, pole triple). It retains the
-// local bath sums and sends only an integer completion message. Rank zero
-// dispatches dynamically; it is deliberately not an MPI-RMA progress loop.
-// Unlike a pre-shuffled task vector, this scheduler uses O(1) task storage.
+// One completed task's diagnostic payload. The norms are sums of Frobenius
+// norms BEFORE cancellation between tasks, not estimates of the error from
+// dropping a sector. Keeping this fixed-size also avoids a second MPI message.
+struct LiveTaskSample {
+  std::uint64_t id=0;
+  int group=-1,cut=-1,directions=-1;
+  int pole[3]={-1,-1,-1};
+  double worker_seconds=0,sigma_norm=0,g_norm=0,f00_norm=0,f01_norm=0;
+  double convolved_functions=0,root_functions=0;
+};
+static_assert(std::is_trivially_copyable_v<LiveTaskSample>);
+
+// A task is one (topology, cut, arrow sector, pole triple), with all its
+// bath/backbone paths summed locally. Completion already requires a message
+// to the dispatcher; attach a tiny timing/norm payload to that same message.
+// Rank zero periodically flushes a task CSV and a compact log summary, so
+// interrupted long runs still leave useful profiling data. Shared-family
+// time is kept separate rather than spuriously assigned to one topology.
 template<class Work>
 void schedule(std::uint64_t tasks,int rank,int size,bool mpi_enabled,
               std::ostream* log,double interval,const char* phase,Work work,
-              bool reduced=false)
+              bool reduced=false,bool live=false,std::uint64_t evaluation=0)
 {
   const auto begin=std::chrono::steady_clock::now();
   auto last=begin;
+  constexpr const char* names[]={"A","B","C","D","E","F","shared-self","shared-physical","shared-EF"};
+  struct Summary {
+    std::uint64_t count=0;
+    double seconds=0,sigma=0,g=0,f00=0,f01=0;
+  };
+  std::array<Summary,9> summary{};
+  std::ofstream live_file;
+  const std::string live_path=std::string("fca_live_")+phase+
+    (evaluation ? "."+std::to_string(evaluation) : std::string{})+".csv";
+  if (rank==0 && live) {
+    live_file.open(live_path,std::ios::out|std::ios::trunc);
+    if (live_file) {
+      live_file<<"completed_elapsed_s,task,group,cut,directions,pole0,pole1,pole2,worker_s,"
+                 "sigma_gross_norm,g_gross_norm,f00_gross_norm,f01_gross_norm,"
+                 "convolved_functions,root_functions\n";
+      live_file<<std::setprecision(17);
+    } else if (log) {
+      (*log)<<"FCA DLR "<<phase<<" live diagnostic unavailable: cannot open "<<live_path<<std::endl;
+    }
+  }
+  const auto record=[&](const LiveTaskSample& sample) {
+    if (rank!=0 || !live || sample.group<0 || sample.group>=9) return;
+    auto& s=summary[sample.group];
+    ++s.count; s.seconds+=sample.worker_seconds; s.sigma+=sample.sigma_norm;
+    s.g+=sample.g_norm; s.f00+=sample.f00_norm; s.f01+=sample.f01_norm;
+    if (live_file) {
+      const double elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-begin).count();
+      live_file<<elapsed<<','<<sample.id<<','<<names[sample.group]<<','<<sample.cut<<','
+        <<sample.directions<<','<<sample.pole[0]<<','<<sample.pole[1]<<','<<sample.pole[2]<<','
+        <<sample.worker_seconds<<','<<sample.sigma_norm<<','<<sample.g_norm<<','
+        <<sample.f00_norm<<','<<sample.f01_norm<<','<<sample.convolved_functions<<','
+        <<sample.root_functions<<'\n';
+    }
+  };
+  // Standalone algebra tests also use this scheduler with void callbacks.
+  const auto invoke=[&](std::uint64_t task) -> LiveTaskSample {
+    if constexpr (std::is_void_v<std::invoke_result_t<Work,std::uint64_t>>) {
+      work(task);
+      return {};
+    } else return work(task);
+  };
   const auto report=[&](std::uint64_t done) {
     const auto now=std::chrono::steady_clock::now();
-    if (rank!=0 || !log || interval<=0.0 ||
-        (done!=tasks && std::chrono::duration<double>(now-last).count()<interval)) return;
+    if (rank!=0 || (done!=tasks && (interval<=0.0 ||
+        std::chrono::duration<double>(now-last).count()<interval))) return;
     const double elapsed=std::chrono::duration<double>(now-begin).count();
-    (*log)<<"FCA DLR "<<phase<<" progress: completed="<<done<<"/"<<tasks
-          <<" elapsed_seconds="<<elapsed<<" remaining_seconds="
-          <<(done ? elapsed*(tasks-done)/done : 0.0)<<std::endl;
+    if (log && interval>0.0)
+      (*log)<<"FCA DLR "<<phase<<" progress: completed="<<done<<"/"<<tasks
+            <<" elapsed_seconds="<<elapsed<<" remaining_seconds="
+            <<(done ? elapsed*(tasks-done)/done : 0.0)<<std::endl;
+    if (live && log) {
+      (*log)<<"FCA DLR "<<phase<<" live: file="<<live_path<<" groups=[";
+      bool first=true;
+      for (int g=0;g<9;++g) if (summary[g].count) {
+        if (!first) (*log)<<",";
+        first=false;
+        const auto& s=summary[g];
+        (*log)<<names[g]<<":tasks="<<s.count<<":worker_s="<<s.seconds;
+        if (phase[0]=='s') (*log)<<":gross_sigma_norm="<<s.sigma;
+        else (*log)<<":gross_g_f00_f01_norm="<<s.g<<"/"<<s.f00<<"/"<<s.f01;
+      }
+      (*log)<<"]"<<std::endl;
+    }
+    if (live_file) live_file.flush();
     last=now;
   };
   if (rank==0 && log)
     (*log)<<"FCA DLR "<<phase<<" start: tasks="<<tasks<<" ranks="<<size
           <<" scheduler="<<(mpi_enabled && size>1 ? "dynamic-dispatch" : "serial")
           <<" cuts="<<(reduced ? "rotation-reduced" : "unreduced")
-          <<" orientations=all"<<std::endl;
+          <<" orientations=all live_profile="<<(live ? "yes" : "no")<<std::endl;
 #ifdef _MPI
   if (mpi_enabled && size>1) {
     constexpr int assignment=27810,completion=27811;
@@ -2493,9 +2921,10 @@ void schedule(std::uint64_t tasks,int rank,int size,bool mpi_enabled,
         if (task<tasks) ++active;
       }
       while (active) {
-        std::uint64_t finished;
+        LiveTaskSample finished;
         MPI_Status status;
-        MPI_Recv(&finished,1,MPI_UINT64_T,MPI_ANY_SOURCE,completion,MPI_COMM_WORLD,&status);
+        MPI_Recv(&finished,sizeof(finished),MPI_BYTE,MPI_ANY_SOURCE,completion,MPI_COMM_WORLD,&status);
+        record(finished);
         ++done;
         const std::uint64_t task=next<tasks ? next++ : tasks;
         MPI_Send(&task,1,MPI_UINT64_T,status.MPI_SOURCE,assignment,MPI_COMM_WORLD);
@@ -2508,14 +2937,26 @@ void schedule(std::uint64_t tasks,int rank,int size,bool mpi_enabled,
         std::uint64_t task;
         MPI_Recv(&task,1,MPI_UINT64_T,0,assignment,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
         if (task==tasks) break;
-        work(task);
-        MPI_Send(&task,1,MPI_UINT64_T,0,completion,MPI_COMM_WORLD);
+        const auto task_begin=std::chrono::steady_clock::now();
+        LiveTaskSample finished=invoke(task);
+        finished.id=task;
+        finished.worker_seconds=std::chrono::duration<double>(
+          std::chrono::steady_clock::now()-task_begin).count();
+        MPI_Send(&finished,sizeof(finished),MPI_BYTE,0,completion,MPI_COMM_WORLD);
       }
     }
     return;
   }
 #endif
-  if (rank==0) for (std::uint64_t task=0;task<tasks;++task) { work(task); report(task+1); }
+  if (rank==0) for (std::uint64_t task=0;task<tasks;++task) {
+    const auto task_begin=std::chrono::steady_clock::now();
+    LiveTaskSample finished=invoke(task);
+    finished.id=task;
+    finished.worker_seconds=std::chrono::duration<double>(
+      std::chrono::steady_clock::now()-task_begin).count();
+    record(finished);
+    report(task+1);
+  }
 }
 
 inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
@@ -2535,6 +2976,14 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
   // that regime by default; a minimum of one explicitly forces grouping.
   const bool sum_poles=options.self_pole_sum &&
     p>=static_cast<std::uint64_t>(options.self_pole_sum_min_poles);
+  // Preserve separate live files for each FCA self-consistency iteration.
+  // Every MPI rank enters evaluate the same number of times, but only rank
+  // zero opens the file. A new solver process starts again at iteration 0.
+  static std::uint64_t live_evaluation_counter=0;
+  const std::uint64_t live_evaluation=(options.live_profile || options.bath_sector_profile) ?
+    live_evaluation_counter++ : 0;
+  static std::uint64_t tt_probe_evaluation_counter=0;
+  const std::uint64_t tt_probe_evaluation=tt_probe_evaluation_counter++;
   Result r;
   const auto sigma_zero=[&] { return MatrixXd::Zero(w.rank(),w.pseudo_count()).eval(); };
   const auto physical_zero=[&] { return MatrixXd::Zero(w.rank(),w.channel_count()).eval(); };
@@ -2561,6 +3010,20 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
   // These are not wall times; they identify expensive diagrams separately
   // from load balancing. Cache peak is the largest per-task retained cache.
   MatrixXd profile=MatrixXd::Zero(6,27);
+  // One small reduction after the self phase; no per-bath MPI messages and
+  // no path-sized storage. Rows are (topology, streamed bath).
+  MatrixXd bath_sector_stats=MatrixXd::Zero(7*cix.Nbath,4);
+  const std::size_t block_entries=options.bath_sector_profile ?
+    bath_block_entries(cix.Nbath,cix.Nblock) : 0;
+  MatrixXd bath_block_stats=MatrixXd::Zero(7*block_entries,2);
+  const auto add_block_scores=[&](int group,const auto& counters) {
+    if (!block_entries || counters.bath_block_prefix.size()!=block_entries ||
+        counters.bath_block_intermediate.size()!=block_entries) return;
+    for (std::size_t i=0;i<block_entries;++i) {
+      bath_block_stats(group*block_entries+i,0)+=counters.bath_block_prefix[i];
+      bath_block_stats(group*block_entries+i,1)+=counters.bath_block_intermediate[i];
+    }
+  };
   double cache_peak=0;
   const auto poles=[&](std::uint64_t id) {
     return std::array<int,3>{{static_cast<int>(id%p),static_cast<int>((id/p)%p),
@@ -2576,6 +3039,9 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
           <<" physical_cache_resume="<<(options.physical_cache_resume ? "yes" : "no")
           <<" physical_cache_retain="<<(options.physical_cache_resume && options.physical_cache_retain ? "yes" : "no")
           <<" self_reuse="<<(options.self_reuse ? "yes" : "no")
+          <<" self_coeff_chain="<<(options.self_coeff_chain &&
+              w.basis().coefficient_convolution_available() ? "yes" : "no")
+          <<" self_coeff_chain_requested="<<(options.self_coeff_chain ? "yes" : "no")
           <<" adaptive_anchor="<<(options.self_adaptive_anchor ? "yes" : "no")
           <<" reuse_prepared="<<(options.reuse_prepared ? "yes" : "no")
           <<" root_plans="<<(options.root_plans ? "yes" : "no")
@@ -2598,8 +3064,22 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
   const int direction_tasks=options.self_direction_sum ? 4 : 8;
   const std::uint64_t ordinary_tasks=ordinary_orbits.size()*direction_tasks*self_pole_tasks;
   const std::uint64_t family_tasks=shared_family.empty() ? 0 : direction_tasks*p*p;
+  if (options.tt_probe_task>=0 &&
+      static_cast<std::uint64_t>(options.tt_probe_task)>=family_tasks)
+    throw std::invalid_argument("fca_tt_probe_task requires an enabled shared-self task");
+  if (options.tt_probe_bath < -1 || options.tt_probe_pole < -1 ||
+      options.tt_probe_bath>=cix.Nbath || options.tt_probe_pole>=static_cast<int>(p))
+    throw std::invalid_argument("FCA TT probe bath or pole out of range");
+  if (rank==0 && log && options.tt_probe_task>=0)
+    (*log)<<"FCA TT probe enabled: shared_task="<<options.tt_probe_task
+          <<" streamed_bath="<<options.tt_probe_bath
+          <<" streamed_pole="<<options.tt_probe_pole
+          <<" output=fca_tt_probe.self.iter"<<tt_probe_evaluation
+          <<".task"<<options.tt_probe_task<<".rank<worker>.csv"
+          <<" (diagnostic only; exact evaluation continues)"<<std::endl;
   schedule(ordinary_tasks+family_tasks,rank,size,mpi_enabled,log,interval,"self",[&](std::uint64_t id) {
     const auto start=std::chrono::steady_clock::now();
+    LiveTaskSample sample;
     // Dispatch the larger shared-family tasks first. The remaining ordinary
     // tasks then fill workers as families finish, rather than leaving a
     // small, expensive family-only tail on a many-rank machine. When the
@@ -2607,13 +3087,39 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
     if (id<family_tasks) {
       const std::array<int,2> fixed{{static_cast<int>(id%p),static_cast<int>((id/p)%p)}};
       const int directions=(id/(p*p))*(options.self_direction_sum ? 2 : 1);
+      sample.group=6; sample.directions=directions;
+      sample.pole[0]=fixed[0]; sample.pole[1]=fixed[1];
       SharedPrefixProfile counters;
+      std::ofstream tt_file;
+      std::ostream* tt_output=nullptr;
+      if (options.tt_probe_task>=0 && id==static_cast<std::uint64_t>(options.tt_probe_task)) {
+        const std::string name="fca_tt_probe.self.iter"+std::to_string(tt_probe_evaluation)+
+          ".task"+std::to_string(id)+".rank"+std::to_string(rank)+".csv";
+        tt_file.open(name,std::ios::out|std::ios::trunc);
+        if (!tt_file) throw std::runtime_error("cannot open FCA TT probe file "+name);
+        tt_file<<std::setprecision(17)
+          <<"vertex,arrow_branch,streamed_pole,streamed_bath,active_rows,block_keys,"
+             "retained_rank,singular_value,relative_tail,unit_row_singular_value,"
+             "unit_row_relative_tail,vertex_seconds,spectrum_seconds\n";
+        tt_output=&tt_file;
+      }
       const auto values=evaluator.self_prefix_family(shared_family,directions,fixed,options,&counters,
-                                                     options.self_direction_sum);
+                                                     options.self_direction_sum,tt_output);
+      if (options.bath_sector_profile)
+        for (int bath=0;bath<int(counters.bath_sectors.size());++bath) {
+          const auto& sector=counters.bath_sectors[bath];
+          const int row=6*cix.Nbath+bath;
+          bath_sector_stats(row,0)+=sector.visits;
+          bath_sector_stats(row,1)+=sector.seconds;
+          bath_sector_stats(row,2)+=sector.prescore;
+          bath_sector_stats(row,3)+=sector.intermediate_norm;
+        }
+      if (options.bath_sector_profile) add_block_scores(6,counters);
       for (std::size_t k=0;k<shared_family.size();++k) {
         const auto& orbit=shared_family[k];
         r.sigma_topology[orbit.topology]+=double(orbit.members.size())*values[k];
         if (diagnostics) for (int cut:orbit.members) r.sigma_cut[orbit.topology][cut]+=values[k];
+        if (options.live_profile) sample.sigma_norm+=double(orbit.members.size())*values[k].norm();
       }
       family_stats(0,0)+=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
       family_stats(0,1)+=1; family_stats(0,2)+=counters.fallbacks;
@@ -2622,7 +3128,9 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
       family_stats(0,5)+=counters.root_functions;
       family_stats(0,6)+=counters.shared_branch_inputs;
       family_peak=std::max(family_peak,double(counters.peak_bytes));
-      return;
+      sample.convolved_functions=counters.prefix_convolutions+counters.tail_convolutions;
+      sample.root_functions=counters.root_functions;
+      return sample;
     }
     id-=family_tasks;
     const auto pole=poles(id);
@@ -2630,15 +3138,29 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
     const int directions=id%direction_tasks; id/=direction_tasks;
     const auto& orbit=ordinary_orbits[id];
     const int topology=orbit.topology;
+    sample.group=topology; sample.cut=orbit.representative; sample.directions=directions;
+    for (int j=0;j<3;++j) sample.pole[j]=pole[j];
+    if (sum_poles) sample.pole[2]=-1; // one pole is internally summed, not fixed by this task
     SelfProfile counters;
     const auto value=options.self_direction_sum ?
       evaluator.self_nodes_direction_sum(topology,orbit.representative,directions,pole,sum_poles,options,
-                                         options.profile ? &counters : nullptr) : sum_poles ?
+                                         (options.profile || options.live_profile || options.bath_sector_profile) ? &counters : nullptr) : sum_poles ?
       evaluator.self_nodes_pole_sum(topology,orbit.representative,directions,{{pole[0],pole[1]}},options,
-                                   options.profile ? &counters : nullptr) :
+                                   (options.profile || options.live_profile || options.bath_sector_profile) ? &counters : nullptr) :
       evaluator.self_nodes(topology,orbit.representative,directions,pole,options,
-                           options.profile ? &counters : nullptr);
+                           (options.profile || options.live_profile || options.bath_sector_profile) ? &counters : nullptr);
+    if (options.bath_sector_profile)
+      for (int bath=0;bath<int(counters.bath_sectors.size());++bath) {
+        const auto& sector=counters.bath_sectors[bath];
+        const int row=topology*cix.Nbath+bath;
+        bath_sector_stats(row,0)+=sector.visits;
+        bath_sector_stats(row,1)+=sector.seconds;
+        bath_sector_stats(row,2)+=sector.prescore;
+        bath_sector_stats(row,3)+=sector.intermediate_norm;
+      }
+    if (options.bath_sector_profile) add_block_scores(topology,counters);
     r.sigma_topology[topology]+=static_cast<double>(orbit.members.size())*value;
+    if (options.live_profile) sample.sigma_norm=double(orbit.members.size())*value.norm();
     // Preserve the existing per-cut output contract. Equality holds after
     // the complete internal-arrow/pole sum, not necessarily for one task.
     if (diagnostics) for (int cut:orbit.members) r.sigma_cut[topology][cut]+=value;
@@ -2663,7 +3185,10 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
       profile(topology,22)+=counters.shared_branch_inputs;
       profile(topology,23)+=counters.shared_transform_seconds;
     }
-  },options.reduce_cuts);
+    sample.convolved_functions=counters.convolution_functions;
+    sample.root_functions=counters.root_functions;
+    return sample;
+  },options.reduce_cuts,options.live_profile,live_evaluation);
   const auto reduce=[&](MatrixXd& x) {
 #ifdef _MPI
     if (size>1) for (Eigen::Index i=0;i<x.size();) {
@@ -2692,6 +3217,52 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
   for (int t=0;t<6;++t) {
     reduce(r.sigma_topology[t]); r.sigma+=r.sigma_topology[t];
     if (diagnostics) for (auto& cut:r.sigma_cut[t]) reduce(cut);
+  }
+  if (options.bath_sector_profile) {
+    reduce(bath_sector_stats);
+    if (block_entries) reduce(bath_block_stats);
+    if (rank==0) {
+      const std::string path="fca_bath_self."+std::to_string(live_evaluation)+".csv";
+      std::ofstream out(path,std::ios::out|std::ios::trunc);
+      if (out) {
+        out<<"topology,bath,visits,worker_s,prefix_score_gross,intermediate_norm_gross\n";
+        out<<std::setprecision(17);
+        for (int t=0;t<7;++t) for (int bath=0;bath<cix.Nbath;++bath) {
+          const int row=t*cix.Nbath+bath;
+          if (t<6) out<<fca::names[t]; else out<<"shared-self";
+          out<<','<<bath;
+          for (int j=0;j<4;++j) out<<','<<bath_sector_stats(row,j);
+          out<<'\n';
+        }
+      }
+      if (log) (*log)<<"FCA bath self diagnostic: file="<<path
+        <<" scope=streamed-self-chains score=proxy,not-error-bound"
+        <<" shared-family=separate-row reference-fallbacks=not-covered"
+        <<" status="<<(out ? "written" : "write-failed")<<std::endl;
+      if (block_entries) {
+        const std::string block_path="fca_bath_backbone."+
+          std::to_string(live_evaluation)+".csv";
+        std::ofstream block_out(block_path,std::ios::out|std::ios::trunc);
+        if (block_out) {
+          block_out<<"topology,bath,block_first,block_second,opening_proxy_gross,closing_norm_gross\n";
+          block_out<<std::setprecision(17);
+          for (int t=0;t<7;++t) for (int bath=0;bath<cix.Nbath;++bath)
+            for (int first=0;first<cix.Nblock;++first)
+              for (int second=0;second<cix.Nblock;++second) {
+                const std::size_t row=t*block_entries+
+                  (std::size_t(bath)*cix.Nblock+first)*cix.Nblock+second;
+                if (bath_block_stats(row,0)==0. && bath_block_stats(row,1)==0.) continue;
+                if (t<6) block_out<<fca::names[t]; else block_out<<"shared-self";
+                block_out<<','<<bath<<','<<first<<','<<second<<','
+                  <<bath_block_stats(row,0)<<','<<bath_block_stats(row,1)<<'\n';
+              }
+        }
+        if (log) (*log)<<"FCA bath/block diagnostic: file="<<block_path
+          <<" status="<<(block_out ? "written" : "write-failed")
+          <<" block_key=intermediate-matrix-pair,not-complete-backbone"<<std::endl;
+      } else if (log) (*log)<<"FCA bath/block diagnostic skipped: Nbath*Nblock^2 exceeds "
+        <<bath_block_score_limit<<" entries per family"<<std::endl;
+    }
   }
   // At this boundary every rank has the COMPLETE self-energy, not just its
   // local tasks. The production adapter can now transform and save it before
@@ -2779,13 +3350,22 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
   if (physical)
     schedule(ordinary_physical.size()*8*triples+physical_family_tasks+ef_tasks,rank,size,mpi_enabled,log,interval,"physical",[&](std::uint64_t id) {
       const auto start=std::chrono::steady_clock::now();
+      LiveTaskSample sample;
       // Larger families first; ordinary work fills workers as they finish.
       if (id<physical_family_tasks) {
+        sample.group=7; sample.directions=id/triples;
+        const auto pole=poles(id);
+        for (int j=0;j<3;++j) sample.pole[j]=pole[j];
         PhysicalSharedProfile counters;
         const auto values=evaluator.physical_family_topologies(physical_family,id/triples,poles(id),options,&counters);
         for (int t=0;t<6;++t) {
           auto& target=r.physical_topology[t];
           target.g+=values[t].g; target.f00+=values[t].f00; target.f01+=values[t].f01;
+          if (options.live_profile) {
+            sample.g_norm+=values[t].g.norm();
+            sample.f00_norm+=values[t].f00.norm();
+            sample.f01_norm+=values[t].f01.norm();
+          }
         }
         physical_family_stats(0,0)+=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
         physical_family_stats(0,1)+=1; physical_family_stats(0,2)+=counters.fallbacks;
@@ -2807,10 +3387,14 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
         physical_boundary_peak=std::max(physical_boundary_peak,double(counters.boundary_peak_bytes));
         physical_transform_peak=std::max(physical_transform_peak,double(counters.transform_peak_bytes));
         physical_family_peak=std::max(physical_family_peak,double(counters.peak_bytes));
-        return;
+        sample.convolved_functions=counters.convolution_functions;
+        return sample;
       }
       id-=physical_family_tasks;
       if (id<ef_tasks) {
+        sample.group=8; sample.cut=id/(8*triples); sample.directions=(id/triples)%8;
+        const auto pole=poles(id);
+        for (int j=0;j<3;++j) sample.pole[j]=pole[j];
         PhysicalProfile counters;
         const auto values=evaluator.physical_ef_family(ef_families[id/(8*triples)],
           (id/triples)%8,poles(id),options,&counters);
@@ -2818,6 +3402,11 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
           r.physical_topology[t].g+=values[t].g;
           r.physical_topology[t].f00+=values[t].f00;
           r.physical_topology[t].f01+=values[t].f01;
+          if (options.live_profile) {
+            sample.g_norm+=values[t].g.norm();
+            sample.f00_norm+=values[t].f00.norm();
+            sample.f01_norm+=values[t].f01.norm();
+          }
         }
         ef_stats(0,0)+=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
         ef_stats(0,1)+=1; ef_stats(0,2)+=counters.convolution_functions;
@@ -2825,7 +3414,8 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
         ef_stats(0,5)+=counters.final_convolutions_saved;
         ef_stats(0,6)+=counters.boundary_builds; ef_stats(0,7)+=counters.boundary_hits;
         ef_peak=std::max(ef_peak,double(counters.cross_diagram_peak_bytes));
-        return;
+        sample.convolved_functions=counters.convolution_functions;
+        return sample;
       }
       id-=ef_tasks;
       const auto pole=poles(id);
@@ -2835,13 +3425,20 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
       const int topology=orbit.topology,cut=orbit.representative/2;
       int directions=(orbit.representative%2)<<cut,bit=0;
       for (int l=0;l<4;++l) if (l!=cut) directions|=((internal_directions>>bit++)&1)<<l;
+      sample.group=topology; sample.cut=cut; sample.directions=directions;
+      for (int j=0;j<3;++j) sample.pole[j]=pole[j];
       PhysicalProfile counters;
       const auto value=evaluator.physical_nodes(topology,cut,directions,pole,options,
-                                                options.profile ? &counters : nullptr);
+                                                (options.profile || options.live_profile) ? &counters : nullptr);
       const double multiplicity=orbit.members.size();
       r.physical_topology[topology].g+=multiplicity*value.g;
       r.physical_topology[topology].f00+=multiplicity*value.f00;
       r.physical_topology[topology].f01+=multiplicity*value.f01;
+      if (options.live_profile) {
+        sample.g_norm=multiplicity*value.g.norm();
+        sample.f00_norm=multiplicity*value.f00.norm();
+        sample.f01_norm=multiplicity*value.f01.norm();
+      }
       if (options.profile) {
         profile(topology,2)+=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
         profile(topology,3)+=1;
@@ -2853,7 +3450,9 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
         profile(topology,26)+=counters.cache_evictions;
         cache_peak=std::max(cache_peak,static_cast<double>(counters.cache_peak_bytes));
       }
-    },options.reduce_cuts);
+      sample.convolved_functions=counters.convolution_functions;
+      return sample;
+    },options.reduce_cuts,options.live_profile,live_evaluation);
   if (physical && !ef_families.empty()) {
     reduce(ef_stats);
 #ifdef _MPI

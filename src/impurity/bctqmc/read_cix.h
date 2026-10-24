@@ -60,6 +60,7 @@ inline std::ostream& operator<<(std::ostream& os, const BathBlocks& bb)
 
 class Cix{
 public:
+  string cix_filename; // Also identifies an optional <cix>.nlsj sidecar.
   int Nsite, Natst, Npsi, Nbath, Nblock, Nmaxsize; // cluster size, number of cluster states, number of creation operators, number of hybridization entries, number of Hamiltonian blocks, the largest dimension of Hamiltonian
   Array<int,1> bath_sigind0, bath_sigind;//, bath_gflip;
   Array<double,1> bath_spin;
@@ -84,6 +85,7 @@ public:
   vector<deque<TinyVector<int,3>>> Sgm_indx;
   int Npseudo_unique, Nbath_unique, Nbath_unique_unique;
   double Emin, Emax, F_atom;
+  double F0_input = 0.0, mu_input = 0.0; // Retain the CIX energy correction for Probability2.dat.
   Array<int,1> deg_pp;
   Array<int,1> deg_bth;
   Array<int,1> deg_bath;
@@ -157,6 +159,9 @@ public:
 
   void Read_cix(const string& _fcix_, double F0, double mu, double beta)
   {
+    cix_filename = _fcix_;
+    F0_input = F0;
+    mu_input = mu;
     bool DEBUG=false;
     ifstream fcix(_fcix_);
     if (not fcix.good()){

@@ -5,6 +5,7 @@
 #include <blitz/array.h>
 #include "basics.h"
 #include "interpolate.h"
+#include "nlsj_probability.h"
 #include "tinyMatmul.h"
 #include "Eigen/Dense"
 #include "Eigen/Eigenvalues"
@@ -1959,6 +1960,7 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
     //double sumQ = sum(Prob_eig);
     clog<<"   "<<itt<<") Q = "<<sumQ<<endl;
     ofstream out("Probability.dat");
+    ofstream out_labeled("Probability2.dat");
     for (int ib=0; ib<cix.Nblock; ++ib){
       int N = cix.Block[ib].size();
       double Ptot=0;
@@ -1977,6 +1979,9 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
       for (int i=0; i<N; ++i) 
 	out<<ib+1<<" "<<i<<" "<<Prob_eig(cix.Block[ib](i)-1)<<endl;
     }
+    // Uses the same normalized Prob_eig values as Probability.dat. A missing
+    // <cix>.nlsj sidecar yields N-only rows; a mismatched sidecar is an error.
+    nlsj_probability::write(cix, Prob_eig, out_labeled);
   }
   return r;
 }    

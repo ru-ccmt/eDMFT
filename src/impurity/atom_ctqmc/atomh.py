@@ -767,6 +767,223 @@ def construct_reduced_base_njz(op: AtomicDirectBasis, n: int, jz: float) -> List
     return [state for state in range(1 << op.baths) if op.nel(state) == n and abs(op.jz_of(state) - jz) < 1e-10]
 
 
+def _angular_operator_matrix(op: AtomicDirectBasis, basis: Sequence[int], name: str) -> np.ndarray:
+    """Return a many-electron L², S², or J² matrix in a fixed (N,Jz) sector."""
+    index = {state: i for i, state in enumerate(basis)}
+    matrix = np.zeros((len(basis), len(basis)), dtype=float)
+    apply = getattr(op, name)
+    for col, state in enumerate(basis):
+        terms = apply(state)
+        for dest, amplitude in (terms.items() if isinstance(terms, dict) else terms):
+            row = index.get(dest)
+            if row is not None:
+                matrix[row, col] += amplitude
+    return 0.5 * (matrix + matrix.T)
+
+
+def _twice_angular_momentum(square: float) -> int:
+    """Convert the eigenvalue q(q+1) to the integer 2q, checking its accuracy."""
+    twice_q = int(round(math.sqrt(max(0.0, 1.0 + 4.0 * square)) - 1.0))
+    q = twice_q / 2.0
+    if abs(square - q * (q + 1.0)) > 1e-6:
+        raise ValueError(f"Angular-momentum operator has nonquantized eigenvalue {square}")
+    return twice_q
+
+
+def build_nlsj_basis(op: AtomicDirectBasis, basis: Sequence[int], n: int) -> Tuple[np.ndarray, List[Tuple[int, int, int, int]]]:
+    """Simultaneously diagonalize commuting L², S², J² in the |m_l,m_s> basis.
+
+    Degenerate vectors with the same (N,L,S,J) can be chosen arbitrarily: the
+    solver sums their *squared* overlaps, so only the whole labeled subspace
+    matters. The tuple stores twice each angular momentum to represent half
+    integers exactly in the sidecar file.
+    """
+    dimension = len(basis)
+    operators = {name: _angular_operator_matrix(op, basis, name) for name in ("l2", "s2", "j2")}
+    groups: List[Tuple[np.ndarray, Tuple[int, ...]]] = [(np.eye(dimension), (n,))]
+    for name in ("l2", "s2", "j2"):
+        next_groups: List[Tuple[np.ndarray, Tuple[int, ...]]] = []
+        for vectors, labels in groups:
+            reduced = vectors.T @ operators[name] @ vectors
+            eigenvalues, rotation = np.linalg.eigh(0.5 * (reduced + reduced.T))
+            twice_q = [_twice_angular_momentum(float(value)) for value in eigenvalues]
+            for quantum_number in sorted(set(twice_q)):
+                columns = [i for i, value in enumerate(twice_q) if value == quantum_number]
+                next_groups.append((vectors @ rotation[:, columns], labels + (quantum_number,)))
+        groups = next_groups
+    columns = [vectors[:, i] for vectors, _ in groups for i in range(vectors.shape[1])]
+    labels = [label for vectors, label in groups for _ in range(vectors.shape[1])]
+    result = np.column_stack(columns)
+    if result.shape != (dimension, dimension) or np.max(np.abs(result.T @ result - np.eye(dimension))) > 1e-8:
+        raise ValueError("The constructed NLSJ basis is not complete and orthonormal")
+    return result, labels
+
+
+def _fnv1a_file(path: str) -> str:
+    """A portable file identifier, checked by bctqmc before using the sidecar."""
+    value = 14695981039346656037
+    with open(path, "rb") as source:
+        while chunk := source.read(1 << 20):
+            for byte in chunk:
+                value = ((value ^ byte) * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+    return f"{value:016x}"
+
+
+def write_nlsj_sidecar(
+    output: str,
+    sectors: Sequence[Dict[str, object]],
+    natst: int,
+    orbitals: Sequence[Tuple[float, float]],
+) -> None:
+    """List physical energy eigenstates first, then their complete CIX-basis vectors.
+
+    The CIX writes each Hamiltonian entry with ten decimal places. Diagonalize
+    that same rounded matrix here, so the reported spectrum matches bctqmc's
+    input. The solver receives all six-significant-digit vector coefficients,
+    including small ones; no occupation annotations are needed in this format.
+    """
+    eigensystems = []
+    for sector in sectors:
+        ham = np.round(np.asarray(sector["ham"], dtype=float), 10)
+        energies, vectors = np.linalg.eigh(ham)
+        assignments = []
+        qn_vectors = sector.get("qn_vectors")
+        if qn_vectors is None:
+            assignments = [(None, 0.0)] * len(energies)
+        else:
+            overlaps = np.asarray(qn_vectors, dtype=float).T @ vectors
+            for eigen in range(len(energies)):
+                weights: Dict[Tuple[int, int, int, int], float] = defaultdict(float)
+                for column, qn in enumerate(sector["qn_labels"]):
+                    weights[tuple(qn)] += float(abs(overlaps[column, eigen]) ** 2)
+                total = sum(weights.values())
+                if abs(total - 1.0) > 1e-5:
+                    raise ValueError(f"Incomplete NLSJ projection in block {sector['block_id']}")
+                # Sorting makes ties deterministic; label_weight exposes cases
+                # where the one printed label is not a good quantum number.
+                best = max(sorted(weights), key=lambda qn: weights[qn])
+                assignments.append((best, min(1.0, weights[best] / total)))
+        eigensystems.append((energies, vectors, assignments))
+
+    with open(output + ".nlsj", "w", encoding="ascii") as sidecar:
+        print("# NLSJ_EIGENSTATES_V3", file=sidecar)
+        print(natst, len(sectors), len(orbitals), _fnv1a_file(output),
+              "# nstates nblocks norbitals cix_fingerprint", file=sidecar)
+        print(" ".join(str(len(sector["basis"])) for sector in sectors),
+              "# block dimensions, in CIX order", file=sidecar)
+        print(f"# {'idx':>4} {'blk':>3} {'N':>2} {'L':>3} {'S':>3} {'J':>3} "
+              f"{'Jz':>4} {'E_CIX':>18} {'label_weight':>12}", file=sidecar)
+        for sector, (energies, _, assignments) in zip(sectors, eigensystems):
+            for local, (label, weight) in enumerate(assignments):
+                if label is None:
+                    quantum_numbers = (-1, -1, -1)
+                else:
+                    quantum_numbers = (label[1] / 2, label[2] / 2, label[3] / 2)
+                l_value, s_value, j_value = quantum_numbers
+                line = (f"  {sector['state_ids'][local]:4d} {sector['block_id']:3d} "
+                        f"{sector['n']:2d} {l_value:3g} {s_value:3g} {j_value:3g} "
+                        f"{sector['jz']:4g} {energies[local] + 0.0:18.12g} "
+                        f"{weight:12.8g}")
+                print(line + (" # unlabeled" if label is None else ""), file=sidecar)
+
+        print("# state eigenvector_components_in_CIX_block_order", file=sidecar)
+        for sector, (_, vectors, _) in zip(sectors, eigensystems):
+            for column in range(len(sector["basis"])):
+                components = vectors[:, column]
+                print(f"  {sector['state_ids'][column]:4d} " +
+                      " ".join(f"{value:.6g}" for value in components),
+                      file=sidecar)
+
+
+def label_existing_cix(path: str, l: int) -> None:
+    """Create only the NLSJ sidecar for an existing atomh.py-style CIX file.
+
+    Its state lines already contain the |j,m_j> occupation bitstrings. Reading
+    those makes the sidecar match the original CIX byte-for-byte: no atomic
+    energies, interaction parameters, or impurity-solver input is regenerated.
+    Blocks that are strict subsets of a (N,Jz) sector are left unlabeled rather
+    than falsely projecting angular-momentum eigenvectors into them.
+    """
+    with open(path, "r", encoding="utf-8") as cix:
+        cix.readline()
+        cix.readline()
+        header = cix.readline().split()
+        if len(header) < 6:
+            raise ValueError("Not an atomh.py-style bctqmc.cix header")
+        natst, npsi, nbath, nblock = map(int, (header[1], header[2], header[3], header[4]))
+        if npsi != 2 * (2 * l + 1) or nbath != npsi:
+            raise ValueError(f"CIX has {npsi} operators, inconsistent with shell l={l}")
+        cix.readline()  # bath heading
+        for _ in range(nbath):
+            cix.readline()
+        cix.readline()  # energy heading
+        cix.readline()  # bath energies
+        cix.readline()  # state heading
+        blocks: List[Dict[str, object]] = [
+            {"block_id": ib + 1, "basis": [], "state_ids": [], "n": None, "jz": None}
+            for ib in range(nblock)
+        ]
+        for expected_id in range(1, natst + 1):
+            line = cix.readline()
+            if "#" not in line:
+                raise ValueError(f"Missing occupation bitstring for CIX state {expected_id}")
+            left, comment = line.split("#", 1)
+            fields = left.split()
+            if len(fields) < 5 + npsi or int(fields[0]) != expected_id:
+                raise ValueError(f"Malformed CIX state {expected_id}")
+            block_id, n, jz = int(fields[1]), int(fields[2]), float(fields[4])
+            if not 1 <= block_id <= nblock:
+                raise ValueError(f"Invalid block for CIX state {expected_id}")
+            bits = comment.split()[0]
+            if len(bits) != npsi or any(bit not in "01" for bit in bits):
+                raise ValueError(f"Invalid occupation bitstring for CIX state {expected_id}")
+            state = sum((1 << index) for index, bit in enumerate(bits) if bit == "1")
+            block = blocks[block_id - 1]
+            if block["n"] is None:
+                block["n"], block["jz"] = n, jz
+            elif block["n"] != n or abs(block["jz"] - jz) > 1e-10:
+                raise ValueError(f"Block {block_id} mixes N or Jz")
+            block["basis"].append(state)
+            block["state_ids"].append(expected_id)
+
+        if not cix.readline().startswith("# All blocks of local Hamiltonian"):
+            raise ValueError("Missing CIX Hamiltonian section")
+        for block in blocks:
+            dimension = len(block["basis"])
+            header = cix.readline().split("#", 1)[0].split()
+            if (len(header) < 2 + dimension or
+                    int(header[0]) != block["block_id"] or
+                    int(header[1]) != dimension or
+                    [int(x) for x in header[2:2 + dimension]] != block["state_ids"]):
+                raise ValueError(f"Invalid CIX Hamiltonian header for block {block['block_id']}")
+            rows = []
+            for _ in range(dimension):
+                fields = cix.readline().split("#", 1)[0].split()
+                if len(fields) != dimension:
+                    raise ValueError(f"Incomplete CIX Hamiltonian block {block['block_id']}")
+                rows.append([float(x) for x in fields])
+            block["ham"] = np.asarray(rows, dtype=float)
+            if not np.allclose(block["ham"], block["ham"].T, rtol=0, atol=1e-8):
+                raise ValueError(f"Non-Hermitian CIX Hamiltonian block {block['block_id']}")
+
+    op_mlms = AtomicDirectBasis(l)
+    op_jm = JmProductBasis(build_one_electron_basis(l))
+    cg = ClebschGordan()
+    jm_to_mlms = build_jm_to_mlms_transform(l, op_mlms.ml_ms, build_one_electron_basis(l), cg)
+    for block in blocks:
+        n, jz = int(block["n"]), float(block["jz"])
+        basis_jm = block["basis"]
+        full_basis_jm = construct_reduced_base_njz(op_jm, n, jz)
+        if len(basis_jm) != len(full_basis_jm) or set(basis_jm) != set(full_basis_jm):
+            block["qn_vectors"] = None
+            continue
+        basis_mlms = construct_reduced_base_njz(op_mlms, n, jz)
+        transform = build_sector_transform(jm_to_mlms, basis_jm, basis_mlms, op_jm.baths)
+        qn_mlms, block["qn_labels"] = build_nlsj_basis(op_mlms, basis_mlms, n)
+        block["qn_vectors"] = transform @ qn_mlms
+    write_nlsj_sidecar(path, blocks, natst, build_one_electron_basis(l))
+
+
 def connected_components_from_matrix(mat: np.ndarray, tol: float = 1e-10) -> List[List[int]]:
     n = mat.shape[0]
     seen = [False] * n
@@ -1165,6 +1382,14 @@ def generate_bctqmc(
                 "ham": ham,
                 "exact_components": exact_components,
             }
+            if n not in approx_set:
+                # The CIX Hamiltonian is in the |j,m_j> product basis. Build
+                # NLSJ vectors in |m_l,m_s>, then rotate them into precisely
+                # the same CIX basis and ordering. Do not use eigenvalue order
+                # to associate labels with the solver's Hamiltonian eigenstates.
+                qn_mlms, qn_labels = build_nlsj_basis(op_mlms, basis_mlms, n)
+                sector_entry["qn_vectors"] = transform @ qn_mlms
+                sector_entry["qn_labels"] = qn_labels
             if n in approx_set:
                 if approx_mode == "matched":
                     matched_energies, matched_overlaps = match_direct_states_to_exact_eigenvalues(ham)
@@ -1217,6 +1442,7 @@ def generate_bctqmc(
                         "state_ids": state_ids,
                         "approx_mode": approx_mode,
                         "match_overlaps": overlap_map,
+                        "qn_vectors": None,
                     }
                 )
                 global_state_id += len(sub_basis)
@@ -1238,6 +1464,11 @@ def generate_bctqmc(
                     "eigvals": eigvals,
                     "state_ids": state_ids,
                     "approx_mode": None,
+                    # A strict sub-block generally is not invariant under
+                    # L²/S²/J²; never attach a sliced, incorrectly labeled
+                    # subset of the full-sector angular-momentum basis.
+                    "qn_vectors": sector["qn_vectors"] if len(comp) == len(basis) else None,
+                    "qn_labels": sector["qn_labels"] if len(comp) == len(basis) else None,
                 }
             )
             global_state_id += len(sub_basis)
@@ -1335,6 +1566,11 @@ def generate_bctqmc(
                             file=fh,
                         )
 
+    # A separate file keeps the long-established CIX reader and its column
+    # layout unchanged. The solver treats this file as optional, but verifies
+    # the CIX fingerprint before it attaches any angular-momentum labels.
+    write_nlsj_sidecar(output, sectors, global_state_id - 1, one_electron_basis)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -1350,7 +1586,13 @@ def main() -> None:
     parser.add_argument("-a", "--approx", type=str, default="", help="Valences to treat approximately, e.g. [4,5]")
     parser.add_argument("--approx-mode", choices=("diagonal", "matched"), default="matched", help="Approximation mode for valences listed in --approx")
     parser.add_argument("-o", "--output", type=str, default="bctqmc.cix", help="Output cix filename")
+    parser.add_argument("--label-existing", type=str, default="", metavar="CIX",
+                        help="Write only CIX.nlsj for an existing atomh.py-style CIX; leave CIX untouched")
     args = parser.parse_args()
+
+    if args.label_existing:
+        label_existing_cix(args.label_existing, args.l)
+        return
 
     impq = parse_list_arg(args.Impq, int) if args.Impq else None
     eimp = parse_list_arg(args.Eimp, float) if args.Eimp else None
