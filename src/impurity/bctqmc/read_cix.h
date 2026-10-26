@@ -92,6 +92,27 @@ public:
   Array<int,1> deg_bath;
   vector<vector<int>> unique_blocks;
   int first_anomalous;
+  // Optional valence-selective projection; empty preserves the legacy path.
+  std::vector<int> pp_approx_N, pp_reference_group;
+  std::vector<bool> pp_selected;
+  std::string pp_approx_signature;
+  std::vector<Array<double,2>> pp_unprojected_ham;
+  const Array<double,2>& SidecarHamiltonian(int ib) const {
+    return !pp_unprojected_ham.empty() && pp_unprojected_ham[ib].size()
+      ? pp_unprojected_ham[ib] : Ham[ib];
+  }
+  bool PseudoElementAllowed(int ib, int i, int j) const {
+    if (pp_approx_N.empty()) return true;
+    const int a=Block[ib](i), b=Block[ib](j);
+    return !(pp_selected[a] || pp_selected[b]) || pp_reference_group[a]==pp_reference_group[b];
+  }
+  template<class T> void MaskPseudo(std::vector<Array<T,2>>& matrix) const {
+    if (pp_approx_N.empty()) return;
+    for (int ib=0; ib<Nblock; ++ib)
+      for (int i=0; i<Block[ib].size(); ++i)
+        for (int j=0; j<Block[ib].size(); ++j)
+          if (!PseudoElementAllowed(ib,i,j)) matrix[ib](i,j)=0;
+  }
   //
   //  pp = cix.Fbc(op(i),pp);
   //  pp = cix.Fi(op(i),pp);
@@ -725,6 +746,15 @@ public:
   void PrintSymmetry(ostream& cout, bool pindx=true)
   {
     cout<<"# Sindex version 2"<<endl;
+    if (!pp_approx_N.empty()) {
+      cout<<"# pp_approx_N [";
+      for (std::size_t i=0; i<pp_approx_N.size(); ++i) {
+        if (i) cout<<",";
+        cout<<pp_approx_N[i];
+      }
+      cout<<"]"<<endl;
+      cout<<"# pp_approx_signature "<<pp_approx_signature<<endl;
+    }
     cout<<"# Nblock "<<Nblock<<endl;
     cout<<"# Npseudo_unique "<<Npseudo_unique<<endl;
     cout<<"# first_anomalous "<<first_anomalous<<endl;
@@ -1698,7 +1728,7 @@ void Determine_Symmetry(Cix& cix, Diag2Matrix& diag2matrix)
     
     for (int i=0; i < N; ++i){
       for (int j=0; j < N; ++j)
-	Gm0[ib](i,j) = static_cast<long long>(gt(i,j)*1000);
+	Gm0[ib](i,j) = cix.PseudoElementAllowed(ib,i,j) ? static_cast<long long>(gt(i,j)*1000) : 0;
     }
     //cout<<"ib="<<ib+1<<" expE="<<expE<<" Ek="<<E<<" H="<<H<<" gt="<<gt<<endl;
     Sgm[ib] = Gm0[ib];
@@ -1813,6 +1843,7 @@ void Determine_Symmetry(Cix& cix, Diag2Matrix& diag2matrix)
 	}
       }
     }
+    cix.MaskPseudo(Sgm); // Project on every symbolic iteration, before feedback.
     // G0 <- G0 + Sigma_NCA
     for (int ib=0; ib<cix.Nblock; ++ib) Gm0[ib](Range::all(),Range::all()) = Sgm[ib](Range::all(),Range::all());
 
@@ -1942,6 +1973,7 @@ void Determine_Symmetry(Cix& cix, Diag2Matrix& diag2matrix)
   //       to appear at the end.
   // ======================================================================
   // Resize and initialize the symmetry arrays
+  cix.MaskPseudo(Sgm);
   cix.Sgm_symmetry.resize(cix.Nblock);
   for (int ib=0; ib<cix.Nblock; ++ib){
     int N = cix.Block[ib].size();
@@ -2269,6 +2301,11 @@ void ReadSindex(string fname, Cix& cix)
     }
   }
 
+  for (int ib=0; ib<cix.Nblock; ++ib)
+    for (int i=0; i<cix.Block[ib].size(); ++i)
+      for (int j=0; j<cix.Block[ib].size(); ++j)
+        if (!cix.PseudoElementAllowed(ib,i,j) && cix.Sgm_symmetry[ib](i,j)!=0)
+          throw std::runtime_error("Sindex.dat contains an element forbidden by pp_approx_N");
   FinalizeSindex(cix, header_first_anomalous);
   if (header_npseudo >= 0 && header_npseudo != cix.Npseudo_unique){
     throw std::runtime_error("Sindex header Npseudo_unique mismatch in " + fname);

@@ -252,7 +252,11 @@ inline void read_v3(std::istream& input, const Cix& cix, Labels& labels,
       require(!(row >> extra), "extra data on V3 eigenstate row");
       const double reference_energy = labels.block[ib][eig].energy -
                                       energy_shift(cix, n);
-      require(std::abs(energy - reference_energy) <
+      // A runtime valence projection changes the spectrum. Its sidecar still
+      // describes the original CIX; validate its vectors against that original
+      // Hamiltonian below, then overlap them with the projected eigenvectors.
+      require((!cix.pp_unprojected_ham.empty() && cix.pp_unprojected_ham[ib].size()) ||
+              std::abs(energy - reference_energy) <
               1e-6 * (1.0 + std::abs(reference_energy)),
               "V3 energy spectrum differs from CIX Hamiltonian");
       require(std::isfinite(weight) && weight >= 0.0 && weight <= 1.0001,
@@ -298,7 +302,7 @@ inline void read_v3(std::istream& input, const Cix& cix, Labels& labels,
       for (int row = 0; row < dimension; ++row) {
         double h_times_vector = 0.0;
         for (int col = 0; col < dimension; ++col)
-          h_times_vector += cix.Ham[ib](row,col) * vectors[eig * dimension + col];
+          h_times_vector += cix.SidecarHamiltonian(ib)(row,col) * vectors[eig * dimension + col];
         const double shifted_energy = saved[ib][eig].energy +
                                       energy_shift(cix, saved[ib][eig].n);
         const double residual = h_times_vector -

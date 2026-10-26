@@ -12,6 +12,7 @@
 #include "oca_dlr_batched.h"
 #include "tca_dlr.h"
 #include "oca_matrix_dlr.h"
+#include "kugler_nca_chunked.h"
 #include "fca_dlr.h"
 #include "analytic_orders.h"
 
@@ -42,6 +43,7 @@ public:
   Array<complex<double>,2> iDeltaw;
   SVDFunc svdf;
   const Cix& cix;
+  bool higher_order_subblocks=true,higher_order_skip_zero=true;
   vector<int> G_importance;  int OCA_cut_sum;
   // Compact-diagram state.  These adapters are intentionally optional: the
   // legacy spline/uniform-mesh OCA remains the production result until the
@@ -49,6 +51,7 @@ public:
   bool aaa_adapter_enabled=false, dlr_adapter_enabled=false;
   edmft::kugler::Correlators kugler_tau; // channels x dense tau, positive-sign convention
   Eigen::MatrixXd kugler_hartree; // two endpoint sectors, from the atomic density matrix
+  bool kugler_nca_chunked=true;
 
   void AddKuglerDense(const edmft::kugler::Correlators& dense,double Q) {
     if (!cix.kugler_estimators) return;
@@ -71,7 +74,15 @@ public:
   // NCA has no internal integrals: reconstruct its two arcs exactly on the
   // original dense mesh, so the Hartree term uses the same atomic density
   // matrix as DeterminePseudos, rather than an extrapolated frequency tail.
-  void NCAKugler(const Array<double,1>& mesh,const Array<double,2>& pp,double Q) {
+  void NCAKugler(const Array<double,1>& mesh,const Array<double,2>& pp,double Q,MPIcls& mpi) {
+    if(kugler_nca_chunked) {
+      auto dense=edmft::kugler_nca::evaluate(cix,pp,mpi);
+      AddKuglerDense(dense,Q);
+      const int nt=mesh.extent(0);kugler_hartree.resize(2,cix.Nbath_unique_unique);
+      for(int s=0;s<cix.Nbath_unique_unique;++s)for(int k=0;k<2;++k)
+        kugler_hartree(k,s)=kugler_tau.value[k](s,0)+kugler_tau.value[k](s,nt-1);
+      return;
+    }
     using Physical=edmft::tca_dlr::SummedPhysicalEvaluator;
     using Engine=Physical::Engine;
     const int nt=mesh.extent(0);
@@ -156,6 +167,9 @@ public:
   ImagAxis0(double _beta_, const Cix& _cix_, json& pars, MPIcls& mpi) :
     AnyAxis(_beta_), cix(_cix_), G_importance(cix.Npseudo_unique,0), OCA_cut_sum(10)
   {
+    higher_order_subblocks=pars["higher_order_subblocks"].get<bool>();
+    higher_order_skip_zero=pars["higher_order_skip_zero"].get<bool>();
+    kugler_nca_chunked=pars["kugler_nca_chunked"].get<bool>();
     //cout<<"In ImagAxis0 constructor beta="<<beta<<endl; cout.flush();
     pars["svd_x0"] = min(1./beta, pars["svd_x0"].get<double>());
     //cout<<"svd_x0="<< pars["svd_x0"].get<double>()<<endl; cout.flush();
@@ -926,9 +940,11 @@ public:
                  << " refinement_iterations=" << refinement_iterations
                  << " pole_fit_relative_rms=" << aaa_relative_rms_error
                  << " pole_fit_max_error=" << aaa_max_error << std::endl;
-    if (diagram_dlr_workspace && aaa_hybridization.poles.size()>0)
+    if (diagram_dlr_workspace && aaa_hybridization.poles.size()>0) {
       diagram_dlr_workspace->prepare_hybridization(*dlr_basis,aaa_hybridization,
                                                    cix.Nbath_unique_unique);
+      diagram_dlr_workspace->set_atomic_optimizations(higher_order_subblocks,higher_order_skip_zero);
+    }
     const bool active_workspace_requested=
       tca_pole_count<pole_count || requested_keep_weight<1.0;
     if (active_workspace_requested) {
@@ -936,6 +952,7 @@ public:
         std::make_unique<edmft::imag_dlr::Workspace>();
       tca_active_dlr_workspace->prepare_hybridization(
         *dlr_basis,tca_active_hybridization,cix.Nbath_unique_unique);
+      tca_active_dlr_workspace->set_atomic_optimizations(higher_order_subblocks,higher_order_skip_zero);
       if (mpi.rank==mpi.master)
         (*mpi.out) << "TCA active workspace: poles=" << tca_pole_count
                    << "/" << pole_count
@@ -1032,6 +1049,7 @@ public:
     fca_dlr_workspace=std::make_unique<edmft::imag_dlr::Workspace>();
     fca_dlr_workspace->prepare_hybridization(
       fca_dlr_basis ? *fca_dlr_basis : *dlr_basis,fit,channels);
+      fca_dlr_workspace->set_atomic_optimizations(higher_order_subblocks,higher_order_skip_zero);
     if (mpi.rank==mpi.master)
       (*mpi.out)<<"FCA DLR accuracy: requested="<<accuracy
                 <<" active="<<(mc_anchor ? "full-MC-anchor" : accuracy)
@@ -1231,7 +1249,7 @@ public:
     kugler_tau.clear(); kugler_hartree.resize(0,0);
     double phi = I_NCA(Sm_new,G00t,F00t,F01t,
 		       cmpPhysG,Q,beta,tau,tau_dh,Gm,Delta,cix,mpi);
-    if (cmpPhysG && cix.kugler_estimators) NCAKugler(tau,Gm,Q);
+    if (cmpPhysG && cix.kugler_estimators) NCAKugler(tau,Gm,Q,mpi);
     return phi;
   }
   double OCA(Array<double,2>& dSm, Array<double,2>& G00t, Array<double,2>& F00t, Array<double,2>& F01t,
@@ -1338,7 +1356,10 @@ public:
         if (matrix_oca)
           result=edmft::oca_matrix_dlr::evaluate(cix,*diagram_dlr_workspace,tau,
             cmpPhysG,pars["oca_dlr_mpi"].get<bool>() && mpi.size>1,
-            mpi.rank,mpi.size,mpi.out);
+            mpi.rank,mpi.size,mpi.out,pars["oca_matrix_subblocks"].get<bool>(),
+            pars["oca_matrix_skip_zero"].get<bool>(),pars["oca_matrix_profile"].get<bool>(),
+            pars["oca_matrix_reuse"].get<bool>(),
+            pars["oca_measurement_reuse"].get<bool>(),pars["oca_measurement_dense"].get<bool>());
         else result=edmft::oca_dlr::EvaluateOCAPhysicalBatched(cix,G_importance,
           OCA_cut_sum,*diagram_dlr_workspace,degeneracy,tau,
           static_cast<size_t>(batch_paths),
@@ -2846,6 +2867,9 @@ public:
     Array<complex<double>,2> SigD(cix.Nbath_unique_unique,iom.extent(0)); SigD=0;
     Array<complex<double>,2> Gcn(cix.Nbath_unique_unique,iom.extent(0)); Gcn=0;
     density_matrix.resize(cix.Nbath_unique_unique); density_matrix=0;
+    // Accumulate all physical representatives before averaging a reduced channel.
+    // A channel may occur in several scalar or matrix blocks.
+    Array<int,1> deg_dm(cix.Nbath_unique_unique); deg_dm=0;
     Ekin = 0; nf=0;
 
     const bool blend_sdyson_bulla = pars["Sdyson_Bulla_blend"].get<bool>();
@@ -2912,7 +2936,7 @@ public:
 	      }
 	      _Ekin(iib) = _Ekin_*2.0/beta;
 	      _nf(iib) = _nf_*2.0/beta + fermi(beta*E_inf_scalar);
-	      density_matrix(iib) = std::real(tail_sum)*2.0/beta + fermi(beta*E_inf_scalar);
+
 	      Ekin += _Ekin(iib);
 	      nf += _nf(iib);
 	      component_set[iib]=true;
@@ -2920,6 +2944,8 @@ public:
 	      Ekin += _Ekin(iib);
 	      nf += _nf(iib);
 	    }
+            density_matrix(iib) += _nf(iib);
+            deg_dm(iib) += 1;
 	  }
 	}
       }else{
@@ -3142,46 +3168,30 @@ public:
 	_density_matrix_ *= 2.0/beta; // 2 because sum from -infty->infty
 	_Ekin_ *= 2.0/beta;
 	_nf_ *= 2.0/beta;
-	Array<int,1> deg_dm(cix.Nbath_unique_unique); deg_dm=0;
+
 	for (int iorb=0; iorb<cix.Nbath; ++iorb){
 	  if (bb.orb_ind[iorb][0]==ib){
 	    int j=bb.orb_ind[iorb][1], k=bb.orb_ind[iorb][2];
 	    int iib0 = cix.bath_sigind0(iorb);
 	    double ib_sg = (iib0 < 0 ? -1 : 1);
 	    int iib   = std::abs(iib0);
-	    // density_matrix(iib) is a reduced quantity: several physical
-	    // orbitals can map to the same reduced bath index iib.  To keep the
-	    // same convention as density_matrix0 from DeterminePseudos, we
-	    // average over all such equivalent representatives.
+            // Add this representative; normalize once after all blocks.
 	    density_matrix(iib) += std::real(_density_matrix_(j,k))*ib_sg;
 	    deg_dm(iib) += 1;
 	    if (k==j){
-	      // The Fermi-function add-back is different for density_matrix and
-	      // nf on purpose:
-	      //
-	      // 1) density_matrix(iib) is an averaged reduced-component object,
-	      //    hence we add one representative Fermi term only *after*
-	      //    averaging over equivalent orbitals.
-	      //
-	      // 2) nf is the total physical occupancy, hence every physical
-	      //    orbital contributes and we must sum the Fermi term over all
-	      //    diagonal orbital representatives.
-	      //_nf_ += fermi(beta*cix.Ebath(iib));
+              // nf is a physical total; the reduced density uses the same
+              // add-back before the global representative average below.
 	      _nf_ += fermi(beta*E_inf(k,k));
 	      density_matrix(iib) += fermi(beta*E_inf(k,k));
 	    }
-	  }
-	}
-	for (int iib=0; iib<cix.Nbath_unique_unique; ++iib){
-	  if (deg_dm(iib)>0){
-	    density_matrix(iib) /= deg_dm(iib);
-	    //density_matrix(iib) += fermi(beta*cix.Ebath(iib));
 	  }
 	}
 	Ekin += _Ekin_;
 	nf += _nf_;
       }
     }
+    for (int iib=0; iib<cix.Nbath_unique_unique; ++iib)
+      if (deg_dm(iib)>0) density_matrix(iib) /= deg_dm(iib);
 
     if (mpi.rank==mpi.master){
       Print_Physical1("Gimpw.out", Gc);

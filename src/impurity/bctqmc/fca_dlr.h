@@ -663,7 +663,11 @@ class Evaluator {
     bytes+=cix.Nblock*(2*sizeof(tca_dlr::MatrixFunction)+2+256);
     for (int b=0;b<cix.Nblock;++b) {
       const long double n=cix.Block[b].size();
-      bytes+=2.L*w.rank()*(8.L*n*n+sizeof(MatrixXd)+64);
+      // Account for either dense caches or the compact-piece layout, including
+      // the worst case of n singleton matrices. These paths share an object
+      // only when both reference/optimized diagnostics explicitly request it.
+      bytes+=2.L*w.rank()*(8.L*n*n+n*(sizeof(MatrixXd)+64));
+      bytes+=n*(sizeof(atomic_convolution::Piece)+sizeof(int)+128)+512;
     }
     if (bytes>=std::numeric_limits<std::size_t>::max())
       return std::numeric_limits<std::size_t>::max();
@@ -977,6 +981,8 @@ public:
       const int channel=cix.bath_sigind0(bath);
       for (int direction=0;direction<2;++direction) {
         const int op=2*bath+direction;
+        const auto& delta=direction==0 ? w.delta_plus() : w.delta_minus();
+        if(w.atomic_skip_zero_roots() && (delta.col(std::abs(channel)).array()==0.0).all())continue;
         roots.push_back({operators[Engine::Opposite(op)],operators[op],
           std::abs(channel),direction,
           static_cast<double>(tca_dlr::SignedIndexSign(channel))});

@@ -28,6 +28,7 @@ MPIcls *mpi;
 #include "fmt/ostream.h"
 #include "readinput.h"
 #include "json.hpp"
+#include "pp_approx.h"
 #include "analytic_orders.h"
 std::ostream* xout;
 #include "skeletons.h"
@@ -1034,6 +1035,8 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     // because ranks spend part of each collective contraction waiting.
     t_nca=t_oca=t_tca=t_fca=t_mc=0.0;
     RereadParameters(pars);
+    if (pp_approx::selection(pars["pp_approx_N"])!=cix.pp_approx_N)
+      throw std::invalid_argument("changing pp_approx_N requires restarting with compatible Sindex/PPSigma");
     if (pars["kugler"].get<bool>()!=kugler)
       throw std::invalid_argument("changing kugler requires restarting the solver");
     // Orders determine allocated MC storage and prepared workspaces. Do not
@@ -1419,6 +1422,7 @@ int main(int argc, char *argv[])
   pars["Norder"]          = 5;    // at which order do we stop with MC
   pars["N_min_order"]     = 1;    // at which order do we start with MC
   pars["Ms"]              = 1e8;
+  pars["pp_approx_N"] = json::array(); // Reference partition only in these valences.
   pars["cix"]             = "bctqmc.cix";
   pars["Nitt"]            = 100;  // max number of self-consistent steps for bold calculation
   pars["fca_lagged"]      = false; // effective default is resolved after PARAMS: analytic 4,4 only
@@ -1505,6 +1509,7 @@ int main(int argc, char *argv[])
   pars_i["S_kappa"] = 4.0;   // how aggresively we cut once the treshold for cutting is achieved
   pars_i["S_min_order"]=2;   // order at which we start to correct with attenuation
   pars_i["r_dyson_laplace"]=2;// how many times larger uniform mesh we built (2^r_dyson_laplace points) for solving Dyson-Laplace
+  pars_i["volterra_split_blocks"] = true; // Exact structural subblocks; false keeps the dense reference path.
   pars_i["volterra_scheduler_auto"] = true;          // if true, choose scheduler thresholds from mpi.size automatically; if false, use the manual values below verbatim
   pars_i["volterra_cmp2_small_cutoff"] = 4;          // block-size cutoff for local solver choice: N<=cutoff uses cmp2_small, larger blocks use cmp2_large
   pars_i["volterra_no_inside_parallel_below"] = 64;  // blocks smaller than this are never parallelized inside the block; they stay block-parallel over ib
@@ -1621,6 +1626,15 @@ int main(int argc, char *argv[])
   // on a cluster, not a RAM-backed /tmp or a slow shared filesystem.
   pars_i["oca_dlr_physical_mode"] = "auto"; // auto, batched, full (fallback)
   pars_i["oca_dlr_backend"] = "matrix"; // matrix (default, enumeration-free) or paths (previous evaluator)
+  pars_i["kugler_nca_chunked"] = true;
+  pars_i["higher_order_subblocks"] = true;
+  pars_i["higher_order_skip_zero"] = true;
+  pars_i["oca_measurement_reuse"] = true; // Exact shared Green/Bulla/Kugler boundary products.
+  pars_i["oca_measurement_dense"] = true; // Adaptive dense products for composite operators and traces.
+  pars_i["oca_matrix_reuse"] = true; // Exact bath/root sums before common convolutions.
+  pars_i["oca_matrix_subblocks"] = true;
+  pars_i["oca_matrix_skip_zero"] = true;
+  pars_i["oca_matrix_profile"] = false;
   pars_i["oca_dlr_physical_batch_paths"] = 100000; // max unique keys per hash/plan batch
   pars_i["oca_dlr_batch_directory"] = ""; // empty: system temporary directory
   pars_i["oca_dlr_whole_poles"] = true;             // default: fast batched whole-pole evaluation; false is the diagnostic shared-pole path
@@ -1917,6 +1931,9 @@ int main(int argc, char *argv[])
       two_2_i *= 2;
     }
   }
+
+  pp_approx::configure(cix,pars["pp_approx_N"],beta,*mpi->out);
+  pp_approx::check_restart_policy(cix,"Sindex.dat",pars["PPSig"].get<std::string>()+"0");
 
   {// Here we check if Sindex exists. If yes, we just read it. If no, we generate it and bcast to all nodes.
     bool sindex_exists = false;

@@ -444,7 +444,8 @@ auto DeterminProbabilities(const Array<double,1>& om, const Array<complex<double
 	    int _ii_ = cix.Sgm_symmetry[ib](k,i);
 	    int ii = abs(_ii_)-1;
 	    if (ii>=0){
-	      nalpha(ibth) += sign(_ii_*j_pseudo*k_pseudo)*dQm(ii); // dQ[k_pseudo,i_pseudo] * <k_pseudo|F^+_{ibth}|j_pseudo><j_pseudo|F_{ibth}|i_pseudo>
+	      // Take signs before multiplying: the product of indices can overflow int.
+	      nalpha(ibth) += sign(_ii_)*sign(j_pseudo)*sign(k_pseudo)*dQm(ii); // dQ[k_pseudo,i_pseudo] * <k_pseudo|F^+_{ibth}|j_pseudo><j_pseudo|F_{ibth}|i_pseudo>
 	      //cout<<"ibth="<<ibth<<" i_pseudo="<<i_pseudo<<" j_pseudo="<<j_pseudo<<" k_pseudo="<<k_pseudo<<" ii="<<ii<<" (i,k)=("<<i<<","<<k<<")"<<" dnalpha="<<sign(_ii_*j_pseudo*k_pseudo)*dQm(ii)<<endl;
 	    }
 	  }
@@ -497,16 +498,23 @@ auto DeterminProbabilities(const Array<double,1>& om, const Array<complex<double
       double Ptot=0;
       for (int i=0; i<N; ++i) Ptot += Probability(cix.Block[ib](i)-1);
       if (Ptot>small){
-	int nmax=N;
-	for (; nmax>0; --nmax){
-	  if (abs(Probability(cix.Block[ib](nmax-1)-1)) > 0.2*small) break;
-	}
-	int Nocc = cix.iN(cix.Block[ib](0)-1);
-	//clog<<"   "<<itt<<") Prob["<<ib+1<<",N="<<Nocc<<"]=[";
-	fmt::print(clog,"   {:d}) Prob[{:d},N={:d}]={:10.7f} [",itt,ib+1,Nocc,Ptot);
-	for (int i=0; i<nmax; ++i)
-	  fmt::print(clog,"{:10.7f},",Probability(cix.Block[ib](i)-1));
-	clog<<"]"<<endl;
+        // Limit product-basis logging; this does not change the probabilities.
+        // Indices are local, zero-based positions within the CIX block.
+        vector<int> order(N);
+        for (int i=0; i<N; ++i) order[i]=i;
+        stable_sort(order.begin(), order.end(), [&](int a, int b){
+          return Probability(cix.Block[ib](a)-1) > Probability(cix.Block[ib](b)-1);
+        });
+        const int nshow = min(N,10);
+        double omitted=0;
+        for (int k=nshow; k<N; ++k) omitted += Probability(cix.Block[ib](order[k])-1);
+        int Nocc = cix.iN(cix.Block[ib](0)-1);
+        fmt::print(clog,"   {:d}) Prob[{:d},N={:d}]={:10.7f} top {:d} (i=0-based) [",itt,ib+1,Nocc,Ptot,nshow);
+        for (int k=0; k<nshow; ++k){
+          const int i=order[k];
+          fmt::print(clog,"{}{:d}:{:.7f}",k ? ", " : "",i,Probability(cix.Block[ib](i)-1));
+        }
+        fmt::print(clog,"] omitted={:.7g} ({:d} states)\n",omitted,N-nshow);
       }
     }
     clog<<"   "<<itt<<") Fimp = "<<r.Fimp<<endl;

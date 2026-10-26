@@ -2,8 +2,8 @@
 Python port of atomh.cc focused on direct-basis Bold-CTQMC input generation.
 
 This implementation keeps the direct-product occupation basis, builds atomic
-Hamiltonian blocks labeled by (N, Jz), further splits them only by actual
-Hamiltonian connectivity, and writes a preliminary ``bctqmc.cix``.
+Hamiltonian blocks compatible with the supplied hybridization symmetry,
+and writes ``bctqmc.cix``. The original |j,mj> occupation basis is retained.
 
 Spin-orbit is taken to be already included in ``Eimp``. To avoid any
 double-counting, this generator intentionally does not expose a separate
@@ -13,9 +13,11 @@ double-counting, this generator intentionally does not expose a separate
 from __future__ import annotations
 
 import argparse
+import ast
 import math
 from collections import defaultdict, deque
 from functools import lru_cache
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -644,6 +646,10 @@ class JmProductBasis:
         n = _bit_count(state & (mask - 1))
         return 1 - 2 * (n & 1)
 
+    def one_body(self, state: int, h1: np.ndarray) -> Dict[int, float]:
+        # This occupation-bit operation is independent of orbital quantum numbers.
+        return AtomicDirectBasis.one_body(self, state, h1)
+
     def fp(self, state: int, j: float, jz: float, _cg: ClebschGordan) -> List[Tuple[int, float]]:
         idx = self.index_of[(j, jz)]
         mask = self.masks[idx]
@@ -871,8 +877,9 @@ def write_nlsj_sidecar(
               "# nstates nblocks norbitals cix_fingerprint", file=sidecar)
         print(" ".join(str(len(sector["basis"])) for sector in sectors),
               "# block dimensions, in CIX order", file=sidecar)
+        jz_heading = "Jz_basis" if any("basis_jz" in sector for sector in sectors) else "Jz"
         print(f"# {'idx':>4} {'blk':>3} {'N':>2} {'L':>3} {'S':>3} {'J':>3} "
-              f"{'Jz':>4} {'E_CIX':>18} {'label_weight':>12}", file=sidecar)
+              f"{jz_heading:>4} {'E_CIX':>18} {'label_weight':>12}", file=sidecar)
         for sector, (energies, _, assignments) in zip(sectors, eigensystems):
             for local, (label, weight) in enumerate(assignments):
                 if label is None:
@@ -880,9 +887,13 @@ def write_nlsj_sidecar(
                 else:
                     quantum_numbers = (label[1] / 2, label[2] / 2, label[3] / 2)
                 l_value, s_value, j_value = quantum_numbers
+                # The V3 reader checks this field against the corresponding
+                # CIX product-state row. It is not a conserved eigenstate Jz
+                # when the block contains several Jz sectors.
+                row_jz = sector["basis_jz"][local] if "basis_jz" in sector else sector["jz"]
                 line = (f"  {sector['state_ids'][local]:4d} {sector['block_id']:3d} "
                         f"{sector['n']:2d} {l_value:3g} {s_value:3g} {j_value:3g} "
-                        f"{sector['jz']:4g} {energies[local] + 0.0:18.12g} "
+                        f"{row_jz:4g} {energies[local] + 0.0:18.12g} "
                         f"{weight:12.8g}")
                 print(line + (" # unlabeled" if label is None else ""), file=sidecar)
 
@@ -911,7 +922,7 @@ def label_existing_cix(path: str, l: int) -> None:
         if len(header) < 6:
             raise ValueError("Not an atomh.py-style bctqmc.cix header")
         natst, npsi, nbath, nblock = map(int, (header[1], header[2], header[3], header[4]))
-        if npsi != 2 * (2 * l + 1) or nbath != npsi:
+        if npsi != 2 * (2 * l + 1) or nbath < npsi:
             raise ValueError(f"CIX has {npsi} operators, inconsistent with shell l={l}")
         cix.readline()  # bath heading
         for _ in range(nbath):
@@ -920,7 +931,7 @@ def label_existing_cix(path: str, l: int) -> None:
         cix.readline()  # bath energies
         cix.readline()  # state heading
         blocks: List[Dict[str, object]] = [
-            {"block_id": ib + 1, "basis": [], "state_ids": [], "n": None, "jz": None}
+            {"block_id": ib + 1, "basis": [], "basis_jz": [], "state_ids": [], "n": None, "jz": None}
             for ib in range(nblock)
         ]
         for expected_id in range(1, natst + 1):
@@ -941,9 +952,10 @@ def label_existing_cix(path: str, l: int) -> None:
             block = blocks[block_id - 1]
             if block["n"] is None:
                 block["n"], block["jz"] = n, jz
-            elif block["n"] != n or abs(block["jz"] - jz) > 1e-10:
-                raise ValueError(f"Block {block_id} mixes N or Jz")
+            elif block["n"] != n:
+                raise ValueError(f"Block {block_id} mixes particle numbers")
             block["basis"].append(state)
+            block["basis_jz"].append(jz)
             block["state_ids"].append(expected_id)
 
         if not cix.readline().startswith("# All blocks of local Hamiltonian"):
@@ -971,16 +983,25 @@ def label_existing_cix(path: str, l: int) -> None:
     cg = ClebschGordan()
     jm_to_mlms = build_jm_to_mlms_transform(l, op_mlms.ml_ms, build_one_electron_basis(l), cg)
     for block in blocks:
-        n, jz = int(block["n"]), float(block["jz"])
+        n = int(block["n"])
         basis_jm = block["basis"]
-        full_basis_jm = construct_reduced_base_njz(op_jm, n, jz)
-        if len(basis_jm) != len(full_basis_jm) or set(basis_jm) != set(full_basis_jm):
-            block["qn_vectors"] = None
-            continue
-        basis_mlms = construct_reduced_base_njz(op_mlms, n, jz)
-        transform = build_sector_transform(jm_to_mlms, basis_jm, basis_mlms, op_jm.baths)
-        qn_mlms, block["qn_labels"] = build_nlsj_basis(op_mlms, basis_mlms, n)
-        block["qn_vectors"] = transform @ qn_mlms
+        block["qn_vectors"] = np.zeros((len(basis_jm), len(basis_jm)))
+        block["qn_labels"] = []
+        for jz in sorted(set(block["basis_jz"])):
+            rows = [i for i, value in enumerate(block["basis_jz"]) if value == jz]
+            subset = [basis_jm[i] for i in rows]
+            full_basis_jm = construct_reduced_base_njz(op_jm, n, jz)
+            if set(subset) != set(full_basis_jm):
+                block["qn_vectors"] = None
+                break
+            basis_mlms = construct_reduced_base_njz(op_mlms, n, jz)
+            transform = build_sector_transform(jm_to_mlms, subset, basis_mlms, op_jm.baths)
+            qn_mlms, labels = build_nlsj_basis(op_mlms, basis_mlms, n)
+            column = len(block["qn_labels"])
+            block["qn_vectors"][np.ix_(rows, range(column, column + len(rows)))] = transform @ qn_mlms
+            block["qn_labels"].extend(labels)
+        if len(set(block["basis_jz"])) == 1:
+            del block["basis_jz"]
     write_nlsj_sidecar(path, blocks, natst, build_one_electron_basis(l))
 
 
@@ -1040,6 +1061,131 @@ def default_epsk(impqs: Sequence[int], eimp: Sequence[float]) -> List[float]:
         n = (max(impqs) + 1) if impqs else 0
         return [0.0] * n
     return list(eimp)
+
+
+def read_trans_sigind(path: str) -> np.ndarray:
+    """Read the one-based Sigind section of the wrapper's Trans.dat."""
+    with open(path, encoding="utf-8") as source:
+        data = (line.split("#", 1)[0].strip() for line in source)
+        data = (line for line in data if line)
+        dims = [int(x) for x in next(data).split()]
+        if len(dims) != 2 or dims[0] != dims[1] or dims[0] <= 0:
+            raise ValueError(f"Invalid Sigind dimensions in {path}")
+        return np.asarray([[int(x) for x in next(data).split()]
+                           for _ in range(dims[0])], dtype=int)
+
+
+def prepare_hybridization(
+    orbitals: Sequence[Tuple[float, float]],
+    impq: Optional[Sequence[int]],
+    eimp: Optional[Sequence[float]],
+    sigind: Optional[Sequence[Sequence[int]]],
+) -> Tuple[List[int], List[float], np.ndarray, List[Tuple[int, int, int]]]:
+    """Separate physical operators, directed bath entries, and unique functions.
+
+    Sigind uses the eDMFT convention: zero is absent and positive labels are
+    one-based. CIX function labels and legacy Impq entries are zero-based.
+    Diagonal bath entries stay first to preserve historical operator ordering.
+    """
+    npsi = len(orbitals)
+    if sigind is None:
+        impqs = list(impq) if impq is not None else default_impqs(orbitals)
+        if len(impqs) != npsi or any(q < 0 for q in impqs):
+            raise ValueError(f"Impq must contain {npsi} nonnegative indices")
+        mapping = np.diag(np.asarray(impqs, dtype=int) + 1)
+    else:
+        raw = np.asarray(sigind)
+        if raw.shape != (npsi, npsi) or not np.all(np.isfinite(raw)):
+            raise ValueError(f"Sigind must be a finite {npsi} by {npsi} matrix")
+        if not np.all(raw == np.asarray(raw, dtype=int)) or np.any(raw < 0):
+            raise ValueError("Sigind requires nonnegative integer labels; zero means absent")
+        mapping = np.asarray(raw, dtype=int)
+        if np.any(np.diag(mapping) <= 0):
+            raise ValueError("Every physical orbital needs a positive diagonal Sigind label")
+        labels = set(int(q) for q in mapping.flat if q)
+        if labels != set(range(1, int(mapping.max()) + 1)):
+            raise ValueError("Sigind component labels must be contiguous starting at 1")
+        impqs = [int(q) - 1 for q in np.diag(mapping)]
+        if impq is not None and list(impq) != impqs:
+            raise ValueError("Impq disagrees with the diagonal of Sigind")
+    ncomponents = int(mapping.max())
+    epsk = default_epsk(impqs, list(eimp) if eimp is not None else [])
+    if len(epsk) > ncomponents:
+        raise ValueError("Eimp has more entries than the hybridization component mapping")
+    epsk.extend([0.0] * (ncomponents - len(epsk)))
+    if np.any(np.abs(np.asarray(epsk, dtype=complex).imag) > 1e-14):
+        raise ValueError("Complex impurity levels are not supported by the real CIX Hamiltonian")
+    epsk = [float(complex(value).real) for value in epsk]
+    h1 = np.zeros((npsi, npsi), dtype=float)
+    present = mapping > 0
+    h1[present] = np.asarray(epsk)[mapping[present] - 1]
+    if not np.all(np.isfinite(h1)) or not np.allclose(h1, h1.T, rtol=0, atol=1e-12):
+        raise ValueError("Eimp and Sigind must define a real symmetric impurity Hamiltonian")
+    baths = [(i, i, int(mapping[i, i]) - 1) for i in range(npsi)]
+    baths.extend((i, j, int(mapping[i, j]) - 1)
+                 for i in range(npsi) for j in range(npsi)
+                 if i != j and mapping[i, j] > 0)
+    return impqs, epsk, h1, baths
+
+
+def merge_hybridization_sectors(
+    sectors: Sequence[Dict[str, object]],
+    orbitals: Sequence[Tuple[float, float]],
+    baths: Sequence[Tuple[int, int, int]],
+    h1: np.ndarray,
+    op: JmProductBasis,
+) -> List[Dict[str, object]]:
+    """Retain Jz modulo the transfers allowed by hybridization and Eimp.
+
+    Slater interactions conserve Jz. A bath entry (a,b) allows transfer
+    mj[a]-mj[b], even when its initial self-energy or impurity level is zero.
+    The gcd of twice those transfers determines the remaining symmetry.
+    Full blocks of that symmetry also give each physical operator a unique
+    target block, as required by the CIX reader.
+    """
+    modulus = 0
+    for a, b, _ in baths:
+        if a != b:
+            modulus = math.gcd(modulus, abs(int(round(2 * (orbitals[a][1] - orbitals[b][1])))))
+    off = h1 - np.diag(np.diag(h1))
+    for a, b in zip(*np.nonzero(np.abs(off) > 1e-14)):
+        modulus = math.gcd(modulus, abs(int(round(2 * (orbitals[a][1] - orbitals[b][1])))))
+    if not any(a != b for a, b, _ in baths):
+        return list(sectors)
+    # A zero transfer can mix orbitals with equal mj without merging Jz sectors.
+    groups: Dict[Tuple[int, int], List[Dict[str, object]]] = defaultdict(list)
+    for sector in sectors:
+        twice_jz = int(round(2 * float(sector["jz"])))
+        key = twice_jz % modulus if modulus else twice_jz
+        groups[(int(sector["n"]), key)].append(sector)
+    result = []
+    for (n, key), members in sorted(groups.items()):
+        basis = [state for member in members for state in member["basis"]]
+        ham = np.zeros((len(basis), len(basis)))
+        labeled = all("qn_vectors" in member for member in members)
+        qn = np.zeros_like(ham) if labeled else None
+        labels = []
+        start = 0
+        for member in members:
+            stop = start + len(member["basis"])
+            ham[start:stop, start:stop] = member["ham"]
+            if labeled:
+                qn[start:stop, start:stop] = member["qn_vectors"]
+                labels.extend(member["qn_labels"])
+            start = stop
+        index = {state: i for i, state in enumerate(basis)}
+        for col, state in enumerate(basis):
+            for dest, amplitude in op.one_body(state, off).items():
+                if dest not in index:
+                    raise ValueError("Off-diagonal impurity level escapes its symmetry block")
+                ham[index[dest], col] += amplitude
+        entry = {"n": n, "jz": key / 2, "basis": basis,
+                 "basis_jz": [op.jz_of(state) for state in basis],
+                 "ham": ham, "exact_components": [(len(result) + 1, list(range(len(basis))))]}
+        if labeled:
+            entry["qn_vectors"], entry["qn_labels"] = qn, labels
+        result.append(entry)
+    return result
 
 
 def build_one_body_matrix(
@@ -1215,6 +1361,11 @@ def compute_admissible_approx_components(
     approx_n = set(int(x) for x in approx_set)
     if not approx_n:
         return []
+    if any("basis_jz" in sector for sector in sector_data):
+        # Even with an approximate diagonal atomic Hamiltonian, off-diagonal
+        # baths generate pseudo self-energy throughout the residual-symmetry
+        # block. Do not split those blocks back into fixed-Jz pieces.
+        return [list(sector["basis"]) for sector in sector_data if sector["n"] in approx_n]
 
     state_to_exact_block: Dict[int, int] = {}
     exact_fixed_blocks: List[Tuple[int, List[int]]] = []
@@ -1341,6 +1492,7 @@ def generate_bctqmc(
     approx_n: Optional[Sequence[int]] = None,
     approx_mode: str = "matched",
     output: str = "bctqmc.cix",
+    sigind: Optional[Sequence[Sequence[int]]] = None,
 ) -> None:
     op_mlms = AtomicDirectBasis(l)
     cg = ClebschGordan()
@@ -1348,10 +1500,11 @@ def generate_bctqmc(
     fkoj = compute_coulomb_ratios(l)
     one_electron_basis = build_one_electron_basis(l)
     op = JmProductBasis(one_electron_basis)
-    impqs = list(impq) if impq is not None else default_impqs(one_electron_basis)
+    impqs, epsk, h1_jm, baths = prepare_hybridization(one_electron_basis, impq, eimp, sigind)
     approx_set = set(approx_n or [])
     global_flip = compute_global_flip(one_electron_basis)
-    epsk = default_epsk(impqs, list(eimp) if eimp is not None else [])
+    # Assemble the Jz-conserving part using the established atomic backend.
+    # Off-diagonal jm levels are added after merging the symmetry blocks.
     h1_mlms = build_one_body_matrix(l, op_mlms.ml_ms, one_electron_basis, impqs, epsk, cg)
     jm_to_mlms = build_jm_to_mlms_transform(l, op_mlms.ml_ms, one_electron_basis, cg)
     uc_mlms_backend = build_coulomb_tensor_mlms(op_mlms, gck, fkoj, j_coulomb)
@@ -1390,15 +1543,17 @@ def generate_bctqmc(
                 qn_mlms, qn_labels = build_nlsj_basis(op_mlms, basis_mlms, n)
                 sector_entry["qn_vectors"] = transform @ qn_mlms
                 sector_entry["qn_labels"] = qn_labels
-            if n in approx_set:
-                if approx_mode == "matched":
-                    matched_energies, matched_overlaps = match_direct_states_to_exact_eigenvalues(ham)
-                else:
-                    matched_energies = np.diag(ham).astype(float)
-                    matched_overlaps = np.ones(len(basis), dtype=float)
-                sector_entry["matched_energies"] = matched_energies
-                sector_entry["matched_overlaps"] = matched_overlaps
             sector_data.append(sector_entry)
+
+    sector_data = merge_hybridization_sectors(sector_data, one_electron_basis, baths, h1_jm, op)
+    for sector in sector_data:
+        if sector["n"] in approx_set:
+            if approx_mode == "matched":
+                energies, overlaps = match_direct_states_to_exact_eigenvalues(sector["ham"])
+            else:
+                energies = np.diag(sector["ham"]).astype(float)
+                overlaps = np.ones(len(sector["basis"]), dtype=float)
+            sector["matched_energies"], sector["matched_overlaps"] = energies, overlaps
 
     approx_components = compute_admissible_approx_components(approx_set, sector_data, one_electron_basis, op, cg)
     approx_component_by_state: Dict[int, int] = {}
@@ -1443,6 +1598,8 @@ def generate_bctqmc(
                         "approx_mode": approx_mode,
                         "match_overlaps": overlap_map,
                         "qn_vectors": None,
+                        **({"basis_jz": [op.jz_of(state) for state in sub_basis]}
+                           if "basis_jz" in sector else {}),
                     }
                 )
                 global_state_id += len(sub_basis)
@@ -1469,6 +1626,8 @@ def generate_bctqmc(
                     # subset of the full-sector angular-momentum basis.
                     "qn_vectors": sector["qn_vectors"] if len(comp) == len(basis) else None,
                     "qn_labels": sector["qn_labels"] if len(comp) == len(basis) else None,
+                    **({"basis_jz": [op.jz_of(state) for state in sub_basis]}
+                       if "basis_jz" in sector else {}),
                 }
             )
             global_state_id += len(sub_basis)
@@ -1493,14 +1652,20 @@ def generate_bctqmc(
             1,
             global_state_id - 1,
             len(one_electron_basis),
-            len(one_electron_basis),
+            len(baths),
             len(sectors),
             max_block,
             file=fh,
         )
         print("# baths, psi^+, psi, Sigind, # spin, moment", file=fh)
-        for ib, (j, jz) in enumerate(one_electron_basis):
-            print(f"{ib} {ib} {ib}* {impqs[ib]} {jz:4.1f} ({j:3.1f},{jz:4.1f})", file=fh)
+        for ib, (a, b, component) in enumerate(baths):
+            j, jz = one_electron_basis[a]
+            if a == b:
+                print(f"{ib} {a} {b}* {component} {jz:4.1f} ({j:3.1f},{jz:4.1f})", file=fh)
+            else:
+                jb, mjb = one_electron_basis[b]
+                print(f"{ib} {a} {b}* {component} 0.0 "
+                      f"({j:3.1f},{jz:4.1f})->({jb:3.1f},{mjb:4.1f})", file=fh)
         print("# cluster energies for non-equivalent baths, eps[k]", file=fh)
         print(" ".join(f"{x:.10f}" for x in epsk), file=fh)
         print(f"#  iblck  n k  Jz   {' '.join(f'F^+_{i:<2}' for i in range(len(one_electron_basis)))}", file=fh)
@@ -1510,7 +1675,8 @@ def generate_bctqmc(
             state_ids = sector["state_ids"]
             for local_idx, state in enumerate(basis):
                 state_id = state_ids[local_idx]
-                print(f"{state_id:<4d} {sector['block_id']:3d} {sector['n']:2d} {0:1d} {sector['jz']:5.1f}  ", end="", file=fh)
+                row_jz = op.jz_of(state) if "basis_jz" in sector else sector["jz"]
+                print(f"{state_id:<4d} {sector['block_id']:3d} {sector['n']:2d} {0:1d} {row_jz:5.1f}  ", end="", file=fh)
                 for orb, (j, jz) in enumerate(one_electron_basis):
                     dest = 0
                     for new_state, amp in op.fp(state, j, jz, cg):
@@ -1583,6 +1749,9 @@ def main() -> None:
     parser.add_argument("-J", dest="j_coulomb", type=float, default=0.0, help="Coulomb scale J")
     parser.add_argument("-Impq", type=str, default="", help="Equivalent bath indices, e.g. [0,0,1,1,...]")
     parser.add_argument("-Eimp", type=str, default="", help="Bath energies, e.g. [0.0,0.2]")
+    parser.add_argument("-Sigind", "--sigind", default="", help="Full one-based hybridization index matrix; zero means absent")
+    parser.add_argument("--trans", default=None, metavar="FILE",
+                        help="Read Sigind from FILE; by default read Trans.dat when present")
     parser.add_argument("-a", "--approx", type=str, default="", help="Valences to treat approximately, e.g. [4,5]")
     parser.add_argument("--approx-mode", choices=("diagonal", "matched"), default="matched", help="Approximation mode for valences listed in --approx")
     parser.add_argument("-o", "--output", type=str, default="bctqmc.cix", help="Output cix filename")
@@ -1597,6 +1766,12 @@ def main() -> None:
     impq = parse_list_arg(args.Impq, int) if args.Impq else None
     eimp = parse_list_arg(args.Eimp, float) if args.Eimp else None
     approx_n = parse_list_arg(args.approx, int) if args.approx else None
+    if args.sigind and args.trans:
+        parser.error("Use either --sigind or --trans")
+    sigind = ast.literal_eval(args.sigind) if args.sigind else None
+    trans = Path(args.trans) if args.trans else Path("Trans.dat")
+    if sigind is None and (args.trans or trans.is_file()):
+        sigind = read_trans_sigind(str(trans))
     generate_bctqmc(
         l=args.l,
         ns=args.ns,
@@ -1607,6 +1782,7 @@ def main() -> None:
         approx_n=approx_n,
         approx_mode=args.approx_mode,
         output=args.output,
+        sigind=sigind,
     )
 
 

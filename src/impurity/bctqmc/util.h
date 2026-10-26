@@ -483,18 +483,13 @@ struct Class1Compare
 {
   bool operator() (const bl::TinyVector<int,3>& lhs, const bl::TinyVector<int,3>& rhs) const
   {
-    const uint64_t Large=5000;
-    const uint64_t a0 = static_cast<uint64_t>(lhs[0]);
-    const uint64_t a1 = static_cast<uint64_t>(lhs[1]);
-    const uint64_t a2 = static_cast<uint64_t>(lhs[2]);
-    
-    const uint64_t b0 = static_cast<uint64_t>(rhs[0]);
-    const uint64_t b1 = static_cast<uint64_t>(rhs[1]);
-    const uint64_t b2 = static_cast<uint64_t>(rhs[2]);
-
-    const uint64_t lhs_ = a0 + Large * (a1 + Large * a2);
-    const uint64_t rhs_ = b0 + Large * (b1 + Large * b2);
-    return lhs_ < rhs_;
+    // Compare the complete triple. Propagator indices can exceed 5000;
+    // fixed-radix encoding would then identify different diagram terms.
+    // Keep the previous ordering for indices below that old radix.
+    for (int i=2; i>=0; --i) {
+      if (lhs[i]!=rhs[i]) return lhs[i]<rhs[i];
+    }
+    return false;
   }
   static inline uint64_t pack(const bl::TinyVector<int,6>& v) noexcept
   {

@@ -29,6 +29,11 @@ using Eigen::VectorXd;
 class Workspace {
 public:
   Workspace() = default;
+  void set_atomic_optimizations(bool subblocks,bool skip_zero_roots) {
+    atomic_subblocks_=subblocks;atomic_skip_zero_roots_=skip_zero_roots;
+  }
+  bool atomic_subblocks() const {return atomic_subblocks_;}
+  bool atomic_skip_zero_roots() const {return atomic_skip_zero_roots_;}
 
   void prepare_hybridization(const dlr::FermionicBasis& basis,
                              const aaa::PoleExpansion& expansion,
@@ -168,6 +173,7 @@ private:
     if (!has_pseudos()) throw std::logic_error("imaginary-axis DLR workspace has no pseudo-particles");
   }
 
+  bool atomic_subblocks_=true,atomic_skip_zero_roots_=true;
   const dlr::FermionicBasis* basis_=nullptr;
   VectorXd poles_, kernel_zero_plus_, kernel_zero_minus_;
   MatrixXd residues_, kernel_plus_, kernel_minus_;

@@ -30,6 +30,16 @@ from scipy import interpolate
 import ctqmc
 
 
+def _pp_approx_sectors(value):
+    """Normalize the solver-only valence selector without changing CIX."""
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("pp_approx_N must be a list of nonnegative integer valences")
+    if builtins.any(isinstance(n, (builtins.bool, bool_)) or
+                    not isinstance(n, (builtins.int, integer)) or n < 0 for n in value):
+        raise ValueError("pp_approx_N must be a list of nonnegative integer valences")
+    return sorted(set(builtins.int(n) for n in value))
+
+
 def _strip_quotes(text):
     """Returns a command-line scalar without outer single/double quotes."""
     if isinstance(text, str):
@@ -221,6 +231,8 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
             payload["CoulombF"] = _strip_quotes(payload["CoulombF"])
         if "OffDiagonal" in payload:
             payload["OffDiagonal"] = _strip_quotes(payload["OffDiagonal"])
+        if "pp_approx_N" in payload:
+            payload["pp_approx_N"] = _pp_approx_sectors(payload["pp_approx_N"])
 
         with open(self.dir + self.PARAMS, "w") as fp:
             print("{", file=fp)

@@ -8,6 +8,7 @@
 #define EDMFT_TCA_DLR_H
 
 #include "imag_axis_dlr.h"
+#include "atomic_convolution.h"
 #include "kugler.h"
 #include <memory>
 #include "tca_matrix.h"
@@ -575,6 +576,8 @@ public:
     mutable std::vector<MatrixFunction> hilbert_blocks;
     mutable std::vector<unsigned char> block_ready;
     mutable std::vector<unsigned char> block_nonzero;
+    mutable std::vector<atomic_convolution::Right> piece_blocks;
+    mutable std::vector<unsigned char> piece_ready,piece_active;
   };
 
   struct BathPairNodeResult {
@@ -1469,7 +1472,8 @@ public:
 
   static SparseFunction ContractRoot(
       const SparseFunction& input,const std::vector<StoredRootPair>& roots,
-      const imag_dlr::Workspace& workspace,const VectorXd& vertex_scalar)
+      const imag_dlr::Workspace& workspace,const VectorXd& vertex_scalar,
+      bool allow_zero_skip=true)
   {
     SparseFunction result;
     for (const auto& root:roots) {
@@ -1483,6 +1487,8 @@ public:
       const VectorXd root_scalar=
         (-root.bath_sign*delta_matrix.col(root.channel).array()*
          vertex_scalar.array()).matrix();
+      if(allow_zero_skip && workspace.atomic_skip_zero_roots() &&
+         (root_scalar.array()==0.0).all())continue;
       for (const auto& [key,values]:input) {
         if (key.first<0 || key.first>=
               static_cast<int>(root.zero.by_target.size())) continue;
@@ -1524,7 +1530,8 @@ public:
 
   static SparseFunction ConvolveRightPseudo(
       const SparseFunction& input,const Cix& cix,
-      const imag_dlr::Workspace& workspace,const VectorXd& scalar)
+      const imag_dlr::Workspace& workspace,const VectorXd& scalar,
+      bool allow_subblocks=true)
   {
     if (scalar.size()!=workspace.rank())
       throw std::invalid_argument(
@@ -1537,7 +1544,7 @@ public:
     // can be used directly without either a solve or a copy.
     const PreparedPseudoCoefficients prepared=
       PreparePseudoCoefficients(workspace,scalar);
-    return ConvolveRightPseudoPrepared(input,cix,workspace,prepared);
+    return ConvolveRightPseudoPrepared(input,cix,workspace,prepared,false,allow_subblocks);
   }
 
   static PreparedPseudoCoefficients PreparePseudoCoefficients(
@@ -1560,12 +1567,45 @@ public:
     return result;
   }
 
+  // Non-owning input views avoid duplicating full atomic matrices in the
+  // single-function API. Prepared right pieces stay owned by their cache.
+  static std::vector<atomic_convolution::Input> AtomicInputs(
+      const std::vector<const SparseFunction*>& functions,const Cix& cix,
+      const imag_dlr::Workspace& workspace,const PreparedPseudoCoefficients& prepared,
+      const std::vector<const SparseFunction*>* left_hilbert=nullptr)
+  {
+    const auto& unique=prepared.use_workspace_coefficients ? workspace.pseudo_coefficients() : prepared.dressed;
+    if(prepared.piece_ready.empty()) {
+      prepared.piece_blocks.resize(cix.Nblock);prepared.piece_ready.assign(cix.Nblock,0);
+      prepared.piece_active.resize(unique.cols());
+      for(int p=0;p<unique.cols();++p)prepared.piece_active[p]=
+        (unique.col(p).array()!=0.0).any() || (prepared.hilbert.col(p).array()!=0.0).any();
+    }
+    if(prepared.piece_ready.size()!=static_cast<std::size_t>(cix.Nblock))throw std::logic_error("atomic convolution cache/CIX mismatch");
+    std::vector<atomic_convolution::Input> items;
+    for(int state=0;state<static_cast<int>(functions.size());++state)
+      for(const auto& [key,values]:*functions[state]) {
+        const int block=key.second;
+        if(!prepared.piece_ready[block]) {
+          prepared.piece_blocks[block]=atomic_convolution::prepare(cix.Sgm_symmetry[block],unique,prepared.hilbert,prepared.piece_active);
+          prepared.piece_ready[block]=1;
+        }
+        items.push_back({state,key,&values,left_hilbert ? &(*left_hilbert)[state]->at(key) : nullptr,&prepared.piece_blocks[block]});
+      }
+    return items;
+  }
+
   static SparseFunction ConvolveRightPseudoPrepared(
       const SparseFunction& input,const Cix& cix,
       const imag_dlr::Workspace& workspace,
       const PreparedPseudoCoefficients& prepared,
-      bool reflect_output=false)
+      bool reflect_output=false,bool allow_subblocks=true)
   {
+    if(allow_subblocks && workspace.atomic_subblocks()) {
+      const auto items=AtomicInputs({&input},cix,workspace,prepared);
+      auto output=atomic_convolution::evaluate(workspace.basis(),items,1,reflect_output);
+      return std::move(output[0]);
+    }
     const MatrixXd& unique_coefficients=
       prepared.use_workspace_coefficients
         ? workspace.pseudo_coefficients() : prepared.dressed;
@@ -1646,6 +1686,18 @@ public:
   {
     if (left_hilbert && left_hilbert->size()!=functions.size())
       throw std::logic_error("TCA prepared left: state count mismatch");
+    if(workspace.atomic_subblocks()) {
+      std::vector<const SparseFunction*> input,hilbert;
+      input.reserve(functions.size());hilbert.reserve(functions.size());
+      for(std::size_t i=0;i<functions.size();++i) {
+        input.push_back(&functions[i]);if(left_hilbert)hilbert.push_back(&(*left_hilbert)[i]);
+      }
+      const auto items=AtomicInputs(input,cix,workspace,prepared,left_hilbert ? &hilbert : nullptr);
+      auto output=atomic_convolution::evaluate(workspace.basis(),items,functions.size(),reflect_output,
+         scratch ? &scratch->dlr_buffers : nullptr,input_coefficients,output_coefficients);
+      functions.swap(output);
+      return;
+    }
     const MatrixXd& unique_coefficients=
       prepared.use_workspace_coefficients
         ? workspace.pseudo_coefficients() : prepared.dressed;
@@ -2211,7 +2263,8 @@ public:
     return destroys_pair || normal_down;
   }
 
-  static OperatorTranspose MakeBullaTranspose(const Cix& cix,int orbital)
+  static OperatorTranspose MakeBullaTranspose(const Cix& cix,int orbital,
+                                               bool full_operator=true)
   {
     OperatorTranspose result;
     result.by_source.assign(cix.Nblock,-1);
@@ -2237,14 +2290,11 @@ public:
             "summed TCA N_jm block dimensions differ from bath operator");
         for (int i=0;i<matrix.rows();++i)
           for (int j=0;j<matrix.cols();++j)
-            // The fixed-plan product basis contains one index only for a
-            // nonzero transition of the ordinary one-body operator.  Its
-            // dense Bulla connector may mix those transition indices, but
-            // it cannot introduce a source row or target column absent from
-            // that support.  Projecting here makes the full block matrix
-            // exactly equivalent to BullaConnector(BlockPlan,...).
-            if (base.matrix.row(i).cwiseAbs().maxCoeff()!=0.0 &&
-                base.matrix.col(j).cwiseAbs().maxCoeff()!=0.0)
+            // Composite [H_int,c^dagger] can connect states for which the
+            // bare creation operator vanishes. Keep the complete real Njm.
+            // The opt-in legacy projection is only for fixed-plan diagnostics.
+            if (full_operator || (base.matrix.row(i).cwiseAbs().maxCoeff()!=0.0 &&
+                                  base.matrix.col(j).cwiseAbs().maxCoeff()!=0.0))
               matrix(i,j)=nx.transposed
                 ? (*nx.njm)(j,i) : (*nx.njm)(i,j);
       } else {

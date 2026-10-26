@@ -866,6 +866,8 @@ public:
   }
 };
 
+#include "volterra_blocks.h"
+
 struct SchedulerParams {
   int no_inside_parallel_below = 64;
   int prefer_inside_parallel_at_or_above = 94;
@@ -1492,6 +1494,17 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
   // dimension of each block. The optimized Volterra solver is dominated by
   // matrix-matrix multiplies for larger blocks, hence the cost is closer to N^3.
   ////////////////////////////////////////////////////////////////////////////
+  const bool split_enabled = !pars.contains("volterra_split_blocks") || pars["volterra_split_blocks"].get<bool>();
+  std::vector<volterra_blocks::Parts> subblocks(cix.Nblock);
+  for (int ib=0; ib<cix.Nblock; ++ib) {
+    subblocks[ib]=volterra_blocks::partition(cix.Ham[ib],cix.Sgm_symmetry[ib],split_enabled);
+    if (sched.print_diagnostics && mpi.rank==mpi.master && subblocks[ib].size()>1) {
+      int largest=0;
+      for (const auto& part : subblocks[ib]) largest=std::max(largest,int(part.size()));
+      clog<<"Volterra split ib="<<ib+1<<" container="<<cix.Block[ib].size()
+          <<" pieces="<<subblocks[ib].size()<<" largest="<<largest<<endl;
+    }
+  }
   std::vector<BlockJob> jobs; jobs.reserve(cix.Nblock);
   Array<int,1> deg(cix.Nblock); deg=0;
   { // this part just figures out which blocks require computation. Some are equivalent and can be skept.
@@ -1508,7 +1521,11 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
 	}
       }
       if (need_to_compute){
-	jobs.push_back({ib, N, double(N)*N*N}); // {iblock,size,cost}
+	double cost=0.0; int largest=0;
+        for (const auto& part : subblocks[ib]) {
+          const int d=part.size(); largest=std::max(largest,d); cost+=double(d)*d*d;
+        }
+        jobs.push_back({ib,largest,cost}); // Size/cost of the actual independent solves.
 	for (int i=0; i<N; ++i){
 	  for (int j=0; j<N; ++j){
 	    int ii = abs(cix.Sgm_symmetry[ib](i,j))-1; // use symmetry to not compute the same componente multiple times.
@@ -1604,6 +1621,42 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
   {
     BlockSolveStats stats;
     int N = cix.Block[ib].size();
+    if (subblocks[ib].size()>1) {
+      auto scalar_solve = [&](Array<double,1>& g,const Array<double,1>& s,double e) {
+        volterra.cmp1(g,s,e);
+      };
+      auto matrix_solve = [&](Array<double,3>& g,const Array<double,3>& s,const Array<double,1>& e) {
+#ifdef _MPI
+        if (use_inside_parallel && team_size>1 && s.extent(0)>vparams.cmp2_small_cutoff)
+          volterra.cmp2_large_parallel(g,s,e,team_comm,team_rank,team_size);
+        else volterra.cmp2(g,s,e);
+#else
+        volterra.cmp2(g,s,e);
+#endif
+      };
+      auto emit = [&](const std::vector<int>& part,const Array<double,3>& values) {
+        if (!write_output) return;
+        for (int i=0; i<part.size(); ++i) for (int j=0; j<part.size(); ++j) {
+          const int a=part[i],b=part[j],label=cix.Sgm_symmetry[ib](a,b);
+          if (label>0 && bl::all(cix.Sgm_indx[label-1][0]==TinyVector<int,3>(ib,a,b)))
+            Gm(label-1,Range::all())=values(Range::all(),i,j);
+        }
+      };
+      const auto result=volterra_blocks::solve(cix.Ham[ib],cix.Sgm_symmetry[ib],
+        Sm,tau,r.lambda0,subblocks[ib],scalar_solve,matrix_solve,emit);
+      t_diag2+=result.diagonalization;
+      t_sg_trans+=result.sigma_rotation;
+      t_dl+=result.volterra;
+      t_g_trans+=result.g_rotation;
+      t_set_g+=result.scatter;
+      for (int i=0; i<N; ++i) {
+        const double q=result.probability[i];
+        stats.sumQ+=q;
+        if (abs(q)>stats.maxQ) { stats.maxQ=abs(q); stats.maxPseudo=cix.Block[ib](i); }
+        if (write_output) Prob_eig(cix.Block[ib](i)-1)=q;
+      }
+      return stats;
+    }
     if (N==1){
       auto t0 = get_cpu_time();
       double Em = cix.Ham[ib](0,0) - r.lambda0;
@@ -1966,15 +2019,23 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
       double Ptot=0;
       for (int i=0; i<N; ++i) Ptot += Prob_eig(cix.Block[ib](i)-1);
       if (Ptot>small){
-	int nmax=N;
-	for (; nmax>0; --nmax){
-	  if (abs(Prob_eig(cix.Block[ib](nmax-1)-1)) > 0.2*small) break;
-	}
-	int Nocc = cix.iN(cix.Block[ib](0)-1);
-	fmt::print(clog,"   {:d}) Prob_eig[{:d},N={:d}]={:10.7f} [",itt,ib+1,Nocc,Ptot);
-	for (int i=0; i<nmax; ++i)
-	  fmt::print(clog,"{:10.7f},",Prob_eig(cix.Block[ib](i)-1));
-	clog<<"]"<<endl;
+        // Limit the log to the largest probabilities; keep complete file output below.
+        // Local eigenstate indices are zero-based, as in Probability.dat.
+        vector<int> order(N);
+        for (int i=0; i<N; ++i) order[i]=i;
+        stable_sort(order.begin(), order.end(), [&](int a, int b){
+          return Prob_eig(cix.Block[ib](a)-1) > Prob_eig(cix.Block[ib](b)-1);
+        });
+        const int nshow = min(N,10);
+        double omitted=0;
+        for (int k=nshow; k<N; ++k) omitted += Prob_eig(cix.Block[ib](order[k])-1);
+        int Nocc = cix.iN(cix.Block[ib](0)-1);
+        fmt::print(clog,"   {:d}) Prob_eig[{:d},N={:d}]={:10.7f} top {:d} (i=0-based) [",itt,ib+1,Nocc,Ptot,nshow);
+        for (int k=0; k<nshow; ++k){
+          const int i=order[k];
+          fmt::print(clog,"{}{:d}:{:.7f}",k ? ", " : "",i,Prob_eig(cix.Block[ib](i)-1));
+        }
+        fmt::print(clog,"] omitted={:.7g} ({:d} states)\n",omitted,N-nshow);
       }
       for (int i=0; i<N; ++i) 
 	out<<ib+1<<" "<<i<<" "<<Prob_eig(cix.Block[ib](i)-1)<<endl;
@@ -2033,7 +2094,8 @@ auto DeterminProbabilitiesI(const Array<double,1>& tau, const Array<double,2>& G
 	    int ii = abs(_ii_)-1;
 	    if (ii>=0){
 	      double dQm = Gm(ii,itlast);
-	      nalpha(ibth) += sign(_ii_*j_pseudo*k_pseudo)*dQm; // dQ[k_pseudo,i_pseudo] * <k_pseudo|F^+_{ibth}|j_pseudo><j_pseudo|F_{ibth}|i_pseudo>
+	      // Take signs before multiplying: the product of indices can overflow int.
+	      nalpha(ibth) += sign(_ii_)*sign(j_pseudo)*sign(k_pseudo)*dQm; // dQ[k_pseudo,i_pseudo] * <k_pseudo|F^+_{ibth}|j_pseudo><j_pseudo|F_{ibth}|i_pseudo>
 	      //cout<<"ibth="<<ibth<<" i_pseudo="<<i_pseudo<<" j_pseudo="<<j_pseudo<<" k_pseudo="<<k_pseudo<<" ii="<<ii<<" (i,k)=("<<i<<","<<k<<")"<<" dnalpha="<<sign(_ii_*j_pseudo*k_pseudo)*dQm(ii)<<endl;
 	    }
 	  }
@@ -2089,16 +2151,23 @@ auto DeterminProbabilitiesI(const Array<double,1>& tau, const Array<double,2>& G
       double Ptot=0;
       for (int i=0; i<N; ++i) Ptot += Probability(cix.Block[ib](i)-1);
       if (Ptot>small){
-	int nmax=N;
-	for (; nmax>0; --nmax){
-	  if (abs(Probability(cix.Block[ib](nmax-1)-1)) > 0.2*small) break;
-	}
-	int Nocc = cix.iN(cix.Block[ib](0)-1);
-	//clog<<"   "<<itt<<") Prob["<<ib+1<<",N="<<Nocc<<"]=[";
-	fmt::print(clog,"   {:d}) Prob[{:d},N={:d}]={:10.7f} [",itt,ib+1,Nocc,Ptot);
-	for (int i=0; i<nmax; ++i)
-	  fmt::print(clog,"{:10.7f},",Probability(cix.Block[ib](i)-1));
-	clog<<"]"<<endl;
+        // Limit product-basis logging; this does not change the probabilities.
+        // Indices are local, zero-based positions within the CIX block.
+        vector<int> order(N);
+        for (int i=0; i<N; ++i) order[i]=i;
+        stable_sort(order.begin(), order.end(), [&](int a, int b){
+          return Probability(cix.Block[ib](a)-1) > Probability(cix.Block[ib](b)-1);
+        });
+        const int nshow = min(N,10);
+        double omitted=0;
+        for (int k=nshow; k<N; ++k) omitted += Probability(cix.Block[ib](order[k])-1);
+        int Nocc = cix.iN(cix.Block[ib](0)-1);
+        fmt::print(clog,"   {:d}) Prob[{:d},N={:d}]={:10.7f} top {:d} (i=0-based) [",itt,ib+1,Nocc,Ptot,nshow);
+        for (int k=0; k<nshow; ++k){
+          const int i=order[k];
+          fmt::print(clog,"{}{:d}:{:.7f}",k ? ", " : "",i,Probability(cix.Block[ib](i)-1));
+        }
+        fmt::print(clog,"] omitted={:.7g} ({:d} states)\n",omitted,N-nshow);
       }
     }
     clog<<"   "<<itt<<") Fimp = "<<r.Fimp<<endl;

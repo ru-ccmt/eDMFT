@@ -3,6 +3,8 @@
 
 #include "tca_dlr.h"
 #include "oca_dlr.h"
+#include "oca_subblocks.h"
+#include "oca_measurements.h"
 #include <chrono>
 
 namespace edmft::oca_matrix_dlr {
@@ -32,8 +34,40 @@ class Evaluator {
   Engine::PseudoBlocks pseudo;
   std::vector<Engine::OperatorTranspose> operators, bulla;
   std::array<std::vector<Engine::StoredRootPair>,2> roots;
+  std::vector<Engine::StoredRootPair> summed_roots;
+  // Each group shares the physical operator at the final split-line vertex.
+  // The other endpoint and its bath coefficient are summed before convolution.
+  std::array<std::vector<std::vector<int>>,2> endpoint_groups;
   std::vector<double> degeneracy;
   VectorXd one;
+  bool split_blocks,skip_zero,profile,measurement_reuse,dense_measurements;
+  mutable std::unique_ptr<oca_measurements::Boundary<Cix,Physical>> measurements;
+  void measure(const Engine::SparseFunction& first,const Engine::SparseFunction& second,
+               double prefactor,Physical::Result& result) const {
+    if(measurement_reuse) {
+      if(!measurements)measurements=std::make_unique<oca_measurements::Boundary<Cix,Physical>>(
+        cix,operators,bulla,dense_measurements,profile);
+      measurements->accumulate(first,second,prefactor,result);
+      return;
+    }
+    for(int external=0;external<cix.Nbath;++external) {
+      const int channel=cix.bath_sigind0(external);
+      Physical::AccumulateBoundaryEstimators(first,second,
+        operators[2*external],operators[2*external+1],bulla[external],
+        prefactor*(channel<0?-1.0:1.0),std::abs(channel),
+        Physical::IsF01Channel(cix,external),result);
+    }
+  }
+  mutable std::unique_ptr<oca_subblocks::Convolution> convolution;
+  Engine::SparseFunction convolve(const Engine::SparseFunction& input,const VectorXd& scalar) const {
+    return split_blocks ? (*convolution)(input,scalar) : Engine::ConvolveRightPseudo(input,cix,w,scalar,false);
+  }
+public:
+  void report(std::ostream& out) const {
+    if(convolution && profile)convolution->report(out);
+    if(measurements && profile)measurements->report(out);
+  }
+private:
 
   // Unlike the fixed-path TCA prototype, OCA's dense Njm enumeration can
   // use every source/target element in the permitted atomic block. Do not
@@ -56,9 +90,14 @@ class Evaluator {
   }
 
 public:
-  Evaluator(const Cix& input,const imag_dlr::Workspace& workspace)
+  Evaluator(const Cix& input,const imag_dlr::Workspace& workspace,
+            bool split=true,bool skip=true,bool profiling=false,
+            bool reuse_measurements=true,bool dense_boundary=true)
     : cix(input),w(workspace),pseudo(Engine::PreparePseudoBlocks(cix,w)),
-      degeneracy(cix.Npseudo_unique),one(VectorXd::Ones(w.rank())) {
+      degeneracy(cix.Npseudo_unique),one(VectorXd::Ones(w.rank())),
+      split_blocks(split),skip_zero(skip),profile(profiling),
+      measurement_reuse(reuse_measurements),dense_measurements(dense_boundary) {
+    if(split_blocks)convolution=std::make_unique<oca_subblocks::Convolution>(cix,w,profile);
     if (!w.has_pseudos() || w.pseudo_count()!=cix.Npseudo_unique ||
         w.channel_count()!=cix.Nbath_unique_unique)
       throw std::invalid_argument("OCA matrix workspace/CIX mismatch");
@@ -68,10 +107,102 @@ public:
     for (int bath=0;bath<cix.Nbath;++bath) {
       bulla.push_back(full_bulla(bath));
       const int s=cix.bath_sigind0(bath);
-      for (int d=0;d<2;++d)
+      for (int d=0;d<2;++d) {
+        const auto& delta=d==0 ? w.delta_plus() : w.delta_minus();
+        if(skip_zero && (delta.col(std::abs(s)).array()==0.0).all())continue;
         roots[d].push_back({operators[2*bath+1-d],operators[2*bath+d],
                            std::abs(s),d,s<0 ? -1.0 : 1.0});
+      }
     }
+    for (int d=0;d<2;++d) {
+      summed_roots.insert(summed_roots.end(),roots[d].begin(),roots[d].end());
+      std::map<int,std::vector<int>> grouped;
+      for (int bath=0;bath<cix.Nbath;++bath)
+        grouped[cix.Fi_indx(2*bath+d)].push_back(bath);
+      for (auto& [op,baths]:grouped)
+        endpoint_groups[d].push_back(std::move(baths));
+    }
+  }
+
+  int group_count(int direction) const {return endpoint_groups.at(direction).size();}
+
+  // Exact sum of both root directions and all split baths in one endpoint
+  // group. Only linear maps precede the common final operator. In particular,
+  // no replacement of a directed term by a symmetry factor is made here.
+  MatrixXd self_group_nodes(int split_direction,int pole,int group) const {
+    const auto& baths=endpoint_groups.at(split_direction).at(group);
+    const auto decoration=tca_dlr::MakeRootedLineDecoration(
+      1,3,split_direction,w.poles()(pole));
+    std::array<VectorXd,4> vertex;
+    std::array<VectorXd,3> edge;
+    for (auto& x:vertex) x=one;
+    for (auto& x:edge) x=one;
+    for (int i=0;i<4;++i) {
+      const int s=decoration.vertex_kernel[i];
+      if (s) vertex[i]=s>0 ? w.kernel_plus().col(pole) : w.kernel_minus().col(pole);
+    }
+    for (int i=0;i<3;++i) {
+      const int s=decoration.edge_kernel[i];
+      if (s) edge[i]=s>0 ? w.kernel_plus().col(pole) : w.kernel_minus().col(pole);
+    }
+    MatrixXd result=MatrixXd::Zero(w.rank(),w.pseudo_count());
+    Engine::SparseFunction first,base;
+    for (int bath:baths) {
+      const int channel=cix.bath_sigind0(bath);
+      const double weight=-(channel<0 ? -1.0 : 1.0)*tca_dlr::CodePolePrefactor(
+        w.residues()(std::abs(channel),pole),
+        tca_dlr::KernelZero(w,pole,decoration.denominator_kernel),decoration);
+      if (weight==0.0) continue;
+      if (base.empty()) base=Engine::PseudoValues(pseudo,edge[0]);
+      Engine::AddFunction(first,Engine::MultiplyRight(
+        base,operators[2*bath+1-split_direction],vertex[1],weight));
+    }
+    if (first.empty()) return result;
+    base.clear();
+    auto chain=convolve(first,edge[1]);
+    first.clear();
+    chain=Engine::ContractRoot(chain,summed_roots,w,vertex[2],skip_zero);
+    chain=convolve(chain,edge[2]);
+    chain=Engine::MultiplyRight(chain,operators[2*baths.front()+split_direction],vertex[3]);
+    Engine::AccumulateCut(chain,cix,1.0,degeneracy,result);
+    return result;
+  }
+
+  // Boundary estimators are bilinear in the two arcs. Within a group the
+  // second arc is identical, so all weighted first arcs can be combined
+  // before their convolution. Keep the complete existing boundary routines.
+  Physical::Result physical_group_nodes(int direction,int pole,int group) const {
+    const auto& baths=endpoint_groups.at(direction).at(group);
+    Physical::Result result{MatrixXd::Zero(w.rank(),w.channel_count()),
+      MatrixXd::Zero(w.rank(),w.channel_count()),MatrixXd::Zero(w.rank(),w.channel_count())};
+    const bool direct=(direction==0 && w.poles()(pole)>=0.0) ||
+                      (direction==1 && w.poles()(pole)<0.0);
+    const int sign=direct ? (direction==0 ? 1 : -1) : (direction==0 ? -1 : 1);
+    std::array<VectorXd,4> edge;
+    for (int i=0;i<4;++i) {
+      const bool inside=i>=1 && i<3;
+      edge[i]=(inside==direct)
+        ? VectorXd(sign>0 ? w.kernel_plus().col(pole) : w.kernel_minus().col(pole)) : one;
+    }
+    Engine::SparseFunction first,base;
+    for (int bath:baths) {
+      const int s=cix.bath_sigind0(bath);
+      const double weight=(s<0 ? -1.0 : 1.0)*w.residues()(std::abs(s),pole)/
+                            tca_dlr::KernelZero(w,pole,sign);
+      if (weight==0.0) continue;
+      if (base.empty()) base=Engine::PseudoValues(pseudo,edge[0]);
+      Engine::AddFunction(first,Engine::MultiplyRight(
+        base,operators[2*bath+1-direction],one,weight));
+    }
+    if (first.empty()) return result;
+    base.clear();
+    first=convolve(first,edge[1]);
+    auto second=Engine::PseudoValues(pseudo,edge[2]);
+    second=Engine::MultiplyRight(second,operators[2*baths.front()+direction],one);
+    second=convolve(second,edge[3]);
+    Physical::Reflect(second,w.basis());
+    measure(first,second,1.0,result);
+    return result;
   }
 
   // One self cut / pole / split-bath task. Both signs of omega use the
@@ -102,9 +233,9 @@ public:
     if (prefactor==0.0) return result;
     auto chain=Engine::PseudoValues(pseudo,edge[0]);
     chain=Engine::MultiplyRight(chain,operators[2*bath+1-split_direction],vertex[1]);
-    chain=Engine::ConvolveRightPseudo(chain,cix,w,edge[1]);
-    chain=Engine::ContractRoot(chain,roots[root_direction],w,vertex[2]);
-    chain=Engine::ConvolveRightPseudo(chain,cix,w,edge[2]);
+    chain=convolve(chain,edge[1]);
+    chain=Engine::ContractRoot(chain,roots[root_direction],w,vertex[2],skip_zero);
+    chain=convolve(chain,edge[2]);
     chain=Engine::MultiplyRight(chain,operators[2*bath+split_direction],vertex[3]);
     Engine::AccumulateCut(chain,cix,prefactor,degeneracy,result);
     return result;
@@ -131,18 +262,12 @@ public:
     if (prefactor==0.0) return result;
     auto first=Engine::PseudoValues(pseudo,edge[0]);
     first=Engine::MultiplyRight(first,operators[2*bath+1-direction],one);
-    first=Engine::ConvolveRightPseudo(first,cix,w,edge[1]);
+    first=convolve(first,edge[1]);
     auto second=Engine::PseudoValues(pseudo,edge[2]);
     second=Engine::MultiplyRight(second,operators[2*bath+direction],one);
-    second=Engine::ConvolveRightPseudo(second,cix,w,edge[3]);
+    second=convolve(second,edge[3]);
     Physical::Reflect(second,w.basis());
-    for (int external=0;external<cix.Nbath;++external) {
-      const int channel=cix.bath_sigind0(external);
-      Physical::AccumulateBoundaryEstimators(first,second,
-        operators[2*external],operators[2*external+1],bulla[external],
-        prefactor*(channel<0 ? -1.0 : 1.0),std::abs(channel),
-        Physical::IsF01Channel(cix,external),result);
-    }
+    measure(first,second,prefactor,result);
     return result;
   }
 };
@@ -152,33 +277,57 @@ public:
 // ranks evaluate the full answer independently, matching the existing API.
 inline oca_dlr::CombinedResult evaluate(const Cix& cix,
     const imag_dlr::Workspace& w,const blitz::Array<double,1>& tau,
-    bool physical,bool distributed,int rank,int ranks,std::ostream* log) {
+    bool physical,bool distributed,int rank,int ranks,std::ostream* log,
+    bool split_blocks=true,bool skip_zero=true,bool profile=false,bool reuse=true,
+    bool measurement_reuse=true,bool dense_measurements=true) {
   using Clock=std::chrono::steady_clock;
   const auto start=Clock::now();
-  Evaluator evaluator(cix,w);
+  Evaluator evaluator(cix,w,split_blocks,skip_zero,profile,measurement_reuse,dense_measurements);
   MatrixXd sigma=MatrixXd::Zero(w.rank(),w.pseudo_count());
   Physical::Result phys{MatrixXd::Zero(w.rank(),w.channel_count()),
     MatrixXd::Zero(w.rank(),w.channel_count()),MatrixXd::Zero(w.rank(),w.channel_count())};
   const int workers=distributed ? ranks : 1, worker=distributed ? rank : 0;
   const int percut=w.pole_count()*cix.Nbath;
-  const int total=(physical ? 6 : 4)*percut;
+  struct Task {bool physical;int direction,pole,index;};
+  std::vector<Task> tasks;
+  if (reuse) {
+    for (int phase=0;phase<(physical ? 2 : 1);++phase)
+      for (int direction=0;direction<2;++direction)
+        for (int pole=0;pole<w.pole_count();++pole)
+          for (int group=0;group<evaluator.group_count(direction);++group)
+            tasks.push_back({phase!=0,direction,pole,group});
+  }
+  const int total=reuse ? tasks.size() : (physical ? 6 : 4)*percut;
   int completed=0;
   double self_seconds=0.0,physical_seconds=0.0;
   auto last=start;
   if (rank==0 && log) *log<<"OCA matrix start: tasks="<<total<<" ranks="<<workers
     <<" poles="<<w.pole_count()<<" DLR_rank="<<w.rank()<<" physical="<<physical
-    <<" enumeration=none"<<std::endl;
+    <<" enumeration=none subblocks="<<split_blocks<<" skip_zero="<<skip_zero
+    <<" reuse="<<reuse<<" measurement_reuse="<<measurement_reuse
+    <<" measurement_dense="<<dense_measurements<<std::endl;
   for (int task=worker;task<total;task+=workers) {
-    const int cut=task/percut,pole=(task%percut)/cix.Nbath,bath=task%cix.Nbath;
     const auto task_start=Clock::now();
-    if (cut<4) sigma+=evaluator.self_nodes(cut/2,cut%2,pole,bath);
-    else {
-      const auto x=evaluator.physical_nodes(cut-4,pole,bath);
-      phys.g+=x.g; phys.f00+=x.f00; phys.f01+=x.f01; phys.kugler.add(x.kugler);
+    bool physical_task;
+    if (reuse) {
+      const auto& t=tasks[task];physical_task=t.physical;
+      if (!t.physical) sigma+=evaluator.self_group_nodes(t.direction,t.pole,t.index);
+      else {
+        const auto x=evaluator.physical_group_nodes(t.direction,t.pole,t.index);
+        phys.g+=x.g; phys.f00+=x.f00; phys.f01+=x.f01; phys.kugler.add(x.kugler);
+      }
+    } else {
+      const int cut=task/percut,pole=(task%percut)/cix.Nbath,bath=task%cix.Nbath;
+      physical_task=cut>=4;
+      if (!physical_task) sigma+=evaluator.self_nodes(cut/2,cut%2,pole,bath);
+      else {
+        const auto x=evaluator.physical_nodes(cut-4,pole,bath);
+        phys.g+=x.g; phys.f00+=x.f00; phys.f01+=x.f01; phys.kugler.add(x.kugler);
+      }
     }
     ++completed;
     const auto now=Clock::now();
-    (cut<4 ? self_seconds : physical_seconds)+=
+    (physical_task ? physical_seconds : self_seconds)+=
       std::chrono::duration<double>(now-task_start).count();
     if (rank==0 && log && std::chrono::duration<double>(now-last).count()>=30) {
       *log<<"OCA matrix progress: rank0_tasks="<<completed<<"/"
@@ -188,6 +337,7 @@ inline oca_dlr::CombinedResult evaluate(const Cix& cix,
     }
   }
   if (physical && cix.kugler_estimators) phys.kugler.ensure(w.rank(),w.channel_count());
+  if(rank==0 && log)evaluator.report(*log);
   const auto reduce_start=Clock::now();
   double work_min[2]={self_seconds,physical_seconds};
   double work_max[2]={self_seconds,physical_seconds};
