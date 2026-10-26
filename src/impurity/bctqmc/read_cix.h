@@ -60,6 +60,7 @@ inline std::ostream& operator<<(std::ostream& os, const BathBlocks& bb)
 
 class Cix{
 public:
+  bool kugler_estimators=false; // Optional analytic physical endpoint correlators.
   string cix_filename; // Also identifies an optional <cix>.nlsj sidecar.
   int Nsite, Natst, Npsi, Nbath, Nblock, Nmaxsize; // cluster size, number of cluster states, number of creation operators, number of hybridization entries, number of Hamiltonian blocks, the largest dimension of Hamiltonian
   Array<int,1> bath_sigind0, bath_sigind;//, bath_gflip;

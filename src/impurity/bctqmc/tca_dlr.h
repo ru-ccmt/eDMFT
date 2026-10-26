@@ -8,6 +8,8 @@
 #define EDMFT_TCA_DLR_H
 
 #include "imag_axis_dlr.h"
+#include "kugler.h"
+#include <memory>
 #include "tca_matrix.h"
 #include "tca_topology.h"
 
@@ -604,6 +606,9 @@ public:
     std::vector<SparseMatrixEntry> nonzero;
   };
   struct OperatorTranspose {
+    int op=-1;
+    const Cix* cix=nullptr;
+    mutable std::shared_ptr<OperatorTranspose> interaction;
     std::vector<OperatorEntry> entries;
     std::vector<int> by_source;
     std::vector<std::vector<int>> by_target;
@@ -1164,6 +1169,7 @@ public:
   static OperatorTranspose MakeOperatorTranspose(const Cix& cix,int op)
   {
     OperatorTranspose result;
+    result.op=op; result.cix=&cix;
     result.by_source.assign(cix.Nblock,-1);
     result.by_target.resize(cix.Nblock);
     for (int source=0;source<cix.Nblock;++source) {
@@ -1800,6 +1806,7 @@ public:
     MatrixXd g;
     MatrixXd f00;
     MatrixXd f01;
+    kugler::Correlators kugler;
   };
 
   struct BathPairResult {
@@ -2262,6 +2269,84 @@ public:
     return result;
   }
 
+  // Full composite operator at an EXTERNAL endpoint. In contrast to the
+  // legacy fixed-path Bulla connector, retain all Njm entries within a block.
+  static const OperatorTranspose& InteractionOperator(const OperatorTranspose& ordinary) {
+    if (ordinary.interaction) return *ordinary.interaction;
+    if (!ordinary.cix || ordinary.op<0)
+      throw std::logic_error("Kugler endpoint lacks CIX operator metadata");
+    const Cix& cix=*ordinary.cix;
+    auto q=std::make_shared<OperatorTranspose>();
+    q->by_source.assign(cix.Nblock,-1); q->by_target.resize(cix.Nblock);
+    for (const auto& base:ordinary.entries) {
+      const auto nx=cix.Njm_ind(base.source,ordinary.op);
+      if (!nx.njm_c) continue;
+      Engine::OperatorEntry entry;
+      entry.source=base.source; entry.target=base.target;
+      entry.matrix=MatrixXd::Zero(base.matrix.rows(),base.matrix.cols());
+      if (nx.njm_c==1) entry.matrix=nx.njm_r*base.matrix;
+      else if (nx.njm_c==2 && nx.njm) {
+        const int rows=nx.transposed ? nx.njm->extent(1) : nx.njm->extent(0);
+        const int cols=nx.transposed ? nx.njm->extent(0) : nx.njm->extent(1);
+        if (rows!=entry.matrix.rows() || cols!=entry.matrix.cols())
+          throw std::logic_error("Kugler Njm endpoint dimension mismatch");
+        for (int i=0;i<rows;++i) for (int j=0;j<cols;++j)
+          entry.matrix(i,j)=nx.transposed ? (*nx.njm)(j,i) : (*nx.njm)(i,j);
+      } else throw std::logic_error("unsupported Kugler Njm representation");
+      for (int i=0;i<entry.matrix.rows();++i)
+        for (int j=0;j<entry.matrix.cols();++j)
+          if (entry.matrix(i,j)!=0.) entry.nonzero.push_back({i,j,entry.matrix(i,j)});
+      if (entry.nonzero.empty()) continue;
+      const int index=q->entries.size();
+      q->by_source[entry.source]=index;
+      q->by_target[entry.target].push_back(index);
+      q->entries.push_back(std::move(entry));
+    }
+    ordinary.interaction=std::move(q);
+    return *ordinary.interaction;
+  }
+
+  static void AccumulateKugler(const SparseFunction& first,const SparseFunction& second,
+      const OperatorTranspose& creation,const OperatorTranspose& annihilation,
+      double prefactor,int channel,bool anomalous,kugler::Correlators& output) {
+    if (!creation.cix || !creation.cix->kugler_estimators) return;
+    if (first.empty() || second.empty()) return;
+    output.ensure(first.begin()->second.size(),creation.cix->Nbath_unique_unique);
+    const auto& qc=InteractionOperator(creation);
+    const auto& qa=InteractionOperator(annihilation);
+    // One right multiplication per endpoint type; share it between the two
+    // possible creation closures. No internal convolution is repeated.
+    for (const auto& [key,values]:first) {
+      for (int right_kind=0;right_kind<2;++right_kind) {
+        const auto& a=right_kind ? qa : annihilation;
+        const int ai=a.by_source.at(key.second);
+        if (ai<0) continue;
+        const auto& right=a.entries[ai];
+        for (int node=0;node<static_cast<int>(values.size());++node) {
+          MatrixXd product;
+          if (!right_kind) product=Engine::MultiplyRightOperator(values[node],right);
+          else {
+            product=MatrixXd::Zero(values[node].rows(),right.matrix.cols());
+            for (const auto& entry:right.nonzero)
+              product.col(entry.column).noalias()+=entry.value*values[node].col(entry.row);
+          }
+          for (int left_kind=0;left_kind<2;++left_kind) {
+            if (!right_kind && !left_kind) continue;
+            const auto& c=left_kind ? qc : creation;
+            const int observable=right_kind ? (left_kind ? 4 : 2) : 0;
+            for (int ci:c.by_target.at(key.first)) {
+              const auto& left=c.entries[ci];
+              const auto r=second.find({right.target,left.source});
+              if (r==second.end()) continue;
+              output.value[observable+int(anomalous)](node,channel)+=prefactor*
+                Engine::TraceLeftProduct(left,product,r->second[node]);
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Close the two physical backbones for one external bath and accumulate
   // both the ordinary Green's function and its Bulla estimator.  Sparse block
   // compatibility is resolved once, outside the DLR-node loop.  An ordinary
@@ -2275,6 +2360,7 @@ public:
       const OperatorTranspose& bulla,
       double prefactor,int channel,bool anomalous,Result& output)
   {
+    AccumulateKugler(first,second,creation,annihilation,prefactor,channel,anomalous,output.kugler);
     struct Closure {
       const Engine::OperatorEntry* creation=nullptr;
       const Engine::OperatorEntry* bulla=nullptr;
@@ -2363,6 +2449,7 @@ public:
 };
 
 struct SelfEnergyNodeResult {
+  kugler::Correlators kugler;
   MatrixXd sigma;
   std::array<MatrixXd,2> sigma_by_topology;
   MatrixXd g;
@@ -3435,6 +3522,7 @@ private:
   {
     SelfEnergyNodeResult result;
     result.physical_enabled=true;
+    if (cix.kugler_estimators) result.kugler.ensure(workspace.rank(),workspace.channel_count());
     result.g=MatrixXd::Zero(workspace.rank(),workspace.channel_count());
     result.f00=MatrixXd::Zero(workspace.rank(),workspace.channel_count());
     result.f01=MatrixXd::Zero(workspace.rank(),workspace.channel_count());
@@ -3495,6 +3583,7 @@ private:
             result.g+=orbit_multiplicity*batch.values.g;
             result.f00+=orbit_multiplicity*batch.values.f00;
             result.f01+=orbit_multiplicity*batch.values.f01;
+            result.kugler.add(batch.values.kugler,orbit_multiplicity);
             result.nonempty_plans_by_topology[topology]+=
               batch.nonempty_pairs;
             completed+=owned_bath_pairs.size();
@@ -3532,6 +3621,7 @@ private:
       Allreduce(result.g,communicator);
       Allreduce(result.f00,communicator);
       Allreduce(result.f01,communicator);
+      for (auto& x:result.kugler.value) if (x.size()) Allreduce(x,communicator);
       std::uint64_t local[2]={result.nonempty_plans_by_topology[0],
                               result.nonempty_plans_by_topology[1]};
       std::uint64_t global[2]={};
@@ -3559,6 +3649,7 @@ private:
   {
     SelfEnergyNodeResult result;
     result.physical_enabled=true;
+    if (cix.kugler_estimators) result.kugler.ensure(workspace.rank(),workspace.channel_count());
     result.g=MatrixXd::Zero(workspace.rank(),workspace.channel_count());
     result.f00=MatrixXd::Zero(workspace.rank(),workspace.channel_count());
     result.f01=MatrixXd::Zero(workspace.rank(),workspace.channel_count());
@@ -3627,6 +3718,7 @@ private:
       result.g+=orbit_multiplicity*batch.values.g;
       result.f00+=orbit_multiplicity*batch.values.f00;
       result.f01+=orbit_multiplicity*batch.values.f01;
+            result.kugler.add(batch.values.kugler,orbit_multiplicity);
       if (first==0)
         result.nonempty_plans_by_topology[item.topology]+=
           batch.nonempty_pairs;
@@ -3640,6 +3732,7 @@ private:
     Allreduce(result.g,communicator);
     Allreduce(result.f00,communicator);
     Allreduce(result.f01,communicator);
+      for (auto& x:result.kugler.value) if (x.size()) Allreduce(x,communicator);
     std::uint64_t local[2]={result.nonempty_plans_by_topology[0],
                             result.nonempty_plans_by_topology[1]};
     std::uint64_t global[2]={};
@@ -3946,6 +4039,7 @@ public:
       Allreduce(result.g,communicator);
       Allreduce(result.f00,communicator);
       Allreduce(result.f01,communicator);
+      for (auto& x:result.kugler.value) if (x.size()) Allreduce(x,communicator);
     }
     if (keep_individual_cuts) {
       for (auto& cut:result.cuts) Allreduce(cut,communicator);

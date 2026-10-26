@@ -358,7 +358,13 @@ Use a separate test directory or check timestamps to avoid mixing runs.
 - Logs include all six Phi contributions, cut-sum checks, D/F C4-orbit
   differences, phase progress and per-iteration `t(FCA)`.
 
-Topology/cut files require `fca_store_self_diagnostics=true` (reference default).
+Topology/cut files require `fca_store_self_diagnostics=true` (opt-in;
+the default is false). The aggregate `aStval.4` and `ag00.4` files are
+written regardless of this diagnostic setting. For analytic imaginary-axis
+`N_min_order=Norder=4`, `fca_lagged` now defaults to true; the separate
+`Skugler.out` estimator is enabled by default when its analytic-order and
+unpruned matrix-OCA requirements are met. Explicit PARAMS values override
+these defaults.
 Physical files are written only on measurement iterations. As with the older
 orders, these filenames describe the latest evaluation, not iteration archives.
 The cut files ALREADY include the topology symmetry factor. Their sum is the

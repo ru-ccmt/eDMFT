@@ -1,6 +1,7 @@
 // Compact DLR/AAA evaluation plans for imaginary-axis OCA diagrams.
 #ifndef EDMFT_OCA_DLR_H
 #define EDMFT_OCA_DLR_H
+#include "kugler.h"
 
 #include "imag_axis_dlr.h"
 #include "oca_dlr_types.h"
@@ -550,6 +551,7 @@ struct PhysicalResult {
   MatrixXd g;
   MatrixXd f00;
   MatrixXd f01;
+  edmft::kugler::Correlators kugler;
 };
 
 // Compact evaluator for the physical Green function and the two Bulla

@@ -445,6 +445,7 @@ inline Decorations decorate(const Workspace& w,const fca::Cut& cut,
 }
 
 struct Result {
+  kugler::Correlators kugler;
   MatrixXd sigma,g,f00,f01;
   std::array<MatrixXd,6> sigma_topology;
   std::array<std::array<MatrixXd,8>,6> sigma_cut;
@@ -1904,7 +1905,7 @@ public:
     const auto accumulate=[&](std::size_t k,const Physical::Result& value) {
       const auto& orbit=family[k]; const double count=orbit.members.size();
       auto& target=output[orbit.topology];
-      target.g+=count*value.g; target.f00+=count*value.f00; target.f01+=count*value.f01;
+      target.g+=count*value.g; target.f00+=count*value.f00; target.f01+=count*value.f01; target.kugler.add(value.kugler,count);
     };
     if (!options.physical_ef_shared || !options.physical_reuse || !options.physical_shared_bytes) {
       for (std::size_t k=0;k<family.size();++k)
@@ -1991,7 +1992,15 @@ public:
         if (options.shared_boundary && options.physical_ef_boundary && accumulate_shared_boundary(
             mirrored ? right : *pair.left,mirrored ? *pair.left : right,
             factor,output[topology],boundary,boundary_bytes,options.boundary_cache_bytes,
-            &boundary_profile,mirrored)) return;
+            &boundary_profile,mirrored)) {
+          if (cix.kugler_estimators) for (int external=0;external<cix.Nbath;++external) {
+            const int channel=cix.bath_sigind0(external);
+            Physical::AccumulateKugler(*pair.left,right,operators[2*external],
+              operators[2*external+1],factor*tca_dlr::SignedIndexSign(channel),
+              std::abs(channel),Physical::IsF01Channel(cix,external),output[topology].kugler);
+          }
+          return;
+        }
         for (int external=0;external<cix.Nbath;++external) {
           const int channel=cix.bath_sigind0(external);
           Physical::AccumulateBoundaryEstimators(*pair.left,right,
@@ -2109,7 +2118,7 @@ public:
         const auto value=physical_nodes(orbit.topology,external,bits,mapped,options);
         auto& target=output[topology_totals ? orbit.topology : k];
         const double count=topology_totals ? orbit.members.size() : 1.;
-        target.g+=count*value.g; target.f00+=count*value.f00; target.f01+=count*value.f01;
+        target.g+=count*value.g; target.f00+=count*value.f00; target.f01+=count*value.f01; target.kugler.add(value.kugler,count);
       }
       return output;
     }
@@ -2365,7 +2374,15 @@ public:
           auto& target=output[topology_totals ? t : k];
           const double factor=weight*fca::symmetry[t]*fca::crossing_sign[t]*member_scale(k);
           if (options.shared_boundary && accumulate_shared_boundary(*left,*right,factor,
-                  target,boundaries,boundary_bytes,options.boundary_cache_bytes,profile)) continue;
+                  target,boundaries,boundary_bytes,options.boundary_cache_bytes,profile)) {
+            if (cix.kugler_estimators) for (int external=0;external<cix.Nbath;++external) {
+              const int channel=cix.bath_sigind0(external);
+              Physical::AccumulateKugler(*left,*right,operators[2*external],
+                operators[2*external+1],factor*tca_dlr::SignedIndexSign(channel),
+                std::abs(channel),Physical::IsF01Channel(cix,external),target.kugler);
+            }
+            continue;
+          }
           if (options.shared_boundary && profile) ++profile->boundary_fallbacks;
           SectionTimer boundary_timer(profile ? &profile->boundary_reference_seconds : nullptr);
           // Preserve all external bath channels and the creation boundary at
@@ -3360,7 +3377,7 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
         const auto values=evaluator.physical_family_topologies(physical_family,id/triples,poles(id),options,&counters);
         for (int t=0;t<6;++t) {
           auto& target=r.physical_topology[t];
-          target.g+=values[t].g; target.f00+=values[t].f00; target.f01+=values[t].f01;
+          target.g+=values[t].g; target.f00+=values[t].f00; target.f01+=values[t].f01; target.kugler.add(values[t].kugler);
           if (options.live_profile) {
             sample.g_norm+=values[t].g.norm();
             sample.f00_norm+=values[t].f00.norm();
@@ -3402,6 +3419,7 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
           r.physical_topology[t].g+=values[t].g;
           r.physical_topology[t].f00+=values[t].f00;
           r.physical_topology[t].f01+=values[t].f01;
+          r.physical_topology[t].kugler.add(values[t].kugler);
           if (options.live_profile) {
             sample.g_norm+=values[t].g.norm();
             sample.f00_norm+=values[t].f00.norm();
@@ -3434,6 +3452,7 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
       r.physical_topology[topology].g+=multiplicity*value.g;
       r.physical_topology[topology].f00+=multiplicity*value.f00;
       r.physical_topology[topology].f01+=multiplicity*value.f01;
+      r.physical_topology[topology].kugler.add(value.kugler,multiplicity);
       if (options.live_profile) {
         sample.g_norm=multiplicity*value.g.norm();
         sample.f00_norm=multiplicity*value.f00.norm();
@@ -3497,6 +3516,9 @@ inline Result evaluate(const Cix& cix,const Workspace& w,bool physical,
     if (physical) {
       auto& v=r.physical_topology[t];
       reduce(v.g); reduce(v.f00); reduce(v.f01);
+      if (cix.kugler_estimators) v.kugler.ensure(w.rank(),w.channel_count());
+      for (auto& x:v.kugler.value) if (x.size()) reduce(x);
+      r.kugler.add(v.kugler);
       r.g+=v.g; r.f00+=v.f00; r.f01+=v.f01;
     }
   }

@@ -174,7 +174,7 @@ inline oca_dlr::CombinedResult evaluate(const Cix& cix,
     if (cut<4) sigma+=evaluator.self_nodes(cut/2,cut%2,pole,bath);
     else {
       const auto x=evaluator.physical_nodes(cut-4,pole,bath);
-      phys.g+=x.g; phys.f00+=x.f00; phys.f01+=x.f01;
+      phys.g+=x.g; phys.f00+=x.f00; phys.f01+=x.f01; phys.kugler.add(x.kugler);
     }
     ++completed;
     const auto now=Clock::now();
@@ -187,6 +187,7 @@ inline oca_dlr::CombinedResult evaluate(const Cix& cix,
       last=now;
     }
   }
+  if (physical && cix.kugler_estimators) phys.kugler.ensure(w.rank(),w.channel_count());
   const auto reduce_start=Clock::now();
   double work_min[2]={self_seconds,physical_seconds};
   double work_max[2]={self_seconds,physical_seconds};
@@ -199,6 +200,10 @@ inline oca_dlr::CombinedResult evaluate(const Cix& cix,
         MPI_Allreduce(MPI_IN_PLACE,matrix->data()+offset,n,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
         offset+=n;
       }
+    }
+    for (auto& matrix:phys.kugler.value) for (Eigen::Index offset=0;offset<matrix.size();) {
+      const int n=static_cast<int>(std::min<Eigen::Index>(matrix.size()-offset,100000000));
+      MPI_Allreduce(MPI_IN_PLACE,matrix.data()+offset,n,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD); offset+=n;
     }
     MPI_Allreduce(MPI_IN_PLACE,work_min,2,MPI_DOUBLE,MPI_MIN,MPI_COMM_WORLD);
     MPI_Allreduce(MPI_IN_PLACE,work_max,2,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
@@ -215,6 +220,8 @@ inline oca_dlr::CombinedResult evaluate(const Cix& cix,
   oca_dlr::CombinedResult result;
   result.sigma=dense(sigma);
   if (physical) result.physical={dense(phys.g),dense(phys.f00),dense(phys.f01)};
+  if (physical && !phys.kugler.empty())
+    for (int i=0;i<6;++i) result.physical.kugler.value[i]=dense(phys.kugler.value[i]);
   if (rank==0 && log) *log<<"OCA matrix done: evaluate_seconds="
     <<std::chrono::duration<double>(Clock::now()-start).count()
     <<" self_work_seconds_range=["<<work_min[0]<<","<<work_max[0]<<"]"

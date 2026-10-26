@@ -47,6 +47,61 @@ public:
   // legacy spline/uniform-mesh OCA remains the production result until the
   // comparisons below are accepted for all target problems.
   bool aaa_adapter_enabled=false, dlr_adapter_enabled=false;
+  edmft::kugler::Correlators kugler_tau; // channels x dense tau, positive-sign convention
+  Eigen::MatrixXd kugler_hartree; // two endpoint sectors, from the atomic density matrix
+
+  void AddKuglerDense(const edmft::kugler::Correlators& dense,double Q) {
+    if (!cix.kugler_estimators) return;
+    if (dense.empty()) throw std::logic_error("missing analytic Kugler correlators");
+    const int nt=dense.value[0].cols();
+    kugler_tau.ensure(cix.Nbath_unique_unique,nt);
+    std::vector<int> deg(cix.Nbath_unique_unique,0);
+    std::vector<bool> sc(cix.Nbath_unique_unique,false);
+    for (int b=0;b<cix.Nbath;++b) {
+      const int s=std::abs(cix.bath_sigind0(b)); ++deg[s];
+      sc[s]=cix.SC_bath(b);
+    }
+    for (int s=0;s<cix.Nbath_unique_unique;++s) {
+      if (!deg[s]) continue;
+      const double norm=(sc[s] ? 2. : 1.)/(Q*deg[s]);
+      for (int i=0;i<6;++i) kugler_tau.value[i].row(s)+=norm*dense.value[i].row(s);
+    }
+  }
+
+  // NCA has no internal integrals: reconstruct its two arcs exactly on the
+  // original dense mesh, so the Hartree term uses the same atomic density
+  // matrix as DeterminePseudos, rather than an extrapolated frequency tail.
+  void NCAKugler(const Array<double,1>& mesh,const Array<double,2>& pp,double Q) {
+    using Physical=edmft::tca_dlr::SummedPhysicalEvaluator;
+    using Engine=Physical::Engine;
+    const int nt=mesh.extent(0);
+    Engine::SparseFunction first,second;
+    for (int b=0;b<cix.Nblock;++b) {
+      const int n=cix.Block[b].size();
+      auto& a=first[{b,b}]; auto& r=second[{b,b}];
+      a.assign(nt,Eigen::MatrixXd::Zero(n,n)); r=a;
+      for (int i=0;i<n;++i) for (int j=0;j<n;++j) {
+        const int p=cix.Sgm_symmetry[b](i,j);
+        if (!p) continue;
+        for (int t=0;t<nt;++t) {
+          a[t](i,j)=(p<0 ? -1. : 1.)*pp(std::abs(p)-1,t);
+          r[t](i,j)=(p<0 ? -1. : 1.)*pp(std::abs(p)-1,nt-1-t);
+        }
+      }
+    }
+    edmft::kugler::Correlators nodes; nodes.ensure(nt,cix.Nbath_unique_unique);
+    for (int b=0;b<cix.Nbath;++b)
+      Physical::AccumulateKugler(first,second,Engine::MakeOperatorTranspose(cix,2*b),
+        Engine::MakeOperatorTranspose(cix,2*b+1),cix.bath_sigind0(b)<0 ? -1. : 1.,
+        std::abs(cix.bath_sigind0(b)),Physical::IsF01Channel(cix,b),nodes);
+    edmft::kugler::Correlators dense;
+    for (int i=0;i<6;++i) dense.value[i]=nodes.value[i].transpose();
+    AddKuglerDense(dense,Q);
+    kugler_hartree.resize(2,cix.Nbath_unique_unique);
+    for (int s=0;s<cix.Nbath_unique_unique;++s) for (int k=0;k<2;++k)
+      kugler_hartree(k,s)=kugler_tau.value[k](s,0)+kugler_tau.value[k](s,nt-1);
+  }
+
 
   // AAA objects have distinct roles. aaa_result is the barycentric fit used
   // to discover poles; aaa_hybridization is the real-pole partial-fraction
@@ -1173,8 +1228,10 @@ public:
   }
   double NCA(Array<double,2>& Sm_new, Array<double,2>& G00t, Array<double,2>& F00t, Array<double,2>& F01t,
 	     double cmpPhysG, double Q, const Array<double,1>& tau, const Array<double,2>& Gm, Cix& cix, MPIcls& mpi){
+    kugler_tau.clear(); kugler_hartree.resize(0,0);
     double phi = I_NCA(Sm_new,G00t,F00t,F01t,
 		       cmpPhysG,Q,beta,tau,tau_dh,Gm,Delta,cix,mpi);
+    if (cmpPhysG && cix.kugler_estimators) NCAKugler(tau,Gm,Q);
     return phi;
   }
   double OCA(Array<double,2>& dSm, Array<double,2>& G00t, Array<double,2>& F00t, Array<double,2>& F01t,
@@ -1261,6 +1318,8 @@ public:
     const bool bounded_physical=cmpPhysG && use_dlr && !run_legacy &&
       (physical_mode=="batched" ||
        (physical_mode=="auto" && cix.Npseudo_unique>=4096));
+    if (cix.kugler_estimators && !matrix_oca)
+      throw std::invalid_argument("kugler requires the unpruned block-matrix OCA backend");
     if (bounded_physical || matrix_oca) {
       // Release the preceding iterations' full plans BEFORE enumeration.
       // No batch is retained here: only small global output-node arrays live
@@ -1313,6 +1372,7 @@ public:
         }
       phi/=Q;
       if (!cmpPhysG) return phi;
+      if (cix.kugler_estimators) AddKuglerDense(result.physical.kugler,Q);
       // Same Q, bath-degeneracy, signed Sigind, and Nambu Bulla conventions
       // as the full-plan branch below. Only integration/storage is changed.
       std::vector<double> bath_degeneracy(cix.Nbath_unique_unique,0.0);
@@ -1959,8 +2019,8 @@ public:
       pars["tca_root_sum_min_baths"].get<int>();
     if (root_sum_min_baths<1)
       throw std::invalid_argument("tca_root_sum_min_baths must be positive");
-    const bool root_sum=pars["tca_root_sum"].get<bool>() &&
-                        cix.Nbath>=root_sum_min_baths;
+    const bool root_sum=cix.kugler_estimators || (pars["tca_root_sum"].get<bool>() &&
+                        cix.Nbath>=root_sum_min_baths);
     const bool store_self_diagnostics=
       pars["tca_store_self_diagnostics"].get<bool>();
     const bool topology_b_self_c3=pars["tca_self_c3"].get<bool>();
@@ -2022,6 +2082,7 @@ public:
           result.g=std::move(physical.g);
           result.f00=std::move(physical.f00);
           result.f01=std::move(physical.f01);
+          result.kugler=std::move(physical.kugler);
           result.physical_enabled=true;
         }
       } else {
@@ -2349,6 +2410,11 @@ public:
     F00t.resize(cix.Nbath_unique,output_tau.extent(0)); F00t=0.0;
     F01t.resize(cix.Nbath_unique,output_tau.extent(0)); F01t=0.0;
     if (cmpPhysG) {
+      if (cix.kugler_estimators) {
+        edmft::kugler::Correlators dense;
+        for (int i=0;i<6;++i) dense.value[i]=to_dense(compact.kugler.value[i]);
+        AddKuglerDense(dense,Q);
+      }
       const Eigen::MatrixXd g=to_dense(compact.g);
       const Eigen::MatrixXd f00=to_dense(compact.f00);
       const Eigen::MatrixXd f01=to_dense(compact.f01);
@@ -2628,6 +2694,11 @@ public:
       }
     };
     physical_dense(result.g,result.f00,result.f01,G00t,F00t,F01t);
+    if (cmpPhysG && cix.kugler_estimators) {
+      edmft::kugler::Correlators values;
+      for (int i=0;i<6;++i) values.value[i]=dense(result.kugler.value[i]);
+      AddKuglerDense(values,Q);
+    }
     if (diagnostics && cmpPhysG && mpi.rank==mpi.master)
       for (int t=0;t<6;++t) {
         Array<double,2> g,f,h;
@@ -2743,6 +2814,33 @@ public:
 	}
       }
     }
+    if (cix.kugler_estimators) {
+      if (kugler_tau.empty() || kugler_tau.value[0].cols()!=tau.extent(0) ||
+          kugler_hartree.cols()!=cix.Nbath_unique_unique)
+        throw std::logic_error("incomplete Kugler physical measurement");
+    }
+    std::array<Eigen::MatrixXcd,6> kfreq;
+    if (cix.kugler_estimators) {
+      const int nc=cix.Nbath_unique_unique;
+      Spline1DMany auxiliary(tau.extent(0),6*nc);
+      for (int t=0;t<tau.extent(0);++t) for (int a=0;a<6;++a)
+        for (int s=0;s<nc;++s) auxiliary(t,a*nc+s)=-kugler_tau.value[a](s,t);
+      auxiliary.splineIt(tau);
+      for (auto& x:kfreq) x.resize(nc,iom.extent(0));
+      Array<complex<double>,1> transformed(6*nc);
+      for (int iw=0;iw<iom.extent(0);++iw) {
+        auxiliary.Fourier(transformed,iom(iw));
+        for (int a=0;a<6;++a) for (int s=0;s<nc;++s)
+          kfreq[a](s,iw)=transformed(a*nc+s);
+      }
+    }
+    Array<complex<double>,2> SigK;
+    if (cix.kugler_estimators) { SigK.resize(cix.Nbath_unique_unique,iom.extent(0)); SigK=0; }
+    const auto kugler_matrix=[&](int block,int kind,int iw,bool hartree=false) {
+      return edmft::kugler::reconstruct(cix,bb,block,kind,hartree,[&](int a,int channel) {
+        return hartree ? complex<double>(kugler_hartree(a%2,channel),0.) : kfreq[a](channel,iw);
+      });
+    };
     Sigm.resize(cix.Nbath_unique_unique,iom.extent(0)); Sigm=0;
     Array<complex<double>,2> SigB(cix.Nbath_unique_unique,iom.extent(0)); SigB=0;
     Array<complex<double>,2> SigD(cix.Nbath_unique_unique,iom.extent(0)); SigD=0;
@@ -2791,6 +2889,12 @@ public:
 	      //SigB(iib,Range::all())  = 0.5*(Fc1(iib,Range::all())+Fc2(iib,Range::all()))/Gc(iib,Range::all());
 	      SigB(iib,Range::all())  = Fc1(iib,Range::all())/Gc(iib,Range::all());
 	      E_inf_scalar = Eimp*ib_sg + std::real(SigB(iib,ilast))*ib_sg;
+              if (cix.kugler_estimators) for (int iw=0;iw<iom.extent(0);++iw) {
+                const Eigen::MatrixXcd green=Eigen::MatrixXcd::Constant(1,1,ib_sg*Gc(iib,iw));
+                const auto sk=edmft::kugler::self_energy(kugler_matrix(ib,0,iw,true),
+                  kugler_matrix(ib,2,iw),kugler_matrix(ib,1,iw),green,kugler_matrix(ib,0,iw));
+                SigK(iib,iw)=ib_sg*sk(0,0);
+              }
 	      SigD(iib,Range::all()) = -1.0/Gc(iib,Range::all())*ib_sg-iDeltaw(iib,Range::all())*ib_sg-Eimp*ib_sg+iom(Range::all())*j;
 	      for (int iw=0; iw<iom.size(); ++iw){
 		const double W = bulla_weight(iom(iw));
@@ -2948,6 +3052,10 @@ public:
 	  }
 	  MatrixXcd Gminv = Gm.inverse();         // Gm^{-1}
 	  MatrixXcd SmB   = Gminv * Fm;           // Bulla/EOM estimator: SmB = Gm^{-1} * Fm
+          MatrixXcd SmK;
+          if (cix.kugler_estimators) SmK=edmft::kugler::self_energy(
+            kugler_matrix(ib,0,iw,true),kugler_matrix(ib,2,iw),
+            kugler_matrix(ib,1,iw),Gm,kugler_matrix(ib,0,iw));
 	  MatrixXcd SmD   = om_Eimp - Gminv - Dm; // Dyson: Σ = (ω - E_imp) - G^{-1} - Δ
 	  
 	  if (mpi.rank==mpi.master){
@@ -3006,6 +3114,7 @@ public:
 		Sigm(iib,iw) = Sm(j,k)*ib_sg;  // just find the first occurence of this component.
 		SigB(iib,iw) = SmB(j,k)*ib_sg;
 		SigD(iib,iw) = SmD(j,k)*ib_sg;
+                if (cix.kugler_estimators) SigK(iib,iw)=SmK(j,k)*ib_sg;
 		Gcn(iib,iw) = Gmc(j,k)*ib_sg;
 		//cout<<"Sigm["<<iib<<","<<iw<<"]= Sm["<<j<<","<<k<<"]*"<<ib_sg<<endl;
 		component_set[iib] = true;
@@ -3080,6 +3189,7 @@ public:
     Gc = Gcn; // Be careful. Gc becomes 1/(om-Eimp-Sigma-Delta)
     if (mpi.rank==mpi.master){
       Print_Physical1("Sbulla.out", SigB);
+      if (cix.kugler_estimators) Print_Physical1("Skugler.out", SigK);
       Print_Physical1(dysonFname+"out", SigD);
     }
     /*
