@@ -141,7 +141,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   
   !----------- Actual reading of the self-energy -------------!
   do icix=1,ncix
-     CALL ReadSelfenergy(fh_sig+icix, sigma(:,icix,:), omega, s_oo(:,icix), gammac, csize(icix), nomega, maxsize)
+     CALL ReadSelfenergy(fh_sig+icix, sigma(:,icix,:), omega, s_oo(:,icix), gammac, csize(icix), nomega, maxsize, Sigind(:,:,icix), maxdim)
   enddo
   
   !--------------  change from eV to Rydbergs --------------------------!

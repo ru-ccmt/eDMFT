@@ -22,15 +22,31 @@ FUNCTION CountSelfenergy(fh_sig, ncorr)
   RETURN
 END FUNCTION CountSelfenergy
 
-SUBROUTINE ReadSelfenergy(fh_sig, sigma, omega, s_oo, gammac, ncorr, nom, maxsize)
+SUBROUTINE ReadSelfenergy(fh_sig, sigma, omega, s_oo, gammac, ncorr, nom, maxsize, Sigind, maxdim)
   IMPLICIT NONE
-  INTEGER, intent(in)     :: fh_sig, ncorr, nom, maxsize
+  INTEGER, intent(in)     :: fh_sig, ncorr, nom, maxsize, maxdim
+  INTEGER, intent(in)     :: Sigind(maxdim,maxdim)
   REAL*8, intent(out)     :: omega(nom)
   REAL*8, intent(in)      :: gammac
   COMPLEX*16, intent(out) :: sigma(maxsize,nom), s_oo(maxsize)
   ! locals
   REAL*8 :: sigma_vec(2*ncorr), ome
-  INTEGER:: ios, iom, i
+  INTEGER:: ios, iom, i, j, label
+  LOGICAL :: broaden_component(ncorr)
+  ! Preserve the historical floor only for exclusively diagonal components.
+  ! A shared diagonal/off-diagonal label cannot be broadened independently.
+  broaden_component = .FALSE.
+  DO i=1,maxdim
+     label = ABS(Sigind(i,i))
+     IF (label.GT.0.AND.label.LE.ncorr) broaden_component(label) = .TRUE.
+  ENDDO
+  DO j=1,maxdim
+     DO i=1,maxdim
+        IF (i.EQ.j) CYCLE
+        label = ABS(Sigind(i,j))
+        IF (label.GT.0.AND.label.LE.ncorr) broaden_component(label) = .FALSE.
+     ENDDO
+  ENDDO
   sigma=0
   ios=0
   DO iom=1,nom
@@ -42,7 +58,7 @@ SUBROUTINE ReadSelfenergy(fh_sig, sigma, omega, s_oo, gammac, ncorr, nom, maxsiz
      endif
      omega(iom) = ome
      DO i=1,ncorr
-        IF (ABS(sigma_vec(2*i)).LT.gammac) sigma_vec(2*i) = -gammac ! Set minimum broadening for correlated orbitals
+        IF (broaden_component(i).AND.ABS(sigma_vec(2*i)).LT.gammac) sigma_vec(2*i) = -gammac
         sigma(i,iom) = dcmplx(sigma_vec(2*i-1),sigma_vec(2*i))
      ENDDO
   ENDDO

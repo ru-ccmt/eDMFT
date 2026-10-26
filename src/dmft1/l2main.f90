@@ -350,7 +350,7 @@ SUBROUTINE L2MAIN(Qcomplex,nsymop,mode,projector,Qrenormalize,fUdmft)
         if (icix>1) pre_cix = sum(csize(:icix-1))
         istart = pre_cix+1
         iend   = pre_cix+csize(icix)
-        CALL ReadSelfenergy(fh_sig+icix, sigma2(istart:iend,:), omega, s_oo(istart:iend), gammac, csize(icix), nomega, csize(icix))
+        CALL ReadSelfenergy(fh_sig+icix, sigma2(istart:iend,:), omega, s_oo(istart:iend), gammac, csize(icix), nomega, csize(icix), Sigind(:,:,icix), maxdim)
         !sigma_brisi(:csize(icix),icix,:) = sigma2(istart:iend,:)
         !s_oo_brisi(:csize(icix),icix) = s_oo(istart:iend)
      enddo

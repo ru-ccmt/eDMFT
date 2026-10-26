@@ -85,7 +85,7 @@ SUBROUTINE cmpLogGdloc(logG, eimp_nd, eimp_nd2, DeltaG, forb, TrGSigVdc, Gdloc, 
   !if (nipc.eq.4) then
   do icix=1,ncix
      rewind(fh_sig+icix)
-     CALL ReadSelfenergy(fh_sig+icix, sigma0(:,icix,:), omega, s_oo(:,icix), 0.d0, csize(icix), nomega, maxsize)
+     CALL ReadSelfenergy(fh_sig+icix, sigma0(:,icix,:), omega, s_oo(:,icix), 0.d0, csize(icix), nomega, maxsize, Sigind(:,:,icix), maxdim)
      do it=1,maxsize
         sigma0(it,icix,:) = sigma0(it,icix,:)-s_oo(it,icix)
      enddo
