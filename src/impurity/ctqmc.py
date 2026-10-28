@@ -5,7 +5,7 @@ import sys, re, os, glob, shutil, types
 from numpy import *
 from scipy import interpolate
 from utils import DmftEnvironment
-from cmpEimp2 import GiveImpFunctional
+from cmpEimp2 import GiveImpFunctional, ReadBoldCix, BoldAtomicEnergy
 import brod  # should be replaced by system call
 import subprocess
 import dmft_DC
@@ -389,6 +389,8 @@ class IMP_CTQMC:
                sinf[b]      -- DMFT self-energy at infinity
                Edc[b]       -- double counting using DMFT occupancies
         """
+        global TrSigmaG
+        preserve_solver = False
         if kbroad>0.0 or wbroad>0.0:
             bexe = self.env.ROOT + '/broad'
             shutil.move(self.dir+self.sparams['Sig'], self.dir+self.sparams['Sig']+'b')
@@ -401,16 +403,30 @@ class IMP_CTQMC:
         for i in range(len(Sigind)):
             for j in range(len(Sigind)):
                 if Sigind[i,j]>0:
-                    self.Diagonal[Sigind[i,j]-1]= (i==j)
+                    label = Sigind[i,j]-1
+                    self.Diagonal[label] = self.Diagonal.get(label, False) or (i==j)
                     if i!=j: OffDiagonalExist = True
 
         # Reading Self-energy of the impurity
-        Sg_data = loadtxt(self.dir + self.sparams['Sig']).T
+        Sg_data = loadtxt(self.dir + self.sparams['Sig'], ndmin=2).T
+        if (Sg_data.shape[0] != 1+2*len(self.Diagonal) or
+                not isfinite(Sg_data).all()):
+            raise ValueError("Impurity self-energy columns do not match Sigind or contain non-finite values")
         om = Sg_data[0]
         Sigo = Sg_data[1::2,:]+Sg_data[2::2,:]*1j
         
-        # Computing self-energy in alternative way to keep off-diagonal components of self-energy forcing G_{loc}=G_{imp} exactly
-        if (self.sparams['OffDiagonal'] and OffDiagonalExist):
+        # Reconstruct only when the impurity omits matrix channels. Preserve
+        # complete matrix output, including for legacy CIX matrix bath blocks.
+        if OffDiagonalExist and not preserve_solver:
+            provided = self._impurity_green_channels()
+            ind = [i for i in range(len(Sigind)) if Sigind[i,i] > 0]
+            required = {int(Sigind[i,j])-1 for i in ind for j in ind if Sigind[i,j] > 0}
+            if required.issubset(provided):
+                self.SigmaOffDiagonal(om, Sigo, 0.0, 0.0)  # validate full Gf.out
+                preserve_solver = True
+                print("Using complete impurity matrix self-energy directly; "
+                      "skipping lattice reconstruction and automatic clipping", file=self.fh_info)
+        if (not preserve_solver and self.sparams['OffDiagonal'] and OffDiagonalExist):
             Sign = self.SigmaOffDiagonal(om,Sigo,wbroad,kbroad)
             if Sign is not None: Sigo = Sign
 
@@ -422,10 +438,19 @@ class IMP_CTQMC:
             m = re.search('nf=', par) or re.search('TrSigmaG=', par) or re.search('mom=', par)
             if m is not None : exec(par, globals())
         ntot = nf
+        layout = ReadBoldCix(os.path.join(self.dir, self.sparams.get('cix', 'actqmc.cix')))
+        if layout is not None:
+            # The Bold atomic and Matsubara density estimators need not agree.
+            # Keep the atomic energy and its density together in DMFT outputs.
+            metadata = dict(token.split('=', 1) for token in adat if '=' in token)
+            ntot = float(metadata['nd'])
+            TrSigmaG = BoldAtomicEnergy(layout, mom, float(metadata['Epot']))
+            print('Using Bold atomic occupancy=', ntot,
+                  'and atomic interaction energy=', TrSigmaG, file=self.fh_info)
         print('From impurity Sigma: nf=', nf, 'TrSigmaG=', TrSigmaG, 'mom=', mom, file=self.fh_info)
         
         for b in range(shape(Sigo)[0]):   #print b, 'This is diagonal bath, correcting it'
-            if self.Diagonal[b]:
+            if self.Diagonal[b] and not preserve_solver:
                 for iom in range(shape(Sigo)[1]):
                     if Sigo[b,iom].imag>0: # violates causality, correct it.
                         print('Disregarding non-causal self-energy at Sig['+str(b)+','+str(iom)+']=',Sigo[b,iom], file=self.fh_info)
@@ -473,18 +498,41 @@ class IMP_CTQMC:
                 nf_ = nl_imp
             print('Here we have nl_imp=', nf_, file=self.fh_info)
             print('lmbda=', lmbda, 'epsilon=', epsilon, file=self.fh_info)
-            (Edc0,Phidc0)=dmft_DC.ComputeExactDC(nf_, lmbda, epsilon, self.icase, self.fh_info, projector='projectorw.dat',trans=self.dir+'Trans.dat')
+            # Exact DC uses diagonal occupations only. Component labels in
+            # Trans.dat also include off-diagonal density-matrix entries.
+            # Lattice occupations can instead be a compact diagonal-only list.
+            diagonal = flatnonzero(DC_ones)
+            density = asarray(nf_, dtype=float)
+            diagonal_density = zeros(len(Edc_old))
+            if density.ndim != 1:
+                raise ValueError("Exact DC requires a vector of diagonal occupations")
+            if len(density) == len(Edc_old):
+                diagonal_density[diagonal] = density[diagonal]
+            elif len(density) == len(diagonal):
+                diagonal_density[diagonal] = density
+            else:
+                raise ValueError("Exact DC occupation count does not match Sigind")
+            nf_ = diagonal_density
+            print('Exact DC diagonal occupations=', nf_, 'total=', sum(nf_), file=self.fh_info)
+            (diagonal_edc,Phidc0)=dmft_DC.ComputeExactDC(nf_, lmbda, epsilon, self.icase, self.fh_info, projector='projectorw.dat',trans=self.dir+'Trans.dat')
+            # ComputeExactDC returns labels through the largest diagonal label.
+            # Expand by label, never by the ordering of dictionary entries.
+            diagonal_edc = asarray(diagonal_edc, dtype=float)
+            if diagonal.size and diagonal[-1] >= len(diagonal_edc):
+                raise ValueError("Exact DC potential count does not match diagonal Sigind labels")
+            Edc0 = zeros(len(Edc_old))
+            Edc0[diagonal] = diagonal_edc[diagonal]
             print('The Exact Double-counting is: Vdc=', Edc0, 'PhiDC=', Phidc0, file=self.fh_info)
 
         elif DCs=='FLL' or DCs=='default' or DCs=='FLL_l':
-            nf_ = nf
+            nf_ = ntot
             if DCs=='FLL_l' and nf_: 
                 nf_ = sum(nl_imp)
             # This is the fully localized limit double-counting by Anisimov
             Edc0 = DC_ones*( Ud*(nf_-0.5) - Jd*(nf_/2.-0.5) )
             Phidc0 = Ud*0.5*nf_*(nf_-1.) - Jd*0.25*nf_*(nf_-2.)
         elif DCs=='AMF':
-            nf_ = nf
+            nf_ = ntot
             if DCs=='AMF_l' and nf_: 
                 nf_ = sum(nl_imp)
             Ueff = Ud*(1-1./(2.*(2.*self.l+1.))) - Jd*self.l/(2*self.l+1.)
@@ -504,9 +552,14 @@ class IMP_CTQMC:
             Phidc0 += sum([params['dDC'][0][i]*nf_[i] for i in range(len(nf_))])
             print('The Double-counting corrected to: Vdc=', Edc0, 'PhiDC=', Phidc0, file=self.fh_info)
 
-        Edc = Edc_old # we want to keep Edc<-1000 for orbitals which are projected out!
+        # Double counting has no off-diagonal-only components, including
+        # when a user-supplied dDC vector contains such entries.
+        Edc0 = asarray(Edc0, dtype=float) * DC_ones
+        Edc = copy(Edc_old) # keep the sentinel for projected-out diagonal orbitals
         for i in range(len(Edc)):
-            if (Edc_old[i]>-1000.): # this is true for all orbitals which are kept!
+            if not self.Diagonal[i]:
+                Edc[i] = 0.0
+            elif (Edc_old[i]>-1000.): # this is true for all orbitals which are kept!
                 Edc[i] = Edc0[i]
             else:                   # these orbitals are projected out -> we want to keep sinf=Edc for orbitals projected out!
                 sinf[i] = Edc[i]
@@ -621,12 +674,53 @@ class IMP_CTQMC:
         shutil.move(self.dir+'/Trans.dat_cluster', self.dir+'/Trans.dat')
         shutil.move(self.dir+'/link_actqmc.cix', self.dir+'/actqmc.cix')
         
+    def _impurity_green_channels(self):
+        """CIX-declared Gf.out channels; measured zeros are still available."""
+        cixfile = os.path.join(self.dir, self.sparams.get('cix', 'actqmc.cix'))
+        layout = ReadBoldCix(cixfile)
+        if layout is not None:
+            if builtins.any(not normal for a, b, channel, sign, conjugate, normal in layout[1]):
+                raise ValueError("Green-function reconstruction requires a normal-state CIX")
+            channels = {channel for a, b, channel, sign, conjugate, normal in layout[1]}
+        else:
+            # Legacy CIX bath blocks declare every measured matrix component.
+            channels = set()
+            with open(cixfile) as stream:
+                next(stream); next(stream)
+                nbaths = int(next(stream).split()[2])
+                next(stream)
+                for ib in range(nbaths):
+                    row = next(stream).split('#', 1)[0].split()
+                    dim = int(row[1])
+                    if int(row[0]) != ib or dim < 1 or len(row) < 2+dim*dim:
+                        raise ValueError("Invalid CIX bath block")
+                    channels.update(int(v) for v in row[2:2+dim*dim] if int(v) >= 0)
+        sigind = array(self.Sigind_shifted)
+        diagonal = {int(sigind[i, i])-1 for i in range(len(sigind)) if sigind[i, i] > 0}
+        if not diagonal.issubset(channels):
+            raise ValueError("CIX does not supply all correlated diagonal Green-function channels")
+        return channels
+
     def SigmaOffDiagonal(self,om,Sigo,wbroad,kbroad,fname='Glatt.imp'):
+        # Only absent impurity channels may be borrowed from the lattice.
+        provided = self._impurity_green_channels()
+        Sigind = array(self.Sigind_shifted)
+        ind = [i for i in range(len(Sigind)) if Sigind[i, i] > 0]
+        required = {int(Sigind[i, j])-1 for i in ind for j in ind if Sigind[i, j] > 0}
+        Gimp_dat = loadtxt(self.dir + '/' + self.sparams['Gf'], ndmin=2).T
+        if (Gimp_dat.shape[0] != 1+2*len(Sigo) or
+                not isfinite(Gimp_dat).all() or
+                Gimp_dat.shape[1] != len(om) or
+                not allclose(Gimp_dat[0], om, rtol=1e-10, atol=1e-11) or
+                not provided.issubset(set(range(len(Sigo))))):
+            raise ValueError("Impurity Green-function columns or mesh do not match self-energy channels")
+        if required.issubset(provided):
+            # Avoid interpolation and cancellation in Dyson inversion when complete.
+            return copy(Sigo)
         glatfile = self.dir + '/'+fname
         if not os.path.isfile(glatfile) or os.path.getsize(glatfile)==0: return None
         
         # Reading Gimp, Glatt, and Delta
-        Gimp_dat = loadtxt(self.dir + '/'+self.sparams['Gf'] ).T
         Glat_dat = loadtxt(glatfile).T
         Delta_dat = loadtxt(self.dir+'/Delta.imp').T
         # Two frequency meshes, logarithmic and linear
@@ -635,13 +729,18 @@ class IMP_CTQMC:
         om1 = Delta_dat[0]
         Glat = Glat_dat[1::2] + Glat_dat[2::2]*1j
         Delta = Delta_dat[1::2] + Delta_dat[2::2]*1j
+        if (Glat.shape != Delta.shape or len(Delta) != len(Sigo) or
+                not isfinite(Glat_dat).all() or not isfinite(Delta_dat).all() or
+                not allclose(Glat_dat[0], om1, rtol=1e-10, atol=1e-11) or
+                not all(diff(om0) > 0) or not all(diff(om1) > 0)):
+            raise ValueError("Lattice Green-function and hybridization channels or meshes disagree")
         # Find correspondence between linear and logarithmic mesh
         iom=0
         Gimp=[] # Gimp on logarithmic mesh
         for i in range(len(om1)):
             while (iom<len(om0) and om0[iom]-1e-6<om1[i] ): iom+=1
             if abs(om1[i]-om0[iom-1])>1e-4:
-                print('Problems! Can not find the correspondence between logarithmic and linear meshin Delta.imp and Gf.out!')
+                raise ValueError('Delta.imp frequencies are not present in the impurity Green-function mesh')
             Gimp.append( Gimp0[:,iom-1] )
         Gimp = array(Gimp).T
             
@@ -682,15 +781,17 @@ class IMP_CTQMC:
                 for j,jj in enumerate(ind):
                     if (Sigind[ii,jj]>0):
                         Dlt[i,j] = Delta[Sigind[ii,jj]-1,iom]
-                        Gc[i,j]  = Glat[Sigind[ii,jj]-1,iom]
-                    Gc[i,i] = Gimp[Sigind[ii,ii]-1,iom]
+                        channel = Sigind[ii,jj]-1
+                        Gc[i,j] = (Gimp[channel,iom] if channel in provided
+                                   else Glat[channel,iom])
                     
             Sigm = Id*(om1[iom]*1j)-Dlt-Eimp-Gc.I
             
             for i,ii in enumerate(ind):
                 for j,jj in enumerate(ind):
                     if (Sigind[ii,jj]>0):
-                        if (ii!=jj and self.sparams['OffDiagonal']=='real'):
+                        if (ii!=jj and Sigind[ii,jj]-1 not in provided
+                                and self.sparams['OffDiagonal']=='real'):
                             Sigma[Sigind[ii,jj]-1, iom] += real(Sigm[i,j])
                         else:
                             Sigma[Sigind[ii,jj]-1, iom] += Sigm[i,j]
@@ -719,7 +820,7 @@ class IMP_CTQMC:
             fSr = interpolate.UnivariateSpline(om1, Sigma[ib].real, s=0)
             fSi = interpolate.UnivariateSpline(om1, Sigma[ib].imag, s=0)
             Sg = fSr(om) + fSi(om)*1j
-            if not self.Diagonal[ib]:
+            if not self.Diagonal[ib] and ib not in provided:
                 Sg[nom:] *= exp(-(om[nom:]-om[nom]))
             Sign.append( Sg )
             

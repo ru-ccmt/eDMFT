@@ -1,0 +1,35 @@
+FCA accuracy presets (updated 2026-10-28)
+
+low:      4 hybridization poles, FCA DLR tolerance 1e-4
+modest:   5 hybridization poles, FCA DLR tolerance 1e-4
+high:     6 hybridization poles, FCA DLR tolerance 1e-5
+veryhigh: 6 hybridization poles, FCA DLR tolerance 1e-6
+
+Named presets own both controls and override fca_aaa_poles and
+fca_dlr_tolerance supplied beside them. Actual pole count is capped by the
+number available in the accurate AAA expansion. Symmetry is preserved.
+OCA, TCA and the dense Dyson mesh retain their independent settings.
+
+custom leaves fca_aaa_poles and fca_dlr_tolerance under explicit control.
+For a full-pole reference, use custom, fca_aaa_poles=0 and, for example,
+fca_dlr_tolerance=1e-7. Zero poles means all available AAA poles; zero
+tolerance means reuse the shared OCA/TCA DLR basis.
+
+The omitted/default mode remains standard for compatibility, with manual
+controls supported and default values 0 poles / 0 tolerance. When FCA is
+the normalization anchor for higher-order MC, it uses the full accurate
+pole table and shared DLR basis regardless of the analytic preset.
+
+The named presets are practical cost/accuracy choices, not universal error
+bounds. Check pole and DLR convergence for each input bath. Use the
+actual settings, fit errors and ranks printed in ctqmc.log.
+
+
+         Setting       | ag00.4 diff| Anomal Sig.out diff| FCA time  | PP self-energy time
+         3 poles , 1e-4| 13.373%    | 6.609%	         | 12.49 min |	3.83 min
+         3 poles , 1e-5| 13.372%    | 6.627%	         | 22.85 min |	6.13 min
+Low:     4 poles , 1e-4| 1.773%	    | 0.909%	         | 24.72 min |	7.66 min
+Modest:  5 poles , 1e-4| 1.619%	    | 0.559%	         | 42.98 min |	13.41 min
+         6 poles , 1e-4| 0.1493%    | 0.0495%	         | 99.93 min |	30.21 min
+High:    6 poles , 1e-5| 0.00286%   | 0.00270%	         | 125.95 min|	39.02 min
+Veryhigh:6 poles , 1e-6| Reference  | Reference	         | 187.79 min|	50.03 min

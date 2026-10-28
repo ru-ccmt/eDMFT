@@ -28,6 +28,7 @@ MPIcls *mpi;
 #include "fmt/ostream.h"
 #include "readinput.h"
 #include "json.hpp"
+#include "self_energy_selection.h"
 #include "pp_approx.h"
 #include "analytic_orders.h"
 std::ostream* xout;
@@ -922,6 +923,7 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
       pars["oca_dlr_backend"].get<std::string>()!="matrix" || pars["oca_dlr_diagnostic"].get<bool>() ||
       pars["OCA_cut1"].get<double>()<1.0 || pars["OCA_cut2"].get<double>()<1.0))
     throw std::invalid_argument("kugler requires unpruned OCA_solver=dlr, oca_dlr_backend=matrix without legacy diagnostics");
+  edmft::self_energy::validate(pars,ImagAxis,kugler);
   cix.kugler_estimators=kugler;
   const bool lagged_fca=pars["fca_lagged"].get<bool>();
   if (lagged_fca && (!ImagAxis || N_min_order!=4 || N_max_order!=4))
@@ -1035,6 +1037,7 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     // because ranks spend part of each collective contraction waiting.
     t_nca=t_oca=t_tca=t_fca=t_mc=0.0;
     RereadParameters(pars);
+    edmft::self_energy::validate(pars,ImagAxis,kugler);
     if (pp_approx::selection(pars["pp_approx_N"])!=cix.pp_approx_N)
       throw std::invalid_argument("changing pp_approx_N requires restarting with compatible Sindex/PPSigma");
     if (pars["kugler"].get<bool>()!=kugler)
@@ -1464,6 +1467,7 @@ int main(int argc, char *argv[])
   pars["OCA_cut_sum"] = 3;
   pars["OCA_MC"] = true;          // When analytic OCA is the last order, should we add MC corrections or not.
   pars["kugler"] = false; // effective default is resolved after PARAMS; also writes Skugler.out
+  pars["self_energy_estimator"] = "legacy"; // dyson, bulla, kugler, blended; legacy preserves existing settings
   pars["Sdyson_Bulla_blend"] = true;  // if true, Sig.out is Sdyson at low energy smoothly blended to Bulla at high energy.
   // added by codex
   //pars["matrix_mc_samples"] = 0;
@@ -1542,8 +1546,8 @@ int main(int argc, char *argv[])
   // FCA-only accuracy ladder; OCA/TCA and the dense-mesh Dyson solver are
   // unchanged. Keep "standard" as the backward-compatible default: old
   // PARAMS files retain the full AAA fit and shared DLR basis. For new runs,
-  // choose low=(3,1e-4), modest=(4,1e-5), high=(6,1e-6), or
-  // veryhigh=(all,1e-7), where each pair is (AAA poles, DLR tolerance).
+  // choose low=(4,1e-4), modest=(5,1e-4), high=(6,1e-5), or
+  // veryhigh=(6,1e-6), where each pair is (AAA poles, DLR tolerance).
   // "custom" takes the two controls below literally. Zero poles means all
   // available poles; zero tolerance means reuse the shared DLR basis.
   pars_i["fca_accuracy"] = "standard";
@@ -1590,6 +1594,8 @@ int main(int argc, char *argv[])
   pars_i["fca_tt_probe_pole"] = -1;                   // -1: first nonzero streamed pole in that task
   pars_i["aaa_adapter"] = false;
   pars_i["aaa_tolerance"] = 1.e-10;
+  pars_i["aaa_anomalous_symmetry"] = "auto"; // auto-detect even anomalous data; none retains the general fit
+  pars_i["aaa_symmetry_tolerance"] = 1.e-9; // relative input parity defect; no amplitude cutoff
   pars_i["aaa_max_support_pairs"] = 25;
   pars_i["aaa_pole_imag_tolerance"] = 1.e-7;
   pars_i["aaa_refine_poles"] = true;
@@ -1627,10 +1633,14 @@ int main(int argc, char *argv[])
   pars_i["oca_dlr_physical_mode"] = "auto"; // auto, batched, full (fallback)
   pars_i["oca_dlr_backend"] = "matrix"; // matrix (default, enumeration-free) or paths (previous evaluator)
   pars_i["kugler_nca_chunked"] = true;
-  pars_i["higher_order_subblocks"] = true;
+  pars_i["higher_order_subblocks"] = "auto"; // TCA on, FCA off; a bool overrides both.
   pars_i["higher_order_skip_zero"] = true;
   pars_i["oca_measurement_reuse"] = true; // Exact shared Green/Bulla/Kugler boundary products.
   pars_i["oca_measurement_dense"] = true; // Adaptive dense products for composite operators and traces.
+  pars_i["spatial_symmetry"] = true; // Verified ordered signed orbital symmetry.
+  pars_i["time_reversal_self"] = true; // Verified Kramers row reduction for anomalous baths.
+  pars_i["oca_matrix_symmetry"] = true; // Pair only exactly verified orbital symmetries.
+  pars_i["oca_convolution_layout"] = true; // Contiguous coefficient views for atomic products.
   pars_i["oca_matrix_reuse"] = true; // Exact bath/root sums before common convolutions.
   pars_i["oca_matrix_subblocks"] = true;
   pars_i["oca_matrix_skip_zero"] = true;
@@ -1805,17 +1815,17 @@ int main(int argc, char *argv[])
       return EXIT_FAILURE;
     }
     if (fca_accuracy=="low") {
-      pars["fca_aaa_poles"]=3;
+      pars["fca_aaa_poles"]=4;
       pars["fca_dlr_tolerance"]=1.e-4;
     } else if (fca_accuracy=="modest") {
-      pars["fca_aaa_poles"]=4;
-      pars["fca_dlr_tolerance"]=1.e-5;
+      pars["fca_aaa_poles"]=5;
+      pars["fca_dlr_tolerance"]=1.e-4;
     } else if (fca_accuracy=="high") {
       pars["fca_aaa_poles"]=6;
-      pars["fca_dlr_tolerance"]=1.e-6;
+      pars["fca_dlr_tolerance"]=1.e-5;
     } else if (fca_accuracy=="veryhigh") {
-      pars["fca_aaa_poles"]=0;     // full accurate AAA table
-      pars["fca_dlr_tolerance"]=1.e-7;
+      pars["fca_aaa_poles"]=6;
+      pars["fca_dlr_tolerance"]=1.e-6;
     }
     // Older PARAMS files may still contain manual FCA controls beside a
     // named preset.  Keep the preset authoritative, but flag a disagreement

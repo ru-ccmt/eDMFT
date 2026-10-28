@@ -768,7 +768,7 @@ public:
             chain=ConvolveRightPseudo(chain,cix,workspace,
                                       edge_factor[vertex]);
         }
-        AccumulateCut(chain,cix,prefactor,pseudo_degeneracy,output);
+        AccumulateCut(chain,cix,prefactor,pseudo_degeneracy,output,&workspace.self_rows());
       }
     return output;
   }
@@ -1034,9 +1034,11 @@ public:
           // populated entries is 1, Nbath, or Nbath^2 according to the line
           // overlap pattern.
           const int state_extent=cix.Nbath+1;
-          const int state_count=state_extent*state_extent;
-          const auto encode_state=[&](int bath0,int bath1) {
-            return (bath0+1)*state_extent+(bath1+1);
+          const int base_state_count=state_extent*state_extent;
+          const auto& spatial=workspace.spatial_symmetry();
+          const int state_count=base_state_count*(spatial.active?2:1);
+          const auto encode_state=[&](int bath0,int bath1,int broken=0) {
+            return broken*base_state_count+(bath0+1)*state_extent+(bath1+1);
           };
           std::array<int,6> event_split{{-1,-1,-1,-1,-1,-1}};
           std::array<bool,6> event_open{{false,false,false,false,false,false}};
@@ -1065,7 +1067,8 @@ public:
             for (int state=0;state<state_count;++state) {
               if (states[state].empty()) continue;
               std::array<int,2> live{{
-                state/state_extent-1,state%state_extent-1}};
+                (state%base_state_count)/state_extent-1,state%state_extent-1}};
+              const int broken=state/base_state_count;
               if (vertex==root_vertex) {
                 AddFunction(next[state],ContractRoot(
                   states[state],roots,workspace,vertex_factor[vertex]));
@@ -1085,13 +1088,18 @@ public:
                   // it at the opening vertex avoids every intervening matrix
                   // multiplication and convolution.
                   if (line_weight[split][bath]==0.0) continue;
+                  // Quotient the simultaneous bath tuple once, at its first
+                  // nonfixed choice. Keep this stabilizer bit after labels
+                  // close, so early bath sums remain valid.
+                  if(spatial.active && !broken && bath>spatial.bath[bath])continue;
+                  const bool first_moved=spatial.active && !broken && bath!=spatial.bath[bath];
                   auto target_live=live;
                   target_live[split]=bath;
                   const int ds=2*bath+line.direction;
                   AddFunction(next[encode_state(target_live[0],
-                                                target_live[1])],
+                                                target_live[1],broken || first_moved)],
                     MultiplyRight(states[state],operator_cache[Opposite(ds)],
-                                  vertex_factor[vertex]));
+                                  vertex_factor[vertex],first_moved?2.0:1.0));
                 }
               } else {
                 const int bath=live[split];
@@ -1102,12 +1110,17 @@ public:
                 target_live[split]=-1;
                 const int ds=2*bath+line.direction;
                 AddFunction(next[encode_state(target_live[0],
-                                              target_live[1])],
+                                              target_live[1],broken)],
                   MultiplyRight(states[state],operator_cache[ds],
                                 vertex_factor[vertex],
                                 line_weight[split][bath]));
               }
             }
+            // No new bath choice follows the last opening. The stabilizer
+            // is then dead too: merge its two buckets before convolution.
+            if(spatial.active && vertex>=std::max(cut.split[0].first_vertex,cut.split[1].first_vertex))
+              for(int state=0;state<base_state_count;++state)
+                AddFunction(next[state],std::move(next[state+base_state_count]));
             if (vertex<5)
               ConvolveRightPseudoPreparedBatch(
                 next,cix,workspace,prepared[prepared_index[vertex]]);
@@ -1116,8 +1129,10 @@ public:
           const double common_prefactor=
             edmft::tca::topology_crossing_sign[topology]*
             edmft::tca::topology_symmetry_factor[topology];
+          if(spatial.active)AddFunction(states[encode_state(-1,-1)],
+            std::move(states[encode_state(-1,-1,1)]));
           AccumulateCut(states[encode_state(-1,-1)],cix,
-                        common_prefactor,pseudo_degeneracy,result.nodes);
+                        common_prefactor,pseudo_degeneracy,result.nodes,&workspace.self_rows());
           continue;
         }
 
@@ -1150,7 +1165,7 @@ public:
                 chain,cix,workspace,prepared[prepared_index[vertex]]);
           }
           if (!chain.empty()) plan.nonempty=true;
-          AccumulateCut(chain,cix,prefactor,pseudo_degeneracy,result.nodes);
+          AccumulateCut(chain,cix,prefactor,pseudo_degeneracy,result.nodes,&workspace.self_rows());
         }
       }
 
@@ -1525,6 +1540,7 @@ public:
         }
       }
     }
+    workspace.self_rows().project(result);
     return result;
   }
 
@@ -1796,19 +1812,25 @@ public:
 
   static void AccumulateCut(
       const SparseFunction& values,const Cix& cix,double prefactor,
-      const std::vector<double>& pseudo_degeneracy,MatrixXd& output)
+      const std::vector<double>& pseudo_degeneracy,MatrixXd& output,
+      const time_reversal::Rows* rows=nullptr)
   {
     for (const auto& [key,function]:values) {
       if (key.first!=key.second) continue;
       const int block=key.first;
       const auto& labels=cix.Sgm_symmetry[block];
       const int n=cix.Block[block].size();
-      for (int incoming=0;incoming<n;++incoming)
+      const bool reduced=rows && rows->active();
+      const int nr=function.empty()?0:function.front().rows();
+      if(nr!=(reduced?int(rows->index[block].size()):n))
+        throw std::logic_error("self row reconstruction dimension mismatch");
+      for (int incoming=0;incoming<nr;++incoming)
         for (int outgoing=0;outgoing<n;++outgoing) {
-          const int label=labels(outgoing,incoming);
+          const int original=reduced?rows->index[block][incoming]:incoming;
+          const int label=labels(outgoing,original);
           if (label==0) continue;
           const int pseudo=std::abs(label)-1;
-          const double weight=prefactor*SignedIndexSign(label)/
+          const double weight=prefactor*(reduced?rows->weight[block][incoming]:1)*SignedIndexSign(label)/
                               pseudo_degeneracy[pseudo];
           for (int node=0;node<static_cast<int>(function.size());++node)
             output(node,pseudo)+=
@@ -2064,6 +2086,12 @@ public:
       bool nonempty=false;
     };
     std::vector<BathPlan> plans(bath_pairs.size());
+    const auto& spatial=workspace.spatial_symmetry();
+    bool spatial_pairs=spatial.active && selected_external_bath<0;
+    const std::set<std::array<int,2>> pair_domain(bath_pairs.begin(),bath_pairs.end());
+    spatial_pairs=spatial_pairs && pair_domain.size()==bath_pairs.size();
+    if(spatial_pairs)for(auto pair:bath_pairs)
+      if(!pair_domain.count({spatial.bath.at(pair[0]),spatial.bath.at(pair[1])})){spatial_pairs=false;break;}
     for (std::size_t pair=0;pair<bath_pairs.size();++pair) {
       BathPlan& plan=plans[pair];
       plan.fixed_prefactor=
@@ -2080,6 +2108,11 @@ public:
         const int signed_channel=cix.bath_sigind0(bath);
         plan.channel[split]=std::abs(signed_channel);
         plan.fixed_prefactor*=SignedIndexSign(signed_channel);
+      }
+      if(spatial_pairs){const auto ids=bath_pairs[pair];
+        const std::array<int,2> mapped{{spatial.bath[ids[0]],spatial.bath[ids[1]]}};
+        if(ids>mapped)plan.fixed_prefactor=0.;
+        else if(ids!=mapped)plan.fixed_prefactor*=2.;
       }
     }
 
@@ -3204,6 +3237,20 @@ private:
 #endif
       )
   {
+    // A single canonical-arrow cut need not be invariant by itself. The
+    // complete topology is invariant. Preserve the optional cut diagnostics
+    // with a full workspace; never reconstruct an incomplete arrow sum.
+    if(keep_individual_cuts && workspace.self_rows().active()) {
+      auto full=workspace;full.set_self_rows({});
+      if(mpi_rank==0 && progress)*progress<<"TCA time reversal: full rows for individual-cut diagnostics"<<std::endl;
+      return Evaluate(cix,full,pseudo_degeneracy,mpi_rank,mpi_size,
+        keep_individual_cuts,progress,progress_seconds,topology_b_c3,
+        dynamic_scheduler,requested_micro_batch
+#ifdef _MPI
+        ,communicator
+#endif
+        );
+    }
     SelfEnergyNodeResult result=MakeResult(workspace,keep_individual_cuts);
     // Reference mode retains all six pseudo cuts in the fixed-arrow d0=0
     // convention.  The optional topology-B C3 candidate instead restores the

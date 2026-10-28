@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <set>
 #include <stdexcept>
@@ -49,6 +50,41 @@ inline double int_newt_cotes(const Array<double,1>& f, double a, double b, int N
   return 0;
 }
 */
+
+// Exact exponential integrals of the four cubic-spline panel functions.
+// Their closed forms subtract terms through order a^3 before dividing by a^4.
+// Use convergent moment series near zero to avoid catastrophic cancellation.
+inline TinyVector<double,4> volterra_panel_weights(double dt, double a)
+{
+  TinyVector<double,4> w;
+  const double dt3 = dt*dt*dt;
+  if (std::abs(a) <= 1.0) {
+    static constexpr auto coefficients = [] {
+      std::array<std::array<double,4>,21> c{};
+      double factorial = 1.0;
+      for (int k=0; k<=20; ++k) {
+        if (k) factorial *= k;
+        const double v = (k%2 ? -1.0 : 1.0)/factorial;
+        c[k] = {v/(k+2), v/((k+1.0)*(k+2)),
+                -v/(3.0*(k+2)*(k+4)),
+                -v*(k+6)/(6.0*(k+2)*(k+3)*(k+4))};
+      }
+      return c;
+    }();
+    for (int j=0; j<4; ++j) {
+      double value = coefficients[20][j];
+      for (int k=19; k>=0; --k) value = value*a + coefficients[k][j];
+      w[j] = value*(j<2 ? dt : dt3);
+    }
+  } else {
+    const double ema = std::exp(-a), a2 = a*a, a4 = a2*a2;
+    w[0] = dt*(1-ema*(1+a))/a2;
+    w[1] = dt*(a-1+ema)/a2;
+    w[2] = -dt3/a4*((1+a+a2/3.)*ema + a2/6.-1);
+    w[3] = -dt3/a4*((1-a+a2/3.) + ema*(a2/6.-1));
+  }
+  return w;
+}
 
 class VolterraSolver{
   // Here we solve DysonLaplace transformation with the double integral equation.
@@ -318,20 +354,8 @@ public:
     for (int i=0; i<tau.extent(0)-1; ++i){
       double dt = (tau(i+1)-tau(i));
       double a = Em*dt;
-      double ema = exp(-a), a2=a*a, a4=a*a*a*a;
-      double dt3 = dt*dt*dt;
-      TinyVector<double,4> Liw;
-      if (fabs(a)>1e-7){
-        Liw[0] = dt*(1-ema*(1+a))/a2;
-        Liw[1] = dt*(a-1+ema)/a2;
-        Liw[2] = -dt3/a4*((1+a+a2/3.)*ema  + a2/6.-1);
-        Liw[3] = -dt3/a4*((1-a+a2/3.) + ema*(a2/6.-1));
-      }else{ // Taylor expansion for the case of small a, which would otherwise diverge
-        Liw[0] = dt*(0.5-a/3.);
-        Liw[1] = dt*(0.5-a/6.);
-        Liw[2] = dt3*(-1./24.+a/45.);
-        Liw[3] = dt3*(-1./24.+a*7./360.);
-      }
+      double ema = exp(-a);
+      const auto Liw = volterra_panel_weights(dt, a);
       convv(i+1) = convv(i)*ema + fSig.evaluate(i,Liw);
     }
     // Next we spline conv(t) = int_0^t G0(t-x) \Sigma(x) dx, so that convolution with G0 and G can be computed next.
@@ -348,20 +372,8 @@ public:
     for (int i=0; i<tau.extent(0)-1; ++i){
       double dt = (tau(i+1)-tau(i));
       double a = Em*dt;
-      double ema = exp(-a), a2=a*a, a4=a*a*a*a;
-      double dt3 = dt*dt*dt;
-      TinyVector<double,4> Liw;
-      if (fabs(a)>1e-7){
-        Liw[0] = dt*(1-ema*(1+a))/a2;
-        Liw[1] = dt*(a-1+ema)/a2;
-        Liw[2] = -dt3/a4*((1+a+a2/3.)*ema  + a2/6.-1);
-        Liw[3] = -dt3/a4*((1-a+a2/3.) + ema*(a2/6.-1));
-      }else{
-        Liw[0] = dt*(0.5-a/3.);
-        Liw[1] = dt*(0.5-a/6.);
-        Liw[2] = dt3*(-1./24.+a/45.);
-        Liw[3] = dt3*(-1./24.+a*7./360.);
-      }
+      double ema = exp(-a);
+      const auto Liw = volterra_panel_weights(dt, a);
       Rx(i+1) = Rx(i)*ema + fconv.evaluate(i,Liw);
     }
    // Finally, we compute weights Wij, which can solve Volterra equation.
@@ -555,17 +567,8 @@ public:
     for (int i=0; i<tau.extent(0)-1; ++i){
       double dt = (tau(i+1)-tau(i));
       for (int i1=0; i1<N; ++i1){
-        double a = Em(i1)*dt, ema = exp(-a), a2=a*a, a4=a*a*a*a;
-        double dt3 = dt*dt*dt;
-        TinyVector<double,4> Liw;
-        if (fabs(a)>1e-7){
-          Liw[0] = dt*(1-ema*(1+a))/a2; Liw[1] = dt*(a-1+ema)/a2;
-          Liw[2] = -dt3/a4*((1+a+a2/3.)*ema  + a2/6.-1);
-          Liw[3] = -dt3/a4*((1-a+a2/3.) + ema*(a2/6.-1));
-        }else{
-          Liw[0] = dt*(0.5-a/3.); Liw[1] = dt*(0.5-a/6.);
-          Liw[2] = dt3*(-1./24.+a/45.); Liw[3] = dt3*(-1./24.+a*7./360.);
-        }
+        double a = Em(i1)*dt, ema = exp(-a);
+        const auto Liw = volterra_panel_weights(dt, a);
         for (int i2=0; i2<N; ++i2){
           int icmp = i1*N+i2;
           fconv(i+1,icmp) = fconv(i,icmp)*ema + fSig.evaluate(i,icmp,Liw);
@@ -589,17 +592,8 @@ public:
     for (int i=0; i<tau.extent(0)-1; ++i){
       for (int i2=0; i2<N; ++i2){
         double dt = (tau(i+1)-tau(i));
-        double a = Em(i2)*dt, ema = exp(-a), a2=a*a, a4=a*a*a*a;
-        double dt3 = dt*dt*dt;
-        TinyVector<double,4> Liw;
-        if (fabs(a)>1e-7){
-          Liw[0] = dt*(1-ema*(1+a))/a2; Liw[1] = dt*(a-1+ema)/a2;
-          Liw[2] = -dt3/a4*((1+a+a2/3.)*ema  + a2/6.-1);
-          Liw[3] = -dt3/a4*((1-a+a2/3.) + ema*(a2/6.-1));
-        }else{
-          Liw[0] = dt*(0.5-a/3.); Liw[1] = dt*(0.5-a/6.);
-          Liw[2] = dt3*(-1./24.+a/45.); Liw[3] = dt3*(-1./24.+a*7./360.);
-        }
+        double a = Em(i2)*dt, ema = exp(-a);
+        const auto Liw = volterra_panel_weights(dt, a);
         for (int i1=0; i1<N; ++i1){
           int icmp = i1*N+i2;
           Rx(i+1,i1,i2) = Rx(i,i1,i2)*ema + fconv.evaluate(i,icmp,Liw);
@@ -689,17 +683,8 @@ public:
     for (int i=0; i<tau.extent(0)-1; ++i){
       double dt = (tau(i+1)-tau(i));
       for (int i1=0; i1<N; ++i1){
-        double a = Em(i1)*dt, ema = exp(-a), a2=a*a, a4=a*a*a*a;
-        double dt3 = dt*dt*dt;
-        TinyVector<double,4> Liw;
-        if (fabs(a)>1e-7){
-          Liw[0] = dt*(1-ema*(1+a))/a2; Liw[1] = dt*(a-1+ema)/a2;
-          Liw[2] = -dt3/a4*((1+a+a2/3.)*ema  + a2/6.-1);
-          Liw[3] = -dt3/a4*((1-a+a2/3.) + ema*(a2/6.-1));
-        }else{
-          Liw[0] = dt*(0.5-a/3.); Liw[1] = dt*(0.5-a/6.);
-          Liw[2] = dt3*(-1./24.+a/45.); Liw[3] = dt3*(-1./24.+a*7./360.);
-        }
+        double a = Em(i1)*dt, ema = exp(-a);
+        const auto Liw = volterra_panel_weights(dt, a);
         for (int i2=0; i2<N; ++i2){
           int icmp = i1*N+i2;
           fconv(i+1,icmp) = fconv(i,icmp)*ema + fSig.evaluate(i,icmp,Liw);
@@ -716,17 +701,8 @@ public:
     for (int i=0; i<tau.extent(0)-1; ++i){
       for (int i2=0; i2<N; ++i2){
         double dt = (tau(i+1)-tau(i));
-        double a = Em(i2)*dt, ema = exp(-a), a2=a*a, a4=a*a*a*a;
-        double dt3 = dt*dt*dt;
-        TinyVector<double,4> Liw;
-        if (fabs(a)>1e-7){
-          Liw[0] = dt*(1-ema*(1+a))/a2; Liw[1] = dt*(a-1+ema)/a2;
-          Liw[2] = -dt3/a4*((1+a+a2/3.)*ema  + a2/6.-1);
-          Liw[3] = -dt3/a4*((1-a+a2/3.) + ema*(a2/6.-1));
-        }else{
-          Liw[0] = dt*(0.5-a/3.); Liw[1] = dt*(0.5-a/6.);
-          Liw[2] = dt3*(-1./24.+a/45.); Liw[3] = dt3*(-1./24.+a*7./360.);
-        }
+        double a = Em(i2)*dt, ema = exp(-a);
+        const auto Liw = volterra_panel_weights(dt, a);
         for (int i1=0; i1<N; ++i1){
           int icmp = i1*N+i2;
           Rx(i+1,i1,i2) = Rx(i,i1,i2)*ema + fconv.evaluate(i,icmp,Liw);
@@ -782,17 +758,8 @@ public:
     for (int i=0; i<tau.extent(0)-1; ++i){
       double dt = (tau(i+1)-tau(i));
       for (int i1=0; i1<N; ++i1){
-        double a = Em(i1)*dt, ema = exp(-a), a2=a*a, a4=a*a*a*a;
-        double dt3 = dt*dt*dt;
-        TinyVector<double,4> Liw;
-        if (fabs(a)>1e-7){
-          Liw[0] = dt*(1-ema*(1+a))/a2; Liw[1] = dt*(a-1+ema)/a2;
-          Liw[2] = -dt3/a4*((1+a+a2/3.)*ema  + a2/6.-1);
-          Liw[3] = -dt3/a4*((1-a+a2/3.) + ema*(a2/6.-1));
-        }else{
-          Liw[0] = dt*(0.5-a/3.); Liw[1] = dt*(0.5-a/6.);
-          Liw[2] = dt3*(-1./24.+a/45.); Liw[3] = dt3*(-1./24.+a*7./360.);
-        }
+        double a = Em(i1)*dt, ema = exp(-a);
+        const auto Liw = volterra_panel_weights(dt, a);
         for (int i2=0; i2<N; ++i2){
           int icmp = i1*N+i2;
           fconv(i+1,icmp) = fconv(i,icmp)*ema + fSig.evaluate(i,icmp,Liw);
@@ -809,17 +776,8 @@ public:
     for (int i=0; i<tau.extent(0)-1; ++i){
       for (int i2=0; i2<N; ++i2){
         double dt = (tau(i+1)-tau(i));
-        double a = Em(i2)*dt, ema = exp(-a), a2=a*a, a4=a*a*a*a;
-        double dt3 = dt*dt*dt;
-        TinyVector<double,4> Liw;
-        if (fabs(a)>1e-7){
-          Liw[0] = dt*(1-ema*(1+a))/a2; Liw[1] = dt*(a-1+ema)/a2;
-          Liw[2] = -dt3/a4*((1+a+a2/3.)*ema  + a2/6.-1);
-          Liw[3] = -dt3/a4*((1-a+a2/3.) + ema*(a2/6.-1));
-        }else{
-          Liw[0] = dt*(0.5-a/3.); Liw[1] = dt*(0.5-a/6.);
-          Liw[2] = dt3*(-1./24.+a/45.); Liw[3] = dt3*(-1./24.+a*7./360.);
-        }
+        double a = Em(i2)*dt, ema = exp(-a);
+        const auto Liw = volterra_panel_weights(dt, a);
         for (int i1=0; i1<N; ++i1){
           int icmp = i1*N+i2;
           Rx(i+1,i1,i2) = Rx(i,i1,i2)*ema + fconv.evaluate(i,icmp,Liw);
@@ -2127,7 +2085,10 @@ auto DeterminProbabilitiesI(const Array<double,1>& tau, const Array<double,2>& G
     int iib = cix.bath_sigind0(b);
     int ib_sg = 1;
     if (iib<0){ iib=-iib; ib_sg=-1;}
-    Epot_singlep += (cix.Ebath(iib)+mu)*ib_sg*nalpha(b); // previously we subtracted Ebath-=mu, now we add back, like in Epot
+    // Initialization subtracts mu only from normal diagonal bath levels.
+    const bool diagonal = !cix.bath_SC(b) &&
+      cix.Fi_indx(2*b)/2 == cix.Fi_indx(2*b+1)/2;
+    Epot_singlep += (cix.Ebath(iib)+(diagonal ? mu : 0.0))*ib_sg*nalpha(b);
   }
   r.TrSigmaG = r.Epot - Epot_singlep; // This is now Tr(H^{atom}_m P_m) - Tr(E^{imp}_a n_a) and is 1/2Tr(Sigma*G) because we subtract single-particle contribution to potential energy
 

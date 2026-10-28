@@ -20,3 +20,9 @@ bctqmc : boldc.cc readinput.h interpolate.h measureW.h skeletons.h wfile.h basic
 
 clean:
 	rm -f bctqmc boldc.o
+
+# Symmetry-preserving pole fitting and its boundary regression.
+bctqmc : aaa_symmetry.h
+
+test_aaa_symmetry : test_aaa_symmetry.cc aaa.h aaa_symmetry.h
+	$(PC++) $(CFLAGS) -I. test_aaa_symmetry.cc -o $@ $(LIBS)

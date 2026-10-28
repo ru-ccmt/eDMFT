@@ -246,21 +246,6 @@ class IMP_BCTQMC(ctqmc.IMP_CTQMC):
                 print(line, file=fp)
             print("}", file=fp)
 
-    def HighFrequency(self, params, DCs, nl_imp, extn, wbroad=0.0, kbroad=0.0):
-        """Postprocesses Bold-CTQMC output using the legacy ctqmc.py logic.
-
-        The bold solver now writes the same DMFT-facing filenames and Gf.out
-        header fields as the old impurity solver (`Sig.out`, `Gf.out`,
-        `ctqmc.log`, `nf`, `TrSigmaG`, `mom`, ...).  That means the existing
-        high-frequency and double-counting machinery from ctqmc.py can be
-        reused directly.
-
-        Keeping an explicit override here makes that choice visible and gives
-        us one natural place to customize the postprocessing later if Bold-CTQMC
-        needs solver-specific handling.
-        """
-        return super().HighFrequency(params, DCs, nl_imp, extn, wbroad=wbroad, kbroad=kbroad)
-
     def _exe(self, params, DCs, extn, UpdateAtom, gbroad=0.0, kbroad=0.0, maxAc=2000.0):
         """Executes the Bold-CTQMC impurity solver."""
         REMOVE_STATUS = False

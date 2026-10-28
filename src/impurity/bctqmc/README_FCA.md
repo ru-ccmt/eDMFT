@@ -270,10 +270,10 @@ Dyson solver keep their own settings. The presets are:
 
 | `fca_accuracy` | FCA AAA poles | FCA DLR tolerance | Purpose |
 | --- | ---: | ---: | --- |
-| `low` | 3 | `1e-4` | Fast exploratory SC calculations |
-| `modest` | 4 | `1e-5` | First production candidate; validate for each model |
-| `high` | 6 | `1e-6` | More accurate fourth-order check |
-| `veryhigh` | all available | `1e-7` | Reference calculation, potentially very expensive |
+| `low` | 4 | `1e-4` | Fast exploratory SC calculations |
+| `modest` | 5 | `1e-4` | Additional pole resolution at the same DLR tolerance |
+| `high` | 6 | `1e-5` | More accurate fourth-order check |
+| `veryhigh` | 6 | `1e-6` | Tightest practical named preset |
 | `custom` | `fca_aaa_poles` | `fca_dlr_tolerance` | Explicit independent controls |
 
 The default remains `standard` for compatibility with existing PARAMS files.
@@ -305,7 +305,8 @@ The SC three-pole hybridization fit had a large relative fit error, and its
 good rank-22 versus rank-37 comparison tested the DLR reduction at fixed
 three poles, not the pole approximation against a full-pole answer. Because
 three hybridization lines are split, pole work grows roughly as the cube of
-the pole count; `veryhigh` can be impractical for a large SC problem.
+the pole count. Full-pole references remain available through `custom` with
+`fca_aaa_poles=0` and, for example, `fca_dlr_tolerance=1e-7`.
 
 Compression minimizes the worst relative channel fit error using the existing
 greedy residue-refit algorithm. When the source has both frequency signs and

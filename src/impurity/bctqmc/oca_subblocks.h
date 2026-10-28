@@ -38,9 +38,9 @@ public:
   };
   mutable Stats stats;
   explicit Convolution(const Cix& input,const imag_dlr::Workspace& workspace,
-                       bool profile=false,std::size_t cap=16384)
+                       bool profile=false,std::size_t cap=16384,bool contiguous=true)
     :cix(input),w(workspace),parts(input.Nblock),flat_cap(std::max<std::size_t>(1,cap)) {
-    scratch.profile=profile;
+    scratch.profile=profile;scratch.contiguous_products=contiguous;
     std::vector<unsigned char> active(cix.Npseudo_unique,0);
     for (int p=0;p<cix.Npseudo_unique;++p)
       active[p]=(w.pseudo_values().col(p).array()!=0.0).any() ||
@@ -64,7 +64,7 @@ public:
   const auto& partition() const {return parts;}
   void report(std::ostream& out) const {
     out<<"OCA convolution profile: calls="<<stats.calls<<" preparations="<<stats.preparations
-       <<" tiles="<<stats.tiles<<" packed_entries="<<stats.packed_entries
+       <<" contiguous="<<scratch.contiguous_products<<" tiles="<<stats.tiles<<" packed_entries="<<stats.packed_entries
        <<" dense_entries="<<stats.dense_entries<<" peak_batch_entries="<<stats.peak_batch_entries
        <<" pack_seconds="<<scratch.pack_seconds<<" transform_seconds="<<scratch.transform_seconds
        <<" product_seconds="<<scratch.product_seconds<<" unpack_seconds="<<scratch.unpack_seconds<<std::endl;
@@ -101,7 +101,7 @@ public:
     if(scalar.size()!=w.rank())throw std::invalid_argument("OCA subblock scalar rank mismatch");
     ++stats.calls;if(input.empty())return {};
     auto& slot=prepare(scalar);Engine::SparseFunction result;
-    struct Job {Engine::BlockKey key;std::vector<int> rows;const std::vector<int>* columns;MatrixFunction values;const Piece* piece;};
+    struct Job {Engine::BlockKey key;std::vector<int> rows;const std::vector<int>* columns;MatrixFunction values;const Piece* piece;int row_count;};
     std::deque<Job> jobs;std::size_t flat=0;
     auto flush=[&](){
       if(jobs.empty())return;
@@ -109,7 +109,7 @@ public:
       for(const auto& job:jobs){f.push_back(&job.values);g.push_back(&job.piece->g);hg.push_back(&job.piece->hg);}
       auto output=w.basis().time_ordered_convolution_values_right_prepared_batch(f,g,hg,reflect_output,&scratch);
       for(std::size_t k=0;k<jobs.size();++k){const auto& job=jobs[k];auto& dst=result[job.key];
-        if(dst.empty())dst.assign(w.rank(),MatrixXd::Zero(cix.Block[job.key.first].size(),cix.Block[job.key.second].size()));
+        if(dst.empty())dst.assign(w.rank(),MatrixXd::Zero(job.row_count,cix.Block[job.key.second].size()));
         for(int l=0;l<w.rank();++l)for(std::size_t i=0;i<job.rows.size();++i)for(std::size_t j=0;j<job.columns->size();++j)
           dst[l](job.rows[i],(*job.columns)[j])=output[k][l](i,j);
       }
@@ -117,7 +117,7 @@ public:
     };
     for(const auto& [key,values]:input){
       if(static_cast<int>(values.size())!=w.rank())throw std::invalid_argument("OCA subblock input rank mismatch");
-      expand(slot,key.second);const int nr=cix.Block[key.first].size(),nc=cix.Block[key.second].size();
+      expand(slot,key.second);const int nr=values.empty()?0:values.front().rows(),nc=cix.Block[key.second].size();
       for(const auto& matrix:values)if(matrix.rows()!=nr || matrix.cols()!=nc)throw std::invalid_argument("OCA subblock input dimensions mismatch");
       stats.dense_entries+=static_cast<std::uint64_t>(nr)*nc;
       for(std::size_t k=0;k<parts[key.second].size();++k){
@@ -127,7 +127,7 @@ public:
         const std::size_t row_tile=std::max<std::size_t>(1,flat_cap/columns.size());
         for(std::size_t first=0;first<rows.size();first+=row_tile){const auto last=std::min(rows.size(),first+row_tile);const std::size_t size=(last-first)*columns.size();
           if(flat && flat+size>flat_cap)flush();
-          Job job;job.key=key;job.rows.assign(rows.begin()+first,rows.begin()+last);job.columns=&columns;job.piece=&piece;
+          Job job;job.key=key;job.row_count=nr;job.rows.assign(rows.begin()+first,rows.begin()+last);job.columns=&columns;job.piece=&piece;
           job.values.resize(w.rank());for(int l=0;l<w.rank();++l){job.values[l].resize(job.rows.size(),columns.size());for(std::size_t i=0;i<job.rows.size();++i)for(std::size_t j=0;j<columns.size();++j)job.values[l](i,j)=values[l](job.rows[i],columns[j]);}
           jobs.push_back(std::move(job));flat+=size;++stats.tiles;stats.packed_entries+=size;
           if(flat>=flat_cap)flush();

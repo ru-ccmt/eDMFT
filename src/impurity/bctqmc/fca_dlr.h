@@ -940,6 +940,7 @@ class Evaluator {
           Engine::AccumulateBothOperators(out->second[node],left,values[node],right,root_weights[link.root](node));
       }
     }
+    w.self_rows().project(result);
     return result;
   }
 
@@ -994,6 +995,12 @@ public:
     }
   }
 
+  int spatial_anchor_weight(int bath) const {
+    const auto& map=w.spatial_symmetry();
+    if(!map.active || map.bath[bath]==bath)return 1;
+    return bath<map.bath[bath]?2:0;
+  }
+
   // pole[] refers to the three NON-root lines in the rotated cut. The root
   // bath/direction is summed locally; its hybridization comes from precisely
   // this workspace (never the more accurate OCA workspace).
@@ -1019,6 +1026,8 @@ public:
       if (cut.split[j].b>cut.split[anchor].b) anchor=j;
     if (profile) profile->anchor=anchor;
     for (int anchor_bath=0;anchor_bath<cix.Nbath;++anchor_bath) {
+      const int spatial_weight=spatial_anchor_weight(anchor_bath);
+      if(!spatial_weight)continue;
       States states;
       states[{{-1,-1,-1}}]=Engine::PseudoValues(pseudos,d.edge[0]);
       for (int vertex=1;vertex<8 && !states.empty();++vertex) {
@@ -1068,8 +1077,8 @@ public:
       for (const auto& [state,h]:states) {
         if (state!=State{{-1,-1,-1}}) throw std::logic_error("FCA unclosed bath");
         Engine::AccumulateCut(h,cix,
-          fca::symmetry[topology]*fca::crossing_sign[topology]*d.inverse_denominator,
-          degeneracy,output);
+          spatial_weight*fca::symmetry[topology]*fca::crossing_sign[topology]*d.inverse_denominator,
+          degeneracy,output,&w.self_rows());
       }
     }
     return output;
@@ -1354,6 +1363,8 @@ public:
               throw std::logic_error("FCA shared prefix decorations differ");
         }
         for (int bath=0;bath<cix.Nbath;++bath) {
+          const int spatial_weight=spatial_anchor_weight(bath);
+          if(!spatial_weight)continue;
           if (residue(bath,l)==0.) continue;
           // Auto-select once and retain the same slice for both arrows.
           if (tt_probe && selected_probe_pole<0) selected_probe_pole=l;
@@ -1415,7 +1426,7 @@ public:
             // BEFORE the pole sum, just as in the independent grouped path.
             for (auto& [state,h]:tail) {
               for (auto& [key,values]:h) for (auto& matrix:values)
-                matrix*=decorations[k].inverse_denominator;
+                matrix*=spatial_weight*decorations[k].inverse_denominator;
               if (profile && options.bath_sector_profile)
                 for (const auto& [key,values]:h) {
                   double block_squared=0;
@@ -1459,7 +1470,7 @@ public:
         for (const auto& [state,h]:states) {
           if (state!=State{{-1,-1,-1}}) throw std::logic_error("unclosed FCA shared-prefix bath");
           const int t=family[k].topology;
-          Engine::AccumulateCut(h,cix,fca::symmetry[t]*fca::crossing_sign[t],degeneracy,output[k]);
+          Engine::AccumulateCut(h,cix,fca::symmetry[t]*fca::crossing_sign[t],degeneracy,output[k],&w.self_rows());
         }
       }
       return output;
@@ -1779,6 +1790,8 @@ public:
           }
         }
         for (int bath=0;bath<cix.Nbath && !states.empty();++bath) {
+          const int spatial_weight=spatial_anchor_weight(bath);
+          if(!spatial_weight)continue;
           if (residue(bath,pole[anchor])==0.0) continue;
           // Cheap screening proxy: residue times the norms of geometrically
           // compatible prefix blocks and the opening operator. This is NOT
@@ -1813,6 +1826,8 @@ public:
           // It MUST enter before summing different poles at this endpoint.
           double intermediate_squared=0;
           for (auto& [state,h]:middle) {
+            if(spatial_weight!=1)for(auto& [key,values]:h)
+              for(auto& value:values)value*=spatial_weight;
             if (summed_pole>=0 || summed_direction>=0) for (auto& [key,values]:h)
               for (auto& value:values) value*=d.inverse_denominator;
             if (profile && options.bath_sector_profile)
@@ -1851,7 +1866,7 @@ public:
       if (state!=State{{-1,-1,-1}}) throw std::logic_error("FCA unclosed bath");
       Engine::AccumulateCut(h,cix,fca::symmetry[topology]*fca::crossing_sign[topology]*
                             (summed_pole>=0 || summed_direction>=0 ? 1. : d.inverse_denominator),
-                            degeneracy,output);
+                            degeneracy,output,&w.self_rows());
     }
     if (profile) {
       profile->pack_seconds+=scratch.dlr_buffers.pack_seconds;

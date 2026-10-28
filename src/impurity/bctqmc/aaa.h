@@ -728,4 +728,6 @@ inline RefinementReport refine_poles(const std::vector<Complex>& z_positive,
 
 } // namespace edmft::aaa
 
+#include "aaa_symmetry.h"
+
 #endif

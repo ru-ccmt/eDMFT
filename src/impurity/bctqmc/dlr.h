@@ -678,12 +678,17 @@ public:
   // are reused for repeated shapes; rank-by-M size is bounded by the caller's
   // existing batch cap. No physics data survive a task via this workspace.
   struct ConvolutionScratch {
-    bool profile=false;
+    bool profile=false,contiguous_products=false;
     double pack_seconds=0,transform_seconds=0,product_seconds=0,unpack_seconds=0;
     std::vector<int> nr,nk,nc;
     std::vector<Eigen::Index> input_offset,output_offset;
     MatrixXd f_value_flat,f_flat,hf_flat,diagonal_flat,off_diagonal_flat,values_flat;
     MatrixXd f_l,hf_l,diagonal,off_diagonal;
+    // Each atomic matrix at one DLR node is a contiguous row-major view.
+    // Kept separate from the column-major LU buffers to retain the original
+    // interpolation solve and its numerical conditioning.
+    using RowMatrix=Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic,Eigen::RowMajor>;
+    RowMatrix f_rows,hf_rows,diagonal_rows,off_diagonal_rows;
   };
   std::vector<std::vector<MatrixXd>>
   time_ordered_convolution_values_right_prepared_batch(
@@ -786,47 +791,77 @@ public:
     elapsed(buffers.transform_seconds); mark();
     auto& diagonal_flat=buffers.diagonal_flat;
     auto& off_diagonal_flat=buffers.off_diagonal_flat;
-    diagonal_flat.resize(rank(),output_offset.back());
-    off_diagonal_flat.resize(rank(),output_offset.back());
-    for (int item=0;item<count;++item) {
-      auto& f_l=buffers.f_l; auto& hf_l=buffers.hf_l;
-      f_l.resize(nr[item],nk[item]); hf_l.resize(nr[item],nk[item]);
-      auto& diagonal=buffers.diagonal; auto& off_diagonal=buffers.off_diagonal;
-      for (int l=0;l<rank();++l) {
-        for (int i=0;i<nr[item];++i)
-          for (int j=0;j<nk[item];++j) {
-            const Eigen::Index column=input_offset[item]+i*nk[item]+j;
-            f_l(i,j)=f_flat(l,column);
-            hf_l(i,j)=hf_flat(l,column);
-          }
-        diagonal.noalias()=f_l*(*g[item])[l];
-        off_diagonal.noalias()=hf_l*(*g[item])[l]+f_l*(*hg[item])[l];
-        for (int i=0;i<nr[item];++i)
-          for (int j=0;j<nc[item];++j) {
-            const Eigen::Index column=output_offset[item]+i*nc[item]+j;
-            diagonal_flat(l,column)=diagonal(i,j);
-            off_diagonal_flat(l,column)=off_diagonal(i,j);
-          }
+    if (buffers.contiguous_products) {
+      using RowMatrix=ConvolutionScratch::RowMatrix;
+      // A single blocked layout conversion replaces the repeated strided
+      // gather/scatter loops at every atomic product. These include general
+      // rectangular nr x nk times nk x nc matrices, not only square pieces.
+      auto& f=buffers.f_rows; auto& hf=buffers.hf_rows;
+      auto& d=buffers.diagonal_rows; auto& o=buffers.off_diagonal_rows;
+      f=f_flat; hf=hf_flat;
+      d.resize(rank(),output_offset.back());o.resize(rank(),output_offset.back());
+      for (int item=0;item<count;++item) for (int l=0;l<rank();++l) {
+        const auto fi=static_cast<Eigen::Index>(l)*input_offset.back()+input_offset[item];
+        const auto oi=static_cast<Eigen::Index>(l)*output_offset.back()+output_offset[item];
+        Eigen::Map<const RowMatrix> left(f.data()+fi,nr[item],nk[item]);
+        Eigen::Map<const RowMatrix> hilbert(hf.data()+fi,nr[item],nk[item]);
+        Eigen::Map<RowMatrix> diagonal(d.data()+oi,nr[item],nc[item]);
+        Eigen::Map<RowMatrix> off(o.data()+oi,nr[item],nc[item]);
+        diagonal.noalias()=left*(*g[item])[l];
+        off.noalias()=hilbert*(*g[item])[l]+left*(*hg[item])[l];
       }
+      elapsed(buffers.product_seconds);mark();
+      auto& values_flat=buffers.values_flat;
+      values_flat.resize(rank(),output_offset.back());
+      if (output_coefficients)
+        values_flat.noalias()=beta_*(ttcf2cf_*d+o);
+      else if (reflect_output)
+        values_flat.noalias()=beta_*(reflected_ttcf2it_*d+reflected_cf2it_*o);
+      else
+        values_flat.noalias()=beta_*(ttcf2it_*d+cf2it_*o);
+    } else {
+      diagonal_flat.resize(rank(),output_offset.back());
+      off_diagonal_flat.resize(rank(),output_offset.back());
+      for (int item=0;item<count;++item) {
+        auto& f_l=buffers.f_l; auto& hf_l=buffers.hf_l;
+        f_l.resize(nr[item],nk[item]); hf_l.resize(nr[item],nk[item]);
+        auto& diagonal=buffers.diagonal; auto& off_diagonal=buffers.off_diagonal;
+        for (int l=0;l<rank();++l) {
+          for (int i=0;i<nr[item];++i)
+            for (int j=0;j<nk[item];++j) {
+              const Eigen::Index column=input_offset[item]+i*nk[item]+j;
+              f_l(i,j)=f_flat(l,column);
+              hf_l(i,j)=hf_flat(l,column);
+            }
+          diagonal.noalias()=f_l*(*g[item])[l];
+          off_diagonal.noalias()=hf_l*(*g[item])[l]+f_l*(*hg[item])[l];
+          for (int i=0;i<nr[item];++i)
+            for (int j=0;j<nc[item];++j) {
+              const Eigen::Index column=output_offset[item]+i*nc[item]+j;
+              diagonal_flat(l,column)=diagonal(i,j);
+              off_diagonal_flat(l,column)=off_diagonal(i,j);
+            }
+        }
+      }
+  
+      elapsed(buffers.product_seconds); mark();
+      auto& values_flat=buffers.values_flat;
+      values_flat.resize(rank(),output_offset.back());
+      // With coefficient output, B*M=T gives h=beta*(M*D+O).
+      // The off-diagonal term is ALREADY in the DLR basis. Do not apply B
+      // and then solve it away at the next convolution. Matrix products in
+      // D and O retain their noncommuting atomic order. The final convolution
+      // still uses the existing node/reflected formula at the boundary.
+      if (output_coefficients)
+        values_flat.noalias()=beta_*(ttcf2cf_*diagonal_flat+off_diagonal_flat);
+      else if (reflect_output)
+        values_flat.noalias()=beta_*(
+          reflected_ttcf2it_*diagonal_flat+
+          reflected_cf2it_*off_diagonal_flat);
+      else
+        values_flat.noalias()=beta_*(
+          ttcf2it_*diagonal_flat+cf2it_*off_diagonal_flat);
     }
-
-    elapsed(buffers.product_seconds); mark();
-    auto& values_flat=buffers.values_flat;
-    values_flat.resize(rank(),output_offset.back());
-    // With coefficient output, B*M=T gives h=beta*(M*D+O).
-    // The off-diagonal term is ALREADY in the DLR basis. Do not apply B
-    // and then solve it away at the next convolution. Matrix products in
-    // D and O retain their noncommuting atomic order. The final convolution
-    // still uses the existing node/reflected formula at the boundary.
-    if (output_coefficients)
-      values_flat.noalias()=beta_*(ttcf2cf_*diagonal_flat+off_diagonal_flat);
-    else if (reflect_output)
-      values_flat.noalias()=beta_*(
-        reflected_ttcf2it_*diagonal_flat+
-        reflected_cf2it_*off_diagonal_flat);
-    else
-      values_flat.noalias()=beta_*(
-        ttcf2it_*diagonal_flat+cf2it_*off_diagonal_flat);
 
     elapsed(buffers.transform_seconds); mark();
     std::vector<std::vector<MatrixXd>> values(count);
@@ -838,7 +873,7 @@ public:
         for (int j=0;j<nc[item];++j)
           for (int l=0;l<rank();++l)
             values[item][l](i,j)=
-              values_flat(l,output_offset[item]+i*nc[item]+j);
+              buffers.values_flat(l,output_offset[item]+i*nc[item]+j);
     }
     elapsed(buffers.unpack_seconds);
     return values;

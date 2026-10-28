@@ -4,6 +4,8 @@
 
 #include "aaa.h"
 #include "dlr.h"
+#include "symmetry_rows.h"
+#include "oca_symmetry.h"
 
 #include <algorithm>
 #include <cmath>
@@ -29,6 +31,10 @@ using Eigen::VectorXd;
 class Workspace {
 public:
   Workspace() = default;
+  void set_spatial_symmetry(oca_symmetry::Verification map) { spatial_symmetry_=std::move(map); }
+  const oca_symmetry::Verification& spatial_symmetry() const { return spatial_symmetry_; }
+  void set_self_rows(time_reversal::Rows rows) { self_rows_=std::move(rows); }
+  const time_reversal::Rows& self_rows() const {return self_rows_;}
   void set_atomic_optimizations(bool subblocks,bool skip_zero_roots) {
     atomic_subblocks_=subblocks;atomic_skip_zero_roots_=skip_zero_roots;
   }
@@ -48,6 +54,7 @@ public:
 
     // The basis is owned by ImagAxis0 and outlives this workspace.  Storing a
     // pointer avoids copying its interpolation matrices and LU factors.
+    self_rows_={}; spatial_symmetry_={};
     basis_=&basis;
     poles_=expansion.poles;
     const int r=basis.rank(), np=poles_.size();
@@ -163,6 +170,8 @@ public:
   }
 
 private:
+  time_reversal::Rows self_rows_;
+  oca_symmetry::Verification spatial_symmetry_;
   void require_ready() const
   {
     if (!ready()) throw std::logic_error("imaginary-axis DLR workspace is not prepared");

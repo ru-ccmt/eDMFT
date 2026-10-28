@@ -5,6 +5,7 @@
 #include "oca_dlr.h"
 #include "oca_subblocks.h"
 #include "oca_measurements.h"
+#include "oca_symmetry.h"
 #include <chrono>
 
 namespace edmft::oca_matrix_dlr {
@@ -41,6 +42,7 @@ class Evaluator {
   std::vector<double> degeneracy;
   VectorXd one;
   bool split_blocks,skip_zero,profile,measurement_reuse,dense_measurements;
+  oca_symmetry::Verification symmetry;
   mutable std::unique_ptr<oca_measurements::Boundary<Cix,Physical>> measurements;
   void measure(const Engine::SparseFunction& first,const Engine::SparseFunction& second,
                double prefactor,Physical::Result& result) const {
@@ -92,12 +94,13 @@ private:
 public:
   Evaluator(const Cix& input,const imag_dlr::Workspace& workspace,
             bool split=true,bool skip=true,bool profiling=false,
-            bool reuse_measurements=true,bool dense_boundary=true)
+            bool reuse_measurements=true,bool dense_boundary=true,
+            bool verify_symmetry=true,bool contiguous=true)
     : cix(input),w(workspace),pseudo(Engine::PreparePseudoBlocks(cix,w)),
       degeneracy(cix.Npseudo_unique),one(VectorXd::Ones(w.rank())),
       split_blocks(split),skip_zero(skip),profile(profiling),
       measurement_reuse(reuse_measurements),dense_measurements(dense_boundary) {
-    if(split_blocks)convolution=std::make_unique<oca_subblocks::Convolution>(cix,w,profile);
+    if(split_blocks)convolution=std::make_unique<oca_subblocks::Convolution>(cix,w,profile,16384,contiguous);
     if (!w.has_pseudos() || w.pseudo_count()!=cix.Npseudo_unique ||
         w.channel_count()!=cix.Nbath_unique_unique)
       throw std::invalid_argument("OCA matrix workspace/CIX mismatch");
@@ -122,6 +125,34 @@ public:
       for (auto& [op,baths]:grouped)
         endpoint_groups[d].push_back(std::move(baths));
     }
+    if(verify_symmetry) {
+      symmetry=w.spatial_symmetry().active ? w.spatial_symmetry() : oca_symmetry::discover(cix);
+      oca_symmetry::verify_endpoints<Physical>(cix,symmetry,operators,bulla);
+      if(symmetry.active)for(int d=0;d<2;++d) {
+        std::map<int,int> by_operator;
+        for(int g=0;g<group_count(d);++g)
+          by_operator[cix.Fi_indx(2*endpoint_groups[d][g].front()+d)]=g;
+        for(const auto& [op,g]:by_operator)
+          if(!by_operator.count(2*symmetry.orbital[op/2]+op%2)) {
+            symmetry.active=false;symmetry.reason="endpoint group permutation differs";
+          }
+      }
+    }
+  }
+
+  const auto& verified_symmetry() const {return symmetry;}
+  std::vector<std::pair<int,int>> scheduled_groups(int direction) const {
+    std::vector<std::pair<int,int>> result;
+    std::map<int,int> by_operator;
+    for(int g=0;g<group_count(direction);++g)
+      by_operator[cix.Fi_indx(2*endpoint_groups[direction][g].front()+direction)]=g;
+    for(int g=0;g<group_count(direction);++g) {
+      if(!symmetry.active){result.push_back({g,1});continue;}
+      int op=cix.Fi_indx(2*endpoint_groups[direction][g].front()+direction);
+      int other=by_operator.at(2*symmetry.orbital[op/2]+op%2);
+      if(g<=other)result.push_back({g,g==other?1:2});
+    }
+    return result;
   }
 
   int group_count(int direction) const {return endpoint_groups.at(direction).size();}
@@ -164,7 +195,7 @@ public:
     chain=Engine::ContractRoot(chain,summed_roots,w,vertex[2],skip_zero);
     chain=convolve(chain,edge[2]);
     chain=Engine::MultiplyRight(chain,operators[2*baths.front()+split_direction],vertex[3]);
-    Engine::AccumulateCut(chain,cix,1.0,degeneracy,result);
+    Engine::AccumulateCut(chain,cix,1.0,degeneracy,result,&w.self_rows());
     return result;
   }
 
@@ -237,7 +268,7 @@ public:
     chain=Engine::ContractRoot(chain,roots[root_direction],w,vertex[2],skip_zero);
     chain=convolve(chain,edge[2]);
     chain=Engine::MultiplyRight(chain,operators[2*bath+split_direction],vertex[3]);
-    Engine::AccumulateCut(chain,cix,prefactor,degeneracy,result);
+    Engine::AccumulateCut(chain,cix,prefactor,degeneracy,result,&w.self_rows());
     return result;
   }
 
@@ -279,23 +310,31 @@ inline oca_dlr::CombinedResult evaluate(const Cix& cix,
     const imag_dlr::Workspace& w,const blitz::Array<double,1>& tau,
     bool physical,bool distributed,int rank,int ranks,std::ostream* log,
     bool split_blocks=true,bool skip_zero=true,bool profile=false,bool reuse=true,
-    bool measurement_reuse=true,bool dense_measurements=true) {
+    bool measurement_reuse=true,bool dense_measurements=true,
+    bool verify_symmetry=true,bool contiguous=true) {
   using Clock=std::chrono::steady_clock;
   const auto start=Clock::now();
-  Evaluator evaluator(cix,w,split_blocks,skip_zero,profile,measurement_reuse,dense_measurements);
+  Evaluator evaluator(cix,w,split_blocks,skip_zero,profile,measurement_reuse,dense_measurements,
+                      verify_symmetry && reuse,contiguous);
+  if(rank==0 && log) {
+    const auto& check=evaluator.verified_symmetry();
+    *log<<"OCA orbital symmetry: active="<<check.active<<" reason="<<check.reason;
+    if(check.active){*log<<" permutation=[";for(auto a:check.orbital)*log<<a<<",";*log<<"] phases=[";for(auto a:check.phase)*log<<a<<",";*log<<"]";}
+    *log<<" endpoint_defect="<<check.endpoint_defect<<" endpoint_roundoff_bound="<<check.endpoint_roundoff_bound<<std::endl;
+  }
   MatrixXd sigma=MatrixXd::Zero(w.rank(),w.pseudo_count());
   Physical::Result phys{MatrixXd::Zero(w.rank(),w.channel_count()),
     MatrixXd::Zero(w.rank(),w.channel_count()),MatrixXd::Zero(w.rank(),w.channel_count())};
   const int workers=distributed ? ranks : 1, worker=distributed ? rank : 0;
   const int percut=w.pole_count()*cix.Nbath;
-  struct Task {bool physical;int direction,pole,index;};
+  struct Task {bool physical;int direction,pole,index,multiplicity;};
   std::vector<Task> tasks;
   if (reuse) {
     for (int phase=0;phase<(physical ? 2 : 1);++phase)
       for (int direction=0;direction<2;++direction)
         for (int pole=0;pole<w.pole_count();++pole)
-          for (int group=0;group<evaluator.group_count(direction);++group)
-            tasks.push_back({phase!=0,direction,pole,group});
+          for (auto [group,multiplicity]:evaluator.scheduled_groups(direction))
+            tasks.push_back({phase!=0,direction,pole,group,multiplicity});
   }
   const int total=reuse ? tasks.size() : (physical ? 6 : 4)*percut;
   int completed=0;
@@ -305,16 +344,17 @@ inline oca_dlr::CombinedResult evaluate(const Cix& cix,
     <<" poles="<<w.pole_count()<<" DLR_rank="<<w.rank()<<" physical="<<physical
     <<" enumeration=none subblocks="<<split_blocks<<" skip_zero="<<skip_zero
     <<" reuse="<<reuse<<" measurement_reuse="<<measurement_reuse
-    <<" measurement_dense="<<dense_measurements<<std::endl;
+    <<" measurement_dense="<<dense_measurements<<" symmetry="<<evaluator.verified_symmetry().active
+    <<" contiguous="<<contiguous<<std::endl;
   for (int task=worker;task<total;task+=workers) {
     const auto task_start=Clock::now();
     bool physical_task;
     if (reuse) {
       const auto& t=tasks[task];physical_task=t.physical;
-      if (!t.physical) sigma+=evaluator.self_group_nodes(t.direction,t.pole,t.index);
+      if (!t.physical) sigma.noalias()+=t.multiplicity*evaluator.self_group_nodes(t.direction,t.pole,t.index);
       else {
         const auto x=evaluator.physical_group_nodes(t.direction,t.pole,t.index);
-        phys.g+=x.g; phys.f00+=x.f00; phys.f01+=x.f01; phys.kugler.add(x.kugler);
+        phys.g+=t.multiplicity*x.g; phys.f00+=t.multiplicity*x.f00; phys.f01+=t.multiplicity*x.f01; phys.kugler.add(x.kugler,t.multiplicity);
       }
     } else {
       const int cut=task/percut,pole=(task%percut)/cix.Nbath,bath=task%cix.Nbath;

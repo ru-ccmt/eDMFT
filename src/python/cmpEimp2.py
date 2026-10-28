@@ -3,6 +3,9 @@
 from numpy import *
 import sys,os,re
 import json
+import ast
+import numpy as np
+from scipy.special import zeta
 from scipy import interpolate
 import builtins
 
@@ -305,13 +308,245 @@ def CmpImpurityCorrection2(om, omD, Dlt, Gfc, Deg, EimpS, beta, fout):
     print('cxx=', cxx, file=fout)
     return cxx
 
+# Normal-state matrix implementation for the direct-basis Bold CIX format.
+# The legacy CTQMC functional below remains the path for its four-field CIX.
+def ReadBoldCix(filename):
+    with open(filename) as stream:
+        next(stream); next(stream)
+        header = next(stream).split()
+        if len(header) == 4:
+            return None
+        if len(header) != 6:
+            raise ValueError('Unrecognized CIX header in impurity functional')
+        norbitals, nbaths = int(header[2]), int(header[3])
+        next(stream)
+        entries = []
+        for ib in range(nbaths):
+            row = next(stream).split('#', 1)[0].split()
+            if int(row[0]) != ib:
+                raise ValueError('CIX bath entries are out of order')
+            first, second, channel = row[1:4]
+            entries.append((int(first.rstrip('*')), int(second.rstrip('*')),
+                            abs(int(channel.rstrip('*'))),
+                            -1 if channel.startswith('-') else 1,
+                            channel.endswith('*'),
+                            not first.endswith('*') and second.endswith('*')))
+        next(stream)
+        levels = np.array([float(v) for v in next(stream).split('#', 1)[0].split()])
+    if not entries or builtins.max(e[2] for e in entries) >= len(levels):
+        raise ValueError('CIX component labels exceed its impurity levels')
+    if builtins.any(a < 0 or b < 0 or a >= norbitals or b >= norbitals
+           for a, b, *_ in entries):
+        raise ValueError('CIX orbital index out of range')
+    return norbitals, entries, levels
+
+
+def BoldAtomicEnergy(layout, moments, atomic_energy):
+    """Header moments already include directed-channel multiplicities."""
+    levels = layout[2]
+    moments = np.asarray(moments, dtype=float)
+    if moments.shape != levels.shape or not np.isfinite(moments).all():
+        raise ValueError('Atomic density components do not match CIX levels')
+    return float(atomic_energy - np.dot(levels, moments))
+
+
+def _bold_matrix(values, layout):
+    n, entries, levels = layout
+    values = np.asarray(values)
+    if values.shape[-1] != len(levels) or not np.isfinite(values).all():
+        raise ValueError('Matrix components do not match CIX or are not finite')
+    result = np.zeros(values.shape[:-1] + (n, n), dtype=complex)
+    seen = set()
+    for a, b, c, sign, conjugate, normal in entries:
+        if not normal:
+            raise ValueError('Bold impurity functional requires normal baths; '
+                             'anomalous baths need a separate Nambu functional')
+        if (a, b) in seen:
+            raise ValueError('Duplicate physical matrix entry in CIX')
+        seen.add((a, b))
+        result[..., a, b] = sign * (values[..., c].conj() if conjugate else values[..., c])
+    if not builtins.all((i, i) in seen for i in range(n)):
+        raise ValueError('Bold impurity functional requires all physical diagonal entries')
+    return result
+
+
+def _bold_read_table(filename, ncomponents):
+    data = np.loadtxt(filename, ndmin=2)
+    if data.shape[1] != 1 + 2*ncomponents or not np.isfinite(data).all():
+        raise ValueError('Invalid impurity table: ' + str(filename))
+    if len(data) < 8 or not np.all(np.diff(data[:, 0]) > 0):
+        raise ValueError('Impurity frequencies must be increasing: ' + str(filename))
+    return data[:, 0], data[:, 1::2] + 1j*data[:, 2::2]
+
+
+def _bold_header(filename):
+    with open(filename) as stream:
+        header = next(stream)
+    result = {}
+    for token in header.lstrip('#').split():
+        if '=' in token:
+            key, value = token.split('=', 1)
+            result[key] = ast.literal_eval(value)
+    return result
+
+
+def _bold_sum(values, omega, beta, fout, name):
+    """Sum a real O(omega^-2) trace with a fitted analytic infinite tail.
+
+    Fit the trace, rather than individual entries, to preserve basis invariance.
+    Different fitting windows supply a tail-sensitivity diagnostic, not a
+    statistical error bar. The input must contain every positive Matsubara point.
+    """
+    values = np.asarray(values, dtype=float)
+    expected = (2*np.arange(len(omega)) + 1)*np.pi/beta
+    if values.shape != omega.shape or not np.isfinite(values).all():
+        raise ValueError('Invalid Matsubara summand: ' + name)
+    if not np.allclose(omega, expected, rtol=2e-10, atol=1e-11):
+        raise ValueError('Bold functional requires a complete positive Matsubara mesh')
+    n = len(omega)
+    if n < 32:
+        raise ValueError('At least 32 Matsubara points are required for tail checks')
+    scale = omega[-1]
+    def tail(first):
+        w = omega[first:]
+        fit = np.column_stack(((scale/w)**2, (scale/w)**4))
+        coef = np.linalg.lstsq(fit, values[first:], rcond=None)[0]
+        return 2/beta*builtins.sum(coef[j]*scale**(2*j+2)*(beta/(2*np.pi))**(2*j+2)
+                          *zeta(2*j+2, n+0.5) for j in range(2))
+    correction = tail(builtins.max(n//2, n-3000))
+    alternate = tail(builtins.max(3*n//4, n-1500))
+    sensitivity = abs(correction-alternate)
+    print(name, 'tail=', correction, 'tail_window_sensitivity=', sensitivity, file=fout)
+    if sensitivity > 1e-3:
+        print('WARNING:', name, 'tail window sensitivity exceeds 1 meV; '
+              'increase the frequency cutoff', file=fout)
+    result = 2/beta*np.sum(values) + correction
+    if not np.isfinite(result):
+        raise ValueError('Non-finite Matsubara trace: ' + name)
+    return float(result)
+
+
+def _bold_delta_on_mesh(omega, source_omega, delta):
+    """Interpolate by frequency values and use moments beyond the input mesh."""
+    target = np.array(omega, copy=True)
+    for edge in (source_omega[0], source_omega[-1]):
+        target[np.isclose(target, edge, rtol=1e-10, atol=1e-11)] = edge
+    spline = interpolate.CubicSpline(source_omega, delta, axis=0, extrapolate=False)
+    inside = (target >= source_omega[0]) & (target <= source_omega[-1])
+    if np.any(target < source_omega[0]):
+        raise ValueError('Hybridization does not cover the lowest Matsubara frequency')
+    values = np.empty((len(target), delta.shape[1]), complex)
+    derivative = np.empty_like(values)
+    values[inside] = spline(target[inside])
+    derivative[inside] = spline(target[inside], 1)
+    if not inside.all():
+        w = source_omega[builtins.max(len(source_omega)//2, len(source_omega)-1000):]
+        d = delta[-len(w):]
+        scale = w[-1]
+        re = np.linalg.lstsq(np.column_stack(((scale/w)**2, (scale/w)**4)), d.real, rcond=None)[0]
+        im = np.linalg.lstsq(np.column_stack((scale/w, (scale/w)**3)), d.imag, rcond=None)[0]
+        x = target[~inside, None]; u = scale/x
+        values[~inside] = u**2*re[0]+u**4*re[1] + 1j*(u*im[0]+u**3*im[1])
+        derivative[~inside] = (-2*u**2*re[0]-4*u**4*re[1]
+                               +1j*(-u*im[0]-3*u**3*im[1]))/x
+    return values, derivative
+
+
+def _bold_log_g(omega, green, reference_hamiltonian, beta, fout):
+    hermitian = (reference_hamiltonian + reference_hamiltonian.conj().T)/2
+    if not np.allclose(hermitian, reference_hamiltonian, rtol=1e-8, atol=1e-9):
+        raise ValueError('High-frequency reference Hamiltonian is not Hermitian')
+    eigenvalues = np.linalg.eigvalsh(hermitian)
+    sign, logabs = np.linalg.slogdet(green)
+    if np.any(sign == 0):
+        raise ValueError('Singular impurity Green function in matrix trace-log')
+    # Real part of log(det G/det Gref), independent of logarithm branches.
+    relative = logabs + np.log(np.abs(1j*omega[:, None]-eigenvalues)).sum(axis=1)
+    free_reference = -np.logaddexp(0., -beta*eigenvalues).sum()/beta
+    return _bold_sum(relative, omega, beta, fout, 'Tr(log(-Gimp))') + free_reference
+
+
+def _give_bold_functional(dire, names, layout, Vdc, fout):
+    cix, delta_file, green_file, sigma_file, beta, mu = names
+    ncomp = len(layout[2])
+    omega, g = _bold_read_table(os.path.join(dire, green_file), ncomp)
+    omega_s, sigma = _bold_read_table(os.path.join(dire, sigma_file), ncomp)
+    omega_d, delta = _bold_read_table(os.path.join(dire, delta_file), ncomp)
+    if omega.shape != omega_s.shape or not np.allclose(omega, omega_s, rtol=1e-10, atol=1e-11):
+        raise ValueError('Green function and self-energy frequency meshes differ')
+    meta = _bold_header(os.path.join(dire, green_file))
+    beta, mu = float(beta), float(mu)
+    if not np.isclose(beta*float(meta['T']), 1., rtol=1e-9):
+        raise ValueError('PARAMS and Green-function temperatures disagree')
+    if not np.isclose(mu, float(meta['mu']), rtol=1e-9, atol=1e-10):
+        raise ValueError('PARAMS and Green-function chemical potentials disagree')
+    moments = np.asarray(meta['mom'], float)
+    multiplicity = np.bincount([e[2] for e in layout[1]], minlength=ncomp)
+    if np.any(multiplicity == 0):
+        raise ValueError('Unused CIX component in impurity functional')
+    rho = _bold_matrix(moments/multiplicity, layout)
+    if not np.allclose(rho, rho.conj().T, atol=1e-9):
+        raise ValueError('Atomic density matrix is not Hermitian')
+    density_trace = float(np.trace(rho).real)
+    nd = float(meta.get('nd', density_trace))
+    if not np.isclose(density_trace, nd, rtol=1e-9, atol=1e-10):
+        # Older Bold output can have an inconsistent reduced moment header.
+        # Preserve the direct pseudo-particle number for the mu*N term;
+        # report the mismatch rather than silently renormalizing rho.
+        print('WARNING: atomic density trace=', density_trace,
+              'differs from pseudo-particle nd=', nd, file=fout)
+    green = _bold_matrix(g, layout)
+    sigma_matrix = _bold_matrix(sigma, layout)
+    sigma_inf = _bold_matrix(sigma[-1].real, layout)
+    levels = _bold_matrix(layout[2], layout)
+    reference = levels-mu*np.eye(layout[0])+sigma_inf
+    log_g = _bold_log_g(omega, green, reference, beta, fout)
+    delta, derivative = _bold_delta_on_mesh(omega, omega_d, delta)
+    delta_matrix = _bold_matrix(delta, layout)
+    derivative_matrix = _bold_matrix(derivative, layout)
+    trace_product = lambda a, b: np.einsum('nab,nba->n', a, b).real
+    delta_g = _bold_sum(trace_product(delta_matrix, green), omega, beta, fout, 'Tr(Delta G)')
+    cxx = _bold_sum(omega*trace_product(derivative_matrix, green), omega, beta, fout, 'Tr(omega dDelta/domega G)')
+    sigma_g_dynamic = _bold_sum(trace_product(sigma_matrix-sigma_inf, green), omega, beta, fout, 'Tr((Sigma-Sigma_inf) G)')
+    sigma_g_static = float(np.trace(sigma_inf@rho).real)
+    sigma_g = sigma_g_dynamic+sigma_g_static
+    atomic_energy = float(meta['Epot'])
+    interaction = BoldAtomicEnergy(layout, moments, atomic_energy)
+    one_body = float(np.dot(layout[2], moments))
+    energy = delta_g+atomic_energy-cxx-mu*nd
+    dc_matrix = _bold_matrix(np.asarray(Vdc), layout)
+    dc_density = float(np.trace(dc_matrix@rho).real)
+    zeorb = delta_g+atomic_energy-cxx-one_body
+    # Preserve the established energy-based estimator combination. This is
+    # Phi_DMFT + T*Simp; entropy is supplied separately when available.
+    phi_energy = -log_g+energy+sigma_g
+    print('Bold matrix functional: density=atomic; estimator combination=legacy energy-based', file=fout)
+    print('nd=', nd, 'nf=', meta['nf'], 'density_difference=', meta['nf']-nd, file=fout)
+    print('TrDeltaG=', delta_g, 'solver Ekin=', meta['Ekin'], file=fout)
+    print('cxx=', cxx, 'lnGimp=', log_g, 'Eimp=Fimp+TSimp=', energy, file=fout)
+    print('Atomic interaction energy=', interaction, 'header TrSigmaG=', meta['TrSigmaG'], file=fout)
+    print('1/2*Tr(Sigma*G)=', sigma_g/2, '(diagnostic; not substituted for atomic energy)', file=fout)
+    print('Vdc*nd=', dc_density, 'zeorb[eV]=', zeorb, file=fout)
+    print('Phi_DMFT+TSimp=', phi_energy, file=fout)
+    if 'Fimp' in meta:
+        print('solver Fimp=', meta['Fimp'], '(diagnostic; not substituted)', file=fout)
+    result = (phi_energy, log_g, energy, dc_density, zeorb)
+    if not np.isfinite(result).all():
+        raise ValueError('Non-finite Bold impurity functional')
+    return result
+
+
 def GiveImpFunctional(dire, fparams, Vdc, fout=sys.stdout):
 
     if not (os.path.exists(dire+'/'+fparams) and os.path.getsize(dire+'/'+fparams)>0):
         print('Give input PARAMS file', file=fout)
         sys.exit(0)
     
-    (cix,Delta,Gf,Sig,beta,mu_qmc) = ReadPARAMS2(dire+'/'+fparams, fout)
+    names = ReadPARAMS2(dire+'/'+fparams, fout)
+    (cix,Delta,Gf,Sig,beta,mu_qmc) = names
+    layout = ReadBoldCix(os.path.join(dire, cix))
+    if layout is not None:
+        return _give_bold_functional(dire, names, layout, Vdc, fout)
     (Deg, Eks) = ReadCix(dire+'/'+cix, fout)
     
     

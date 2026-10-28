@@ -1,3 +1,4 @@
+#include "self_energy_selection.h"
 #ifndef Imag_axis
 #define Imag_axis
 
@@ -8,12 +9,15 @@
 #include "aaa.h"
 #include "dlr.h"
 #include "imag_axis_dlr.h"
+#include "subblock_policy.h"
 #include "oca_dlr.h"
 #include "oca_dlr_batched.h"
 #include "tca_dlr.h"
 #include "oca_matrix_dlr.h"
 #include "kugler_nca_chunked.h"
 #include "fca_dlr.h"
+#include "time_reversal.h"
+#include "spatial_symmetry.h"
 #include "analytic_orders.h"
 
 #include <chrono>
@@ -43,7 +47,8 @@ public:
   Array<complex<double>,2> iDeltaw;
   SVDFunc svdf;
   const Cix& cix;
-  bool higher_order_subblocks=true,higher_order_skip_zero=true;
+  edmft::imag_dlr::SubblockPolicy higher_order_subblocks;
+  bool higher_order_skip_zero=true;
   vector<int> G_importance;  int OCA_cut_sum;
   // Compact-diagram state.  These adapters are intentionally optional: the
   // legacy spline/uniform-mesh OCA remains the production result until the
@@ -119,6 +124,7 @@ public:
   // expansion actually used by the diagram code.
   edmft::aaa::Result aaa_result;
   edmft::aaa::PoleExpansion aaa_hybridization;
+  edmft::aaa::ChannelSymmetry aaa_channel_symmetry;
   // Optional lower-rank hybridization used only by approximate TCA.  OCA and
   // the exact TCA audit always use aaa_hybridization above.
   edmft::aaa::PoleExpansion tca_active_hybridization;
@@ -167,8 +173,13 @@ public:
   ImagAxis0(double _beta_, const Cix& _cix_, json& pars, MPIcls& mpi) :
     AnyAxis(_beta_), cix(_cix_), G_importance(cix.Npseudo_unique,0), OCA_cut_sum(10)
   {
-    higher_order_subblocks=pars["higher_order_subblocks"].get<bool>();
+    higher_order_subblocks=edmft::imag_dlr::resolve_subblocks(pars["higher_order_subblocks"]);
     higher_order_skip_zero=pars["higher_order_skip_zero"].get<bool>();
+    if(mpi.rank==mpi.master)
+      (*mpi.out)<<"Higher-order subblocks: input="<<pars["higher_order_subblocks"]
+                <<" TCA="<<(higher_order_subblocks.tca ? "on" : "off")
+                <<" FCA="<<(higher_order_subblocks.fca ? "on" : "off")
+                <<" (OCA uses oca_matrix_subblocks)"<<std::endl;
     kugler_nca_chunked=pars["kugler_nca_chunked"].get<bool>();
     //cout<<"In ImagAxis0 constructor beta="<<beta<<endl; cout.flush();
     pars["svd_x0"] = min(1./beta, pars["svd_x0"].get<double>());
@@ -428,6 +439,17 @@ public:
       values.push_back(std::move(fn));
     }
 
+    // Channel metadata comes from the physical CIX, not the auxiliary
+    // diagonal matrix used by AAA. Never constrain a normal bath's parity.
+    std::vector<unsigned char> kind(Deltaw.extent(0),0);
+    for(int bath=0;bath<cix.Nbath;++bath)
+      kind[std::abs(cix.bath_sigind0(bath))]|=cix.bath_SC(bath) ? 2 : 1;
+    for(auto& k:kind)k=k==2;
+    aaa_channel_symmetry=edmft::aaa::detect_even_channels(values,kind,
+      pars.value("aaa_anomalous_symmetry",std::string("auto")),
+      pars.value("aaa_symmetry_tolerance",1.e-9),
+      mpi.rank==mpi.master ? mpi.out : nullptr);
+
     edmft::aaa::Options opts;
     opts.tolerance=pars["aaa_tolerance"].get<double>();
     opts.max_support_pairs=pars["aaa_max_support_pairs"].get<int>();
@@ -535,8 +557,15 @@ public:
         const auto finish_expansion=[&](
             const std::vector<MatrixXcd>& fit_values,
             const Eigen::VectorXd& initial_poles,
-            int& iterations) {
+            int& iterations,const edmft::aaa::ChannelSymmetry& symmetry) {
           if (initial_poles.size()==0) return edmft::aaa::PoleExpansion{};
+          if(symmetry.active()) {
+            auto report=edmft::aaa::fit_even_channels(z,fit_values,initial_poles,
+              symmetry,std::max(bound,1.05*initial_poles.cwiseAbs().maxCoeff()),
+              refine ? pars["aaa_refine_max_iterations"].get<int>() : 0,
+              pars["aaa_refine_gradient_tolerance"].get<double>(),mpi.out);
+            iterations+=report.iterations;return std::move(report.expansion);
+          }
           if (!refine)
             return edmft::aaa::fit_residues(z,fit_values,initial_poles);
           const double local_bound=std::max(
@@ -559,7 +588,7 @@ public:
             ? 0.0 : aaa_result.max_error_history.back();
           Eigen::VectorXd poles=aaa_result.real_poles(pole_imag_tolerance);
           int joint_iterations=0;
-          joint_expansion=finish_expansion(values,poles,joint_iterations);
+          joint_expansion=finish_expansion(values,poles,joint_iterations,aaa_channel_symmetry);
           refinement_iterations=joint_iterations;
           if (joint_expansion.poles.size()>0)
             joint_relative_error=expansion_error(joint_expansion).first;
@@ -607,10 +636,15 @@ public:
           const Eigen::VectorXd poles=
             balanced_result.real_poles(pole_imag_tolerance);
           const auto scaled_expansion=finish_expansion(
-            balanced_values,poles,balanced_iterations);
-          if (scaled_expansion.poles.size()>0)
-            balanced_expansion=edmft::aaa::fit_residues(
-              z,values,scaled_expansion.poles);
+            balanced_values,poles,balanced_iterations,aaa_channel_symmetry);
+          if (scaled_expansion.poles.size()>0) {
+            if(aaa_channel_symmetry.active()) {
+              balanced_expansion=scaled_expansion;
+              for(auto& residue:balanced_expansion.residues)
+                for(int b=0;b<Deltaw.extent(0);++b)
+                  residue(b,b)*=std::max(channel_scale[b],channel_scale_floor);
+            } else balanced_expansion=edmft::aaa::fit_residues(z,values,scaled_expansion.poles);
+          }
         }
 
         // The scalar-union construction is intentionally available only when
@@ -643,8 +677,10 @@ public:
                 scalar_result.max_error_history.back());
             Eigen::VectorXd poles=scalar_result.real_poles(pole_imag_tolerance);
             int scalar_iterations=0;
+            edmft::aaa::ChannelSymmetry scalar_symmetry;
+            scalar_symmetry.even={aaa_channel_symmetry.even[b]};
             const auto scalar_expansion=
-              finish_expansion(scalar_values,poles,scalar_iterations);
+              finish_expansion(scalar_values,poles,scalar_iterations,scalar_symmetry);
             channel_iterations+=scalar_iterations;
             for (int l=0; l<scalar_expansion.poles.size(); ++l)
               channel_poles.push_back(scalar_expansion.poles(l));
@@ -673,7 +709,9 @@ public:
           Eigen::VectorXd union_poles(merged.size());
           for (int l=0; l<union_poles.size(); ++l) union_poles(l)=merged[l];
           if (union_poles.size()>0)
-            channel_expansion=edmft::aaa::fit_residues(z,values,union_poles);
+            channel_expansion=aaa_channel_symmetry.active()
+              ? edmft::aaa::refit_even_channels(z,values,union_poles,aaa_channel_symmetry)
+              : edmft::aaa::fit_residues(z,values,union_poles);
         }
 
         const double balanced_relative_error=balanced_expansion.poles.size()>0
@@ -845,6 +883,10 @@ public:
       }
     }
 
+    if(aaa_channel_symmetry.active() &&
+       edmft::aaa::even_symmetry_defect(aaa_hybridization,aaa_channel_symmetry)!=0.)
+      throw std::runtime_error("AAA broadcast violates anomalous even symmetry");
+
     if (pole_count==0) {
       if (mpi.rank==mpi.master)
         (*mpi.out) << "WARN: AAA adapter found no usable real poles; "
@@ -873,8 +915,10 @@ public:
     if (mpi.rank==mpi.master) {
       try {
         if (effective_tca_poles>0 && effective_tca_poles<pole_count) {
-          auto compressed=edmft::aaa::compress_poles_greedy(
-            z,values,aaa_hybridization,effective_tca_poles);
+          auto compressed=aaa_channel_symmetry.active()
+            ? edmft::aaa::compress_even_channels(z,values,aaa_hybridization,
+                effective_tca_poles,aaa_channel_symmetry,mpi.out)
+            : edmft::aaa::compress_poles_greedy(z,values,aaa_hybridization,effective_tca_poles);
           tca_active_hybridization=std::move(compressed.expansion);
           tca_compression_diagnostics[0]=compressed.relative_rms_error;
           tca_compression_diagnostics[1]=
@@ -943,7 +987,7 @@ public:
     if (diagram_dlr_workspace && aaa_hybridization.poles.size()>0) {
       diagram_dlr_workspace->prepare_hybridization(*dlr_basis,aaa_hybridization,
                                                    cix.Nbath_unique_unique);
-      diagram_dlr_workspace->set_atomic_optimizations(higher_order_subblocks,higher_order_skip_zero);
+      diagram_dlr_workspace->set_atomic_optimizations(higher_order_subblocks.tca,higher_order_skip_zero);
     }
     const bool active_workspace_requested=
       tca_pole_count<pole_count || requested_keep_weight<1.0;
@@ -952,7 +996,7 @@ public:
         std::make_unique<edmft::imag_dlr::Workspace>();
       tca_active_dlr_workspace->prepare_hybridization(
         *dlr_basis,tca_active_hybridization,cix.Nbath_unique_unique);
-      tca_active_dlr_workspace->set_atomic_optimizations(higher_order_subblocks,higher_order_skip_zero);
+      tca_active_dlr_workspace->set_atomic_optimizations(higher_order_subblocks.tca,higher_order_skip_zero);
       if (mpi.rank==mpi.master)
         (*mpi.out) << "TCA active workspace: poles=" << tca_pole_count
                    << "/" << pole_count
@@ -995,7 +1039,9 @@ public:
     double errors[2]={0,0};
     if (mpi.rank==mpi.master) {
       try {
-        auto report=edmft::aaa::compress_poles_greedy(z,values,aaa_hybridization,count,1.e-12,true);
+        auto report=aaa_channel_symmetry.active()
+          ? edmft::aaa::compress_even_channels(z,values,aaa_hybridization,count,aaa_channel_symmetry,mpi.out)
+          : edmft::aaa::compress_poles_greedy(z,values,aaa_hybridization,count,1.e-12,true);
         fit=std::move(report.expansion);
         if (count==aaa_hybridization.poles.size()) fit=aaa_hybridization;
         errors[0]=report.relative_rms_error;
@@ -1049,7 +1095,7 @@ public:
     fca_dlr_workspace=std::make_unique<edmft::imag_dlr::Workspace>();
     fca_dlr_workspace->prepare_hybridization(
       fca_dlr_basis ? *fca_dlr_basis : *dlr_basis,fit,channels);
-      fca_dlr_workspace->set_atomic_optimizations(higher_order_subblocks,higher_order_skip_zero);
+      fca_dlr_workspace->set_atomic_optimizations(higher_order_subblocks.fca,higher_order_skip_zero);
     if (mpi.rank==mpi.master)
       (*mpi.out)<<"FCA DLR accuracy: requested="<<accuracy
                 <<" active="<<(mc_anchor ? "full-MC-anchor" : accuracy)
@@ -1353,13 +1399,16 @@ public:
       for (int p=0;p<cix.Npseudo_unique;++p) degeneracy[p]=cix.deg_pp(p);
       edmft::oca_dlr::CombinedResult result;
       try {
+        if(matrix_oca) edmft::spatial_symmetry::configure(cix,*diagram_dlr_workspace,
+          pars.value("time_reversal_self",true),pars.value("spatial_symmetry",true),mpi.rank==mpi.master?mpi.out:nullptr,"OCA");
         if (matrix_oca)
           result=edmft::oca_matrix_dlr::evaluate(cix,*diagram_dlr_workspace,tau,
             cmpPhysG,pars["oca_dlr_mpi"].get<bool>() && mpi.size>1,
             mpi.rank,mpi.size,mpi.out,pars["oca_matrix_subblocks"].get<bool>(),
             pars["oca_matrix_skip_zero"].get<bool>(),pars["oca_matrix_profile"].get<bool>(),
             pars["oca_matrix_reuse"].get<bool>(),
-            pars["oca_measurement_reuse"].get<bool>(),pars["oca_measurement_dense"].get<bool>());
+            pars["oca_measurement_reuse"].get<bool>(),pars["oca_measurement_dense"].get<bool>(),
+            pars["oca_matrix_symmetry"].get<bool>(),pars["oca_convolution_layout"].get<bool>());
         else result=edmft::oca_dlr::EvaluateOCAPhysicalBatched(cix,G_importance,
           OCA_cut_sum,*diagram_dlr_workspace,degeneracy,tau,
           static_cast<size_t>(batch_paths),
@@ -2066,8 +2115,15 @@ public:
     // physical Green/Bulla functions are requested only from the accurate
     // workspace; they are evaluated once, on the final measurement step.
     const auto evaluate_workspace=[&](
-        const edmft::imag_dlr::Workspace& workspace,
+        edmft::imag_dlr::Workspace& workspace,
         bool evaluate_physical) {
+      if(mpi.rank==mpi.master)
+      (*mpi.out)<<"TCA atomic optimizations: subblocks="<<workspace.atomic_subblocks()
+                <<" skip_zero="<<workspace.atomic_skip_zero_roots()
+                <<" mc_reference="<<mc_reference<<std::endl;
+    edmft::spatial_symmetry::configure(cix,workspace,
+        root_sum && !store_self_diagnostics && !mc_reference && pars.value("time_reversal_self",true),pars.value("spatial_symmetry",true),
+        mpi.rank==mpi.master?mpi.out:nullptr,"TCA");
       edmft::tca_dlr::SelfEnergyNodeResult result;
       if (root_sum) {
 #ifdef _MPI
@@ -2528,7 +2584,16 @@ public:
       fca_dlr_workspace->update_pseudos(diagram_dlr_workspace->pseudo_coefficients());
     // As for TCA, do not normalize MC with a deliberately low-pole FCA fit.
     // The full workspace already holds this iteration's pseudo coefficients.
-    const auto& workspace=mc_reference ? *diagram_dlr_workspace : *fca_dlr_workspace;
+    auto& workspace=mc_reference ? *diagram_dlr_workspace : *fca_dlr_workspace;
+    edmft::imag_dlr::ScopedAtomicOptimizations fca_atomic_policy(
+      workspace,higher_order_subblocks.fca,higher_order_skip_zero);
+    if(mpi.rank==mpi.master)
+      (*mpi.out)<<"FCA atomic optimizations: subblocks="<<workspace.atomic_subblocks()
+                <<" skip_zero="<<workspace.atomic_skip_zero_roots()
+                <<" mc_reference="<<mc_reference<<std::endl;
+    edmft::spatial_symmetry::configure(cix,workspace,
+      !mc_reference && pars.value("time_reversal_self",true),pars.value("spatial_symmetry",true),
+      mpi.rank==mpi.master?mpi.out:nullptr,"FCA");
     if (mc_reference && mpi.rank==mpi.master)
       (*mpi.out)<<"FCA MC reference: full AAA poles="<<workspace.pole_count()
                 <<" (FCA pole and DLR-rank approximations bypassed)"<<std::endl;
@@ -2872,7 +2937,11 @@ public:
     Array<int,1> deg_dm(cix.Nbath_unique_unique); deg_dm=0;
     Ekin = 0; nf=0;
 
-    const bool blend_sdyson_bulla = pars["Sdyson_Bulla_blend"].get<bool>();
+    edmft::self_energy::validate(pars,true,cix.kugler_estimators);
+    const auto estimator=edmft::self_energy::selected(pars);
+    const bool explicit_estimator=pars.value("self_energy_estimator",std::string("legacy"))!="legacy";
+    if (mpi.rank==mpi.master)
+      (*mpi.out)<<"Sig.out self-energy estimator="<<edmft::self_energy::name(estimator)<<std::endl;
     const double blend_alpha = pars["Sdyson_Bulla_alpha"].get<double>();
     const double blend_cutoff_fraction = pars["Sdyson_Bulla_cutoff_fraction"].get<double>();
     const double blend_start_ratio = pars["Sdyson_Bulla_start_ratio"].get<double>();
@@ -2886,7 +2955,6 @@ public:
       return x*x*x*(10.0 - 15.0*x + 6.0*x*x);
     };
     auto bulla_weight = [&](double w){
-      if (!blend_sdyson_bulla) return 1.0;
       if (blend_alpha <= 0.0) return 0.0;
       if (w_end <= w_start) return 1.0;
       return smoothstep((std::abs(w)-w_start)/(w_end-w_start));
@@ -2922,7 +2990,8 @@ public:
 	      SigD(iib,Range::all()) = -1.0/Gc(iib,Range::all())*ib_sg-iDeltaw(iib,Range::all())*ib_sg-Eimp*ib_sg+iom(Range::all())*j;
 	      for (int iw=0; iw<iom.size(); ++iw){
 		const double W = bulla_weight(iom(iw));
-		Sigm(iib,iw) = (1.0-W)*SigD(iib,iw) + W*SigB(iib,iw);
+		Sigm(iib,iw) = edmft::self_energy::choose(estimator,SigD(iib,iw),SigB(iib,iw),
+                  cix.kugler_estimators ? SigK(iib,iw) : complex<double>(0.0),W);
 	      }
 	      Gcn (iib,Range::all()) =  1.0/(iom(Range::all())*j-Eimp*ib_sg-Sigm(iib,Range::all())*ib_sg-iDeltaw(iib,Range::all())*ib_sg);
 	      for (int iw=0; iw<iom.size(); ++iw){
@@ -3114,7 +3183,33 @@ public:
 	    SmB.block(N2, 0, N2, N2) = A;
 	  }
 	  const double W = bulla_weight(iom(iw));
-	  MatrixXcd Sm = (1.0-W)*SmD + W*SmB;     // NEW after realizing Sdyson is needed at low w: Combined self-energy used by DMFT: Sdyson at low w, Bulla at high w.
+	  MatrixXcd Sm = edmft::self_energy::choose(estimator,SmD,SmB,SmK,W);
+          if (explicit_estimator) {
+            // Use the same representatives that Sig.out stores. In particular,
+            // an off-diagonal label may occur at both (a,b) and (b,a); the
+            // unprojected EOM matrices need not coincide at finite iteration.
+            std::vector<complex<double>> values(cix.Nbath_unique_unique);
+            std::vector<bool> seen(cix.Nbath_unique_unique,false);
+            for (int bath=0;bath<cix.Nbath;++bath) if (bb.orb_ind[bath][0]==ib) {
+              const int s0=cix.bath_sigind0(bath),s=std::abs(s0);
+              if (!seen[s]) {
+                const int row=bb.orb_ind[bath][1],col=bb.orb_ind[bath][2];
+                values[s]=(s0<0 ? -1.0 : 1.0)*Sm(row,col);
+                seen[s]=true;
+              }
+            }
+            Sm.setZero();
+            for (int bath=0;bath<cix.Nbath;++bath) if (bb.orb_ind[bath][0]==ib) {
+              int row=bb.orb_ind[bath][1],col=bb.orb_ind[bath][2];
+              const int s0=cix.bath_sigind0(bath),s=std::abs(s0);
+              complex<double> value=(s0<0 ? -1.0 : 1.0)*values[s];
+              if (SC && row>=N/2 && col>=N/2) {
+                value=-std::conj(value);
+                std::swap(row,col);
+              }
+              Sm(row,col)=value;
+            }
+          }
 	  MatrixXcd Ginv  = om_Eimp - Sm - Dm;    // G^{-1} = (ω - E_imp - Σ - Δ)
 	  MatrixXcd Gmc  = Ginv.inverse();        // G = (ω - E_imp - Σ - Δ)^{-1}
 	  
@@ -3192,6 +3287,54 @@ public:
     }
     for (int iib=0; iib<cix.Nbath_unique_unique; ++iib)
       if (deg_dm(iib)>0) density_matrix(iib) /= deg_dm(iib);
+
+    if (explicit_estimator && estimator!=edmft::self_energy::Estimator::dyson) {
+      // Sum the physical channels actually saved in Gf.out. This also avoids
+      // counting hole occupations as electron occupations in a Nambu block.
+      std::vector<int> diagonal_sign(cix.Nbath_unique_unique,0);
+      for (int bath=0;bath<cix.Nbath;++bath)
+        if (!cix.bath_SC(bath) && cix.Fi_indx(2*bath)/2==cix.Fi_indx(2*bath+1)/2) {
+          const int label=cix.bath_sigind0(bath);
+          diagonal_sign[std::abs(label)]=label<0 ? -1 : 1;
+        }
+      density_matrix=0;
+      for (int channel=0;channel<cix.Nbath_unique_unique;++channel) {
+        const int sign=diagonal_sign[channel];
+        const double energy=sign*(cix.Ebath(channel)+std::real(Sigm(channel,iom.extent(0)-1)));
+        double sum=0;
+        for (int iw=0;iw<iom.size();++iw) {
+          complex<double> value=Gcn(channel,iw);
+          if (sign) value-=double(sign)/(iom(iw)*j-energy);
+          sum+=w_iom(iw)*std::real(value);
+        }
+        density_matrix(channel)=2.0/beta*sum;
+        if (sign) density_matrix(channel)+=sign*fermi(beta*energy);
+      }
+      nf=0;
+      for (int bath=0;bath<cix.Nbath;++bath)
+        if (!cix.bath_SC(bath) && cix.Fi_indx(2*bath)/2==cix.Fi_indx(2*bath+1)/2) {
+          const int label=cix.bath_sigind0(bath);
+          nf+=(label<0 ? -1.0 : 1.0)*density_matrix(std::abs(label));
+        }
+    }
+
+    if (estimator==edmft::self_energy::Estimator::dyson) {
+      // Dyson reconstructs raw G. Its OCA spectral moment need not be the
+      // identity: use its equal-time endpoint, including off-diagonal entries,
+      // instead of a canonical unit-moment Matsubara add-back.
+      density_matrix = Gimp(Range::all(),tau.extent(0)-1);
+      nf=0;
+      for (int bath=0;bath<cix.Nbath;++bath) {
+        const bool diagonal=!cix.bath_SC(bath) &&
+          cix.Fi_indx(2*bath)/2==cix.Fi_indx(2*bath+1)/2;
+        if (diagonal) {
+          const int label=cix.bath_sigind0(bath);
+          nf+=(label<0 ? -1.0 : 1.0)*density_matrix(std::abs(label));
+        }
+      }
+      if (mpi.rank==mpi.master)
+        (*mpi.out)<<"Dyson density from raw G(beta): nf="<<nf<<std::endl;
+    }
 
     if (mpi.rank==mpi.master){
       Print_Physical1("Gimpw.out", Gc);
