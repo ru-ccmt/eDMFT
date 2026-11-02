@@ -83,7 +83,7 @@ contains
        ibb=MIN(iblock,n0-nnlo-ii+1)  ! size of this block
        if(ibb.gt.0) then
           if (Qforce_j) h_k(:,:) = 0.d0
-          !$OMP PARALLEL DO PRIVATE(bkrot2,bkrloc,yl,arg1,arg2,argt2,phshel)&
+          !$OMP PARALLEL DO PRIVATE(bkrot2,bkrloc,yl,arg1,arg2,argt2,phshel,m)&
           !$OMP& SHARED(h_k,h_alyl)&
           !$OMP& SCHEDULE(STATIC)
           DO i=ii,min(ii+iblock-1,n0-nnlo)
@@ -111,7 +111,14 @@ contains
              if (nonzero_shft) arg2 = dot_product(bk3(:,i), shft(latom,:))*twopi
              ! PHSEHL = e^{I*2pi*( (R_a.(k+K))*tau_n + (K+k)*tau(isym) + (R_n.R_a.(k+K)*R(first)))}
              phshel=EXP( imag*(arg1+arg2+argt2) )
-             h_alyl(:(lmx+1)**2,i-ii+1) = dconjg(yl(:(lmx+1)**2))*phshel
+             ! Keep this scalar.  gfortran 15.2 miscompiles the
+             ! vectorized DCONJG array expression at -O2, producing
+             ! incorrect muffin-tin charges (and mixer NEC01 errors).
+!GCC$ novector
+!DIR$ NOVECTOR
+             do m=1,(lmx+1)**2
+                h_alyl(m,i-ii+1)=dconjg(yl(m))*phshel
+             enddo
              IF(Qforce_j) THEN 
                 h_k(i-ii+1,:) = matmul( rotloc_x_BR1_x_rotij, k3(:,i) )
              ENDIF

@@ -410,3 +410,104 @@ SUBROUTINE cmp_MT_density(w_RHOLM, Aweight, wEpsw, weight, fsph, fnsp, fsph2, ne
 
 END SUBROUTINE cmp_MT_density
 
+
+SUBROUTINE cmp_MT_force_only(Aweight, wEpsw, weight, fsph, fnsp, fsph2, nemin, nemax, DM_nemaxx, nbands, n0, nnlo, time_bl, time_bl_w, time_lo, time_lo_w, time_force, time_force_w)
+  ! Purpose
+  ! -------
+  ! Contract the fixed-window Sternheimer response matrices with the existing
+  ! LAPW Hamiltonian and overlap derivatives.  l2main has diagonalized the
+  ! Hermitian response density, so Aweight contains its eigenvectors, weight
+  ! contains its signed eigenvalues, and wEpsw is the response energy-density
+  ! matrix in the same basis.  The three calls below therefore evaluate
+  !
+  !     Tr[rhoResponse H_A] - Tr[eResponse O_A]
+  !
+  ! using exactly the same radial integrals, local-orbital terms, non-spherical
+  ! potential, and muffin-tin surface terms as the ordinary Pulay force.
+  !
+  ! Why this is separate from cmp_MT_density
+  ! ----------------------------------------
+  ! rhoResponse is off-diagonal between the DMFT window and its complement.  It
+  ! is an effective density matrix for a derivative, not a change of the DMFT
+  ! charge density.  Calling the full density routine would incorrectly add it
+  ! to w_RHOLM and later feed it to the charge mixer and Hartree/XC potential.
+  ! This force-only routine consequently avoids zero_char*, psplit, radial
+  ! charge accumulation, and all charge-analysis side effects.
+  !
+  ! The extra work is only a second construction/contraction of LAPW expansion
+  ! coefficients during force runs.  There is no additional frequency loop.
+  USE param, ONLY: lmax2, nume, nloat, lomax, ngau
+  USE atspdt, ONLY: el
+  USE com, ONLY: nat
+  USE lo, ONLY: ilo, elo
+  USE structure, ONLY: mult, natm, Rmt
+  USE w_atpar, ONLY: retrieve_w_atpar, Vts, lpv, lv, mpv, mv, Nhmx, &
+       ri_mat, ul_Rmt, dul_Rmt
+  USE dmfts, ONLY: iso
+  USE alm_blm_clm, ONLY: cmp_alm_blm_clm
+  USE Forces, ONLY: Force1_DMFT, Force2, Force3, forcea, Qforce
+  IMPLICIT NONE
+  INTEGER, intent(in) :: nemin, nemax, DM_nemaxx, nbands, n0, nnlo
+  COMPLEX*16, intent(in) :: Aweight(nbands,nbands), wEpsw(nbands,nbands)
+  REAL*8, intent(in) :: weight(nume)
+  REAL*8, intent(inout) :: fsph(3,natm), fnsp(3,natm), fsph2(3,natm)
+  REAL*8, intent(inout) :: time_bl, time_bl_w, time_lo, time_lo_w
+  REAL*8, intent(inout) :: time_force, time_force_w
+  COMPLEX*16, allocatable :: alm(:,:), blm(:,:), clm(:,:,:)
+  COMPLEX*16, allocatable :: aalm(:,:,:), bblm(:,:,:), cclm(:,:,:,:)
+  INTEGER :: lmax2lmax2, lomaxlomax, nbandsx
+  INTEGER :: jatom, lfirst, lmmax, latom, mu, is, lmx
+  REAL*8 :: time1, time1_w, time2, time2_w
+  LOGICAL :: Qforce_j
+
+  if (.not.Qforce) return
+  lmax2lmax2=(lmax2+1)*(lmax2+1)
+  lomaxlomax=(lomax+1)*(lomax+1)
+  nbandsx=DM_nemaxx-nemin+1
+  lmx=lmax2
+  if (nbandsx.le.0) return
+
+  allocate(alm(lmax2lmax2,nume),blm(lmax2lmax2,nume))
+  allocate(clm(lomaxlomax,nume,nloat))
+  allocate(aalm(lmax2lmax2,nbands,3),bblm(lmax2lmax2,nbands,3))
+  allocate(cclm(lomaxlomax,nbands,nloat,3))
+
+  do jatom=1,nat
+     CALL retrieve_w_atpar(jatom,lfirst,lmmax)
+     latom=lfirst-1
+     Qforce_j=forcea(0,jatom)
+     do mu=1,mult(jatom)
+        latom=latom+1
+        do is=1,iso
+           CALL cputim(time1)
+           CALL walltim(time1_w)
+           CALL cmp_alm_blm_clm(alm,blm,clm,aalm,bblm,cclm,Aweight, &
+                latom,lfirst,jatom,nemin,nemax,n0,nnlo,is,nemin,nemax, &
+                DM_nemaxx,nbands,nbandsx,Qforce_j,time_bl,time_bl_w, &
+                time_lo,time_lo_w)
+           CALL cputim(time2)
+           CALL walltim(time2_w)
+           if (Qforce_j) then
+              fsph(:,latom)=fsph(:,latom)+Force1_DMFT(nemin,nemax, &
+                   DM_nemaxx,lmx,alm,blm,clm,aalm,bblm,cclm,weight, &
+                   el,elo,wEpsw,ri_mat(:,:,:,jatom),ilo,lmax2,nume, &
+                   nloat,lomax,nbands,nbands)
+              fnsp(:,latom)=fnsp(:,latom)+Force2(nemin,nemax, &
+                   DM_nemaxx,Nhmx(jatom),alm,blm,clm,aalm,bblm,cclm, &
+                   weight,Vts(:,:,:,jatom),lv(:,jatom),lpv(:,jatom), &
+                   mv(:,jatom),mpv(:,jatom),ilo,lmax2,lomax,nume,nloat, &
+                   ngau,nbands)
+              fsph2(:,latom)=fsph2(:,latom)+Force3(nemin,nemax, &
+                   DM_nemaxx,lmx,alm,blm,clm,aalm,bblm,cclm,weight, &
+                   ul_Rmt(:,:,jatom),dul_Rmt(:,:,jatom),Rmt(jatom),ilo, &
+                   lmax2,lomax,nume,nloat,nbands)
+           endif
+           time_force=time_force+time2-time1
+           time_force_w=time_force_w+time2_w-time1_w
+        enddo
+     enddo
+  enddo
+
+  deallocate(alm,blm,clm,aalm,bblm,cclm)
+END SUBROUTINE cmp_MT_force_only
+

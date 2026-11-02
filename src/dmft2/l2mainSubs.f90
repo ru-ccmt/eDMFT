@@ -539,7 +539,16 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, norbitals, nipc, n0
               PHSHEL=EXP(IMAG*(ARG1+ARG2+ARGT2))
               do lcase=1,nl(icase) !----------- loop over L(jatom) requested in the ionput ---------------!
                  l=ll(icase,lcase) !------ current L --!
-                 h_yl(l*l+1:(l+1)**2, i-ii+1) = dconjg(yl(l*l+1:(l+1)**2))*phshel
+                 ! Keep this scalar.  gfortran 15.2 miscompiles the
+                 ! vectorized DCONJG array expression at -O2, producing
+                 ! incorrect muffin-tin charges (and mixer NEC01 errors).
+                 index=l*l
+!GCC$ novector
+!DIR$ NOVECTOR
+                 do m=1,2*l+1
+                    index=index+1
+                    h_yl(index,i-ii+1)=dconjg(yl(index))*phshel
+                 enddo
               enddo
               IF(Qforce_j) THEN
                  h_k(i-ii+1,:) = matmul(rotloc_x_BR1_x_rotij, k3(:,i))
@@ -969,7 +978,7 @@ END SUBROUTINE Diagonalize_DMFT_WEIGHTS
 !---------------------------------------------
 ! To compute overlap needed by renormalization
 !---------------------------------------------
-SUBROUTINE cmp_overlap(Olapm, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim2, emin, emax, iorbital, cix_orb, iSx, nindo, noccur, cixdim, cfX, Rspin, sumw, lmaxp, time_dmf0, time_dmf0w, SIMPLE)
+SUBROUTINE cmp_overlap(Olapm, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim2, emin, emax, iorbital, cix_orb, iSx, nindo, noccur, cixdim, cfX, Rspin, sumw, lmaxp, time_dmf0, time_dmf0w, SIMPLE, dXrel, CalcDerivative, KeepNormalization)
   USE xa,    ONLY: fj, dfj
   USE xa3,   ONLY: bk3, bk3lo, aK, k3, k3lo, As, As_lo
   USE param, ONLY: nume, nmat, nloat, iblock, lmax2
@@ -983,13 +992,14 @@ SUBROUTINE cmp_overlap(Olapm, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim
   !USE MProjector, ONLY: Build_DMFT_Projector2
   IMPLICIT NONE
   COMPLEX*16, intent(out):: Olapm(maxdim,maxdim,ncix), SOlapm(maxdim,maxdim,ncix)
+  COMPLEX*16, intent(out):: dXrel(maxdim,maxdim,ncix,3)
   INTEGER,    intent(out):: max_nbands
   REAL*8,     intent(out):: time_dmf0, time_dmf0w
   INTEGER,    intent(in) :: nnlo, norbitals, natom, maxdim2, lmaxp
   REAL*8,     intent(in) :: emin, emax, sumw
   INTEGER,    intent(in) :: iorbital(natom,lmaxp+1), cix_orb(norbitals), iSx(maxdim2, norbitals), nindo(norbitals), noccur(maxsize,ncix), cixdim(ncix)
   complex*16, intent(in) :: cfX(maxdim2,maxdim2,norbitals,norbitals), Rspin(2,2,norbitals)
-  LOGICAL, intent(in)    :: SIMPLE
+  LOGICAL, intent(in)    :: SIMPLE, CalcDerivative, KeepNormalization
   ! interfaces
   interface
      REAL*8 Function Romb(y,N,dx)
@@ -1000,8 +1010,10 @@ SUBROUTINE cmp_overlap(Olapm, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim
      end Function Romb
   end interface
   ! locals
-  complex*16, ALLOCATABLE :: DMFTU(:,:,:,:), Olapmk(:,:,:), olp(:,:)
-  INTEGER    :: ikp, nemin, nemax, DM_nemin, DM_nemax, n0
+  complex*16, ALLOCATABLE :: DMFTU(:,:,:,:), Olapmk(:,:,:), olp(:,:), olp2(:,:)
+  complex*16, ALLOCATABLE :: dOlapm(:,:,:,:), dOlapmk(:,:,:,:)
+  complex*16, ALLOCATABLE :: Xsaved(:,:,:)
+  INTEGER    :: ikp, nemin, nemax, DM_nemin, DM_nemax, n0, idir
   REAL*8     :: E(nume), wgh0, emist, Olapc(maxsize,ncix), Kn(3), rx
   LOGICAL    :: more_kpoints, Tcompute
   INTEGER    :: jatom, isize, nbands, itape, is, i, iorb1, iorb2, icix, nind1, nind2, ind1, ind2, cixdm, ip, iq, it, iikp, iks, ivector, nkp
@@ -1022,6 +1034,16 @@ SUBROUTINE cmp_overlap(Olapm, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim
   czero = cmplx(0.d0, 0.d0, 8)
   allocate( Olapmk(maxdim,maxdim,ncix), olp(maxdim2,maxdim2) )
   Olapm=0
+  dXrel=0
+  if (KeepNormalization) then
+     allocate(Xsaved(maxdim,maxdim,ncix))
+     Xsaved=SOlapm
+  endif
+  if (CalcDerivative) then
+     allocate(olp2(maxdim2,maxdim2))
+     allocate(dOlapm(maxdim,maxdim,ncix,3), dOlapmk(maxdim,maxdim,ncix,3))
+     dOlapm=0
+  endif
 
   call cputim(t1c)
   call walltim(t1w)
@@ -1103,12 +1125,18 @@ SUBROUTINE cmp_overlap(Olapm, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim
         endif
         ! New
 
+        ! The ordinary overlap construction needs only projector channel 1.
+        ! For a force calculation channels 2:4 contain D_A, with U_A=-iD_A.
+        ! They let us build S_A analytically while traversing the same k-points
+        ! and using exactly the same raw projector definition as for S.
         nipc=1
+        if (CalcDerivative) nipc=4
         allocate( DMFTU(nbands,maxdim2,norbitals,nipc) )
 
         CALL Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, norbitals, nipc, n0, nnlo, nbands, cix_orb, nindo, DM_nemin, DM_nemax, maxdim2, lmaxp)
         
         Olapmk=0
+        if (CalcDerivative) dOlapmk=0
         DO iorb1=1,norbitals
            icix = cix_orb(iorb1)
            if ( icix.EQ.0 ) CYCLE
@@ -1123,11 +1151,32 @@ SUBROUTINE cmp_overlap(Olapm, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim
                     Olapmk( iSx(ind1,iorb1), iSx(ind2,iorb2), icix ) = olp(ind1,ind2)
                  enddo
               enddo
+              if (CalcDerivative) then
+                 do idir=1,3
+                    ! olp  = D_A^+ U and olp2 = U^+ D_A.  Since U_A=-iD_A,
+                    !
+                    !   S_A = U_A^+U + U^+U_A
+                    !       = i(D_A^+U-U^+D_A).
+                    !
+                    ! This combination is Hermitian up to roundoff, as a
+                    ! derivative of the Hermitian overlap S must be.
+                    call zgemm('C','N', nind1, nind2, nbands, cone, DMFTU(:,:,iorb1,idir+1),nbands, DMFTU(:,:,iorb2,1),nbands, czero, olp,maxdim2)
+                    call zgemm('C','N', nind1, nind2, nbands, cone, DMFTU(:,:,iorb1,1),nbands, DMFTU(:,:,iorb2,idir+1),nbands, czero, olp2,maxdim2)
+                    do ind1=1,nind1
+                       do ind2=1,nind2
+                          ! Build dS=U_A^+ U+U^+ U_A.  The force channel D
+                          ! is defined by U_A=-iD in Build_DMFT_Projector.
+                          dOlapmk(iSx(ind1,iorb1),iSx(ind2,iorb2),icix,idir) = IMAG*(olp(ind1,ind2)-olp2(ind1,ind2))
+                       enddo
+                    enddo
+                 enddo
+              endif
            enddo
         ENDDO
            
         wg = (wgh0/sumw)
         Olapm(:,:,:) = Olapm(:,:,:) + Olapmk(:,:,:) * wg ! proper weight for the reducible k-point
+        if (CalcDerivative) dOlapm(:,:,:,:) = dOlapm(:,:,:,:) + dOlapmk(:,:,:,:) * wg
         deallocate( DMFTU )
 
         if (abs(projector).EQ.5) deallocate( phi_jl )
@@ -1145,6 +1194,11 @@ SUBROUTINE cmp_overlap(Olapm, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim
   ENDDO
   
   CALL Reduce_MPI0(Olapm, maxdim, ncix, max_nbands)
+  if (CalcDerivative) then
+     do idir=1,3
+        CALL Reduce_MPI0(dOlapm(:,:,:,idir), maxdim, ncix, max_nbands)
+     enddo
+  endif
   
   deallocate( olapmk, olp )
   
@@ -1284,11 +1338,455 @@ SUBROUTINE cmp_overlap(Olapm, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim
      deallocate( work, rwork, iwork )
      deallocate( olocf, ws, tmp1 )
   endif
+  ! If SOlapm.dat was present, Xsaved is the normalization used by the
+  ! converged DMFT calculation.  The overlap traversal above is needed to
+  ! obtain S_A, not to redefine X.  Restoring X also provides a useful test:
+  ! adding force derivatives must not shift EF in an otherwise identical run.
+  if (KeepNormalization) SOlapm=Xsaved
+  if (CalcDerivative) then
+     CALL ComputeNormalizationDerivative(dXrel, dOlapm, SOlapm, Sigind, cixdim, maxdim, ncix, SIMPLE)
+     deallocate(olp2, dOlapm, dOlapmk)
+  endif
+  if (KeepNormalization) deallocate(Xsaved)
   call cputim(t2c)
   call walltim(t2w)
   time_dmf0 = t2c-t1c
   time_dmf0w= t2w-t1w
 END SUBROUTINE cmp_overlap
+
+
+!===============================================================================
+! DERIVATIVE OF THE GLOBAL PROJECTOR NORMALIZATION
+!===============================================================================
+!
+! Why this term is needed
+! -----------------------
+! Let P_k be the raw LAPW-to-local-orbital projector.  In this implementation
+! the projector used by DMFT is not P_k itself, but
+!
+!                         U_k = P_k X,
+!
+! where the normalization matrix is common to all k-points,
+!
+!               S = sum_k w_k P_k^+ P_k,       X = S^(-1/2).
+!
+! The old force code differentiated P_k and subsequently multiplied that
+! derivative by X.  This gives the first term in
+!
+!                 U_{k,A} = P_{k,A} X + P_k X_A,
+!
+! but misses P_k X_A.  The omitted term is especially important when the
+! correlated and uncorrelated atoms move differently: translating the entire
+! crystal must leave the normalized projector unchanged, and that cancellation
+! involves both terms above.  Ignoring X_A therefore violates the acoustic sum
+! rule even when the explicit derivative P_{k,A} is accurate.
+!
+! Derivative of X=S^(-1/2)
+! ------------------------
+! For a matrix S, X_A is NOT obtained by differentiating every matrix element
+! as if S were diagonal.  Introduce Y=X^(-1)=S^(1/2).  Differentiating
+!
+!                            X S X = 1
+!
+! and eliminating S gives the Sylvester equation
+!
+!                  Y X_A + X_A Y = -X S_A X,                  (1)
+!
+! with
+!
+!          S_A = sum_k w_k (P_{k,A}^+ P_k + P_k^+ P_{k,A}).   (2)
+!
+! The k-point weights are fixed band-integration weights, hence w_{k,A}=0.
+! Equation (1) is solved in the eigenbasis of X.  If x_i are its eigenvalues,
+!
+!          (X_A)'_ij = -x_i x_j (S_A)'_ij/(1/x_i+1/x_j).
+!
+! It is convenient for the projector update to return the relative derivative
+!
+!                         B_A = X^(-1) X_A.
+!
+! In the eigenbasis of X this is
+!
+!              (B_A)'_ij = -x_j (S_A)'_ij/(1/x_i+1/x_j),      (3)
+!
+! which is exactly the expression implemented below.
+!
+! Relation to the force-channel convention
+! ----------------------------------------
+! Build_DMFT_Projector stores the three force channels D_A with the convention
+!
+!                            U_A = -i D_A.
+!
+! Once the ordinary channels have been normalized, Ubar=P X, their missing
+! normalization contribution is Ubar B_A.  Therefore the stored D channel must
+! receive
+!
+!                         D_A <- D_A + i Ubar B_A.
+!
+! This is performed by AddProjectorNormalizationDerivative.
+!
+! SOlapm.dat subtlety
+! -------------------
+! SOlapm.dat contains the normalization X used by the converged DMFT run.  We
+! recompute S_A from the current LAPW vectors, but deliberately restore and use
+! the saved X.  Replacing X by a newly reconstructed value in a force-only step
+! changes the physical projector and can move the chemical potential.  A force
+! derivative must differentiate the projector that was actually used, not
+! silently define a nearby projector.
+!===============================================================================
+SUBROUTINE ComputeNormalizationDerivative(dXrel, dS, X, Sigind, cixdim, maxdim, ncix, SIMPLE)
+  IMPLICIT NONE
+  INTEGER, intent(in) :: maxdim, ncix, cixdim(ncix), Sigind(maxdim,maxdim,ncix)
+  LOGICAL, intent(in) :: SIMPLE
+  COMPLEX*16, intent(in)  :: dS(maxdim,maxdim,ncix,3), X(maxdim,maxdim,ncix)
+  COMPLEX*16, intent(out) :: dXrel(maxdim,maxdim,ncix,3)
+  INTEGER :: icix, cixdm, cixdms, ip, iq, idir, info
+  INTEGER :: lwork, lrwork, liwork
+  INTEGER, allocatable :: cini(:), iwork(:)
+  REAL*8, allocatable :: xeig(:), rwork(:)
+  COMPLEX*16, allocatable :: Xvec(:,:), dSt(:,:), Bt(:,:), Bout(:,:), work(:)
+
+  dXrel=0.d0
+  if (SIMPLE) then
+     do icix=1,ncix
+        do ip=1,cixdim(icix)
+           if (Sigind(ip,ip,icix).eq.0) cycle
+           do idir=1,3
+              ! X=S^{-1/2}: X^{-1} X_A = -1/2 X^2 S_A.
+              dXrel(ip,ip,icix,idir) = -0.5d0*X(ip,ip,icix)**2*dS(ip,ip,icix,idir)
+           enddo
+        enddo
+     enddo
+     return
+  endif
+
+  do icix=1,ncix
+     cixdm=cixdim(icix)
+     allocate(cini(cixdm))
+     cixdms=0
+     do ip=1,cixdm
+        if (Sigind(ip,ip,icix).ne.0) then
+           cixdms=cixdms+1
+           cini(cixdms)=ip
+        endif
+     enddo
+     if (cixdms.eq.0) then
+        deallocate(cini)
+        cycle
+     endif
+
+     lwork=4*cixdms+cixdms*cixdms
+     lrwork=10*cixdms+2*cixdms*cixdms+1
+     liwork=3+10*cixdms
+     allocate(Xvec(cixdms,cixdms), dSt(cixdms,cixdms), Bt(cixdms,cixdms), Bout(cixdms,cixdms))
+     allocate(xeig(cixdms), work(lwork), rwork(lrwork), iwork(liwork))
+     do ip=1,cixdms
+        do iq=1,cixdms
+           Xvec(ip,iq)=X(cini(ip),cini(iq),icix)
+        enddo
+     enddo
+     CALL ZHEEVD('V','U',cixdms,Xvec,cixdms,xeig,work,lwork,rwork,lrwork,iwork,liwork,info)
+     if (info.ne.0 .or. minval(xeig).le.1.d-14) then
+        write(6,*) 'ERROR: diagonalization of S^{-1/2} failed in normalization derivative',icix,info
+        STOP 'ComputeNormalizationDerivative failed'
+     endif
+
+     do idir=1,3
+        do ip=1,cixdms
+           do iq=1,cixdms
+              Bout(ip,iq)=dS(cini(ip),cini(iq),icix,idir)
+           enddo
+        enddo
+        dSt=matmul(conjg(transpose(Xvec)),matmul(Bout,Xvec))
+        do ip=1,cixdms
+           do iq=1,cixdms
+              ! Solve Y X_A+X_A Y=-X S_A X with Y=X^{-1}, then
+              ! return the relative derivative B_A=X^{-1}X_A.  The actual
+              ! normalized-projector derivative is Ubar_A=...+Ubar B_A.
+              Bt(ip,iq)=-xeig(iq)*dSt(ip,iq)/(1.d0/xeig(ip)+1.d0/xeig(iq))
+           enddo
+        enddo
+        Bout=matmul(Xvec,matmul(Bt,conjg(transpose(Xvec))))
+        do ip=1,cixdms
+           do iq=1,cixdms
+              dXrel(cini(ip),cini(iq),icix,idir)=Bout(ip,iq)
+           enddo
+        enddo
+     enddo
+     deallocate(Xvec,dSt,Bt,Bout,xeig,work,rwork,iwork,cini)
+  enddo
+END SUBROUTINE ComputeNormalizationDerivative
+
+
+SUBROUTINE AddProjectorNormalizationDerivative(DMFTU, dXrel, cix_orb, cixdim, nindo, iSx, nbands, maxdim2, norbitals, maxdim, ncix)
+  IMPLICIT NONE
+  INTEGER, intent(in) :: nbands, maxdim2, norbitals, maxdim, ncix
+  INTEGER, intent(in) :: cix_orb(norbitals), cixdim(ncix), nindo(norbitals), iSx(maxdim2,norbitals)
+  COMPLEX*16, intent(in) :: dXrel(maxdim,maxdim,ncix,3)
+  COMPLEX*16, intent(inout) :: DMFTU(nbands,maxdim2,norbitals,4)
+  INTEGER :: icix, cixdm, iorb, nind, ind, idir
+  COMPLEX*16, allocatable :: Ucix(:,:), corr(:,:)
+  COMPLEX*16, parameter :: cone=(1.d0,0.d0), czero=(0.d0,0.d0), IMAG=(0.d0,1.d0)
+
+  do icix=1,ncix
+     cixdm=cixdim(icix)
+     allocate(Ucix(nbands,cixdm),corr(nbands,cixdm))
+     Ucix=0.d0
+     do iorb=1,norbitals
+        if (cix_orb(iorb).ne.icix) cycle
+        nind=nindo(iorb)
+        do ind=1,nind
+           Ucix(:,iSx(ind,iorb))=DMFTU(:,ind,iorb,1)
+        enddo
+     enddo
+     do idir=1,3
+        call zgemm('N','N',nbands,cixdm,cixdm,cone,Ucix,nbands,dXrel(:,:,icix,idir),maxdim,czero,corr,nbands)
+        do iorb=1,norbitals
+           if (cix_orb(iorb).ne.icix) cycle
+           nind=nindo(iorb)
+           do ind=1,nind
+              ! The force channel D uses U_A=-iD, hence D_norm=i Ubar B_A.
+              DMFTU(:,ind,iorb,idir+1)=DMFTU(:,ind,iorb,idir+1)+IMAG*corr(:,iSx(ind,iorb))
+           enddo
+        enddo
+     enddo
+     deallocate(Ucix,corr)
+  enddo
+END SUBROUTINE AddProjectorNormalizationDerivative
+
+
+!===============================================================================
+! RESPONSE OF A PROJECTOR DEFINED IN A FIXED BAND-INDEX WINDOW
+!===============================================================================
+!
+! The missing Sternheimer contribution
+! -------------------------------------
+! The DMFT window W is a fixed set of band indices, for example bands 12--31 at
+! every k-point.  Even though the membership of W does not change under an
+! infinitesimal displacement, a state inside W has the usual first-order
+! response to every state outside W:
+!
+!   |psi_{n,A}>_outside = sum_{a not in W} |psi_a>
+!       <psi_a|H_A-eps_n O_A|psi_n>/(eps_n-eps_a),       n in W.       (4)
+!
+! H_A and O_A are the LAPW Hamiltonian and overlap derivatives already derived
+! and implemented for the ordinary Pulay force.  The original DMFT force code
+! differentiated projector matrix elements whose band index lies inside W, but
+! did not include the outside-band resolution of identity in (4).  This is why
+! increasing the number of LAPW1 bands improves the force sum: it improves the
+! numerical representation of this missing response.
+!
+! A direct Sternheimer solve for every atom and Cartesian direction would be
+! expensive.  We can instead rewrite its contribution as an additional
+! band-space density matrix and reuse the existing H_A and O_A contractions.
+!
+! Quantities already available from the DMFT frequency sum
+! --------------------------------------------------------
+! Use U_W for the normalized projectors restricted to the DMFT window and
+! U_full for the same projectors evaluated for every band stored in case.vector.
+! At each frequency the embedded self-energy is
+!
+!                       Sigma_emb = U_W Sigma U_W^+.
+!
+! cmp_dmft_weights2 already supplies the two Hermitian matrices
+!
+!      rho = sum_omega G(omega),
+!      EG  = sum_omega [epsilon + Sigma_emb(omega)] G(omega),
+!
+! including all temperature and k-point weights.  Therefore no new frequency
+! loop and no two-particle vertex are required:
+!
+!       B = EG - epsilon rho
+!         = sum_omega Sigma_emb(omega) G(omega)
+!         = U_W C,                                                   (5)
+!
+! where C=sum_omega Sigma U_W^+ G.  Stationarity of the DFT+eDMFT Klein
+! functional is what allows the implicit self-energy response (and hence the
+! vertex) to cancel; only the explicit one-particle projector response remains.
+!
+! Reconstructing C and extending it outside W
+! -------------------------------------------
+! When the active projector columns are linearly independent in W,
+!
+!                  C = (U_W^+ U_W)^(-1) U_W^+ B.
+!
+! In practice symmetries or a narrow window can make the metric rank deficient,
+! so the code uses an eigenvalue-cutoff Moore-Penrose pseudoinverse:
+!
+!          K = U_full (U_W^+ U_W)^+ U_W^+ B.                         (6)
+!
+! K_{an} is the frequency-summed DMFT coefficient multiplying the
+! Sternheimer matrix element between an outside state a and a window state n.
+!
+! Response density and energy-density matrices
+! ---------------------------------------------
+! Combining (4) and (6), define for a outside W and n inside W
+!
+!       rhoResponse_{a n} = K_{a n}/(eps_n-eps_a),
+!       rhoResponse_{n a} = rhoResponse_{a n}^*,                     (7)
+!
+!       eResponse_{a n}   = eps_n rhoResponse_{a n},
+!       eResponse_{n a}   = eResponse_{a n}^*.                       (8)
+!
+! The omitted contribution to the stationary-functional derivative is then
+!
+!       Tr[rhoResponse H_A] - Tr[eResponse O_A].                     (9)
+!
+! This has exactly the same algebraic form as the Pulay contractions already
+! evaluated by Force1_DMFT, Force2, and Force3.  l2main diagonalizes the signed
+! Hermitian rhoResponse only as a computational representation, transforms
+! eResponse to the same basis, and calls cmp_MT_force_only.
+!
+! rhoResponse is NOT a correction to the physical charge density
+! --------------------------------------------------------------
+! Equations (7)--(9) are a device for evaluating a derivative of the projector.
+! Adding rhoResponse to w_RHOLM or the interstitial density would change the
+! state whose force is being evaluated.  Consequently cmp_MT_force_only reuses
+! only the force kernels and intentionally performs no charge accumulation.
+!
+! Finite stored-band approximation
+! --------------------------------
+! The exact sum in (4) contains all bands.  Here "outside" means all additional
+! states already present in case.vector/case.vectorso.  Convergence can therefore
+! be checked, and improved when necessary, by asking LAPW1 to write more bands;
+! the DMFT window itself remains unchanged.  Exact cross-window degeneracies
+! require degenerate perturbation theory.  Isolated denominators below 1e-10 Ry
+! are skipped and reported rather than divided by an unstable number.
+!===============================================================================
+SUBROUTINE BuildWindowResponseMatrices(rhoResponse, eResponse, DMFTUfull, Aweight, AEweight, E, nemin, nemax, DM_nemin, DM_nemax, nbands_full, nbands, maxdim2, norbitals, maxdim, ncix, cix_orb, cixdim, nindo, iSx, Sigind)
+  USE com_mpi, ONLY: Qprint
+  IMPLICIT NONE
+  INTEGER, intent(in) :: nemin, nemax, DM_nemin, DM_nemax
+  INTEGER, intent(in) :: nbands_full, nbands, maxdim2, norbitals, maxdim, ncix
+  INTEGER, intent(in) :: cix_orb(norbitals), cixdim(ncix), nindo(norbitals)
+  INTEGER, intent(in) :: iSx(maxdim2,norbitals), Sigind(maxdim,maxdim,ncix)
+  REAL*8, intent(in) :: E(*)
+  COMPLEX*16, intent(in) :: DMFTUfull(nbands_full,maxdim2,norbitals)
+  COMPLEX*16, intent(in) :: Aweight(nbands,nbands), AEweight(nbands,nbands)
+  COMPLEX*16, intent(out) :: rhoResponse(nbands_full,nbands_full)
+  COMPLEX*16, intent(out) :: eResponse(nbands_full,nbands_full)
+  INTEGER :: icix, ip, iq, iorb, ind, ia, iw, in, iw0, iw1
+  INTEGER :: nactive, icolumn, info, lwork, lrwork, liwork, nsmall, ndegenerate
+  INTEGER, allocatable :: activeColumn(:,:), iwork(:)
+  REAL*8 :: eigmax, cutoff, denominator, epsn, responseNorm
+  REAL*8, allocatable :: seig(:), rwork(:)
+  COMPLEX*16 :: response
+  COMPLEX*16, allocatable :: Uall(:,:), Uwindow(:,:), Svec(:,:), Sinv(:,:)
+  COMPLEX*16, allocatable :: B(:,:), localPart(:,:), Kfull(:,:), work(:)
+  COMPLEX*16, parameter :: cone=(1.d0,0.d0), czero=(0.d0,0.d0)
+
+  rhoResponse=czero
+  eResponse=czero
+  iw0=DM_nemin-nemin+1
+  iw1=DM_nemax-nemin+1
+  if (iw0.lt.1 .or. iw1.gt.nbands_full .or. iw1-iw0+1.ne.nbands) then
+     WRITE(6,*) 'ERROR: inconsistent fixed DMFT window in BuildWindowResponseMatrices', &
+          nemin,nemax,DM_nemin,DM_nemax,nbands_full,nbands
+     STOP 'BuildWindowResponseMatrices: inconsistent band bounds'
+  endif
+
+  ! Keep every local state which occurs in at least one self-energy matrix
+  ! element.  Usually testing Sigind(ip,ip) is sufficient, but the row/column
+  ! test also covers a purely off-diagonal block.
+  allocate(activeColumn(maxdim,ncix))
+  activeColumn=0
+  nactive=0
+  do icix=1,ncix
+     do ip=1,cixdim(icix)
+        if (any(Sigind(ip,1:cixdim(icix),icix).gt.0) .or. &
+            any(Sigind(1:cixdim(icix),ip,icix).gt.0)) then
+           nactive=nactive+1
+           activeColumn(ip,icix)=nactive
+        endif
+     enddo
+  enddo
+  if (nactive.eq.0) then
+     deallocate(activeColumn)
+     return
+  endif
+
+  allocate(Uall(nbands_full,nactive),Uwindow(nbands,nactive))
+  Uall=czero
+  do iorb=1,norbitals
+     icix=cix_orb(iorb)
+     if (icix.eq.0) cycle
+     do ind=1,nindo(iorb)
+        ip=iSx(ind,iorb)
+        icolumn=activeColumn(ip,icix)
+        if (icolumn.gt.0) Uall(:,icolumn)=DMFTUfull(:,ind,iorb)
+     enddo
+  enddo
+  Uwindow=Uall(iw0:iw1,:)
+
+  allocate(Svec(nactive,nactive),Sinv(nactive,nactive),seig(nactive))
+  call zgemm('C','N',nactive,nactive,nbands,cone,Uwindow,nbands,Uwindow,nbands, &
+       czero,Svec,nactive)
+  lwork=2*nactive+nactive*nactive
+  lrwork=5*nactive+2*nactive*nactive+1
+  liwork=3+5*nactive
+  allocate(work(lwork),rwork(lrwork),iwork(liwork))
+  CALL ZHEEVD('V','U',nactive,Svec,nactive,seig,work,lwork,rwork,lrwork,iwork,liwork,info)
+  if (info.ne.0) then
+     WRITE(6,*) 'ERROR: projector metric diagonalization failed in window response',info
+     STOP 'BuildWindowResponseMatrices: ZHEEVD failed'
+  endif
+
+  eigmax=maxval(seig)
+  cutoff=max(1.d-13,1.d-11*eigmax)
+  Sinv=Svec
+  nsmall=0
+  do ip=1,nactive
+     if (seig(ip).gt.cutoff) then
+        Sinv(:,ip)=Sinv(:,ip)/seig(ip)
+     else
+        Sinv(:,ip)=czero
+        nsmall=nsmall+1
+     endif
+  enddo
+  Sinv=matmul(Sinv,conjg(transpose(Svec)))
+
+  allocate(B(nbands,nbands),localPart(nactive,nbands),Kfull(nbands_full,nbands))
+  do iw=1,nbands
+     do in=1,nbands
+        ! eps multiplies the Green's function from the left.
+        B(iw,in)=AEweight(iw,in)-E(DM_nemin+iw-1)*Aweight(iw,in)
+     enddo
+  enddo
+  call zgemm('C','N',nactive,nbands,nbands,cone,Uwindow,nbands,B,nbands, &
+       czero,localPart,nactive)
+  localPart=matmul(Sinv,localPart)
+  call zgemm('N','N',nbands_full,nbands,nactive,cone,Uall,nbands_full, &
+       localPart,nactive,czero,Kfull,nbands_full)
+
+  ndegenerate=0
+  do ia=1,nbands_full
+     if (ia.ge.iw0 .and. ia.le.iw1) cycle
+     do iw=1,nbands
+        in=iw0+iw-1
+        epsn=E(DM_nemin+iw-1)
+        denominator=epsn-E(nemin+ia-1)
+        if (abs(denominator).le.1.d-10) then
+           ndegenerate=ndegenerate+1
+           cycle
+        endif
+        response=Kfull(ia,iw)/denominator
+        rhoResponse(ia,in)=response
+        rhoResponse(in,ia)=conjg(response)
+        eResponse(ia,in)=epsn*response
+        eResponse(in,ia)=conjg(eResponse(ia,in))
+     enddo
+  enddo
+
+  responseNorm=sqrt(sum(abs(rhoResponse)**2))
+  if (Qprint .and. (nsmall.gt.0 .or. ndegenerate.gt.0)) then
+     WRITE(6,'(A,2I6,A,ES12.4)') 'Window-response pseudoinverse: small/degenerate=', &
+          nsmall,ndegenerate,'  ||rho_resp||=',responseNorm
+  endif
+
+  deallocate(activeColumn,Uall,Uwindow,Svec,Sinv,seig,work,rwork,iwork)
+  deallocate(B,localPart,Kfull)
+END SUBROUTINE BuildWindowResponseMatrices
+
 
 SUBROUTINE read_overlap_from_file(info, Olapm, SOlapm, cixdim, maxdim, ncix)
   USE com_mpi,ONLY: myrank, master

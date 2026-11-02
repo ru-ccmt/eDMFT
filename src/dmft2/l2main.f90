@@ -69,15 +69,17 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   REAL*8     :: time_dmf, time_dmfw, time_int, time_intw, time_ed, time_edw, time_dmf0, time_dmf0w, time_dmf1, time_dmf1w, time_dmfwgh, time_dmfwgh_w
   !
   INTEGER    :: LM_MAX, ikp, is, itape, icix, iom, max_nbands, norbitals, maxdim2, nbands, nbandsx, nbands_dft, nomega, npomega, fh_sig, fh_dos, nip, nipc
+  INTEGER    :: nbands_full, iw0, iw1, response_nemaxx
   INTEGER    :: ift1, ift2, ift3, iff1t, iff2t, iff3t, ia1, ia2, jx, qmax, iikp, iks, itape1, ivector, iind, ir, l, Nri, icase, nedim, info
   REAL*8     :: OVRDIV, TC, EFGFACT, EFG20, EFG22, EFG2M, QXX, QYY, QZZ, QXY, VXX, VYY, VZZ, vnorm1, twgh, wgamma, rx
   REAL*8     :: volin, beta, logG, logGloc, dens, eimp_nd, eimp_nd2, DeltaG, dEtot, EF, TrGSigVdc
   LOGICAL    :: RENORM_SIMPLE, Qforce_j
   complex*16 :: wkp
-  COMPLEX*16, ALLOCATABLE :: cfX(:,:,:,:), DMFTU(:,:,:,:), STrans(:,:,:,:), Aweight(:,:), Olapm0(:,:,:), SOlapm(:,:,:), AEweight(:,:)
+  COMPLEX*16, ALLOCATABLE :: cfX(:,:,:,:), DMFTU(:,:,:,:), DMFTUfull(:,:,:,:), STrans(:,:,:,:), Aweight(:,:), Olapm0(:,:,:), SOlapm(:,:,:), dXrel(:,:,:,:), AEweight(:,:)
+  COMPLEX*16, ALLOCATABLE :: rhoResponse(:,:), eResponse(:,:), AResponse(:,:), eResponseDiag(:,:)
   COMPLEX*16, ALLOCATABLE :: sumfft(:,:,:), tloc(:,:,:), rho1(:), rhok(:), Rspin(:,:,:)!, vrho1(:), vrhok(:)
   COMPLEX*16, ALLOCATABLE :: ekin1(:), ekink(:), Edimp0(:,:,:)
-  REAL*8,     ALLOCATABLE :: zw2(:), zwe(:), LowE(:,:,:), omega(:), Edimp(:)
+  REAL*8,     ALLOCATABLE :: zw2(:), zwe(:), zResponse(:), weightResponse(:), LowE(:,:,:), omega(:), Edimp(:)
   INTEGER,    ALLOCATABLE :: nindo(:), cix_orb(:), cixdim(:), iSx(:,:), noccur(:,:), iorbital(:,:)
   COMPLEX*16, ALLOCATABLE :: sigma(:,:,:), s_oo(:,:), gloc(:), Gdloc(:,:,:), lgTrans(:,:,:,:), wEpsw(:,:), Gdloc0(:,:,:,:)
   REAL*8,     ALLOCATABLE :: aKR(:), jlr(:), jlp(:), Vlm(:,:), Vr(:), rh1_tmp(:,:), rh2_tmp(:,:), rh3_tmp(:,:)
@@ -336,10 +338,16 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   max_nbands=0
   ! If DMFT-transformation need to be normalized, we compute the renormalization coefficients
   if (Qrenormalize .and. abs(projector).le.5) then
-     allocate(Olapm0(maxdim,maxdim,ncix), SOlapm(maxdim,maxdim,ncix) )
+     allocate(Olapm0(maxdim,maxdim,ncix), SOlapm(maxdim,maxdim,ncix), dXrel(maxdim,maxdim,ncix,3) )
+     dXrel=0.d0
      call read_overlap_from_file(info, Olapm0, SOlapm, cixdim, maxdim, ncix)
      time_dmf0=0; time_dmf0w=0
-     if (info.ne.0) CALL cmp_overlap(Olapm0, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim2, emin, emax, iorbital, cix_orb, iSx, nindo, noccur, cixdim, cfX, Rspin, sumw, lmaxp, time_dmf0, time_dmf0w, RENORM_SIMPLE)
+     ! Forces require S_A and hence X_A for the globally normalized projector
+     ! X=S^(-1/2).  We therefore traverse the overlap k-sum even when SOlapm.dat
+     ! is available.  The final logical argument tells cmp_overlap to keep the
+     ! saved X: the traversal differentiates the existing projector, rather
+     ! than replacing it by a newly reconstructed normalization and changing EF.
+     if (info.ne.0 .or. Qforce) CALL cmp_overlap(Olapm0, SOlapm, max_nbands, nnlo, norbitals, natom, maxdim2, emin, emax, iorbital, cix_orb, iSx, nindo, noccur, cixdim, cfX, Rspin, sumw, lmaxp, time_dmf0, time_dmf0w, RENORM_SIMPLE, dXrel, Qforce, info.eq.0)
   endif
   
   kmax(:)=0
@@ -566,21 +574,52 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         call walltim(t1w)
      
         nbands = DM_nemax-DM_nemin+1
-        allocate( DMFTU(nbands,maxdim2,norbitals,nipc) )
+        if (Qforce) then
+           nbands_full = nemax-nemin+1
+           iw0 = DM_nemin-nemin+1
+           iw1 = DM_nemax-nemin+1
+        else
+           ! Do not enlarge the projector construction in ordinary density
+           ! runs.  Outside-window rows are needed only by the force response.
+           nbands_full = nbands
+           iw0 = 1
+           iw1 = nbands
+        endif
+        allocate( DMFTUfull(nbands_full,maxdim2,norbitals,nipc) )
 
-        ! DMFT-projection is build
+        ! In a force run build U for every LAPW1 band retained in case.vector.
+        ! The DMFT Dyson equation and all frequency sums remain strictly in the
+        ! fixed band-index window [DM_nemin,DM_nemax].  Rows outside that window
+        ! are used only to represent the complementary-space part of
+        !
+        !   |psi_n,A> = sum_{a outside W}|psi_a>
+        !       <psi_a|H_A-eps_n O_A|psi_n>/(eps_n-eps_a).
+        !
+        ! Thus this does not enlarge or redefine the DMFT problem.  It only
+        ! improves the completeness of the projector derivative.  A non-force
+        ! run follows the original, cheaper window-only path.
 
-        CALL Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, norbitals, nipc, n0, nnlo, nbands, cix_orb, nindo, DM_nemin, DM_nemax, maxdim2, lmaxp)
+        if (Qforce) then
+           CALL Build_DMFT_Projector(DMFTUfull, cfX, Rspin, iorbital, norbitals, nipc, n0, nnlo, nbands_full, cix_orb, nindo, nemin, nemax, maxdim2, lmaxp)
+        else
+           CALL Build_DMFT_Projector(DMFTUfull, cfX, Rspin, iorbital, norbitals, nipc, n0, nnlo, nbands_full, cix_orb, nindo, DM_nemin, DM_nemax, maxdim2, lmaxp)
+        endif
         
         if (abs(projector).ge.5) deallocate( phi_jl )
 
         if (Qrenormalize) then
            if (abs(projector).le.5) then
-              CALL RenormalizeTrans(DMFTU, Olapm0, SOlapm, cix_orb, cixdim, nindo, iSx, nbands, nipc, maxdim2, norbitals, maxdim, ncix, RENORM_SIMPLE)
+              CALL RenormalizeTrans(DMFTUfull, Olapm0, SOlapm, cix_orb, cixdim, nindo, iSx, nbands_full, nipc, maxdim2, norbitals, maxdim, ncix, RENORM_SIMPLE)
+              ! RenormalizeTrans supplies P_A X.  Complete
+              ! U_A=P_A X+P X_A by adding the matrix-normalization derivative
+              ! to all three force channels, including the outside-band rows.
+              if (Qforce .and. nipc.eq.4) CALL AddProjectorNormalizationDerivative(DMFTUfull, dXrel, cix_orb, cixdim, nindo, iSx, nbands_full, maxdim2, norbitals, maxdim, ncix)
            else
-              CALL RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, projector, nbands, nipc, maxdim2, norbitals, maxdim, ncix)
+              CALL RenormalizeTransK(DMFTUfull, cix_orb, cixdim, nindo, iSx, Sigind, projector, nbands_full, nipc, maxdim2, norbitals, maxdim, ncix)
            endif
         endif
+        allocate( DMFTU(nbands,maxdim2,norbitals,nipc) )
+        DMFTU(:,:,:,:) = DMFTUfull(iw0:iw1,:,:,:)
         allocate( STrans(maxsize,ncix,nbands,nbands) )
         allocate( lgTrans(nbands,nbands,ntcix,nipc) )
         
@@ -618,9 +657,19 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         CALL GetLocalDensityMatrix(dDM, DMFTU(:,:,:,1), Aweight, vnorm1, iorbital, iSx, nbands, maxdim2, norbitals, lmaxp)
         DM = DM + dDM
 
+        if (Qforce) then
+           allocate(rhoResponse(nbands_full,nbands_full), eResponse(nbands_full,nbands_full))
+           ! AEweight-epsilon*Aweight equals the already frequency-summed
+           ! Sigma_emb*G.  BuildWindowResponseMatrices combines it with the
+           ! outside projector rows and the Sternheimer denominators.  No new
+           ! Matsubara loop, self-energy derivative, or vertex is introduced.
+           CALL BuildWindowResponseMatrices(rhoResponse, eResponse, DMFTUfull(:,:,:,1), Aweight, AEweight, E, nemin, nemax, DM_nemin, DM_nemax, nbands_full, nbands, maxdim2, norbitals, maxdim, ncix, cix_orb, cixdim, nindo, iSx, Sigind)
+        endif
+
         DEALLOCATE( STrans )
         deallocate( lgTrans )
         DEALLOCATE( DMFTU )
+        DEALLOCATE( DMFTUfull )
         
         ! We use the following formula to implement the total energy:
         ! dE = \sum_{k,i} E_{k,i}^{LDA} * n_{i,i}^{DMFT}
@@ -695,6 +744,36 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         nbandsx = DM_nemaxx-DM_nemin+1
 
         CALL cmp_MT_density(w_RHOLM, Aweight, wEpsw, weight, fsph, fnsp, fsph2, nemin, nemax, DM_nemin, DM_nemax, DM_nemaxx, nbands, nbandsx, nbands_dft, lm_max, n0, nnlo, coord, ikp, DM_EF, time_bl,time_bl_w, time_reduc, time_reduc_w, time_radprod, time_radprod_w, time_m, time_m_w, time_rad, time_rad_w, time_ilm, time_ilm_w, time_lo, time_lo_w, time_force, time_force_w)
+
+        if (Qforce) then
+           ! An all-band DMFT window, an uncorrelated calculation, or a
+           ! vanishing self-energy can give an identically zero response.
+           ! Avoid sending a rank-zero matrix to the weight diagonalizer.
+           if (maxval(abs(rhoResponse)).gt.1.d-14) then
+              allocate(AResponse(nbands_full,nbands_full), eResponseDiag(nbands_full,nbands_full))
+              allocate(zResponse(nbands_full), weightResponse(nume))
+              ! rhoResponse is Hermitian but generally indefinite because it
+              ! contains only cross-window coherences.  Diagonalizing it gives
+              ! signed "weights" and a temporary orbital basis understood by
+              ! the existing force routines.  eResponse must be transformed by
+              ! the same eigenvectors so the two contractions remain
+              !
+              !   Tr[rhoResponse H_A] - Tr[eResponse O_A].
+              !
+              ! These objects are passed to cmp_MT_force_only and never added
+              ! to w_RHOLM or sumfft: they represent a derivative correction,
+              ! not an additional physical electron density.
+              AResponse=rhoResponse
+              response_nemaxx=nemax
+              CALL Diagonalize_DMFT_WEIGHTS(zResponse, AResponse, nbands_full, nemin, response_nemaxx, .True.)
+              eResponseDiag=matmul(conjg(transpose(AResponse)),matmul(eResponse,AResponse))
+              weightResponse=0.d0
+              weightResponse(nemin:nemax)=zResponse(:)
+              CALL cmp_MT_force_only(AResponse, eResponseDiag, weightResponse, fsph, fnsp, fsph2, nemin, nemax, response_nemaxx, nbands_full, n0, nnlo, time_bl, time_bl_w, time_lo, time_lo_w, time_force, time_force_w)
+              deallocate(AResponse,eResponseDiag,zResponse,weightResponse)
+           endif
+           deallocate(rhoResponse,eResponse)
+        endif
         
         DEALLOCATE( wEpsw )
         CALL cputim(time1)
@@ -1110,7 +1189,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   CALL w_deallocate1
 
   if (Qrenormalize .and. abs(projector).le.5) then
-     deallocate(Olapm0, SOlapm )
+     deallocate(Olapm0, SOlapm, dXrel )
   endif
 
   

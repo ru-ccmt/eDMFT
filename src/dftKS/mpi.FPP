@@ -42,6 +42,10 @@ CONTAINS
     CALL MPI_INIT( ierr )
     CALL MPI_COMM_SIZE( MPI_COMM_WORLD, nprocs, ierr)
     CALL MPI_COMM_RANK( MPI_COMM_WORLD, myrank, ierr)
+    ! Dense LAPACK storage is replicated on every MPI rank.  Avoid silently
+    ! nesting a threaded BLAS inside MPI; see cputim.c.  Set
+    ! EDMFT_BLAS_THREADS explicitly to opt into nested parallelism.
+    CALL limit_blas_threads(nprocs)
     !WRITE(6,*) 'nprocs=',nprocs,'myrank =',myrank 
     master = 0
     write(cpuID,'(I3)') myrank

@@ -222,6 +222,8 @@ CONTAINS
     use param, only : nume2
     IMPLICIT NONE        
     INTEGER, intent(in)  :: N, NUME2_
+    INTEGER :: alloc_stat
+    CHARACTER(LEN=256) :: alloc_msg
     LOGICAL, intent(in)  :: Qprint
 !    nmatmax1=nmatmax
 !#ifndef _REAL    
@@ -243,22 +245,33 @@ CONTAINS
        call doreallocate( RK, N+1 )
        call doreallocate( Kn, 3,N+1 )
        call doreallocate( KZZ,3,N+1 )
-       allocate( HS(N,N) )
-       allocate( HSDIAG(N) )
-       allocate( Z(N,NUME2) )
+       allocate( HS(N,N), HSDIAG(N), Z(N,NUME2), EIGVAL(N), &
+                 STAT=alloc_stat, ERRMSG=alloc_msg )
+       if (alloc_stat.ne.0) then
+          write(6,'(a,i0,a,i0,a)') 'LAPW1: unable to allocate matrices for N=', &
+               N, ', NUME=', NUME2, '.'
+#ifdef _REAL
+          write(6,'(a,f12.1,a)') 'Requested dense-matrix storage is approximately ', &
+               (dble(N)*dble(N)+dble(N)*dble(NUME2))*8.d0/(1024.d0**2), ' MiB per MPI rank.'
+#else
+          write(6,'(a,f12.1,a)') 'Requested dense-matrix storage is approximately ', &
+               (dble(N)*dble(N)+dble(N)*dble(NUME2))*16.d0/(1024.d0**2), ' MiB per MPI rank.'
+#endif
+          write(6,'(a,a)') 'Allocator message: ', trim(alloc_msg)
+          stop 'LAPW1 matrix allocation failed'
+       endif
        if (Qprint) then
 #ifdef _REAL       
-          write(6,'(a20,f12.1,a)') 'allocate HS',HSROWS**2*8.0/(1024.0*1024.0),' MB '
-          write(6,'(a20,f12.1,a)') 'allocate Z ',HSROWS*NUME2*8.0/(1024.0*1024.0),' MB '
+          write(6,'(a20,f12.1,a)') 'allocate HS',dble(HSROWS)*dble(HSROWS)*8.d0/(1024.d0**2),' MB '
+          write(6,'(a20,f12.1,a)') 'allocate Z ',dble(HSROWS)*dble(NUME2)*8.d0/(1024.d0**2),' MB '
 #else       
-          write(6,'(a20,f12.1,a)') 'allocate HS',HSROWS**2*16.0/(1024.0*1024.0),' MB '
-          write(6,'(a20,f12.1,a)') 'allocate Z ',HSROWS*NUME2*16.0/(1024.0*1024.0),' MB '
+          write(6,'(a20,f12.1,a)') 'allocate HS',dble(HSROWS)*dble(HSROWS)*16.d0/(1024.d0**2),' MB '
+          write(6,'(a20,f12.1,a)') 'allocate Z ',dble(HSROWS)*dble(NUME2)*16.d0/(1024.d0**2),' MB '
 #endif
        endif
        HS=0.0D0
        HSDIAG=0.0D0
        Z=0.0D0
-       allocate( EIGVAL(N) )
        EIGVAL=0.0D0
     end if
 

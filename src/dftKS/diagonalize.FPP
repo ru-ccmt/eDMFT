@@ -91,9 +91,17 @@ SUBROUTINE Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, LCOLZ, Qpri
 #ifdef _REAL  
   call DSYGVX(1, 'V', 'V', 'L', HSROWS, HS, HSROWS, Olap, HSROWS, Elow, Eup, 0, 0, abstol, NE, EIGVAL, Z, HSROWS, WORK, lwork, IWORK, ifail, info)
 #else
-  allocate( rwork(7*HSROWS) )
+  allocate( rwork(7*HSROWS), STAT=IERR )
+  if(IERR.ne.0) THEN
+     write(6,*) 'not enough memory for ZHEGVX real workspace: ', IERR
+     stop 'not enough memory'
+  end if
   call ZHEGVX(1, 'V', 'V', 'L', HSROWS, HS, HSROWS, Olap, HSROWS, Elow, Eup, 0, 0, abstol, NE, EIGVAL, Z, HSROWS, WORK, lwork, RWORK, IWORK, ifail, info)
 #endif
+  if (info.ne.0) then
+     write(6,*) routine_name, ' workspace query failed, INFO = ', info
+     stop 'LAPACK workspace query failed'
+  endif
   lwork = int(work(1)+0.1) ! This is the best lwork
   !print *, 'lwork=', work(1), lwork
   deallocate( work )
@@ -139,7 +147,16 @@ SUBROUTINE Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, LCOLZ, Qpri
   deallocate( ifail )
   
   Flop = 4.d0*dble(HSROWS)**3* (tsize/8.d0)**2/3.d0
-  if (Qprint) WRITE (6,'(1X,A,A,1x,f10.3,2x,f10.3,2x,f10.2,A)') routine_name,'(Compute eigenvalues (CPU)) :', (t2-t1), (t2w-t1w), (1E-9*Flop/(t2-t1)),' Gflops'
+  if (Qprint) then
+     if (t2.gt.t1) then
+        WRITE (6,'(1X,A,A,1x,f10.3,2x,f10.3,2x,f10.2,A)') &
+             routine_name,'(Compute eigenvalues (CPU)) :', (t2-t1), &
+             (t2w-t1w), (1E-9*Flop/(t2-t1)),' Gflops'
+     else
+        WRITE (6,'(1X,A,A,1x,f10.3,2x,f10.3)') &
+             routine_name,'(Compute eigenvalues (CPU)) :', (t2-t1), (t2w-t1w)
+     endif
+  endif
 
   ! Below is printing for debuggig
   if(out) then

@@ -51,8 +51,20 @@ SUBROUTINE cmpLogGdloc(logG, eimp_nd, eimp_nd2, DeltaG, forb, TrGSigVdc, Gdloc, 
   REAL*8      :: GS_dynamic(0:3,ntcix), GS_static(0:3,ntcix)
   COMPLEX*16  :: sigma0(maxsize,ncix,nomega)
   CHARACTER*1 :: label(0:3)=['c', 'x','y','z']
-  LOGICAL,parameter :: Olap_Renormalize=.True.
-  !LOGICAL,parameter :: Olap_Renormalize=.False.
+  ! Normalization convention for the explicit DMFT force:
+  !
+  !   Ubar = U SOlapm,       SOlapm = S^(-1/2).
+  !
+  ! Both the physical projector and its three derivative channels have already
+  ! been transformed by the complete matrix SOlapm in RenormalizeTrans.  Older
+  ! code divided the final logarithmic-force contraction once more by diagonal
+  ! elements of SOlapm.  That treats SOlapm as a set of scalar normalizations,
+  ! double counts the transformation already applied to Ubar, and cannot be
+  ! correct when SOlapm has off-diagonal entries.  The additional division is
+  ! therefore disabled.  The derivative of SOlapm itself is a separate term;
+  ! it is evaluated from the matrix Sylvester equation in l2mainSubs.f90 and is
+  ! inserted into the projector derivative channels before this routine runs.
+  LOGICAL,parameter :: Olap_Renormalize=.False.
   
   TrGSigVdc = 0.d0
   

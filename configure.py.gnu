@@ -10,8 +10,8 @@ class Config:
   cxx         = "g++"          # C++ compiler
 
 
-  cflags      = "-O2"          # linker flags for C programs
-  fflags      = "-O2 -fallow-argument-mismatch"          # linker flags for Fortran programs
+  cflags      = "-O3"          # optimization flags for C and C++ programs
+  fflags      = "-O3 -fallow-argument-mismatch -ffree-form -ffree-line-length-none -fopenmp -ffpe-summary=invalid,zero,overflow" # GNU Fortran flags
   ldflags      = ""             # linker flags debuggin programs
   ompflag     = "-fopenmp"     # linker/compiler flag for openmp
 
