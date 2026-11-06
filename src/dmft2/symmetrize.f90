@@ -233,6 +233,414 @@ SUBROUTINE CmpSymmetryTransformation(ig, RT, cfX, cix_orb, cixdim, iSx, iorbital
 END SUBROUTINE CmpSymmetryTransformation
 
 
+!===============================================================================
+! SYMMETRIZATION OF THE K-GLOBAL PROJECTOR OVERLAP
+!===============================================================================
+!
+! The irreducible-k weight used by dmft2 already contains the multiplicity of
+! the k-star.  That scalar multiplicity is sufficient for a scalar quantity,
+! but not for
+!
+!                     S = sum_k w_k P_k^+ P_k,
+!
+! because S is a matrix in the correlated-orbital basis.  If g is a crystal
+! symmetry operation and R_g is its representation in that basis, the band
+! gauge cancels in P^+P and a missing member of the star is
+!
+!                     S(g k) = R_g^+ S(k) R_g.
+!
+! Consequently the full-star result can be reconstructed after the
+! irreducible-k sum by applying the group projector below.  This is the same
+! operation used by dmft1/SymmetrizeOverlap.  CmpSymmetryTransformation is
+! deliberately reused here because it contains all of the nontrivial pieces:
+! equivalent-atom mappings, local correlated axes, cfX transformations,
+! spin rotations in the SO case, and orbital parity under inversion.
+!
+SUBROUTINE SymmetrizeOverlap(Olapm, cfX, cix_orb, cixdim, iSx, &
+     iorbital, nindo, norbitals, maxdim2)
+  USE sym2,   ONLY: iord
+  USE dmfts,  ONLY: maxdim, ncix, natom, lmaxp
+  USE com_mpi,ONLY: myrank, master
+  IMPLICIT NONE
+  COMPLEX*16, intent(inout) :: Olapm(maxdim,maxdim,ncix)
+  COMPLEX*16, intent(in)    :: cfX(maxdim2,maxdim2,norbitals,norbitals)
+  INTEGER, intent(in)       :: cix_orb(norbitals), cixdim(ncix)
+  INTEGER, intent(in)       :: iSx(maxdim2,norbitals)
+  INTEGER, intent(in)       :: iorbital(natom,lmaxp+1), nindo(norbitals)
+  INTEGER, intent(in)       :: norbitals, maxdim2
+  ! locals
+  COMPLEX*16, allocatable :: Olap0(:,:,:), Olaps(:,:,:), RT(:,:,:)
+  REAL*8 :: change, herm_before, herm_after
+  INTEGER :: ig, icix, cdim, i, j
+
+  allocate(Olap0(maxdim,maxdim,ncix), Olaps(maxdim,maxdim,ncix), &
+       RT(maxdim,maxdim,ncix))
+  Olap0=Olapm
+  Olaps=0.d0
+
+  do ig=1,iord
+     call CmpSymmetryTransformation(ig, RT, cfX, cix_orb, cixdim, &
+          iSx, iorbital, nindo, norbitals, maxdim2, .False.)
+     do icix=1,ncix
+        cdim=cixdim(icix)
+        Olaps(:cdim,:cdim,icix)=Olaps(:cdim,:cdim,icix)+ &
+             matmul(conjg(transpose(RT(:cdim,:cdim,icix))), &
+             matmul(Olap0(:cdim,:cdim,icix), &
+             RT(:cdim,:cdim,icix)))/dble(iord)
+     enddo
+  enddo
+
+  ! Keep the treatment of separate, symmetry-equivalent correlated blocks
+  ! identical to dmft1.  For the common one-cix-per-sort case this is a no-op.
+  call AverageEquivalentCixMatrices(Olaps,cixdim,maxdim,ncix)
+
+  ! S and every derivative of S are Hermitian.  Enforce this only after the
+  ! group average, so the assignment removes roundoff rather than hiding a
+  ! problem in an individual k contribution.
+  herm_before=0.d0
+  do icix=1,ncix
+     cdim=cixdim(icix)
+     do j=1,cdim
+        do i=1,cdim
+           herm_before=max(herm_before, &
+                abs(Olaps(i,j,icix)-conjg(Olaps(j,i,icix))))
+        enddo
+     enddo
+     Olaps(:cdim,:cdim,icix)=0.5d0*(Olaps(:cdim,:cdim,icix)+ &
+          conjg(transpose(Olaps(:cdim,:cdim,icix))))
+  enddo
+
+  change=maxval(abs(Olaps-Olap0))
+  herm_after=0.d0
+  do icix=1,ncix
+     cdim=cixdim(icix)
+     do j=1,cdim
+        do i=1,cdim
+           herm_after=max(herm_after, &
+                abs(Olaps(i,j,icix)-conjg(Olaps(j,i,icix))))
+        enddo
+     enddo
+  enddo
+  Olapm=Olaps
+
+  if (myrank.eq.master) then
+     write(6,'(A,3(1x,ES14.6))') ':OVERLAP_SYM_SCALAR:',change, &
+          herm_before,herm_after
+  endif
+  deallocate(RT,Olaps,Olap0)
+END SUBROUTINE SymmetrizeOverlap
+
+
+! Symmetrize the normalization functional gradient over the same missing
+! k-star members that define the global projector overlap.  The accumulated
+! object is momentBar=conjg(N), where N=sum_k U_k^+ C_k.  N is a general
+! complex matrix (not a density matrix), so it must not be Hermitianized.
+!
+! This operation is deliberately diagnostic/default-off for now.  The
+! production result is unchanged unless
+!
+!   EDMFT_STRESS_NORM_SYMMETRY=APPLY
+!
+! is set.  DIAG evaluates and reports the group projection without applying
+! it.  This lets the finite-difference regression establish whether the
+! missing adjoint k-star projection is the hydrostatic stress discrepancy
+! before it becomes a production correction.
+SUBROUTINE SymmetrizeNormalizationMoment(momentBar,cfX,cix_orb,cixdim, &
+     iSx,iorbital,nindo,norbitals,maxdim2)
+  USE sym2,   ONLY: iord
+  USE dmfts,  ONLY: maxdim,ncix,natom,lmaxp
+  USE com_mpi,ONLY: myrank,master
+  IMPLICIT NONE
+  COMPLEX*16,intent(inout) :: momentBar(maxdim,maxdim,ncix)
+  COMPLEX*16,intent(in) :: cfX(maxdim2,maxdim2,norbitals,norbitals)
+  INTEGER,intent(in) :: cix_orb(norbitals),cixdim(ncix)
+  INTEGER,intent(in) :: iSx(maxdim2,norbitals)
+  INTEGER,intent(in) :: iorbital(natom,lmaxp+1),nindo(norbitals)
+  INTEGER,intent(in) :: norbitals,maxdim2
+  COMPLEX*16,allocatable :: Nraw(:,:,:),Nsym(:,:,:),RT(:,:,:)
+  CHARACTER(len=32) :: mode
+  INTEGER :: status,i,letter,ig,icix,cdim
+  REAL*8 :: rawNorm,differenceNorm,relativeDifference,maxChange
+
+  mode='OFF'
+  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_NORM_SYMMETRY',mode, &
+       STATUS=status)
+  if (status.ne.0 .or. len_trim(mode).eq.0) mode='OFF'
+  mode=adjustl(mode)
+  do i=1,len_trim(mode)
+     letter=iachar(mode(i:i))
+     if (letter.ge.iachar('a') .and. letter.le.iachar('z')) &
+          mode(i:i)=achar(letter-iachar('a')+iachar('A'))
+  enddo
+  if (trim(mode).eq.'OFF') return
+  if (trim(mode).ne.'DIAG' .and. trim(mode).ne.'APPLY') then
+     WRITE(6,'(A,A)') 'ERROR: unknown EDMFT_STRESS_NORM_SYMMETRY=', &
+          trim(mode)
+     STOP 'invalid normalization-moment symmetry mode'
+  endif
+
+  allocate(Nraw(maxdim,maxdim,ncix),Nsym(maxdim,maxdim,ncix), &
+       RT(maxdim,maxdim,ncix))
+  ! momentBar is stored conjugated to match the projector-gradient convention.
+  ! Undo that convention before applying N(gk)=R_g^+ N(k) R_g; conjugate the
+  ! group-projected result only when returning to l2main.
+  Nraw=conjg(momentBar)
+  Nsym=0.d0
+  do ig=1,iord
+     CALL CmpSymmetryTransformation(ig,RT,cfX,cix_orb,cixdim,iSx, &
+          iorbital,nindo,norbitals,maxdim2,.False.)
+     do icix=1,ncix
+        cdim=cixdim(icix)
+        Nsym(:cdim,:cdim,icix)=Nsym(:cdim,:cdim,icix)+ &
+             matmul(conjg(transpose(RT(:cdim,:cdim,icix))), &
+             matmul(Nraw(:cdim,:cdim,icix), &
+             RT(:cdim,:cdim,icix)))/dble(iord)
+     enddo
+  enddo
+  CALL AverageEquivalentCixMatrices(Nsym,cixdim,maxdim,ncix)
+
+  rawNorm=sqrt(sum(abs(Nraw)**2))
+  differenceNorm=sqrt(sum(abs(Nsym-Nraw)**2))
+  relativeDifference=differenceNorm/max(rawNorm,tiny(1.d0))
+  maxChange=maxval(abs(Nsym-Nraw))
+  if (myrank.eq.master) WRITE(6,'(A,1X,A,3(1X,ES20.11))') &
+       ':DMFT_NORMALIZATION_MOMENT_SYMMETRY:',trim(mode), &
+       rawNorm,relativeDifference,maxChange
+  if (trim(mode).eq.'APPLY') momentBar=conjg(Nsym)
+
+  deallocate(RT,Nsym,Nraw)
+END SUBROUTINE SymmetrizeNormalizationMoment
+
+
+! Symmetrize a Cartesian derivative of the overlap.  nq=3 denotes a polar
+! vector (the force/displacement response), while nq=6 denotes the symmetric
+! strain tensor in the ordering (xx,yy,zz,yz,xz,xy).  The orbital and
+! Cartesian transformations must be applied as one direct-product group
+! operation; symmetrizing the six local matrices independently is incorrect.
+!
+! For strain,
+!
+!   S^sym_{,ab} = 1/|G| sum_g R_g^+ [sum_cd Q_g(a,c)Q_g(b,d)S_{,cd}] R_g,
+!
+! where Q_g=BR1*iz_g*BR1^{-1} is the operation in global Cartesian
+! coordinates.  Off-diagonal entries are tensor components, not engineering
+! shear components, so no factor of two is introduced.
+!
+SUBROUTINE SymmetrizeOverlapDerivative(dS, nq, cfX, cix_orb, cixdim, &
+     iSx, iorbital, nindo, norbitals, maxdim2)
+  USE structure,ONLY: BR1
+  USE sym2,    ONLY: iord, iz
+  USE dmfts,   ONLY: maxdim, ncix, natom, lmaxp
+  USE com_mpi, ONLY: myrank, master
+  IMPLICIT NONE
+  INTEGER, intent(in)       :: nq, norbitals, maxdim2
+  COMPLEX*16, intent(inout) :: dS(maxdim,maxdim,ncix,nq)
+  COMPLEX*16, intent(in)    :: cfX(maxdim2,maxdim2,norbitals,norbitals)
+  INTEGER, intent(in)       :: cix_orb(norbitals), cixdim(ncix)
+  INTEGER, intent(in)       :: iSx(maxdim2,norbitals)
+  INTEGER, intent(in)       :: iorbital(natom,lmaxp+1), nindo(norbitals)
+  ! locals
+  INTEGER, parameter :: voigt_a(6)=(/1,2,3,2,1,1/)
+  INTEGER, parameter :: voigt_b(6)=(/1,2,3,3,3,2/)
+  COMPLEX*16, allocatable :: dS0(:,:,:,:), dSs(:,:,:,:), rotated(:,:,:,:)
+  COMPLEX*16, allocatable :: RT(:,:,:)
+  REAL*8 :: BR1inv(3,3), Qcart(3,3), coeff
+  REAL*8 :: change, herm_before, herm_after
+  INTEGER :: ig, icix, cdim, iq, jq, a, b, c, d, i, j
+
+  if (nq.ne.3 .and. nq.ne.6) then
+     write(6,*) 'ERROR SymmetrizeOverlapDerivative: nq must be 3 or 6, nq=',nq
+     stop 'Invalid Cartesian rank in SymmetrizeOverlapDerivative'
+  endif
+
+  allocate(dS0(maxdim,maxdim,ncix,nq), dSs(maxdim,maxdim,ncix,nq), &
+       rotated(maxdim,maxdim,ncix,nq), RT(maxdim,maxdim,ncix))
+  dS0=dS
+  dSs=0.d0
+  call inv_3x3(BR1,BR1inv)
+
+  do ig=1,iord
+     call CmpSymmetryTransformation(ig, RT, cfX, cix_orb, cixdim, &
+          iSx, iorbital, nindo, norbitals, maxdim2, .False.)
+
+     ! This is the same Cartesian operation used to construct the Wigner and
+     ! local-axis transformation inside CmpSymmetryTransformation.
+     Qcart=matmul(BR1,matmul(dble(iz(:,:,ig)),BR1inv))
+     rotated=0.d0
+
+     if (nq.eq.3) then
+        ! Polar-vector response: dS'_a=sum_c Q_ac dS_c.
+        do iq=1,3
+           do jq=1,3
+              rotated(:,:,:,iq)=rotated(:,:,:,iq)+ &
+                   Qcart(iq,jq)*dS0(:,:,:,jq)
+           enddo
+        enddo
+     else
+        ! Expand the six stored symmetric components implicitly.  For c/=d,
+        ! both dS_cd and dS_dc equal the one stored tensor component.
+        do iq=1,6
+           a=voigt_a(iq)
+           b=voigt_b(iq)
+           do jq=1,6
+              c=voigt_a(jq)
+              d=voigt_b(jq)
+              if (c.eq.d) then
+                 coeff=Qcart(a,c)*Qcart(b,d)
+              else
+                 coeff=Qcart(a,c)*Qcart(b,d)+ &
+                      Qcart(a,d)*Qcart(b,c)
+              endif
+              rotated(:,:,:,iq)=rotated(:,:,:,iq)+ &
+                   coeff*dS0(:,:,:,jq)
+           enddo
+        enddo
+     endif
+
+     do iq=1,nq
+        do icix=1,ncix
+           cdim=cixdim(icix)
+           dSs(:cdim,:cdim,icix,iq)=dSs(:cdim,:cdim,icix,iq)+ &
+                matmul(conjg(transpose(RT(:cdim,:cdim,icix))), &
+                matmul(rotated(:cdim,:cdim,icix,iq), &
+                RT(:cdim,:cdim,icix)))/dble(iord)
+        enddo
+     enddo
+  enddo
+
+  do iq=1,nq
+     call AverageEquivalentCixMatrices(dSs(:,:,:,iq),cixdim,maxdim,ncix)
+  enddo
+
+  herm_before=0.d0
+  do iq=1,nq
+     do icix=1,ncix
+        cdim=cixdim(icix)
+        do j=1,cdim
+           do i=1,cdim
+              herm_before=max(herm_before,abs(dSs(i,j,icix,iq)- &
+                   conjg(dSs(j,i,icix,iq))))
+           enddo
+        enddo
+        dSs(:cdim,:cdim,icix,iq)=0.5d0*(dSs(:cdim,:cdim,icix,iq)+ &
+             conjg(transpose(dSs(:cdim,:cdim,icix,iq))))
+     enddo
+  enddo
+
+  change=maxval(abs(dSs-dS0))
+  herm_after=0.d0
+  do iq=1,nq
+     do icix=1,ncix
+        cdim=cixdim(icix)
+        do j=1,cdim
+           do i=1,cdim
+              herm_after=max(herm_after,abs(dSs(i,j,icix,iq)- &
+                   conjg(dSs(j,i,icix,iq))))
+           enddo
+        enddo
+     enddo
+  enddo
+  dS=dSs
+
+  if (myrank.eq.master) then
+     if (nq.eq.3) then
+        write(6,'(A,3(1x,ES14.6))') ':OVERLAP_SYM_VECTOR:',change, &
+             herm_before,herm_after
+     else
+        write(6,'(A,3(1x,ES14.6))') ':OVERLAP_SYM_STRAIN:',change, &
+             herm_before,herm_after
+     endif
+  endif
+  deallocate(RT,rotated,dSs,dS0)
+END SUBROUTINE SymmetrizeOverlapDerivative
+
+
+! Average separate cix blocks that represent symmetry-equivalent atoms.  The
+! orbital rotation has already put every block into the convention expected by
+! dmft1, so this last average is meaningful and reproduces its historical
+! treatment of equivalent correlated blocks.
+SUBROUTINE AverageEquivalentCixMatrices(A,cixdim,maxdim,ncix)
+  IMPLICIT NONE
+  INTEGER, intent(in)       :: maxdim, ncix, cixdim(ncix)
+  COMPLEX*16, intent(inout) :: A(maxdim,maxdim,ncix)
+  INTEGER :: ncix_unique, size_cix_unique(ncix), cix_unique(ncix,ncix)
+  INTEGER :: igroup, j, icix, cdim
+  COMPLEX*16, allocatable :: tmp(:,:)
+
+  call FindUniqueCix(ncix_unique,size_cix_unique,cix_unique)
+  do igroup=1,ncix_unique
+     if (size_cix_unique(igroup).le.1) cycle
+     icix=cix_unique(igroup,1)
+     cdim=cixdim(icix)
+     allocate(tmp(cdim,cdim))
+     tmp=0.d0
+     do j=1,size_cix_unique(igroup)
+        icix=cix_unique(igroup,j)
+        if (cixdim(icix).ne.cdim) then
+           write(6,*) 'ERROR: equivalent cix blocks have different dimensions'
+           stop 'Inconsistent equivalent cix dimensions'
+        endif
+        tmp=tmp+A(:cdim,:cdim,icix)
+     enddo
+     tmp=tmp/dble(size_cix_unique(igroup))
+     do j=1,size_cix_unique(igroup)
+        icix=cix_unique(igroup,j)
+        A(:cdim,:cdim,icix)=tmp
+     enddo
+     deallocate(tmp)
+  enddo
+END SUBROUTINE AverageEquivalentCixMatrices
+
+
+SUBROUTINE FindUniqueCix(ncix_unique,size_cix_unique,cix_unique)
+  USE dmfts, ONLY: natom, ncix, iatom, isort, cix
+  IMPLICIT NONE
+  INTEGER, intent(out) :: ncix_unique, size_cix_unique(ncix)
+  INTEGER, intent(out) :: cix_unique(ncix,ncix)
+  INTEGER :: cix_2_jatom(ncix), group_sort(ncix)
+  INTEGER :: icix, icase, latom, jatom, igroup
+  LOGICAL :: found
+
+  ! Defaulting to a unique negative label avoids undefined grouping if a cix
+  ! is intentionally not attached to the first correlated shell of a case.
+  do icix=1,ncix
+     cix_2_jatom(icix)=-icix
+  enddo
+  do icix=1,ncix
+     do icase=1,natom
+        latom=iatom(icase)
+        jatom=isort(latom)
+        if (icix.eq.cix(icase,1)) then
+           cix_2_jatom(icix)=jatom
+           exit
+        endif
+     enddo
+  enddo
+
+  ncix_unique=0
+  size_cix_unique=0
+  cix_unique=0
+  group_sort=0
+  do icix=1,ncix
+     found=.False.
+     do igroup=1,ncix_unique
+        if (group_sort(igroup).eq.cix_2_jatom(icix)) then
+           size_cix_unique(igroup)=size_cix_unique(igroup)+1
+           cix_unique(igroup,size_cix_unique(igroup))=icix
+           found=.True.
+           exit
+        endif
+     enddo
+     if (.not.found) then
+        ncix_unique=ncix_unique+1
+        group_sort(ncix_unique)=cix_2_jatom(icix)
+        size_cix_unique(ncix_unique)=1
+        cix_unique(ncix_unique,1)=icix
+     endif
+  enddo
+END SUBROUTINE FindUniqueCix
+
+
 SUBROUTINE SymmetrizeDensityMatrix(DM, cfX, cix_orb, cixdim, iSx, iorbital, nindo, norbitals, maxdim2)
   USE sym2,  ONLY: iord
   USE dmfts, ONLY: maxdim, ncix, natom, lmaxp

@@ -1,0 +1,180 @@
+--- a/SRC_lapw1/coors.f
++++ b/SRC_lapw1/coors.f
+@@ -11,6 +11,7 @@
+       use nmr, only  : korig,dokorig
+       use comi, only : nemax_it
+       use comr, only : EU
++      use parallel, only : NPE
+       IMPLICIT NONE
+       INCLUDE 'param.inc'
+ !
+@@ -30,11 +31,16 @@
+ !
+       integer            nvec1loc,nvec2loc,nvec3loc
+       INTEGER            I, IV, J, JA, JB, JC, M, N, NDM1, NV1, NV2, NV3
++      INTEGER            IOS, FIX_N, FIX_I
+       DOUBLE PRECISION   DELTA, Q, RKQ, SBX, SBY, SBZ, SKX, SKY, SKZ
+       real*8               SBX0, SBY0, SBZ0,RKQ0, korigx, korigy, korigz
++      DOUBLE PRECISION   SXREF, SYREF, SZREF, RKMAXFIX
+       CHARACTER*67       ERRMSG
++      CHARACTER*80       FIX_MAGIC
+       INTEGER            IA
+       DOUBLE PRECISION   RNN
++      LOGICAL            FIX_INIT, FIX_WRITE, FIX_READ
++      LOGICAL            THERE_WRITE, THERE_READ
+ !
+ !        External Subroutines
+ !
+@@ -47,7 +53,56 @@
+ !        Data statements
+ !
+       DATA DELTA /1.0D-2/
++      SAVE FIX_INIT, FIX_WRITE, FIX_READ
++      DATA FIX_INIT /.FALSE./
++
++!     Optional finite-difference stress diagnostic.
+ !
++!     Analytic LAPW stress differentiates a fixed variational space. A
++!     normal finite-difference calculation rebuilds the spherical |k+G|
++!     cutoff after strain, so plane waves can enter or leave the basis.
++!     The resulting discontinuous energy change can be larger than the
++!     stress error being tested. The marker files below enable a strictly
++!     opt-in, serial-only diagnostic which keeps the integer G-vector list
++!     fixed while the reciprocal lattice is strained:
++!
++!       lapw1.fixgvec.write  present: write lapw1.fixgvec
++!       lapw1.fixgvec.read   present: read  lapw1.fixgvec
++!
++!     Normal production behavior is unchanged when neither marker exists.
++!     Reference and strained runs must have identical k-point ordering,
++!     lattice type, symmetry ordering, and local-orbital definitions.
++      IF (.NOT.FIX_INIT) THEN
++         INQUIRE(FILE='lapw1.fixgvec.write',EXIST=THERE_WRITE)
++         INQUIRE(FILE='lapw1.fixgvec.read', EXIST=THERE_READ)
++         IF (THERE_WRITE .AND. THERE_READ) THEN
++            WRITE(6,*) 'FIXGVEC: both read and write markers exist'
++            STOP 'FIXGVEC marker conflict'
++         ENDIF
++         FIX_WRITE=THERE_WRITE
++         FIX_READ =THERE_READ
++         IF ((FIX_WRITE .OR. FIX_READ) .AND. NPE.NE.1) THEN
++            WRITE(6,*) 'FIXGVEC: diagnostic currently requires serial lapw1'
++            STOP 'FIXGVEC serial only'
++         ENDIF
++         IF (FIX_WRITE) THEN
++            OPEN(91,FILE='lapw1.fixgvec',STATUS='REPLACE', &
++                 ACTION='WRITE',IOSTAT=IOS)
++            IF (IOS.NE.0) STOP 'FIXGVEC cannot open output file'
++            WRITE(91,'(A)') 'LAPW1_FIXGVEC_V1'
++            WRITE(6,*) 'FIXGVEC: writing fixed G-vector reference'
++         ELSEIF (FIX_READ) THEN
++            OPEN(91,FILE='lapw1.fixgvec',STATUS='OLD', &
++                 ACTION='READ',IOSTAT=IOS)
++            IF (IOS.NE.0) STOP 'FIXGVEC cannot open input file'
++            READ(91,'(A)',IOSTAT=IOS) FIX_MAGIC
++            IF (IOS.NE.0 .OR. TRIM(FIX_MAGIC).NE.'LAPW1_FIXGVEC_V1') &
++                 STOP 'FIXGVEC invalid file header'
++            WRITE(6,*) 'FIXGVEC: reading fixed G-vector reference'
++         ENDIF
++         FIX_INIT=.TRUE.
++      ENDIF
++!
+       iplus=0
+       IF (ORTHO) THEN
+          SKX = SX*PIA(1)
+@@ -64,6 +119,51 @@
+          korigx = korig(1)*BR2(1,1) + korig(2)*BR2(1,2) + korig(3)*BR2(1,3)
+          korigy = korig(1)*BR2(2,1) + korig(2)*BR2(2,2) + korig(3)*BR2(2,3)
+          korigz = korig(1)*BR2(3,1) + korig(2)*BR2(3,2) + korig(3)*BR2(3,3)
++      ENDIF
++
++!     In read mode bypass the usual |k+G| cutoff completely. Keep the
++!     reference integer labels and rebuild only their Cartesian components
++!     using the strained reciprocal lattice BR2. Preserving the reference
++!     order also makes the local-orbital plane-wave selection reproducible.
++      IF (FIX_READ) THEN
++         CALL INIT_MATRICES(0,0,NMATMAX1)
++         NDM1=NMATMAX1+1-NLO
++         READ(91,*,IOSTAT=IOS) FIX_N,SXREF,SYREF,SZREF
++         IF (IOS.NE.0) STOP 'FIXGVEC missing k-point block'
++         IF (FIX_N.LE.0 .OR. FIX_N.GT.NDM1) &
++              STOP 'FIXGVEC invalid matrix dimension'
++         IF (ABS(SX-SXREF).GT.1.D-8 .OR. &
++             ABS(SY-SYREF).GT.1.D-8 .OR. &
++             ABS(SZ-SZREF).GT.1.D-8) THEN
++            WRITE(6,*) 'FIXGVEC k-point mismatch: ',SX,SY,SZ
++            WRITE(6,*) 'FIXGVEC reference k-point:',SXREF,SYREF,SZREF
++            STOP 'FIXGVEC k-list mismatch'
++         ENDIF
++         N=FIX_N
++         DO FIX_I=1,N
++            READ(91,*,IOSTAT=IOS) KZZ(1,FIX_I),KZZ(2,FIX_I), &
++                                  KZZ(3,FIX_I)
++            IF (IOS.NE.0) STOP 'FIXGVEC truncated G-vector block'
++            JA=KZZ(1,FIX_I)
++            JB=KZZ(2,FIX_I)
++            JC=KZZ(3,FIX_I)
++!           WIEN2k stores CXZ KZZ labels in a transformed convention.
++            IF (LATTIC(1:3).EQ.'CXZ') THEN
++               IF (MOD(KZZ(1,FIX_I)-KZZ(3,FIX_I),2).NE.0 .OR. &
++                   MOD(KZZ(1,FIX_I)+KZZ(3,FIX_I),2).NE.0) &
++                    STOP 'FIXGVEC invalid CXZ labels'
++               JA=(KZZ(1,FIX_I)-KZZ(3,FIX_I))/2
++               JC=(KZZ(1,FIX_I)+KZZ(3,FIX_I))/2
++            ENDIF
++            SBX=SKX+JA*BR2(1,1)+JB*BR2(1,2)+JC*BR2(1,3)
++            SBY=SKY+JA*BR2(2,1)+JB*BR2(2,2)+JC*BR2(2,3)
++            SBZ=SKZ+JA*BR2(3,1)+JB*BR2(3,2)+JC*BR2(3,3)
++            XK(FIX_I)=SBX
++            YK(FIX_I)=SBY
++            ZK(FIX_I)=SBZ
++            RK(FIX_I)=SQRT(SBX**2+SBY**2+SBZ**2)
++         ENDDO
++         GOTO 81
+       ENDIF
+ 
+  111  continue
+@@ -174,15 +274,23 @@
+    70    CONTINUE
+       ENDIF
+    80 CONTINUE
++   81 CONTINUE
+       RNN = RMT(1)
+       DO 160 IA = 2, NAT
+          IF (RMT(IA) .LT. RNN) RNN = RMT(IA)
+   160 CONTINUE
+-      RKMT=RK(N)*RNN
++!     The reference order is length-sorted before strain but need not stay
++!     sorted after anisotropic strain. RKMT is informational in read mode.
++      RKMAXFIX=0.D0
++      DO FIX_I=1,N
++         IF (RK(FIX_I).GT.RKMAXFIX) RKMAXFIX=RK(FIX_I)
++      ENDDO
++      RKMT=RKMAXFIX*RNN
+ !
+ !        set up the arrays of spherical Bessel functions
+ !
+ !     check if nvec1,2,3 are large enough
++      IF (FIX_READ) GOTO 165
+       if(nv.eq.0) then      !first pass
+         NV = N
+         iplus=1
+@@ -231,6 +339,18 @@
+             GOTO 90
+          ENDIF
+   100 CONTINUE
++!     Write only after the internal sizing pass and vector-bound checks are
++!     complete; otherwise the same k-point would be recorded more than once.
++      IF (FIX_WRITE) THEN
++         WRITE(91,'(I10,3ES26.16)') N,SX,SY,SZ
++         DO FIX_I=1,N
++            WRITE(91,'(3I12)') KZZ(1,FIX_I),KZZ(2,FIX_I), &
++                                KZZ(3,FIX_I)
++         ENDDO
++         FLUSH(91)
++      ENDIF
++  165 CONTINUE
++      NV=N
+       if(nmat_only) then
+          write(72,*) nv+nlo
+ !         stop 'NMAT_ONLY'

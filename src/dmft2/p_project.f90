@@ -5,6 +5,12 @@ module p_project
   IMPLICIT NONE
   REAL*8, allocatable ::  P_rfi(:,:)
   REAL*8, allocatable :: rix_mat(:,:)
+  ! Optional, diagnostic-only strain derivative of the radial overlaps in
+  ! rix_mat.  The production default is identically zero.  A nonzero array is
+  ! loaded only when EDMFT_PROJECTOR_RIX_DERIVATIVE_FILE is set; see
+  ! p_apply_rix_diagnostics below.
+  REAL*8, allocatable :: drix_mat(:,:,:)
+  LOGICAL :: rix_reference_read=.false.
   INTEGER :: n_al_ucase, max_lcase
   INTEGER, allocatable :: al_ucase(:,:), al_ucase_(:,:), l_al_ucase(:), j_al_ucase(:), nl_case(:)
   INTEGER, parameter :: kNri=5  ! Number of points for the wave function in the interstitials is 2**kNri+1
@@ -13,7 +19,16 @@ module p_project
   ! locals
   INTEGER :: max_nrad, nrf
   REAL*8, allocatable ::  P_rfk(:,:,:)
-  REAL*8, allocatable ::  phi_jl(:, :)
+  ! Interstitial-tail radial integrals used by projector types 5 and 6,
+  !
+  !   phi_jl(G,p)  = int P_p(r) r j_l(|k+G|r) dr,
+  !   dphi_jl(G,p) = d phi_jl / d|k+G|
+  !                 = int P_p(r) r^2 j'_l(|k+G|r) dr.
+  !
+  ! The second array is required by the explicit strain derivative of the
+  ! projector.  It is deliberately kept next to phi_jl so the ordinary and
+  ! differentiated tails are constructed on exactly the same radial mesh.
+  REAL*8, allocatable ::  phi_jl(:, :), dphi_jl(:, :)
            
 CONTAINS
     
@@ -202,7 +217,8 @@ CONTAINS
        WRITE(6,'(A,I3)') 'nrf=', nrf
     endif
     
-    allocate( rix_mat(nrf,n_al_ucase) )
+    allocate( rix_mat(nrf,n_al_ucase),drix_mat(nrf,n_al_ucase,6) )
+    drix_mat=0.d0
     
     RETURN
 900 CONTINUE
@@ -286,6 +302,158 @@ CONTAINS
     !enddo
           
   end SUBROUTINE p_cmp_rixmat
+
+
+  ! -------------------------------------------------------------------------
+  ! Projector-5 radial-overlap diagnostics
+  ! -------------------------------------------------------------------------
+  ! Projector 5 contains radial factors
+  !
+  !   rix_mat(1,p)     = <u_l|phi_p>,
+  !   rix_mat(2,p)     = <udot_l|phi_p>,
+  !   rix_mat(2+jlo,p) = <u_LO_j|phi_p>.
+  !
+  ! The frozen-augmentation stress differentiates the LAPW matching
+  ! coefficients while holding these integrals fixed.  Independently strained
+  ! calculations, however, recompute the radial functions and therefore also
+  ! differentiate rix_mat.  The following opt-in diagnostics make the two
+  ! definitions separable without changing the normal code path.
+  !
+  !   EDMFT_PROJECTOR_RIX_MODE=WRITE
+  !       write the current rix_mat to EDMFT_PROJECTOR_RIX_FILE
+  !       (default projector_rix_reference.dat).
+  !
+  !   EDMFT_PROJECTOR_RIX_MODE=READ
+  !       replace the freshly computed rix_mat by that reference.  This is
+  !       intended for frozen-rix finite-difference endpoint tests.  l2main
+  !       automatically recomputes the endpoint normalization consistently
+  !       instead of reading its ordinary SOlapm.dat.
+  !
+  !   EDMFT_PROJECTOR_RIX_DERIVATIVE_FILE=<path>
+  !       load d rix_mat/d epsilon_q for the six tensor channels.  Its format
+  !       is
+  !
+  !          nrf nprojector
+  !          projector_index radial_index dxx dyy dzz dyz dxz dxy
+  !          ...
+  !
+  !       Build_DMFT_Projector adds the corresponding fixed-coefficient radial
+  !       response to projector_strain.  Since cmp_overlap uses the same
+  !       builder, the global X=S^(-1/2) derivative is included automatically.
+  ! -------------------------------------------------------------------------
+  SUBROUTINE p_apply_rix_diagnostics()
+    USE com_mpi, ONLY: myrank,master
+    IMPLICIT NONE
+    CHARACTER(len=32) :: mode
+    CHARACTER(len=512) :: reference_file,derivative_file
+    INTEGER :: status,letter,i,fh,ios,file_nrf,file_nprojector
+    INTEGER :: ii,irf,file_ii,file_irf
+    REAL*8 :: difference_norm
+    REAL*8,allocatable :: reference(:,:)
+
+    if (.not.allocated(rix_mat)) return
+    if (.not.allocated(drix_mat)) then
+       allocate(drix_mat(nrf,n_al_ucase,6))
+    endif
+    drix_mat=0.d0
+    rix_reference_read=.false.
+
+    mode=''
+    CALL GET_ENVIRONMENT_VARIABLE('EDMFT_PROJECTOR_RIX_MODE',mode, &
+         STATUS=status)
+    if (status.ne.0) mode=''
+    mode=adjustl(mode)
+    do i=1,len_trim(mode)
+       letter=iachar(mode(i:i))
+       if (letter.ge.iachar('a') .and. letter.le.iachar('z')) &
+            mode(i:i)=achar(letter-iachar('a')+iachar('A'))
+    enddo
+
+    reference_file='projector_rix_reference.dat'
+    CALL GET_ENVIRONMENT_VARIABLE('EDMFT_PROJECTOR_RIX_FILE', &
+         reference_file,STATUS=status)
+    if (status.ne.0 .or. len_trim(reference_file).eq.0) &
+         reference_file='projector_rix_reference.dat'
+
+    select case(trim(mode))
+    case('')
+       continue
+    case('WRITE')
+       if (myrank.eq.master) then
+          fh=1002
+          open(fh,file=trim(reference_file),status='replace', &
+               action='write',iostat=ios)
+          if (ios.ne.0) STOP 'cannot write projector rix reference'
+          write(fh,'(2I8)') nrf,n_al_ucase
+          do ii=1,n_al_ucase
+             do irf=1,nrf
+                write(fh,'(2I8,1X,ES25.16)') ii,irf,rix_mat(irf,ii)
+             enddo
+          enddo
+          close(fh)
+          WRITE(6,'(A,1X,A)') ':DMFT_PROJECTOR_RIX_REFERENCE_WRITE:', &
+               trim(reference_file)
+       endif
+    case('READ')
+       allocate(reference(nrf,n_al_ucase))
+       reference=0.d0
+       fh=1002
+       open(fh,file=trim(reference_file),status='old',action='read', &
+            iostat=ios)
+       if (ios.ne.0) STOP 'cannot read projector rix reference'
+       read(fh,*,iostat=ios) file_nrf,file_nprojector
+       if (ios.ne.0 .or. file_nrf.ne.nrf .or. &
+            file_nprojector.ne.n_al_ucase) &
+            STOP 'incompatible projector rix reference header'
+       do ii=1,n_al_ucase
+          do irf=1,nrf
+             read(fh,*,iostat=ios) file_ii,file_irf, &
+                  reference(irf,ii)
+             if (ios.ne.0 .or. file_ii.ne.ii .or. file_irf.ne.irf) &
+                  STOP 'incompatible projector rix reference row'
+          enddo
+       enddo
+       close(fh)
+       difference_norm=sqrt(sum((reference-rix_mat)**2))
+       rix_mat=reference
+       rix_reference_read=.true.
+       if (myrank.eq.master) WRITE(6,'(A,1X,A,1X,ES22.12)') &
+            ':DMFT_PROJECTOR_RIX_REFERENCE_READ:',trim(reference_file), &
+            difference_norm
+       deallocate(reference)
+    case default
+       if (myrank.eq.master) WRITE(6,'(A,1X,A)') &
+            'ERROR: EDMFT_PROJECTOR_RIX_MODE must be WRITE or READ, not', &
+            trim(mode)
+       STOP 'invalid EDMFT_PROJECTOR_RIX_MODE'
+    end select
+
+    derivative_file=''
+    CALL GET_ENVIRONMENT_VARIABLE('EDMFT_PROJECTOR_RIX_DERIVATIVE_FILE', &
+         derivative_file,STATUS=status)
+    if (status.ne.0 .or. len_trim(derivative_file).eq.0) return
+
+    fh=1003
+    open(fh,file=trim(derivative_file),status='old',action='read', &
+         iostat=ios)
+    if (ios.ne.0) STOP 'cannot read projector rix strain derivative'
+    read(fh,*,iostat=ios) file_nrf,file_nprojector
+    if (ios.ne.0 .or. file_nrf.ne.nrf .or. &
+         file_nprojector.ne.n_al_ucase) &
+         STOP 'incompatible projector rix derivative header'
+    do ii=1,n_al_ucase
+       do irf=1,nrf
+          read(fh,*,iostat=ios) file_ii,file_irf, &
+               drix_mat(irf,ii,1:6)
+          if (ios.ne.0 .or. file_ii.ne.ii .or. file_irf.ne.irf) &
+               STOP 'incompatible projector rix derivative row'
+       enddo
+    enddo
+    close(fh)
+    if (myrank.eq.master) WRITE(6,'(A,1X,A,1X,ES22.12)') &
+         ':DMFT_PROJECTOR_RIX_DERIVATIVE_READ:',trim(derivative_file), &
+         sqrt(sum(drix_mat**2))
+  END SUBROUTINE p_apply_rix_diagnostics
   
   SUBROUTINE p_deallocate()
     IMPLICIT NONE
@@ -294,7 +462,8 @@ CONTAINS
     deallocate( dri )
     deallocate( nl_case )
     deallocate( al_ucase_ )
-    deallocate( rix_mat )
+    deallocate( rix_mat, drix_mat )
+    rix_reference_read=.false.
     !deallocate( nrj )
     deallocate( rix )
   END SUBROUTINE p_deallocate

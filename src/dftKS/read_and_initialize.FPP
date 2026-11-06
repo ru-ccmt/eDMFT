@@ -6,7 +6,7 @@ SUBROUTINE read_and_initialize(NUMKPT,DEFFN,INFO,nmat_only)
   use orb, only     : init_orb
   use atspdt, only  : E, DP, DPE, P, PE, PEI, init_atspdt
   use comc, only    : IPGR, KNAME
-  use comi, only    : NT, LNSMAX, NAT,nemax_it
+  use comi, only    : NT, LNSMAX, NAT,nemax_it,fixed_nbands
   use coml, only    : SPRSWF, PRNTWF, WFTAPE, REL, ITER, NOHNS
   use comr, only    : RKM, ELow, EUp, WEIGHT, sproj_limit,eshift_iter,readHinv
   use kpts, only    : K3
@@ -178,7 +178,8 @@ SUBROUTINE read_and_initialize(NUMKPT,DEFFN,INFO,nmat_only)
   endif
   
   ! Reads the file handle for k-points and min,max energy, and maximum number of bands
-  CALL ReadThirdPart_of_in1(ITAPE,E1n,E2n,nemax_it,sproj_limit,eshift_iter,5)
+  CALL ReadThirdPart_of_in1(ITAPE,E1n,E2n,nemax_it,fixed_nbands, &
+       sproj_limit,eshift_iter,5)
   e2n=e2n+efermi
 
   CALL findKlistLength(ITAPE,numkpt,ERRMSG,info)

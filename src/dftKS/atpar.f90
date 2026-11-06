@@ -2,11 +2,13 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
   use param, only : filename_V_vns
   USE readPotential, ONLY: read_V_vns2, init_V_vns, CheckFileExists
   use loabc, only : ELO, PLO, DPLO, PI12LO, PE12LO, pilolo
-  use radial, only: A,B, AE, BE, VLM, A1, B1, AE1, BE1, A1LO, B1LO
+  use radial, only: A,B,AP,BP,AE,BE,APE,BPE,VLM,A1,B1,AP1,BP1,AE1,BE1, &
+       APE1,BPE1,A1LO,B1LO,AP1LO,BP1LO
   use lolog, only : loor, lapw, ilo
-  use atspdt, only: LMMAX, LQIND, LM, LQNS, DP, DPE, E, P, PE,PEI, VNS1, VNS2, VNS3, GFAC!, NL
+  use atspdt, only: LMMAX,LQIND,LM,LQNS,LQMM,DP,DPE,E,P,PE,PEI, &
+       VNS1,VNS2,VNS3,WNS1,WNS2,WNS3,WNS4,GFAC
   use structure, only  : jri, dx, r0, aname
-  use loint, only : VNS1LO, VNS2LO, VNS3LO
+  use loint, only : VNS1LO,VNS2LO,VNS3LO,WNS1LO,WNS2LO,WNS3LO,WNS4LO,WNS5LO
   use potnlc, only: VR 
   use structure, only : IATNR
   use mgaunt, only: gaunt1
@@ -39,6 +41,7 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
   REAL*8      :: CROSS, DELE, DELEI
   REAL*8      :: DUV, DUVB, DUVE, DX_, E1, EI, FL, OVLP, R0_
   REAL*8      :: TRX, UV, UVB, UVE,  RNET(NRAD)
+  REAL*8      :: AW(NRAD), BW(NRAD), AEW(NRAD), BEW(NRAD)
   COMPLEX*16  :: IMAG, IMAG1
   CHARACTER*67:: ERRMSG
   integer     :: klo
@@ -62,7 +65,13 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
   if (myrank.eq.master) then
      if ( (filename_V_vns/="") .and. force) then !CheckFileExists(filename_V_vns)) then
         !     force-output only 
-        write(71,'( " non-spherical Matrixelements x Gaunt-Coefficient (d=du/dE):",/, " l0 ll lp m0 mm mp     uVu dVd",/, "                       uVd dVu")')
+        ! WIEN2k-24 uses sequential-unformatted records for case.nsh.
+        ! The strings are documentary only, but retaining the same first
+        ! record makes files interchangeable with LAPW2 and dmft2.
+        write(71) &
+             " non-spherical Matrixelements x Gaunt-Coefficient (d=du/dE):", &
+             " l0 ll lp m0 mm mp     uVu dVd", &
+             "                       uVd dVu"
      endif
      CALL init_V_vns(filename_V_vns, 19)  ! Start reading non-spherical potential
   endif
@@ -88,44 +97,58 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
         !        calculate energy-derivative by finite difference
         !        DELE is the up and downward energy-shift in Hartrees
         E1 = EI - DELE
-        CALL OUTWINC(A,B,NODEL,UVB,DUVB,REL,VR(:,jatom),Rnet,DX_,JRI_,EI-DELE,FL,ZZ(jatom),nrad)
+        CALL OUTWINC(A,B,AP,BP,NODEL,UVB,DUVB,REL,VR(:,jatom),Rnet,DX_,JRI_,EI-DELE,FL,ZZ(jatom),nrad)
         OVLP = RINT13(REL,A,B,A,B,NRAD,DX_,JRI_,R0_) ! OVLP = A**2+B**2
         TRX = 1.0D+0/SQRT(OVLP)
         AE(1:JRI_) = A(1:JRI_)*TRX
         BE(1:JRI_) = B(1:JRI_)*TRX
+        APE(1:JRI_) = AP(1:JRI_)*TRX
+        BPE(1:JRI_) = BP(1:JRI_)*TRX
         UVB  = UVB*TRX
         DUVB = DUVB*TRX
         ! results are: AE(:), BE(:), UVB, DUVB, E1
         ! outputs: UVE, DUVE, NODE, OVLP
         !     CALCULATE FUNCTION AT EI+DELE
         E1 = EI + DELE
-        CALL OUTWINC(A,B,NODEU,UVE,DUVE,REL,VR(:,jatom),Rnet,DX_,JRI_,EI+DELE,FL,ZZ(jatom),nrad)
+        CALL OUTWINC(A,B,AP,BP,NODEU,UVE,DUVE,REL,VR(:,jatom),Rnet,DX_,JRI_,EI+DELE,FL,ZZ(jatom),nrad)
         OVLP = RINT13(REL,A,B,A,B,NRAD,DX_,JRI_,R0_)
         TRX = 1.0D+0/SQRT(OVLP)
         UVE = DELEI*(TRX*UVE-UVB)
         DUVE = DELEI*(TRX*DUVE-DUVB)
         AE(1:JRI_) = DELEI*( A(1:JRI_)*TRX - AE(1:JRI_))
         BE(1:JRI_) = DELEI*( B(1:JRI_)*TRX - BE(1:JRI_))
+        APE(1:JRI_) = DELEI*( AP(1:JRI_)*TRX - APE(1:JRI_))
+        BPE(1:JRI_) = DELEI*( BP(1:JRI_)*TRX - BPE(1:JRI_))
         ! results are: A(:), B(:), P(:), DP(:), UV, DUV
         !     calculate function at EI
-        CALL OUTWINC(A,B,NODES,UV,DUV,REL,VR(:,jatom),Rnet,DX_,JRI_,EI,FL,ZZ(jatom),nrad)
+        CALL OUTWINC(A,B,AP,BP,NODES,UV,DUV,REL,VR(:,jatom),Rnet,DX_,JRI_,EI,FL,ZZ(jatom),nrad)
         OVLP = RINT13(REL,A,B,A,B,NRAD,DX_,JRI_,R0_)
         TRX = 1.0D+0/SQRT(OVLP)
         P(l+1,jatom) = TRX*UV
         DP(l+1,jatom) = TRX*DUV
         A(1:JRI_) = A(1:JRI_)*TRX
         B(1:JRI_) = B(1:JRI_)*TRX
+        AP(1:JRI_) = AP(1:JRI_)*TRX
+        BP(1:JRI_) = BP(1:JRI_)*TRX
         !     insure orthogonalization
         CROSS = RINT13(REL,A,B,AE,BE,NRAD,DX_,JRI_,R0_)
         IF (Qprint .and. CROSS .GT. 0.05D+0) WRITE (6,6070) L, CROSS, OVLP
         AE(1:JRI_) = AE(1:JRI_) - CROSS*A(1:JRI_)
         BE(1:JRI_) = BE(1:JRI_) - CROSS*B(1:JRI_)
+        ! Apply exactly the same normalization/orthogonalization response to
+        ! the radial derivatives as to their primitive radial functions.
+        APE(1:JRI_) = APE(1:JRI_) - CROSS*AP(1:JRI_)
+        BPE(1:JRI_) = BPE(1:JRI_) - CROSS*BP(1:JRI_)
         ! stores radial functions into A1, B1, AE1, BE1
         IF ((l+1) .LE. NSLMAX) THEN
            A1(1:JRI_,l+1) = A(1:JRI_)
            B1(1:JRI_,l+1) = B(1:JRI_)
+           AP1(1:JRI_,l+1) = AP(1:JRI_)
+           BP1(1:JRI_,l+1) = BP(1:JRI_)
            AE1(1:JRI_,l+1) = AE(1:JRI_)
            BE1(1:JRI_,l+1) = BE(1:JRI_)
+           APE1(1:JRI_,l+1) = APE(1:JRI_)
+           BPE1(1:JRI_,l+1) = BPE(1:JRI_)
         ENDIF
         PE(l+1,jatom) = UVE - CROSS*P(l+1,jatom)
         DPE(l+1,jatom) = DUVE - CROSS*DP(l+1,jatom)
@@ -154,11 +177,13 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
               if ((.not.lapw(l,jatom)).and.jlo.eq.1) cycle  ! apw+lo
               EI = Elo(L,jlo,jatom)/2.D0  ! from Ry2Hartree
               !     calculate function at EI
-              CALL OUTWINC(A,B,NODES,UV,DUV,REL,VR(:,jatom),Rnet,DX_,jri_,Ei,FL,ZZ(jatom),nrad) 
+              CALL OUTWINC(A,B,AP,BP,NODES,UV,DUV,REL,VR(:,jatom),Rnet,DX_,jri_,Ei,FL,ZZ(jatom),nrad)
               OVLP = rint13(REL,A,B,A,B,NRAD,DX_,JRI_,R0_)
               TRX = 1.0D+0/SQRT(OVLP)
               A(1:JRI_) = A(1:JRI_)*TRX
               B(1:JRI_) = B(1:JRI_)*TRX
+              AP(1:JRI_) = AP(1:JRI_)*TRX
+              BP(1:JRI_) = BP(1:JRI_)*TRX
               PLO(l,jlo,jatom) = UV*TRX
               DPLO(l,jlo,jatom) = DUV*TRX
               pi12lo(l,jlo,jatom) = RINT13(REL,A1(:,L+1),B1(:,L+1),A,B,NRAD,DX_,JRI_,R0_)
@@ -166,6 +191,8 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
               IF ((l+1) .LE. NSLMAX) THEN
                  A1LO(1:JRI_,jlo,l) = A(1:JRI_)
                  B1LO(1:JRI_,jlo,l) = B(1:JRI_)
+                 AP1LO(1:JRI_,jlo,l) = AP(1:JRI_)
+                 BP1LO(1:JRI_,jlo,l) = BP(1:JRI_)
               ENDIF
               if (Qprint) WRITE(6,6031) l,PLO(l,jlo,jatom),DPLO(l,jlo,jatom),PI12LO(l,jlo,jatom),PE12LO(l,jlo,jatom), NODEL, NODES, NODEU
            enddo
@@ -189,7 +216,7 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
 !!!  We need to do this in the same loop because the wave functions, such as a1lo(:,:,:), b1lo(:,:,:) and c1lo(:,:,:), are not saved for all atoms, but just for the current atom.
 
      if (myrank.eq.master) then
-        if (force) write(71,'(i3," .Atom ")') jatom
+        if (force) write(71) jatom
         !        read total nonspherical potential of TAPE19=VNS
         !        norm of VLM=VLM*1
         CALL read_V_vns2(Vlm,lmmax(jatom),lm_stored,LM(:,:,jatom),jatom,nrad,jri(jatom),lmmx,lnsmax)
@@ -257,6 +284,10 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
                     LQNS(4,LQIND(jatom),jatom) = ilm
                     LQNS(5,LQIND(jatom),jatom) = m
                     LQNS(6,LQIND(jatom),jatom) = mp
+                    ! LM stores the nonnegative real-harmonic label, while
+                    ! the loop also visits its conjugate negative-M channel.
+                    ! Preserve that sign explicitly for the auxiliary file.
+                    LQMM(LQIND(jatom),jatom) = mm
                  ENDDO
               ENDDO
               !
@@ -298,12 +329,45 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
            VNS1(L0+1,ilm,LP+1,jatom) = RINT13(REL,A,B,A1(:,lp+1),B1(:,lp+1),NRAD,DX_,JRI_,R0_)      ! <A1|V|A1>
            VNS2(L0+1,ilm,LP+1,jatom) = RINT13(REL,AE,BE,AE1(:,lp+1),BE1(:,lp+1),NRAD,DX_,JRI_,R0_)  ! <AE1|V|AE1>
            VNS3(L0+1,ilm,LP+1,jatom) = RINT13(REL,A,B,AE1(:,lp+1),BE1(:,lp+1),NRAD,DX_,JRI_,R0_)    ! <A1|V|AE1>
+
+           ! Stress Eq. (G2) requires
+           !   W = integral r^3 dr (du_bra/dr) V_L u_ket.
+           ! A1=r*u and AP1=r*du/dr, while RINT13 integrates products of
+           ! its stored radial arguments over dr.  Therefore the W bra is
+           ! r*AP1*V.  The derivative remains on the bra, so u'-udot and
+           ! udot'-u are independent channels.
+           AW(1:JRI_)  = RNET(1:JRI_)*AP1(1:JRI_,L0+1)*VLM(1:JRI_,ilm)
+           BW(1:JRI_)  = RNET(1:JRI_)*BP1(1:JRI_,L0+1)*VLM(1:JRI_,ilm)
+           AEW(1:JRI_) = RNET(1:JRI_)*APE1(1:JRI_,L0+1)*VLM(1:JRI_,ilm)
+           BEW(1:JRI_) = RNET(1:JRI_)*BPE1(1:JRI_,L0+1)*VLM(1:JRI_,ilm)
+           WNS1(L0+1,ilm,LP+1,jatom) = RINT13(REL,AW,BW,A1(:,lp+1),B1(:,lp+1),NRAD,DX_,JRI_,R0_)
+           WNS2(L0+1,ilm,LP+1,jatom) = RINT13(REL,AEW,BEW,AE1(:,lp+1),BE1(:,lp+1),NRAD,DX_,JRI_,R0_)
+           WNS3(L0+1,ilm,LP+1,jatom) = RINT13(REL,AW,BW,AE1(:,lp+1),BE1(:,lp+1),NRAD,DX_,JRI_,R0_)
+           WNS4(L0+1,ilm,LP+1,jatom) = RINT13(REL,AEW,BEW,A1(:,lp+1),B1(:,lp+1),NRAD,DX_,JRI_,R0_)
+
+           ! These APW-bra/LO-ket channels cannot be reconstructed by
+           ! transposing the LO-bra values because W is nonsymmetric.
+           IF (LP .LE. LOMAX) THEN
+              do klo=1,ilo(lp,jatom)
+                 WNS4LO(L0+1,ilm,LP+1,klo,jatom)=0.0d0
+                 WNS5LO(L0+1,ilm,LP+1,klo,jatom)=0.0d0
+                 if (.not.lapw(lp,jatom).and.klo.eq.1) cycle
+                 if (.not.loor(lp,jatom)) cycle
+                 WNS4LO(L0+1,ilm,LP+1,klo,jatom) = &
+                      RINT13(REL,AW,BW,A1LO(:,klo,lp),B1LO(:,klo,lp),NRAD,DX_,JRI_,R0_)
+                 WNS5LO(L0+1,ilm,LP+1,klo,jatom) = &
+                      RINT13(REL,AEW,BEW,A1LO(:,klo,lp),B1LO(:,klo,lp),NRAD,DX_,JRI_,R0_)
+              enddo
+           ENDIF
            !     integrals needed for local orbitals
            IF (L0 .LE. LOMAX) THEN
               do jlo=1,ilo(l0,jatom)
                  VNS1LO(L0+1,ilm,LP+1,jlo,jatom) = 0.0D0
                  VNS2LO(L0+1,ilm,LP+1,jlo,jatom) = 0.0D0
                  VNS3LO(L0+1,ilm,LP+1,jlo,:,jatom) = 0.0d0
+                 WNS1LO(L0+1,ilm,LP+1,jlo,jatom) = 0.0D0
+                 WNS2LO(L0+1,ilm,LP+1,jlo,jatom) = 0.0D0
+                 WNS3LO(L0+1,ilm,LP+1,jlo,:,jatom) = 0.0d0
                  if (.not.lapw(l0,jatom).and.jlo.eq.1) cycle
                  if(loor(l0,jatom)) THEN
                     A(1:JRI_) = A1LO(1:JRI_,jlo,L0)*VLM(1:JRI_,ilm)
@@ -314,11 +378,19 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
                  !
                  VNS1LO(L0+1,ilm,LP+1,jlo,jatom) = RINT13(REL,A,B,A1(:,lp+1),B1(:,lp+1),NRAD,DX_,JRI_,R0_)
                  VNS2LO(L0+1,ilm,LP+1,jlo,jatom) = RINT13(REL,A,B,AE1(:,lp+1),BE1(:,lp+1),NRAD,DX_,JRI_,R0_)
+                 AW(1:JRI_) = RNET(1:JRI_)*AP1LO(1:JRI_,jlo,L0)*VLM(1:JRI_,ilm)
+                 BW(1:JRI_) = RNET(1:JRI_)*BP1LO(1:JRI_,jlo,L0)*VLM(1:JRI_,ilm)
+                 WNS1LO(L0+1,ilm,LP+1,jlo,jatom) = &
+                      RINT13(REL,AW,BW,A1(:,lp+1),B1(:,lp+1),NRAD,DX_,JRI_,R0_)
+                 WNS2LO(L0+1,ilm,LP+1,jlo,jatom) = &
+                      RINT13(REL,AW,BW,AE1(:,lp+1),BE1(:,lp+1),NRAD,DX_,JRI_,R0_)
                  !
                  IF (LP .LE. LOMAX) THEN
                     do klo=1,ilo(lp,jatom)
                        if (.not.lapw(lp,jatom).and.klo.eq.1) cycle
                        VNS3LO(L0+1,ilm,LP+1,jlo,klo,jatom) = RINT13(REL,A,B,A1lo(:,klo,lp),B1lo(:,klo,lp),NRAD,DX_,JRI_,R0_)
+                       WNS3LO(L0+1,ilm,LP+1,jlo,klo,jatom) = &
+                            RINT13(REL,AW,BW,A1lo(:,klo,lp),B1lo(:,klo,lp),NRAD,DX_,JRI_,R0_)
                     enddo
                  ENDIF
                  M = LQNS(5,LQX,jatom)
@@ -335,8 +407,9 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
      ENDDO
      if (force .and. myrank.eq.master) then
         call forfhs(jatom) 
-        !               final line for each atom = 6 x 0 and 8 x 0.0d0
-        write(71,'(6i3,4es19.12,/,6(3x),4es19.12)') (0, i=1,6),(0.d0,i=1,8)
+        ! Four complex matrix blocks follow the six integers in each
+        ! WIEN2k-24 record: V, W, phase-weighted V and phase-weighted W.
+        write(71) (0,i=1,6),(0.d0,i=1,32)
      endif
      if (Qprint) WRITE (6,*) '   NUMBER OF RADIAL INTEGRALS FOR ATOM', JATOM,' = ',ICOUNT
   ENDDO

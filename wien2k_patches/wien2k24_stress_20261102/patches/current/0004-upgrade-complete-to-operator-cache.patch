@@ -1,0 +1,587 @@
+--- a/SRC_lapw2/val_rela_kinstrmt.F
++++ b/SRC_lapw2/val_rela_kinstrmt.F
+@@ -1,3 +1,285 @@
++module rela_operator_cache
++ implicit none
++ integer, allocatable, save :: basis_lm(:),basis_ch(:),pair_p(:),pair_q(:)
++ integer*8, allocatable, save :: input_key(:)
++ complex*16, allocatable, save :: operators(:,:,:)
++ real*8, allocatable, save :: overlap(:)
++ integer, save :: nbasis=0,npairs=0,builds=0,hits=0
++contains
++subroutine apply_cached_rela(nemin,nemax,jatom,alm,blm,clm, &
++    rmesh,dx,lf,ldf,sf,sdf,qd,qu,dvry,nmap,outmap,hmap,dmap, &
++    nmap2,outmap2,hmap2,old_scale,surf_scale,en_scale,nat_scale,mass_scale, &
++    band_energy,buf_corr,buf_sr,buf_old,buf_surf)
++ use lo, only: ilo,loor
++ use TestCases, only: SimpInt,ConOpt
++ implicit none
++ integer,intent(in)::nemin,nemax,jatom,nmap(:),outmap(:,:),nmap2(:),outmap2(:,:)
++ complex*16,intent(in)::alm(:,:),blm(:,:),clm(:,:,:),hmap(:,:,:),dmap(:,:,:),hmap2(:,:,:)
++ real*8,intent(in)::rmesh(:),dx,lf(:,0:,:),ldf(:,0:,:),sf(:,0:,:),sdf(:,0:,:), &
++    qd(:,0:,:),qu(:,0:,:),dvry(:),old_scale,surf_scale,en_scale,nat_scale,mass_scale,band_energy(:)
++ complex*16,intent(out)::buf_corr(:,:,:),buf_sr(:,:,:),buf_old(:,:,:),buf_surf(:,:,:)
++ real*8,allocatable::key_real(:)
++ integer*8,allocatable::new_key(:)
++ complex*16,allocatable::coeff(:)
++ complex*16::sums(9,5),product,norm_value
++ integer::num,p,q,k,a,b,t,u,log_unit
++ logical::refresh
++ character(len=32)::cache_env
++ integer::cache_status
++ real*8::t0,t1,t2
++ key_real=[dble(jatom),dble(size(rmesh)),dble(size(lf,2)),dble(size(lf,3)),dx,merge(1.d0,0.d0,SimpInt),merge(1.d0,0.d0,ConOpt),old_scale,surf_scale,en_scale,nat_scale,mass_scale, &
++    dble(ilo),reshape(merge(1.d0,0.d0,loor),[size(loor)]), &
++    rmesh,dvry,reshape(lf,[size(lf)]),reshape(ldf,[size(ldf)]), &
++    reshape(sf,[size(sf)]),reshape(sdf,[size(sdf)]), &
++    reshape(qd,[size(qd)]),reshape(qu,[size(qu)])]
++ new_key=transfer(key_real,[0_8],size(key_real))
++ refresh=.true.
++ if(allocated(input_key)) then
++    if(size(input_key).eq.size(new_key)) refresh=any(input_key.ne.new_key)
++ endif
++ call cpu_time(t0)
++ if(refresh) then
++    call build_operators(rmesh,dx,lf,ldf,sf,sdf,qd,qu,dvry, &
++       nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2,old_scale,surf_scale,en_scale,nat_scale,mass_scale)
++    input_key=new_key
++    builds=builds+1
++ else
++    hits=hits+1
++ endif
++ call cpu_time(t1)
++ buf_corr=(0.d0,0.d0);buf_sr=(0.d0,0.d0);buf_old=(0.d0,0.d0);buf_surf=(0.d0,0.d0)
++!$omp parallel default(shared) private(num,coeff,p,q,k,a,b,t,u,product,sums,norm_value)
++ allocate(coeff(nbasis))
++!$omp do schedule(dynamic,1)
++ do num=nemin,nemax
++    do p=1,nbasis
++       if(basis_ch(p).eq.1) then
++          coeff(p)=alm(basis_lm(p),num)
++       else if(basis_ch(p).eq.2) then
++          coeff(p)=blm(basis_lm(p),num)
++       else
++          coeff(p)=clm(basis_lm(p),num,basis_ch(p)-2)
++       endif
++    enddo
++    sums=(0.d0,0.d0);norm_value=(0.d0,0.d0)
++    do k=1,npairs
++       p=pair_p(k);q=pair_q(k)
++       product=conjg(coeff(p))*coeff(q)
++       do u=1,4
++          do t=1,9
++             sums(t,u)=sums(t,u)+product*operators(t,u,k)
++          enddo
++       enddo
++       if(nat_scale.ne.0.d0) then
++          do t=1,9
++             sums(t,5)=sums(t,5)+product*operators(t,5,k)
++          enddo
++       endif
++       if(en_scale.ne.0.d0) norm_value=norm_value+product*overlap(k)
++    enddo
++    do b=1,3
++       do a=1,3
++          t=a+3*(b-1)
++          buf_sr(a,b,num)=sums(t,1)
++          buf_old(a,b,num)=sums(t,2)
++          buf_surf(a,b,num)=sums(t,3)
++          buf_corr(a,b,num)=sums(t,1)-sums(t,2)
++          if(nat_scale.ne.0.d0) buf_corr(a,b,num)=buf_corr(a,b,num)+nat_scale*band_energy(num)*sums(t,5)
++          if(mass_scale.ne.0.d0) buf_corr(a,b,num)=buf_corr(a,b,num)-0.5d0*mass_scale*real(sums(t,4))
++       enddo
++    enddo
++    if(en_scale.ne.0.d0) then
++       do a=1,3
++          buf_surf(a,a,num)=buf_surf(a,a,num)-en_scale*band_energy(num)*real(norm_value)/3.d0
++       enddo
++    endif
++ enddo
++!$omp end do
++ deallocate(coeff)
++!$omp end parallel
++ call cpu_time(t2)
++ cache_env=''
++ call get_environment_variable('WIEN_STRESS_RELA_CACHE_DIAG',cache_env,status=cache_status)
++ if(cache_status.eq.0.and.len_trim(cache_env).gt.0.and.trim(cache_env).ne.'0') then
++ open(newunit=log_unit,file='operator-cache.log',status='unknown',position='append')
++ write(log_unit,*) jatom,refresh,nbasis,npairs,builds,hits,t1-t0,t2-t1
++ close(log_unit)
++ endif
++end subroutine
++
++subroutine build_operators(r,dx,lf,ldf,sf,sdf,qd,qu,dvry, &
++    nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2,old_scale,surf_scale,en_scale,nat_scale,mass_scale)
++ use lo, only: ilo,loor
++ implicit none
++ integer,intent(in)::nmap(:),outmap(:,:),nmap2(:),outmap2(:,:)
++ complex*16,intent(in)::hmap(:,:,:),dmap(:,:,:),hmap2(:,:,:)
++ real*8,intent(in)::r(:),dx,lf(:,0:,:),ldf(:,0:,:),sf(:,0:,:),sdf(:,0:,:), &
++    qd(:,0:,:),qu(:,0:,:),dvry(:),old_scale,surf_scale,en_scale,nat_scale,mass_scale
++ real*8,allocatable::gv(:,:,:),fv(:,:,:),sv(:,:,:),small(:,:),rad(:,:,:,:,:),rs(:,:,:),fun(:)
++ integer,allocatable::rl(:),rc(:),lookup(:,:),br(:),first(:),last(:)
++ complex*16,allocatable::angular(:,:,:,:),moment(:,:,:,:,:)
++ complex*16::aa(3,3,2,2),mm(3,3,2,2),op(9,5),ang
++ real*8::c2inv,me,rsq,rr,ev
++ integer::nr,lmax,nin,nout,nout2,nchan,nlc,l,m,lm,ch,z,p,q,ip,iq,lp,lq, &
++          i,j,a,b,v,k,w,out,output,t,iu,iv,maxpairs
++ nr=size(r);lmax=ubound(lf,2);nchan=size(lf,3)
++ nin=size(nmap);nout=size(nmap2);nout2=(lmax+3)**2
++ c2inv=1.d0/(137.0359895d0**2);me=0.25d0*c2inv
++ allocate(lookup(0:lmax,nchan));lookup=0
++ nlc=0
++ do l=0,lmax
++    do ch=1,nchan
++       if(ch.gt.2) then
++          if(ch-2.gt.ilo(l)) cycle
++          if(.not.loor(ch-2,l)) cycle
++       endif
++       nlc=nlc+1;lookup(l,ch)=nlc
++    enddo
++ enddo
++ allocate(rl(nlc),rc(nlc),gv(nr,2,nlc),fv(nr,2,nlc),sv(nr,2,nlc),small(nr,nlc))
++ do l=0,lmax
++    do ch=1,nchan
++       z=lookup(l,ch);if(z.eq.0) cycle
++       rl(z)=l;rc(z)=ch
++       gv(:,1,z)=ldf(:,l,ch);gv(:,2,z)=lf(:,l,ch)/r
++       fv(:,1,z)=qd(:,l,ch);fv(:,2,z)=qu(:,l,ch)
++       sv(:,1,z)=sdf(:,l,ch);sv(:,2,z)=sf(:,l,ch)/r
++       small(:,z)=sf(:,l,ch)
++    enddo
++ enddo
++ allocate(rad(2,2,nlc,nlc,5),rs(nlc,nlc,2),fun(nr));rad=0.d0;rs=0.d0
++ do q=1,nlc
++    do p=1,nlc
++       do j=1,2
++          do i=1,2
++             fun=r*r*gv(:,i,p)*gv(:,j,q)
++             call charge(r,dx,fun,1,nr,rad(i,j,p,q,1))
++             fun=r*r*gv(:,i,p)*fv(:,j,q)
++             call charge(r,dx,fun,1,nr,rad(i,j,p,q,2))
++             fun=r*r*sv(:,i,p)*sv(:,j,q)
++             call charge(r,dx,fun,1,nr,rad(i,j,p,q,3))
++             if(nat_scale.ne.0.d0) then
++                fun=r*r*fv(:,i,p)*fv(:,j,q)
++                call charge(r,dx,fun,1,nr,rad(i,j,p,q,4))
++             endif
++             if(mass_scale.ne.0.d0) then
++                fun=r*r*r*dvry*fv(:,i,p)*fv(:,j,q)
++                call charge(r,dx,fun,1,nr,rad(i,j,p,q,5))
++             endif
++          enddo
++       enddo
++       if(mass_scale.ne.0.d0) then
++          fun=r*r*r*dvry*small(:,p)*small(:,q)
++          call charge(r,dx,fun,1,nr,rs(p,q,1))
++       endif
++       if(en_scale.ne.0.d0) then
++          fun=r*r*c2inv*small(:,p)*small(:,q)
++          call charge(r,dx,fun,1,nr,rs(p,q,2))
++       endif
++    enddo
++ enddo
++ allocate(angular(nout,3,2,nin),moment(nout2,3,3,2,nin))
++ angular=(0.d0,0.d0);moment=(0.d0,0.d0)
++ do lm=1,nin
++    do k=1,nmap(lm)
++       out=outmap(k,lm)
++       angular(out,:,1,lm)=hmap(:,k,lm)
++       angular(out,:,2,lm)=dmap(:,k,lm)
++    enddo
++ enddo
++ if(mass_scale.ne.0.d0) then
++    do lm=1,nin
++       do i=1,2
++          do v=1,3
++             do out=1,nout
++                do k=1,nmap2(out)
++                   output=outmap2(k,out)
++                   do a=1,3
++                      moment(output,a,v,i,lm)=moment(output,a,v,i,lm)+ &
++                          hmap2(a,k,out)*angular(out,v,i,lm)
++                   enddo
++                enddo
++             enddo
++          enddo
++       enddo
++    enddo
++ endif
++ nbasis=0
++ do l=0,lmax
++    nbasis=nbasis+(2*l+1)*count(lookup(l,:).ne.0)
++ enddo
++ if(allocated(basis_lm)) deallocate(basis_lm,basis_ch,pair_p,pair_q,operators,overlap)
++ allocate(basis_lm(nbasis),basis_ch(nbasis),br(nbasis),first(nin),last(nin))
++ p=0
++ do lm=1,nin
++    l=int(sqrt(dble(lm-1)));first(lm)=p+1
++    do ch=1,nchan
++       if(lookup(l,ch).eq.0) cycle
++       p=p+1;basis_lm(p)=lm;basis_ch(p)=ch;br(p)=lookup(l,ch)
++    enddo
++    last(lm)=p
++ enddo
++ maxpairs=nbasis*nbasis
++ allocate(pair_p(maxpairs),pair_q(maxpairs),operators(9,5,maxpairs),overlap(maxpairs))
++ npairs=0;rsq=r(nr)*r(nr)
++ do iq=1,nin
++    do ip=1,nin
++       aa=(0.d0,0.d0);mm=(0.d0,0.d0)
++       do j=1,2
++          do i=1,2
++             do b=1,3
++                do a=1,3
++                   aa(a,b,i,j)=0.5d0*sum(conjg(angular(:,a,i,ip))*angular(:,b,j,iq)+ &
++                                                conjg(angular(:,b,i,ip))*angular(:,a,j,iq))
++                   if(mass_scale.ne.0.d0) then
++                      do v=1,3
++                         mm(a,b,i,j)=mm(a,b,i,j)+0.5d0*sum( &
++                            conjg(moment(:,a,v,i,ip))*moment(:,b,v,j,iq)+ &
++                            conjg(moment(:,b,v,i,ip))*moment(:,a,v,j,iq))
++                      enddo
++                   endif
++                enddo
++             enddo
++          enddo
++       enddo
++       if(all(aa.eq.(0.d0,0.d0)).and.all(mm.eq.(0.d0,0.d0)).and.ip.ne.iq) cycle
++       do q=first(iq),last(iq)
++          do p=first(ip),last(ip)
++             lp=br(p);lq=br(q);op=(0.d0,0.d0)
++             do b=1,3
++                do a=1,3
++                   t=a+3*(b-1)
++                   do j=1,2
++                      do i=1,2
++                         ang=aa(a,b,i,j)
++                         op(t,1)=op(t,1)+0.5d0*ang*(rad(i,j,lp,lq,2)+rad(j,i,lq,lp,2))
++                         op(t,2)=op(t,2)+ang*(rad(i,j,lp,lq,1)+old_scale*c2inv*rad(i,j,lp,lq,3))
++                         if(nat_scale.ne.0.d0) op(t,5)=op(t,5)+me*ang*rad(i,j,lp,lq,4)
++                         if(mass_scale.ne.0.d0) op(t,4)=op(t,4)+me*mm(a,b,i,j)*rad(i,j,lp,lq,5)
++                      enddo
++                   enddo
++                   if(mass_scale.ne.0.d0) op(t,4)=op(t,4)-c2inv*aa(a,b,1,1)*rs(lp,lq,1)
++                   op(t,3)=rsq*aa(a,b,1,1)*lf(nr,rl(lp),rc(lp))* &
++                              (qd(nr,rl(lq),rc(lq))-ldf(nr,rl(lq),rc(lq)))
++                   if(surf_scale.ne.0.d0) then
++                      do j=1,2
++                         op(t,3)=op(t,3)+surf_scale*rsq*c2inv*small(nr,lp)*aa(a,b,1,j)*sv(nr,j,lq)
++                      enddo
++                   endif
++                enddo
++             enddo
++             ev=0.d0
++             if(en_scale.ne.0.d0.and.ip.eq.iq) ev=rs(lp,lq,2)
++             if(all(op.eq.(0.d0,0.d0)).and.ev.eq.0.d0) cycle
++             npairs=npairs+1;pair_p(npairs)=p;pair_q(npairs)=q
++             operators(:,:,npairs)=op;overlap(npairs)=ev
++          enddo
++       enddo
++    enddo
++ enddo
++end subroutine
++end module rela_operator_cache
++
+ subroutine val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
+                              buf_corr,buf_sr,buf_old,buf_surf)
+    ! Scalar-relativistic correction to the valence kinetic stress inside
+@@ -63,6 +345,7 @@
+    ! dcoef stores c^a_st.  Once both gradients are expressed in an
+    ! orthonormal Y_LM basis, the angular integral is just a dot product.
+ 
++   use rela_operator_cache, only: apply_cached_rela
+    use param
+    use com, only: rel
+    use struk, only: r0,dx,jri
+@@ -470,286 +753,10 @@
+                                       max_flux_err,max_flux_boundary_err
+    endif
+ 
+-   ! Band loop.  For each radial point, form the large-component gradient,
+-   ! its scalar-relativistic flux q, and the old small-component gradient in
+-   ! the common Y_LM output basis.  Orthogonality then performs the complete
+-   ! angular integral without an angular mesh.
+-   ! Every band writes a distinct NUM slice of BUF_SR/BUF_OLD/BUF_CORR and
+-   ! BUF_SURF.  It is therefore an ideal OpenMP dimension, unlike the angular
+-   ! channels of the nonrelativistic G1 contraction, whose work is strongly
+-   ! imbalanced.  All arrays below are scratch storage for one band and must
+-   ! be private.  Allocating them once per thread (outside OMP DO) avoids both
+-   ! races and the much larger cost of allocating them at every radial point.
+-   ! The shared radial functions/maps above are read-only in this region.
+-!$omp parallel default(shared) &
+-!$omp& private(num,ir,l,m,lm,lmout,imap,jlo,ich,alpha,beta,v,zval, &
+-!$omp&         sum_re,sum_im,small_norm,fvec,dfvec,svec,dsvec,qdvec,quvec, &
+-!$omp&         grad,aux,sgrad,npsi,ndflux,nsval,naux,integ_sr,integ_old, &
+-!$omp&         integ_nat,funct_re,funct_im,massv_tensor,tmp)
+-   allocate(fvec(nin),dfvec(nin),svec(nin),dsvec(nin))
+-   allocate(qdvec(nin),quvec(nin))
+-   allocate(grad(3,nout),aux(3,nout),sgrad(3,nout))
+-   allocate(npsi(3,nout),ndflux(3,nout))
+-   allocate(nsval(3,nout),naux(3,3,nout2))
+-   allocate(integ_sr(3,3,imax),integ_old(3,3,imax),integ_nat(3,3,imax))
+-   allocate(funct_re(imax),funct_im(imax),massv_tensor(3,3,imax),tmp(imax))
+-!$omp do schedule(dynamic,1)
+-   do num=nemin,nemax
+-      integ_sr=(0.d0,0.d0)
+-      integ_old=(0.d0,0.d0)
+-      integ_nat=(0.d0,0.d0)
+-      tmp=0.d0
+-      massv_tensor=0.d0
+-      do ir=1,imax
+-         fvec=(0.d0,0.d0); dfvec=(0.d0,0.d0)
+-         svec=(0.d0,0.d0); dsvec=(0.d0,0.d0)
+-         qdvec=(0.d0,0.d0); quvec=(0.d0,0.d0)
+-         do l=0,lmax
+-            do m=-l,l
+-               lm=l*(l+1)+m+1
+-               fvec(lm)=alm(lm,num)*lf(ir,l,1)+ &
+-                        blm(lm,num)*lf(ir,l,2)
+-               dfvec(lm)=alm(lm,num)*ldf(ir,l,1)+ &
+-                         blm(lm,num)*ldf(ir,l,2)
+-               svec(lm)=alm(lm,num)*sf(ir,l,1)+ &
+-                        blm(lm,num)*sf(ir,l,2)
+-               dsvec(lm)=alm(lm,num)*sdf(ir,l,1)+ &
+-                         blm(lm,num)*sdf(ir,l,2)
+-               qdvec(lm)=alm(lm,num)*qd(ir,l,1)+ &
+-                         blm(lm,num)*qd(ir,l,2)
+-               quvec(lm)=alm(lm,num)*qu(ir,l,1)+ &
+-                         blm(lm,num)*qu(ir,l,2)
+-               do jlo=1,ilo(l)
+-                  if(.not.loor(jlo,l)) cycle
+-                  ich=2+jlo
+-                  fvec(lm)=fvec(lm)+clm(lm,num,jlo)*lf(ir,l,ich)
+-                  dfvec(lm)=dfvec(lm)+clm(lm,num,jlo)*ldf(ir,l,ich)
+-                  svec(lm)=svec(lm)+clm(lm,num,jlo)*sf(ir,l,ich)
+-                  dsvec(lm)=dsvec(lm)+clm(lm,num,jlo)*sdf(ir,l,ich)
+-                  qdvec(lm)=qdvec(lm)+clm(lm,num,jlo)*qd(ir,l,ich)
+-                  quvec(lm)=quvec(lm)+clm(lm,num,jlo)*qu(ir,l,ich)
+-               enddo
+-            enddo
+-         enddo
+-
+-         grad=(0.d0,0.d0); aux=(0.d0,0.d0); sgrad=(0.d0,0.d0)
+-         do alpha=1,3
+-            do lm=1,nin
+-               do imap=1,nmap(lm)
+-                  lmout=outmap(imap,lm)
+-                  grad(alpha,lmout)=grad(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*dfvec(lm)+ &
+-                       dmap(alpha,imap,lm)*fvec(lm)/rmesh(ir)
+-                  aux(alpha,lmout)=aux(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*qdvec(lm)+ &
+-                       dmap(alpha,imap,lm)*quvec(lm)
+-                  sgrad(alpha,lmout)=sgrad(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*dsvec(lm)+ &
+-                       dmap(alpha,imap,lm)*svec(lm)/rmesh(ir)
+-               enddo
+-            enddo
+-         enddo
+-
+-         do alpha=1,3
+-            do beta=1,3
+-               zval=(0.d0,0.d0)
+-               do lmout=1,nout
+-                  ! Q_SR: Hermitian and strain-symmetrized large/flux
+-                  ! bilinear.  Q_old: the plain large gradient plus the
+-                  ! 1/c^2-weighted stored small-component gradient.
+-                  zval=zval+0.25d0*( &
+-                       conjg(grad(alpha,lmout))*aux(beta,lmout)+ &
+-                       conjg(aux(alpha,lmout))*grad(beta,lmout)+ &
+-                       conjg(grad(beta,lmout))*aux(alpha,lmout)+ &
+-                       conjg(aux(beta,lmout))*grad(alpha,lmout))
+-               enddo
+-               integ_sr(alpha,beta,ir)=rmesh(ir)*rmesh(ir)*zval
+-
+-               zval=(0.d0,0.d0)
+-               do lmout=1,nout
+-                  zval=zval+0.5d0*( &
+-                       conjg(grad(alpha,lmout))*grad(beta,lmout)+ &
+-                       conjg(grad(beta,lmout))*grad(alpha,lmout)+ &
+-                       old_small_scale*c2inv* &
+-                       conjg(sgrad(alpha,lmout))*sgrad(beta,lmout)+ &
+-                       old_small_scale*c2inv* &
+-                       conjg(sgrad(beta,lmout))*sgrad(alpha,lmout))
+-               enddo
+-               integ_old(alpha,beta,ir)=rmesh(ir)*rmesh(ir)*zval
+-
+-               zval=(0.d0,0.d0)
+-               do lmout=1,nout
+-                  zval=zval+0.5d0*me*( &
+-                       conjg(aux(alpha,lmout))*aux(beta,lmout)+ &
+-                       conjg(aux(beta,lmout))*aux(alpha,lmout))
+-               enddo
+-               integ_nat(alpha,beta,ir)=rmesh(ir)*rmesh(ir)*zval
+-            enddo
+-         enddo
+-
+-         ! Stored scalar-relativistic small-component norm for this band.
+-         ! SVEC is B(r)/r in WIEN2k's convention and RINT13 weights B^2 by
+-         ! 1/c^2, hence r^2/c^2 times the angular norm is the radial density.
+-         do lm=1,nin
+-            tmp(ir)=tmp(ir)+rmesh(ir)*rmesh(ir)*c2inv*abs(svec(lm))**2
+-         enddo
+-
+-         nsval=(0.d0,0.d0)
+-         naux=(0.d0,0.d0)
+-         do alpha=1,3
+-            do lm=1,nin
+-               do imap=1,nmap(lm)
+-                  lmout=outmap(imap,lm)
+-                  nsval(alpha,lmout)=nsval(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*svec(lm)
+-               enddo
+-            enddo
+-            do beta=1,3
+-               do lm=1,nout
+-                  do imap=1,nmap2(lm)
+-                     lmout=outmap2(imap,lm)
+-                     naux(alpha,beta,lmout)=naux(alpha,beta,lmout)+ &
+-                          hmap2(alpha,imap,lm)*aux(beta,lm)
+-                  enddo
+-               enddo
+-            enddo
+-         enddo
+-         do alpha=1,3
+-            do beta=1,3
+-               zval=(0.d0,0.d0)
+-               do v=1,3
+-                  do lmout=1,nout2
+-                     zval=zval+0.5d0*me*( &
+-                          conjg(naux(alpha,v,lmout))*naux(beta,v,lmout)+ &
+-                          conjg(naux(beta,v,lmout))*naux(alpha,v,lmout))
+-                  enddo
+-               enddo
+-               do lmout=1,nout
+-                  zval=zval-0.5d0*c2inv*( &
+-                       conjg(nsval(alpha,lmout))*nsval(beta,lmout)+ &
+-                       conjg(nsval(beta,lmout))*nsval(alpha,lmout))
+-               enddo
+-               massv_tensor(alpha,beta,ir)=rmesh(ir)*rmesh(ir)* &
+-                    rmesh(ir)*dvry(ir)*real(zval)
+-            enddo
+-         enddo
+-      enddo
+-
+-      do alpha=1,3
+-         do beta=1,3
+-               funct_re=real(integ_sr(alpha,beta,:))
+-               funct_im=aimag(integ_sr(alpha,beta,:))
+-               call charge(rmesh,dx(jatom),funct_re,1,imax,sum_re)
+-               call charge(rmesh,dx(jatom),funct_im,1,imax,sum_im)
+-               buf_sr(alpha,beta,num)=dcmplx(sum_re,sum_im)
+-
+-               funct_re=real(integ_old(alpha,beta,:))
+-               funct_im=aimag(integ_old(alpha,beta,:))
+-               call charge(rmesh,dx(jatom),funct_re,1,imax,sum_re)
+-               call charge(rmesh,dx(jatom),funct_im,1,imax,sum_im)
+-               buf_old(alpha,beta,num)=dcmplx(sum_re,sum_im)
+-               buf_corr(alpha,beta,num)=buf_sr(alpha,beta,num)- &
+-                                         buf_old(alpha,beta,num)
+-
+-               if(ennat_scale.ne.0.d0) then
+-                  funct_re=real(integ_nat(alpha,beta,:))
+-                  funct_im=aimag(integ_nat(alpha,beta,:))
+-                  call charge(rmesh,dx(jatom),funct_re,1,imax,sum_re)
+-                  call charge(rmesh,dx(jatom),funct_im,1,imax,sum_im)
+-                  buf_corr(alpha,beta,num)=buf_corr(alpha,beta,num)+ &
+-                       ennat_scale*band_energy(num)*dcmplx(sum_re,sum_im)
+-               endif
+-         enddo
+-      enddo
+-
+-      ! Correct the APW surface flux.  At this point FVEC, DFVEC and QDVEC
+-      ! still contain the values at the outermost radial point.  HMAP is the
+-      ! exact spherical-harmonic representation of n_alpha*Y_lm.  Thus NPSI
+-      ! represents n_alpha*psi and NDFLUX represents
+-      ! n_alpha*(A*d_r(psi)-d_r(psi)).  The factor R_MT^2 is the surface
+-      ! measure.  Symmetrizing alpha,beta makes the tensor Hermitian before
+-      ! the real occupation sum is taken in l2main.
+-      npsi=(0.d0,0.d0)
+-      ndflux=(0.d0,0.d0)
+-      do alpha=1,3
+-         do lm=1,nin
+-            do imap=1,nmap(lm)
+-               lmout=outmap(imap,lm)
+-               npsi(alpha,lmout)=npsi(alpha,lmout)+ &
+-                    hmap(alpha,imap,lm)*fvec(lm)
+-               ndflux(alpha,lmout)=ndflux(alpha,lmout)+ &
+-                    hmap(alpha,imap,lm)*(qdvec(lm)-dfvec(lm))
+-            enddo
+-         enddo
+-      enddo
+-      do alpha=1,3
+-         do beta=1,3
+-            zval=(0.d0,0.d0)
+-            do lmout=1,nout
+-               zval=zval+0.5d0*( &
+-                    conjg(npsi(alpha,lmout))*ndflux(beta,lmout)+ &
+-                    conjg(npsi(beta,lmout))*ndflux(alpha,lmout))
+-            enddo
+-            buf_surf(alpha,beta,num)=rmesh(imax)*rmesh(imax)*zval
+-
+-         enddo
+-      enddo
+-
+-      if(small_surf_scale.ne.0.d0) then
+-         ! SMALL COMPONENT: unlike the large component it has no APW
+-         ! continuation outside the sphere.  Rebuild NPSI from SVEC so it
+-         ! represents n_alpha*s and contract it with the complete small-
+-         ! component gradient already held in SGRAD.
+-         npsi=(0.d0,0.d0)
+-         do alpha=1,3
+-            do lm=1,nin
+-               do imap=1,nmap(lm)
+-                  lmout=outmap(imap,lm)
+-                  npsi(alpha,lmout)=npsi(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*svec(lm)
+-               enddo
+-            enddo
+-         enddo
+-         do alpha=1,3
+-            do beta=1,3
+-               zval=(0.d0,0.d0)
+-               do lmout=1,nout
+-                  zval=zval+0.5d0*c2inv*( &
+-                       conjg(npsi(alpha,lmout))*sgrad(beta,lmout)+ &
+-                       conjg(npsi(beta,lmout))*sgrad(alpha,lmout))
+-               enddo
+-               buf_surf(alpha,beta,num)=buf_surf(alpha,beta,num)+ &
+-                    small_surf_scale*rmesh(imax)*rmesh(imax)*zval
+-            enddo
+-         enddo
+-      endif
+-
+-
+-      if(ensmall_scale.ne.0.d0) then
+-         call charge(rmesh,dx(jatom),tmp,1,imax,small_norm)
+-         do alpha=1,3
+-            buf_surf(alpha,alpha,num)=buf_surf(alpha,alpha,num)- &
+-                 ensmall_scale*band_energy(num)*small_norm/3.d0
+-         enddo
+-      endif
+-
+-      if(massv_scale.ne.0.d0) then
+-         do alpha=1,3
+-            do beta=1,3
+-               funct_re=massv_tensor(alpha,beta,:)
+-               call charge(rmesh,dx(jatom),funct_re,1,imax,sum_re)
+-               buf_corr(alpha,beta,num)=buf_corr(alpha,beta,num)- &
+-                    0.5d0*massv_scale*sum_re
+-            enddo
+-         enddo
+-      endif
+-   enddo
+-!$omp end do
+-   deallocate(fvec,dfvec,svec,dsvec,qdvec,quvec)
+-   deallocate(grad,aux,sgrad,npsi,ndflux,nsval,naux)
+-   deallocate(integ_sr,integ_old,integ_nat,funct_re,funct_im, &
+-              massv_tensor,tmp)
+-!$omp end parallel
++   call apply_cached_rela(nemin,nemax,jatom,alm,blm,clm, &
++      rmesh,dx(jatom),lf,ldf,sf,sdf,qd,qu,dvry,nmap,outmap,hmap,dmap, &
++      nmap2,outmap2,hmap2,old_small_scale,small_surf_scale,ensmall_scale, &
++      ennat_scale,massv_scale,band_energy,buf_corr,buf_sr,buf_old,buf_surf)
+ 
+    deallocate(nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2, &
+               rmesh,vry,dvry)

@@ -1,0 +1,56 @@
+--- a/SRC_lapw2/symmetrization_stress.f
++++ b/SRC_lapw2/symmetrization_stress.f
+@@ -5,7 +5,9 @@
+     use com  , only : rel
+     use struk, only : lattic,br2,aa,bb,cc, vol    
+     implicit none
+-    integer               :: i,j,k,alpha,beta, index2
++    integer               :: i,j,k,alpha,beta, index2, stress_debug_status
++    logical               :: stress_debug
++    character(len=32)     :: stress_debug_env
+ !     real*8, intent(inout) :: in_stress(1:3,1:3)
+     real*8              :: val_corr(1:3,1:3), kin_rmt(1:3,1:3), kin_int(1:3,1:3),  &
+                            kin_rmt_apw(1:3,1:3), rela_corr(1:3,1:3)                           
+@@ -35,6 +37,14 @@
+     fin_val_str(:,:)    = 0.d0
+     rela_corr_fn(:,:)   = 0.d0
+     con_fac          = 147105.164057
++
++    ! Enable detailed component output only for explicit diagnostics.
++    stress_debug_env = ''
++    call get_environment_variable('WIEN_STRESS_DEBUG',stress_debug_env, &
++                                  status=stress_debug_status)
++    stress_debug = stress_debug_status.eq.0 .and. &
++                   len_trim(stress_debug_env).gt.0 .and. &
++                   trim(stress_debug_env).ne.'0'
+             
+     IF(LATTIC(1:1) .EQ. 'H') THEN
+       BR4(1,1)=SQRT(3.d0)/2.d0                                              
+@@ -225,6 +235,18 @@
+       WRITE(21,*) '==============TOTAL STRESS FOR VALENCES ELECTRONS================='
+       fin_val_str(:,:) = val_corr_fn(:,:)+kin_rmt_fn(:,:)+ &
+                           kin_int_fn(:,:)+kin_rmt_apw_fn(:,:)      
++      if(stress_debug) then
++         do alpha = 1,3
++            do beta = 1,3
++               write(21,2226) alpha,beta, &
++                    val_corr_fn(alpha,beta)/vol, &
++                    kin_rmt_fn(alpha,beta)/vol, &
++                    kin_int_fn(alpha,beta)/vol, &
++                    kin_rmt_apw_fn(alpha,beta)/vol, &
++                    fin_val_str(alpha,beta)/vol
++            enddo
++         enddo
++      endif
+       fin_val_str = fin_val_str/vol                    
+       DO alpha = 1, 3
+          WRITE(21,2225) alpha, (fin_val_str(alpha,beta),beta=1,3)
+@@ -251,6 +273,7 @@
+ 111   FORMAT(3(3I2,/))
+ 112   FORMAT(3(3ES19.12,/))
+ 2225  FORMAT(':STR_VAL',i3.3,':',2x,3f20.12)
++2226  FORMAT(':DBG_STR_VAL:',2I3,5(1X,ES23.15))
+ 
+ return
+ end subroutine symmetrization_stress
+

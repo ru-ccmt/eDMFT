@@ -1,0 +1,53 @@
+--- a/SRC_lapw0/finl_elect_str.F
++++ b/SRC_lapw0/finl_elect_str.F
+@@ -60,7 +60,17 @@
+    
+    call c_alpha_m(cabt)                     !this is c matrix of unit vector expansion
+    
++!  index_a addresses ROTIJ for every atom in the full unit cell, whereas
++!  jatom addresses only inequivalent atom types.  In an MPI calculation a
++!  rank may start at an inequivalent type later than one; initializing the
++!  full-atom index to zero then applies the rotations belonging to earlier
++!  atoms.  Advance over the multiplicities owned by preceding ranks before
++!  entering this rank's local atom-type loop.  The serial result is
++!  unchanged because nstart=1.
+    index_a = 0
++   DO jatom = 1, nstart(myid)-1
++      index_a = index_a + mult(jatom)
++   ENDDO
+    DO 29 jatom = nstart(myid), nstop(myid)         
+    DO 30 mu    = 1, mult(jatom)         
+          index_a   = index_a + 1
+--- a/SRC_lapw0/stress_gga.F
++++ b/SRC_lapw0/stress_gga.F
+@@ -66,7 +66,14 @@
+        spin1 = .FALSE.
+     ENDIF
+     
++    ! ROTIJ is indexed over all atoms, not inequivalent atom types.  Account
++    ! for atom types assigned to earlier MPI ranks before rotating this
++    ! rank's GGA stress tensors.  Otherwise parallel LAPW0 uses rotations
++    ! belonging to the wrong equivalent atoms whenever nstart(myid)>1.
+     index_a = 0
++    DO jatom = 1, nstart(myid)-1
++       index_a = index_a + mult(jatom)
++    ENDDO
+     DO 29 jatom = nstart(myid), nstop(myid)
+     DO 29 mu    = 1, mult(jatom)
+           index_a = index_a + 1
+--- a/SRC_lapw0/xcpot3.F
++++ b/SRC_lapw0/xcpot3.F
+@@ -1040,7 +1040,12 @@
+ !=====================exc_vxc============================================
+          DO J = 1, NKK   
+             RHOKSP(J,1)=VKEXC(J,1)-VKVXC(J,1)
+-            RHOKSP(J,2)=VKEXC(J,2)-VKVXC(J,1)            
++!           The second spin channel must use its own V_xc coefficient.
++!           The old VKVXC(J,1) reference silently mixed the spin-up
++!           potential into the spin-down interstitial (E_xc-rho*V_xc)
++!           contribution.  This block is stress-only, so total energies
++!           were unaffected, but spin-polarized analytic stresses were not.
++            RHOKSP(J,2)=VKEXC(J,2)-VKVXC(J,2)            
+          ENDDO
+          CALL SETFFT(NKK,IFFT1,IFFT2,IFFT3,RHOKSP,UFFT)              
+ 

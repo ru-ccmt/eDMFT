@@ -1,0 +1,38 @@
+--- a/SRC_mixer/scfana.f
++++ b/SRC_mixer/scfana.f
+@@ -35,6 +35,9 @@
+       LOGICAL   fval, switchnonself, switchhf, switchhfso
+       LOGICAL   dftd3_ene,dftd3_force,dftd4_ene,dftd4_force
+       LOGICAL   switchmgga
++      LOGICAL   stress_debug
++      CHARACTER(32) stress_debug_env
++      INTEGER   stress_debug_status
+       DIMENSION FORSUM(NAT,4),FHELP(4),egrad_dftd34(3),egrad_dftd34_rot(3)
+       Real(8),allocatable ::  ESX(:,:)
+ !
+@@ -56,6 +59,13 @@
+       
+       allocate (vcoul(4,nat))
+       allocate (Avcoul(4,nat))
++
++      stress_debug_env = ''
++      call get_environment_variable('WIEN_STRESS_DEBUG',stress_debug_env, &
++                                    status=stress_debug_status)
++      stress_debug = stress_debug_status.eq.0 .and. &
++                     len_trim(stress_debug_env).gt.0 .and. &
++                     trim(stress_debug_env).ne.'0'
+ !
+ ! INITIALIZE FORCE AND TOTAL ENERGY PARAMETER
+ !
+@@ -501,6 +511,10 @@
+        if(Stress2)then
+         DO j = 1, 9
+           Tstress(j) = tot_val_st(j) + cor_corr(j) - ES_STRESS(j)          
++          if(stress_debug) then
++             write(6,'(A,I3,4(1X,ES23.15))') ':DBG_STR_MIX:',j, &
++                  tot_val_st(j),cor_corr(j),ES_STRESS(j),Tstress(j)
++          endif
+         ENDDO       
+        endif
+ !===========end stress modification======================================= 
+

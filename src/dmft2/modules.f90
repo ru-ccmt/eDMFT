@@ -3,6 +3,11 @@ MODULE param
   INTEGER,PARAMETER :: IBLOCK= 128     ! 256
   !c.....Optimize IBLOCK for your hardware (32-255)
   INTEGER,PARAMETER :: LMAX2=    8     ! 10
+  ! Blaha's analytic-stress kernels distinguish the basis cutoff LMAX2
+  ! from the angular cutoff used in the stress contractions (LMAX2N).
+  ! dmft2 currently stores radial functions through LMAX2 only, therefore
+  ! the two cutoffs must coincide until a larger radial set is introduced.
+  INTEGER,PARAMETER :: LMAX2N=LMAX2
   INTEGER,PARAMETER :: LOMAX=    3
   INTEGER,PARAMETER :: NCOM=   121
   ! for ncom parameter check format 1003 in l2main.frc
@@ -364,7 +369,12 @@ END MODULE xa2
 MODULE xa3
   COMPLEX*16,ALLOCATABLE ::  As_lo(:,:,:)
   COMPLEX*16,ALLOCATABLE ::  As(:,:,:)
+  ! Compatibility storage for the analytic WIEN2k stress kernels.  For the
+  ! active spin channel A contains the same rho- or rhoE-pseudo-band
+  ! transformation as the muffin-tin coefficients ALM/BLM/CLM.
+  COMPLEX*16,ALLOCATABLE ::  A(:,:)
   REAL*8,ALLOCATABLE   :: bk3(:,:), aK(:)
+  REAL*8,ALLOCATABLE   :: bkx(:),bky(:),bkz(:)
   INTEGER,ALLOCATABLE  :: k3(:,:)
   REAL*8,ALLOCATABLE    :: bk3lo(:,:)
   INTEGER,ALLOCATABLE   :: k3lo(:,:)
@@ -378,6 +388,7 @@ CONTAINS
        ALLOCATE(k3lo(3,nnlo))
        ALLOCATE(bk3lo(3,nnlo))
        ALLOCATE(As(nmat,nume,iso),As_lo(nnlo,nume,iso))
+       ALLOCATE(A(nmat,nume),bkx(nmat),bky(nmat),bkz(nmat))
     endif
   END SUBROUTINE init_xa3
 
@@ -389,6 +400,7 @@ CONTAINS
        DEALLOCATE(k3lo)
        DEALLOCATE(bk3lo)
        DEALLOCATE(As, As_lo)
+       DEALLOCATE(A,bkx,bky,bkz)
     endif
   END SUBROUTINE fini_xa3
 END MODULE xa3
@@ -407,20 +419,21 @@ MODULE muzero
   INTEGER,   ALLOCATABLE:: nemm(:,:)
   REAL*8,   ALLOCATABLE :: abom(:,:), w_omega(:)
   INTEGER,  ALLOCATABLE :: nomq(:), iomq(:,:), jomq(:)
-  REAL*8,   ALLOCATABLE :: womq(:,:)
+  REAL*8,   ALLOCATABLE :: womq(:,:), matsum_weight(:)
   !
 CONTAINS
 
   SUBROUTINE init_muzero(nomega, qmax)
     INTEGER, intent(in) :: nomega, qmax
-    ALLOCATE( nomq(nomega), jomq(nomega), iomq(nomega,qmax), womq(nomega,qmax), w_omega(nomega) )
+    ALLOCATE( nomq(nomega), jomq(nomega), iomq(nomega,qmax), womq(nomega,qmax), &
+         matsum_weight(nomega), w_omega(nomega) )
     ALLOCATE( abom(2,nomega) )
     wprint1=.FALSE.
   END SUBROUTINE init_muzero
   
   SUBROUTINE fini_muzero()
     DEALLOCATE( abom )
-    DEALLOCATE( nomq, jomq, iomq, womq, w_omega )
+    DEALLOCATE( nomq, jomq, iomq, womq, matsum_weight, w_omega )
   END SUBROUTINE fini_muzero
   SUBROUTINE print_muzero(fh,elecn,DM_EF)
     IMPLICIT NONE
@@ -434,7 +447,8 @@ CONTAINS
     WRITE(fh) w_npomega, w_gamma
     WRITE(fh) wprint,wprint1,Qcheckbands
     do iom=1,w_nomega
-       WRITE(fh) w_omega(iom), abom(1,iom), abom(2,iom), nomq(iom), jomq(iom)
+       WRITE(fh) w_omega(iom), abom(1,iom), abom(2,iom), nomq(iom), &
+            jomq(iom), matsum_weight(iom)
        do j=1,nomq(iom)
           WRITE(fh) womq(iom,j), iomq(iom,j)
        enddo

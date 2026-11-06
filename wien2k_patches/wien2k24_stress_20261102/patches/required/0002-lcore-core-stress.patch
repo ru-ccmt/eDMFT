@@ -1,0 +1,74 @@
+--- a/SRC_lcore/core_corr_stress.f
++++ b/SRC_lcore/core_corr_stress.f
+@@ -50,8 +50,36 @@
+       zero    = 0.d0
+       sqrt2   = sqrt(2.D0)
+       imag2   = (0.d0,1.d0)
+-      counter = nrp+141
+-      
++
++      ! Blaha et al., PRB 104, 174113 (2021), Eqs. (E4)-(E5),
++      ! define both core-correction radial integrals only inside the
++      ! muffin-tin sphere, 0 <= r <= R_MT.  The caller passes nrp as the
++      ! radial-mesh index at R_MT.  The extra 140/141 radial points used by
++      ! lcore are an extrapolation region for solving the atomic core
++      ! problem; they are not part of these muffin-tin integrals.  In
++      ! particular, vns_st is read from case.vns only through nrp, so using
++      ! nrp+141 here differentiated and integrated undefined values.
++      counter = nrp
++
++      ! Initialize all work arrays explicitly.  Besides making the result
++      ! independent of compiler/stack initialization, this protects future
++      ! changes to radial limits or the list of lattice harmonics from
++      ! reintroducing undefined nonspherical-potential values.
++      dpot        = zero
++      V1          = zero
++      value1      = zero
++      dvtmp       = zero
++      vtmp        = zero
++      val_real    = zero
++      val_cmplx   = zero
++      value       = zero
++      dval_real   = zero
++      dval_cmplx  = zero
++      value_c     = zeroc
++      vtmp_cmplx  = zeroc
++      int_ns1     = zeroc
++      int_ns2     = zeroc
++
+       call c_alpha_m(cabt)      !c-matrix of unit vector expansion
+                            
+       cor_corr_sph  = zero!zeroc      !spherical part
+@@ -310,14 +338,24 @@
+   ENDDO   !loop over multiplicity  
+      
+         write(6,*)  'Stress * vol        Spherical            Non-spher.1          Non-spher.2'
+-     !===================look here==================
++      ! Equation (E3) contains the same factor 1/(4*pi) in front of
++      ! the Gaunt coefficient in the I1 term and in front of the Kronecker
++      ! deltas in the I2 term.  Since sq4pi=1/sqrt(4*pi), all three radial
++      ! contributions therefore carry sq4pi*sq4pi.  The previous code
++      ! accumulated 2/(4*pi) for ns1 and 1/sqrt(4*pi) for ns2, even though
++      ! the diagnostic :COR__CORR__ line already printed the correct
++      ! normalization.  sum_tot is what hfsd writes to case.scfc and what
++      ! mixer actually consumes, so the normalization must be fixed here.
+       DO index2 = 1, 9                    
+-         cor_corr_tot(index2) = ( cor_corr_sph(index2)*sq4pi*sq4pi + cor_corr_ns1(index2)*sq4pi + &
+-                                cor_corr_ns2(index2)*sq4pi )!*MULT(jatom)                                           
+-         sum_tot(index2,jatom) = sum_tot(index2,jatom) + REAL(cor_corr_sph(index2))*sq4pi*sq4pi + REAL(cor_corr_ns2(index2))*sq4pi &
+-                                    + REAL(cor_corr_ns1(index2))*sq4pi*sq4pi*2.d0                                                            
+-         WRITE(6,77) index2, REAL(cor_corr_sph(index2))*sq4pi*sq4pi,  REAL(cor_corr_ns1(index2))*sq4pi*sq4pi, &
+-                                    REAL(cor_corr_ns2(index2))*sq4pi*sq4pi         
++         ! cor_corr_* are already REAL*8.  Do not wrap them in REAL()
++         ! without a KIND argument: on compilers where default REAL is
++         ! four bytes that silently rounds the stress before accumulation.
++         cor_corr_tot(index2) = ( cor_corr_sph(index2) + &
++                                  cor_corr_ns1(index2) + &
++                                  cor_corr_ns2(index2) )*sq4pi*sq4pi
++         sum_tot(index2,jatom) = sum_tot(index2,jatom) + cor_corr_tot(index2)
++         WRITE(6,77) index2, cor_corr_sph(index2)*sq4pi*sq4pi, cor_corr_ns1(index2)*sq4pi*sq4pi, &
++                                    cor_corr_ns2(index2)*sq4pi*sq4pi         
+       ENDDO
+      !===============================================         
+       
+

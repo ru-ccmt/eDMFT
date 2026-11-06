@@ -4,7 +4,7 @@
 SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, dNds, Edimp0, AEweight, nedim, STrans, sigma, s_oo, wkp, omega, vnorm1, DM_EF, Temperature, wgamma, gamma, csize, nbands, DM_nemin, DM_nemax, maxsize, ncix, nomega, npomega, nume, matsubara, lgTrans, lg_deg, ntcix, nipc, ikp, maxdim2, iorbital, iSx, norbitals)
   USE defs,  ONLY: pi, IMAG
   USE xa,    ONLY: E
-  USE muzero,ONLY: nomq, iomq, jomq, womq, abom, n0_om
+  USE muzero,ONLY: nomq, iomq, jomq, womq, abom, n0_om, matsum_weight
   USE param, ONLY: CHUNK
   use defs,  only: Ry2eV
   USE dmfts, only: maxdim, lmaxp, natom
@@ -61,15 +61,21 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
   ! locals
   COMPLEX*16 :: sigma_winf(maxsize,ncix)
   COMPLEX*16, allocatable :: Wsum(:,:), WEsum(:,:), w0inf(:), Identity(:,:)
+  COMPLEX*16, allocatable :: WSigPair(:,:), SigDirect(:,:), SigScratch(:,:), &
+       SigmaTail1(:,:)
   COMPLEX*16, allocatable :: Eij(:,:), zek(:), zar(:,:), zal(:,:), tmp(:,:), Sigmaij(:,:), Sigma_inf(:,:), Gij(:,:), tmp2(:,:)
   REAL*8,     allocatable :: zek_inf(:)
   COMPLEX*16, allocatable :: zw1(:), w1(:,:), zar_inf(:,:), zal_inf(:,:), w2(:,:), w3(:,:), Dni(:)
   COMPLEX*16, ALLOCATABLE :: Winf(:,:), Wferm(:,:), Bii(:)
   REAL*8     :: logGD, logG0
   COMPLEX*16 :: cc, gtc, cek, omn, w0, wo, bg, sginf, sginf_!, cc0, cc1, cc2
-  REAL*8  :: fer, tlogGD, tlogG, tlogG0, tdens, ek_inf, beta, csm, wkpt, C0, sginf2, second_order_correction, fermi!, diff
+  REAL*8  :: fer, tlogGD, tlogG, tlogG0, tdens, ek_inf, beta, csm, wkpt, &
+       C0, sginf2, second_order_correction, fermi, matsuWeight, tailMoment2!, diff
   INTEGER :: i, iom, num, num0, it, nomq_max, icix, j, ip, start_nipc
-  LOGICAL :: Qforce
+  LOGICAL :: Qforce, stressMomentDiagnostic
+  CHARACTER(len=64) :: diagnosticEnvironment
+  INTEGER :: diagnosticStatus
+  REAL*8 :: directNorm, directResidual, directScale
   complex*16 :: czero, cone
   cone  = cmplx(1.d0,0.d0, 8)
   czero = cmplx(0.d0,0.d0, 8)
@@ -79,27 +85,65 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
   Qforce=.false.
   if (nedim.eq.nbands) Qforce=.true.
 
+  diagnosticEnvironment=''
+  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_PROJECTOR_DIAG', &
+       diagnosticEnvironment,STATUS=diagnosticStatus)
+  stressMomentDiagnostic=Qforce .and. diagnosticStatus.eq.0 .and. &
+       len_trim(diagnosticEnvironment).gt.0 .and. &
+       trim(diagnosticEnvironment).ne.'0'
+
   if (Qforce) then
      allocate( WEsum(nedim,nedim) ) ! Unfortunately we need this for $OMP command to work.
   else
      allocate( WEsum(1,1) )
   endif
   allocate(Wsum(nbands,nbands), w0inf(nbands))
+  if (stressMomentDiagnostic) then
+     allocate(WSigPair(nbands,nbands),SigDirect(nbands,nbands), &
+          SigScratch(nbands,nbands))
+     WSigPair=0.d0
+  endif
 
   beta = 1/Temperature
   wkpt = dble(wkp)*vnorm1  
   if (matsubara) then
      C0=1.d0
      allocate( Sigmaij(nbands,nbands) )
-     !  This will calculate the first moment of self-energy, i.e., Sigma= sigma_winf/iw + ...
-     sigma_winf=0
-     DO icix=1,ncix
-        do it=1,csize(icix)
-           sigma_winf(it,icix) = -aimag(sigma(it,icix,nomega))*omega(nomega)
-        enddo
-     ENDDO
-     Sigmaij=0
-     CALL AddSigma_optimized2(Sigmaij, sigma_winf, STrans, csize, 1, nbands, ncix, maxsize)
+     ! Determine Sigma_1 in
+     !
+     !      Sigma(iw)-Sigma_inf = Sigma_1/(iw)+Sigma_2/(iw)^2+...
+     !
+     ! from an adaptive two-moment fit.  Smooth tails use the fitted Sigma_1;
+     ! noisy tails use a short plateau average; clearly bad/increasing tails
+     ! retain the historical endpoint estimate -w_N Im Sigma(iw_N).  The
+     ! classification is printed only once (at the first k point).
+     CALL DetermineSelfEnergyTailMoment(sigma_winf,sigma,s_oo,omega,csize, &
+          nomega,maxsize,ncix,ikp.eq.1)
+     allocate(SigmaTail1(nbands,nbands))
+     SigmaTail1=0.d0
+     CALL AddSigma_optimized2(SigmaTail1,sigma_winf,STrans,csize,1, &
+          nbands,ncix,maxsize)
+     ! Roundoff, a shared compact Sigind label, or a noisy off-diagonal fit can
+     ! leave a tiny anti-Hermitian component.  Only the Hermitian moment enters
+     ! the paired Matsubara sum.
+     SigmaTail1=0.5d0*(SigmaTail1+conjg(transpose(SigmaTail1)))
+     ! The older log(G) completion below calls this matrix Sigmaij.  Keep the
+     ! same fitted moment in both the density/stress and free-energy tails;
+     ! otherwise two formally equivalent Matsubara completions would use
+     ! different estimates of Sigma_1.
+     Sigmaij=SigmaTail1
+
+     ! Exact positive-frequency sum from the beginning of the sparse tail:
+     !   sum_{m=j0}^inf 1/w_m^2,  w_m=(2m-1)pi/beta.
+     ! The closed full sum beta^2/8 avoids any special-function dependency;
+     ! subtracting fewer than a few hundred positive terms is stable in double
+     ! precision.  This scalar is used to restore the Sigma_1/(iw)^2 term
+     ! after it has been removed from the cubic-spline quadrature.
+     tailMoment2=beta*beta/8.d0
+     do i=1,jomq(n0_om)-1
+        tailMoment2=tailMoment2- &
+             (beta/(dble(2*i-1)*pi))**2
+     enddo
 
      allocate( zek(nbands), Eij(nbands,nbands) )
      ALLOCATE( zek_inf(nbands) )
@@ -172,6 +216,16 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
         
         if (Qforce) then
            WEsum = WEsum + Gij(:,:)*(omn+DM_EF) - Identity(:,:) ! This is summing A^R  eps_{k,w}/(iom+mu-eps_{k,w}) A^L = (iom+mu)*G - I          
+        endif
+        if (stressMomentDiagnostic) then
+           ! Accumulate both positive- and negative-frequency orientations.
+           ! The negative partner of Sigma*G is Sigma^+*G^+, not
+           ! (Sigma*G)^+=G^+*Sigma^+.  Retaining this order is essential for
+           ! comparing the generally non-Hermitian matrix rhoE-epsilon*rho.
+           SigDirect=matmul(Sigmaij,Gij)
+           SigScratch=matmul(conjg(transpose(Sigmaij)), &
+                conjg(transpose(Gij)))
+           WSigPair=WSigPair+SigDirect+SigScratch
         endif
         
         CALL eigvals(Eij, zek, nbands) ! eigenvalues only
@@ -266,18 +320,20 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
            w0=0.d0
            bg=0.d0
            wo=0.d0
-           ! Frequencies in logarithmic mesh
-           ! Here we interpolate backward. Current and previous frequency are needed
-           do i=1,nomq(iom)
-              omn = IMAG*(2*iomq(iom,i)-1)*pi/beta
-              w0 = w0 + womq(iom,i)*1./(omn-cek)
-              cc = womq(iom,i)*1./(omn-ek_inf)
-              wo = wo + cc
-              bg = bg + cc/(omn-C0)
-              tlogGD = tlogGD - womq(iom,i)*dble(log(-omn+cek))
-              tlogG0 = tlogG0 - womq(iom,i)*dble(log(-omn+ek_inf))
-              tdens  = tdens  + womq(iom,i)*dble(1/(omn-cek)-1/(omn-ek_inf))
-           enddo
+           ! Cubic-spline quadrature of the final integrand.  matsum_weight
+           ! is the sum of the cardinal cubic spline over every omitted
+           ! Matsubara point.  In contrast to the historical scheme, no pole
+           ! or eigenvalue is interpolated before the nonlinear resolvent is
+           ! formed.
+           omn = IMAG*omega(iom)
+           matsuWeight=matsum_weight(iom)
+           w0 = matsuWeight/(omn-cek)
+           cc = matsuWeight/(omn-ek_inf)
+           wo = cc
+           bg = cc/(omn-C0)
+           tlogGD = tlogGD-matsuWeight*dble(log(-omn+cek))
+           tlogG0 = tlogG0-matsuWeight*dble(log(-omn+ek_inf))
+           tdens  = tdens+matsuWeight*dble(1/(omn-cek)-1/(omn-ek_inf))
            w0inf(num0) = w0inf(num0) + wo
            tmp(:,num0) =  zar(:,num0)*w0
            sginf_ = sginf_ + bg*Bii(num0)
@@ -285,6 +341,13 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
            Dni(num0) = 1./(IMAG*omega(iom)-cek)
         ENDDO
         !$OMP END PARALLEL DO
+
+        ! omn is PRIVATE in the OpenMP band loop above.  Set the shared scalar
+        ! explicitly before using it in the matrix-valued tail subtraction;
+        ! otherwise it retains a stale frequency from the preceding dense
+        ! loop and turns the intended 1/omega^2 correction into a nearly
+        ! constant, strongly mesh-dependent shift.
+        omn=IMAG*omega(iom)
 
         gtc = sum(Dni)
         sginf = sginf + sginf_
@@ -298,6 +361,25 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
               tmp(:,num0) = tmp(:,num0)*zek(num0)
            enddo
            CALL zgemm('N','N',nbands,nbands,nbands,cone,tmp,nbands,zal,nbands,cone,WEsum,nbands)
+           ! Remove the leading dynamic high-frequency term from the spline
+           ! sum.  Since (iw)^2=-w^2 this subtraction numerically adds a
+           ! positive Sigma_1/w^2 matrix here.  The exact discrete sum of the
+           ! removed term, from this same n0_om boundary to infinity, is
+           ! restored below.  Subtracting and restoring over identical limits
+           ! prevents double counting and also makes the splined residual
+           ! decay two powers faster.
+           WEsum=WEsum-matsum_weight(iom)*SigmaTail1/(omn*omn)
+        endif
+        if (stressMomentDiagnostic) then
+           ! Gij here is the quadrature-interpolated positive-frequency
+           ! Green function for this logarithmic-mesh node.  Sigmaij is held
+           ! at the same node, exactly as in the WEsum construction above.
+           SigDirect=matmul(Sigmaij,Gij)- &
+                matsum_weight(iom)*SigmaTail1/(omn*omn)
+           SigScratch=matmul(conjg(transpose(Sigmaij)), &
+                conjg(transpose(Gij)))- &
+                matsum_weight(iom)*SigmaTail1/(omn*omn)
+           WSigPair=WSigPair+SigDirect+SigScratch
         endif
         
         ! Evaluating G_local
@@ -332,7 +414,6 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
         
      enddo   ! iom loop
      
-     deallocate( Sigma_inf )
      deallocate( Sigmaij )
      deallocate( Eij, zek, zar, zal )
      deallocate( Gij )
@@ -355,6 +436,22 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
      enddo
      !$OMP END PARALLEL DO
      Wferm = matmul(tmp,zal_inf)
+
+     if (stressMomentDiagnostic) then
+        ! Apply exactly the same static-tail subtraction and Fermi completion
+        ! as Wsum/WEsum, but accumulate Sigma*G independently and preserve
+        ! the order of the negative-frequency product.
+        SigDirect=matmul(Sigma_inf,Winf)
+        SigScratch=matmul(conjg(transpose(Sigma_inf)), &
+             conjg(transpose(Winf)))
+        WSigPair=WSigPair-SigDirect-SigScratch
+        WSigPair=WSigPair-2.d0*tailMoment2*SigmaTail1
+        WSigPair=WSigPair*(2.d0/beta)
+        SigDirect=matmul(Sigma_inf,Wferm)
+        SigScratch=matmul(conjg(transpose(Sigma_inf)), &
+             conjg(transpose(Wferm)))
+        SigDirect=(0.5d0*wkp)*(WSigPair+SigDirect+SigScratch)
+     endif
      
      tmp(:,:) = (Wsum(:,:) - Winf(:,:))*(2/beta) + Wferm(:,:)
      Aweight(:,:) = (0.5*wkp)*(tmp(:,:) + transpose(conjg(tmp(:,:))))
@@ -371,9 +468,29 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
         !   Wferm = zar_inf * ferm * eps_inf * zal_inf
         Wferm = matmul(tmp2, zal_inf)
         tmp = (WEsum(:,:) - Winf(:,:))*(2/beta) + Wferm(:,:)
+        tmp = tmp-(2.d0/beta)*tailMoment2*SigmaTail1
         AEweight(:,:) = (0.5*wkp)*(tmp(:,:) + transpose(conjg(tmp(:,:))))
      endif
-     
+
+     if (stressMomentDiagnostic) then
+        ! B=rhoE-epsilon*rho is the source used by the complementary-band
+        ! response.  Compare it with a separately accumulated Sigma_emb*G,
+        ! including the identical Matsubara tail construction.
+        SigScratch=AEweight
+        do i=1,nbands
+           SigScratch(i,:)=SigScratch(i,:)- &
+                E(i+DM_nemin-1)*Aweight(i,:)
+        enddo
+        directNorm=sqrt(sum(abs(SigScratch)**2))
+        directResidual=sqrt(sum(abs(SigScratch-SigDirect)**2))
+        directScale=max(directNorm,sqrt(sum(abs(SigDirect)**2)),tiny(1.d0))
+        WRITE(6,'(A,I6,5(1X,ES18.9))') ':DMFT_SIGMAG_DIRECT:',ikp, &
+             directNorm,directResidual/directScale, &
+             dble(sum([(SigScratch(i,i),i=1,nbands)])), &
+             dble(sum([(SigDirect(i,i),i=1,nbands)])), &
+             aimag(sum([(SigDirect(i,i),i=1,nbands)]))
+     endif
+
      csm=0
      do i=1,nbands
         csm = csm + real(Aweight(i,i))
@@ -418,6 +535,8 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
      DEALLOCATE( zal_inf, zar_inf )
      deallocate( tmp )
      deallocate( tmp2 )
+     deallocate( Sigma_inf )
+     deallocate( SigmaTail1 )
 
      CALL GetLocalNds(dNds, Aweight, lgTrans, vnorm1, lg_deg, nbands, ntcix, nipc)     
   endif
@@ -477,9 +596,208 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
      enddo
      !$OMP END PARALLEL DO
   endif
+  if (stressMomentDiagnostic) deallocate(WSigPair,SigDirect,SigScratch)
   deallocate(Wsum, WEsum, w0inf) 
 
 END SUBROUTINE cmp_dmft_weights2
+
+
+! Determine the leading dynamic self-energy moment used by the Matsubara
+! stress and free-energy tails.
+!
+! For a causal, sufficiently smooth impurity self-energy,
+!
+!   Sigma(z)-Sigma_infinity = Sigma_1/z + Sigma_2/z^2 + O(z^-3), z=i*omega.
+!
+! Multiplying by z gives a well-conditioned two-parameter fit,
+!
+!   z [Sigma(z)-Sigma_infinity] = Sigma_1 + Sigma_2/z.
+!
+! Real impurity data are not always in their asymptotic regime: a Monte Carlo
+! tail can be noisy, or a failed iteration can even grow at high frequency.
+! We therefore do not blindly trust the two-moment fit.  Each independent
+! self-energy component is classified from its relative residual, stability
+! under shortening the fit interval, agreement with the last-point estimate,
+! and the fraction of points whose dynamic magnitude grows.  GOOD data use
+! the fit; MARGINAL data use a short plateau average of z*(Sigma-Sigma_inf);
+! BAD data retain the conservative historical last-point estimate.  The
+! classification is diagnostic only and is printed once, at the first k point.
+SUBROUTINE DetermineSelfEnergyTailMoment(moment1,sigma,sigmaInfinity, &
+     omega,csize,nomega,maxsize,ncix,printDiagnostic)
+  IMPLICIT NONE
+  INTEGER,intent(in) :: nomega,maxsize,ncix,csize(ncix)
+  REAL*8,intent(in) :: omega(nomega)
+  COMPLEX*16,intent(in) :: sigma(maxsize,ncix,nomega)
+  COMPLEX*16,intent(in) :: sigmaInfinity(maxsize,ncix)
+  LOGICAL,intent(in) :: printDiagnostic
+  COMPLEX*16,intent(out) :: moment1(maxsize,ncix)
+
+  INTEGER :: icix,it,firstFit,nfit,firstShort,nshort,firstPlateau
+  INTEGER :: iom,nIncrease,nComparison,quality
+  REAL*8 :: residual,shortResidual,stability,endpointDifference
+  REAL*8 :: increaseFraction,scale,tinyScale
+  COMPLEX*16 :: fittedMoment,shortMoment,secondMoment
+  COMPLEX*16 :: shortSecondMoment,endpointMoment,plateauMoment
+  COMPLEX*16 :: dynamicSigma,z
+  CHARACTER(len=8) :: qualityName
+
+  tinyScale=100.d0*tiny(1.d0)
+  moment1=0.d0
+
+  do icix=1,ncix
+     do it=1,csize(icix)
+        ! Use at most 24 retained points, all from the last quarter of the
+        ! available frequency range.  With a logarithmic mesh this keeps the
+        ! fit local to the true high-frequency tail without relying on a
+        ! hard-coded energy expressed in eV or Ry.
+        firstFit=max(1,nomega-23)
+        do while (firstFit.lt.nomega-5 .and. &
+             omega(firstFit).lt.0.25d0*omega(nomega))
+           firstFit=firstFit+1
+        enddo
+        nfit=nomega-firstFit+1
+
+        CALL FitTwoSelfEnergyMoments(fittedMoment,secondMoment,residual, &
+             sigma(it,icix,:),sigmaInfinity(it,icix),omega,firstFit, &
+             nomega,nomega)
+
+        ! A second, nested fit is a cheap sensitivity test.  A formally small
+        ! residual is not sufficient when a slowly drifting, non-asymptotic
+        ! tail can be fitted over one particular interval.
+        nshort=max(6,(nfit+1)/2)
+        firstShort=nomega-nshort+1
+        CALL FitTwoSelfEnergyMoments(shortMoment,shortSecondMoment, &
+             shortResidual,sigma(it,icix,:),sigmaInfinity(it,icix), &
+             omega,firstShort,nomega,nomega)
+
+        dynamicSigma=sigma(it,icix,nomega)-sigmaInfinity(it,icix)
+        ! This is exactly the old safe estimate for a normal diagonal
+        ! self-energy.  Keeping it real also prevents a noisy Re Sigma tail
+        ! from manufacturing an anti-Hermitian diagonal moment.
+        endpointMoment=dcmplx(-aimag(dynamicSigma)*omega(nomega),0.d0)
+
+        firstPlateau=max(1,nomega-4)
+        plateauMoment=0.d0
+        do iom=firstPlateau,nomega
+           z=dcmplx(0.d0,omega(iom))
+           plateauMoment=plateauMoment+z* &
+                (sigma(it,icix,iom)-sigmaInfinity(it,icix))
+        enddo
+        plateauMoment=plateauMoment/dble(nomega-firstPlateau+1)
+
+        scale=max(abs(fittedMoment),abs(shortMoment),abs(endpointMoment), &
+             tinyScale)
+        stability=abs(fittedMoment-shortMoment)/scale
+        endpointDifference=abs(fittedMoment-endpointMoment)/scale
+
+        nIncrease=0
+        nComparison=0
+        do iom=firstFit+1,nomega
+           nComparison=nComparison+1
+           if (abs(sigma(it,icix,iom)-sigmaInfinity(it,icix)).gt. &
+                1.10d0*abs(sigma(it,icix,iom-1)- &
+                sigmaInfinity(it,icix))) nIncrease=nIncrease+1
+        enddo
+        increaseFraction=dble(nIncrease)/dble(max(1,nComparison))
+
+        ! quality=2: GOOD, quality=1: MARGINAL, quality=0: BAD.
+        if (residual.lt.0.05d0 .and. stability.lt.0.10d0 .and. &
+             endpointDifference.lt.0.25d0 .and. &
+             increaseFraction.lt.0.35d0) then
+           quality=2
+           qualityName='GOOD'
+           moment1(it,icix)=fittedMoment
+        else if (residual.lt.0.20d0 .and. stability.lt.0.35d0 .and. &
+             increaseFraction.lt.0.50d0) then
+           quality=1
+           qualityName='MARGINAL'
+           moment1(it,icix)=plateauMoment
+        else
+           quality=0
+           qualityName='BAD'
+           moment1(it,icix)=endpointMoment
+        endif
+
+        ! Guard the production result against NaN/overflow without requiring
+        ! compiler-specific IEEE modules.  The comparisons are false for NaN.
+        if (.not.(abs(moment1(it,icix)).le.huge(1.d0))) then
+           moment1(it,icix)=endpointMoment
+           quality=0
+           qualityName='BAD'
+        endif
+        if (.not.(abs(moment1(it,icix)).le.huge(1.d0))) &
+             moment1(it,icix)=0.d0
+
+        if (printDiagnostic) then
+           WRITE(6,'(A,1X,A,3I6,6(1X,ES12.4),4(1X,ES18.9))') &
+                ':SELFENERGY_TAIL:',trim(qualityName),icix,it,nfit, &
+                omega(firstFit),omega(nomega),residual,stability, &
+                endpointDifference,increaseFraction,dble(moment1(it,icix)), &
+                aimag(moment1(it,icix)),dble(secondMoment), &
+                aimag(secondMoment)
+        endif
+     enddo
+  enddo
+
+CONTAINS
+
+  ! Complex least-squares fit of y=a+b*x with
+  ! y=i*omega*(Sigma-Sigma_inf), x=1/(i*omega).  The normal matrix is only
+  ! 2x2, so an explicit Hermitian solution is both cheaper and clearer than
+  ! calling a general LAPACK solver for every self-energy component.
+  SUBROUTINE FitTwoSelfEnergyMoments(firstMoment,secondMoment,fitResidual, &
+       component,staticPart,frequency,first,last,nall)
+    IMPLICIT NONE
+    INTEGER,intent(in) :: first,last,nall
+    REAL*8,intent(in) :: frequency(nall)
+    COMPLEX*16,intent(in) :: component(nall),staticPart
+    COMPLEX*16,intent(out) :: firstMoment,secondMoment
+    REAL*8,intent(out) :: fitResidual
+    INTEGER :: i,npoint
+    REAL*8 :: sumXX,determinant,normY,normResidual,fitScale
+    COMPLEX*16 :: sumX,sumY,sumXY,x,y,yfit,z
+
+    npoint=last-first+1
+    sumX=0.d0
+    sumXX=0.d0
+    sumY=0.d0
+    sumXY=0.d0
+    do i=first,last
+       z=dcmplx(0.d0,frequency(i))
+       x=1.d0/z
+       y=z*(component(i)-staticPart)
+       sumX=sumX+x
+       sumXX=sumXX+abs(x)**2
+       sumY=sumY+y
+       sumXY=sumXY+conjg(x)*y
+    enddo
+    determinant=dble(npoint)*sumXX-abs(sumX)**2
+    if (npoint.lt.2 .or. determinant.le. &
+         100.d0*tiny(1.d0)*max(1.d0,sumXX)) then
+       firstMoment=0.d0
+       secondMoment=0.d0
+       fitResidual=huge(1.d0)
+       return
+    endif
+    firstMoment=(sumY*sumXX-sumX*sumXY)/determinant
+    secondMoment=(dble(npoint)*sumXY-conjg(sumX)*sumY)/determinant
+
+    normY=0.d0
+    normResidual=0.d0
+    do i=first,last
+       z=dcmplx(0.d0,frequency(i))
+       x=1.d0/z
+       y=z*(component(i)-staticPart)
+       yfit=firstMoment+secondMoment*x
+       normY=normY+abs(y)**2
+       normResidual=normResidual+abs(y-yfit)**2
+    enddo
+    fitScale=max(sqrt(normY),sqrt(dble(npoint))*abs(firstMoment), &
+         100.d0*tiny(1.d0))
+    fitResidual=sqrt(normResidual)/fitScale
+  END SUBROUTINE FitTwoSelfEnergyMoments
+
+END SUBROUTINE DetermineSelfEnergyTailMoment
 
 
 SUBROUTINE cmp_dmft_weights(Aweight, gloc, logG, logGD, logG0, dens, STrans, sigma, wkp, omega, vnorm1, DM_EF, Temperature, wgamma, gamma, csize, nbands, DM_nemin, DM_nemax, maxsize, ncix, nomega, npomega, nume, matsubara)

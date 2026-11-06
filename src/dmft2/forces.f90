@@ -192,19 +192,20 @@ CONTAINS
     INTEGER, intent(in)    :: nemin, nemax, Nhmx, DM_nemaxx, nbands_dft, lomax
     COMPLEX*16, intent(in) :: alm((lmax2+1)*(lmax2+1),nume), blm((lmax2+1)*(lmax2+1),nume), clm((lomax+1)*(lomax+1),nume,nloat)
     COMPLEX*16, intent(in) :: aalm((lmax2+1)*(lmax2+1),nbands_dft,3), bblm((lmax2+1)*(lmax2+1),nbands_dft,3), cclm((lomax+1)*(lomax+1),nbands_dft,nloat,3)
-    COMPLEX*16, intent(in) :: Vts(3,3,ngau)
+    COMPLEX*16, intent(in) :: Vts(2+nloat,2+nloat,ngau)
     INTEGER, intent(in)    :: lv(ngau),lpv(ngau),mv(ngau),mpv(ngau)
     INTEGER, intent(in)    :: ilo(0:lmax2),lmax2,nume,nloat,ngau
     REAL*8, intent(in)     :: weight(nume)
     ! local variables
     REAL*8     :: tforce(3)
-    COMPLEX*16 :: afac(3)
-    INTEGER    :: ih, iq, jlo, jlop, lpy, ly, num, nim
+    COMPLEX*16 :: afac(2+nloat),cbra(2+nloat)
+    INTEGER    :: ih,iq,ip,jlo,lpy,ly,num,nim,np,nq
     ! Implementation of Eq.~69 in the notes: (K-K') A*_{iK'} A_{iK} * <chi_K'|V_{non-sph}|chi_K>
     !   it also goes under Eq.~305 non-symmetric part
-    ! tsp[:,:]=[[ tuu,   tud,  tuu12],
-    !           [ tdu,   tdd,  tdu12],
-    !           [ tuu21, tud21,tuu22]] 
+    ! The radial basis is (u,udot,LO_1,...,LO_n).  Older code represented
+    ! every LO by the same third row/column, so multiple-LO matrix elements
+    ! were overwritten and the same contraction was repeated for all jlo.
+    ! case.nsh now supplies the complete matrix and we evaluate C^+ V dC.
     fnsp(:) = 0.d0
     DO num=nemin,DM_nemaxx! nemax
        nim=num-nemin+1
@@ -212,16 +213,26 @@ CONTAINS
        DO ih=1,Nhmx
           lpy= lpv(ih)*(lpv(ih)+1)+mpv(ih)+1
           ly = lv(ih) *( lv(ih)+1)+ mv(ih)+1
-          do iq=1,3
-             afac(iq) = dconjg(alm(lpy,num)) * Vts(1,iq,ih) + dconjg(blm(lpy,num))* Vts(2,iq,ih)
-             DO jlo=1,ilo(lpv(ih))
-                afac(iq) = afac(iq) + dconjg(clm(lpy,num,jlo))* Vts(3,iq,ih)
-             ENDDO
+          np=2+ilo(lpv(ih))
+          nq=2+ilo(lv(ih))
+          cbra=0.d0
+          cbra(1)=alm(lpy,num)
+          cbra(2)=blm(lpy,num)
+          do jlo=1,ilo(lpv(ih))
+             cbra(2+jlo)=clm(lpy,num,jlo)
           enddo
-          tforce(:) = tforce(:) + 2.d0*aimag( afac(1) * aalm(ly,nim,:) + afac(2)*bblm(ly,nim,:))
-          DO jlop=1,ilo(lv(ih))
-             tforce(:) = tforce(:) + 2.d0*aimag( afac(3) * cclm(ly,nim,jlop,:) )
-          ENDDO
+          afac=0.d0
+          do iq=1,nq
+             do ip=1,np
+                afac(iq)=afac(iq)+dconjg(cbra(ip))*Vts(ip,iq,ih)
+             enddo
+          enddo
+          tforce(:)=tforce(:)+2.d0*aimag(afac(1)*aalm(ly,nim,:) + &
+               afac(2)*bblm(ly,nim,:))
+          do jlo=1,ilo(lv(ih))
+             tforce(:)=tforce(:)+2.d0*aimag( &
+                  afac(2+jlo)*cclm(ly,nim,jlo,:))
+          enddo
        ENDDO
        fnsp(:) = fnsp(:) + weight(num)*tforce(:)
     ENDDO

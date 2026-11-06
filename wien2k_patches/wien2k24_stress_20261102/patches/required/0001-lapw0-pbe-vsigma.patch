@@ -1,0 +1,218 @@
+--- a/SRC_lapw0/vxclm2.F
++++ b/SRC_lapw0/vxclm2.F
+@@ -78,7 +78,12 @@
+ !      parameter (mgga_rhocut=1.d-5, mgga_vcut=0.5)
+       
+       real*8 :: XC_VALUE(8,2)
+-      real*8 :: XC_VALUE_KB(2,3)      
++      real*8 :: XC_VALUE_KB(2,3)
++! PBE-family gradient derivatives needed by the analytic stress tensor.
++! The built-in PBE branches return before the generic LIBXC stress code,
++! therefore their d[n*epsilon_xc]/d(sigma) values must be evaluated here.
++      real*8 :: pbe_mu_str,pbe_kappa_str,pbe_beta_str,pbe_cscale_str
++      logical :: pbe_stress_supported
+ !     ___________|____XC_VALUE :1__ |__ XC_VALUE :2_____
+ !     XC_VALUE 1:|   ex_value_up    |  ex_value_down
+ !     XC_VALUE 2:|   ec_value_up    |  ec_value_down
+@@ -95,6 +100,15 @@
+       CutUp=.false. ; CutDn=.false.
+       ldalimit=.false.
+       XC_VALUE=0.d0
++      XC_VALUE_KB=0.d0
++      sig_str_u=0.d0
++      sig_str_d=0.d0
++      sig_str_ud=0.d0
++      pbe_stress_supported=.false.
++      pbe_mu_str=0.d0
++      pbe_kappa_str=0.d0
++      pbe_beta_str=0.d0
++      pbe_cscale_str=1.d0
+ 
+       IF((fu.le. zlevel).and.(fd.le.zlevel)) THEN
+         vxu=0.d0
+@@ -257,6 +271,13 @@
+           exd=2.d0*(exdnpbe+ecpbe)
+           vxu=2.d0*(vxuppbe+vcuppbe)
+           vxd=2.d0*(vxdnpbe+vcdnpbe)
++! Save the parameters while they still have the values actually used by
++! PBEX/PBEC.  xc1_tmp is the optional correlation-energy scale applied below.
++          pbe_stress_supported=.true.
++          pbe_mu_str=xc1
++          pbe_kappa_str=xc2
++          pbe_beta_str=xc3
++          pbe_cscale_str=xc1_tmp
+           xc1=xc1_tmp
+           xc2=xc2_tmp
+           xc3=xc3_tmp
+@@ -370,6 +391,11 @@
+           exd=2.d0*(exdnpbe+ecpbe)
+           vxu=2.d0*(vxuppbe+vcuppbe)
+           vxd=2.d0*(vxdnpbe+vcdnpbe)
++          pbe_stress_supported=.true.
++          pbe_mu_str=xc1
++          pbe_kappa_str=xc2
++          pbe_beta_str=xc3
++          pbe_cscale_str=1.d0
+           xc1=xc1_tmp
+           xc2=xc2_tmp
+           xc3=xc3_tmp
+@@ -443,6 +469,26 @@
+             exd=xcener(ft,fd,pi)+2.d0*eclsd
+             vxd=xcpot(ft,fd,pi)+2.d0*vlsdd
+           endif
++        endif
++! The AEQ_SWITCH block returns below and never reaches the LIBXC-based
++! XC_VALUE_KB assembly.  Before this correction, sig_str_* therefore had no
++! defined value for built-in PBE/PBEsol; in practice this made the full GGA
++! contribution to the stress vanish.  PBE_VSIGMA_BUILTIN returns the LIBXC
++! convention d[n*epsilon_xc]/d(sigma).  The factor 2/JSPIN is the convention
++! expected by XCPOT1/PWXAD5 and is identical to the existing LIBXC branches.
++        if(STRESS.and.pbe_stress_supported) then
++! Match the LDA fallback above: a spin channel whose GGA energy/potential was
++! replaced by LDA cannot contribute an exchange-gradient derivative.  PBEC
++! already uses CutUp/CutDn to retain one half of correlation when only one
++! channel is cut.
++          if(fu.lt.tlev) CutUp=.true.
++          if(fd.lt.tlev) CutDn=.true.
++          call pbe_vsigma_builtin(fu,fd,gmagu,gmagd,t, &
++               pbe_mu_str,pbe_kappa_str,pbe_beta_str,pbe_cscale_str, &
++               JSPIN,CutUp,CutDn,sig_str_u,sig_str_d,sig_str_ud)
++          sig_str_u =2.d0*sig_str_u /dble(JSPIN)
++          sig_str_d =2.d0*sig_str_d /dble(JSPIN)
++          sig_str_ud=2.d0*sig_str_ud/dble(JSPIN)
+         endif
+ ! VDISP-SWITCH
+         IF(VDISP_SWITCH.eq.'VDISP_NLVDW') THEN
+@@ -2126,3 +2172,131 @@
+       ENDIF
+       RETURN
+       END
++
++!-----------------------------------------------------------------------
++! Derivative of the built-in PBE/PBEsol energy density with respect to
++! the three GGA invariants
++!
++!   sigma_uu = grad(rho_up).grad(rho_up)
++!   sigma_dd = grad(rho_dn).grad(rho_dn)
++!   sigma_ud = grad(rho_up).grad(rho_dn).
++!
++! These are the quantities called VSIGMA by LIBXC.  Keeping this routine
++! independent of the real-space stress integration makes it directly
++! testable by finite differences of the PBE energy density.
++!-----------------------------------------------------------------------
++      subroutine pbe_vsigma_builtin(rhoup,rhodn,gradup,graddn, &
++           gradtot,mu,kappa,beta,corr_scale,jspin,cutup,cutdn, &
++           vsigup,vsigdn,vsigud)
++      implicit none
++      real*8, intent(in) :: rhoup,rhodn,gradup,graddn,gradtot
++      real*8, intent(in) :: mu,kappa,beta,corr_scale
++      integer, intent(in) :: jspin
++      logical, intent(in) :: cutup,cutdn
++      real*8, intent(out) :: vsigup,vsigdn,vsigud
++
++      real*8, parameter :: pi=3.1415926535897932384626433832795d0
++      real*8, parameter :: pi32=29.608813203268075856503472999628d0
++      real*8, parameter :: thrd=1.d0/3.d0
++      real*8, parameter :: thrd2=2.d0/3.d0
++      real*8, parameter :: thrd4=4.d0/3.d0
++      real*8, parameter :: ax=-0.738558766382022405884230032680836d0
++      real*8, parameter :: gamma=0.03109069086965489503494086371273d0
++      real*8, parameter :: gamspin=0.5198420997897463295344212145565d0
++      real*8, parameter :: fzz=8.d0/(9.d0*gamspin)
++
++      real*8 :: rho2,fk,s,p0,exunif,vsxup,vsxdn
++      real*8 :: rho,zeta,phi,phi3,ks,twoksphi,tcor,t2,t4
++      real*8 :: rs,eu,eurs,ep,eprs,alfm,alfrsm,fspin,z4,ec
++      real*8 :: delta,b,b2,q4,q5,q8,q9,vsc,corr_factor
++
++      vsigup=0.d0
++      vsigdn=0.d0
++      vsigud=0.d0
++      vsxup=0.d0
++      vsxdn=0.d0
++
++! Exact spin scaling of exchange:
++! E_x[n_up,n_dn] = (E_x[2*n_up]+E_x[2*n_dn])/2.
++! For F_x=1+kappa-kappa/(1+(mu/kappa)*s^2), differentiation
++! with respect to |grad n_spin|^2 gives the expressions below.
++      if((.not.cutup).and.rhoup.gt.1.d-18.and. &
++           abs(kappa).gt.1.d-14) then
++        rho2=2.d0*rhoup
++        fk=(pi32*rho2)**thrd
++        s=2.d0*gradup/(2.d0*fk*rho2)
++        p0=1.d0+(mu/kappa)*s*s
++        exunif=ax*rho2**thrd
++        vsxup=exunif*mu/(4.d0*fk*fk*rhoup*p0*p0)
++      endif
++      if((.not.cutdn).and.rhodn.gt.1.d-18.and. &
++           abs(kappa).gt.1.d-14) then
++        rho2=2.d0*rhodn
++        fk=(pi32*rho2)**thrd
++        s=2.d0*graddn/(2.d0*fk*rho2)
++        p0=1.d0+(mu/kappa)*s*s
++        exunif=ax*rho2**thrd
++        vsxdn=exunif*mu/(4.d0*fk*fk*rhodn*p0*p0)
++      endif
++
++! PBE correlation depends on the total-density invariant
++! sigma=|grad(n_up+n_dn)|^2.  Use precisely the PW91-LDA correlation
++! interpolation and constants used by CORPBE, then differentiate its
++! logarithmic gradient correction H analytically.
++      vsc=0.d0
++      rho=rhoup+rhodn
++      if(rho.gt.1.d-18.and.abs(beta).gt.1.d-14.and. &
++           abs(corr_scale).gt.1.d-14) then
++        zeta=(rhoup-rhodn)/rho
++        phi=((1.d0+zeta)**thrd2+(1.d0-zeta)**thrd2)/2.d0
++        phi3=phi**3
++        fk=(pi32*rho)**thrd
++        rs=(0.75d0/(pi*rho))**thrd
++        call gcor(0.0310907d0,0.21370d0,7.5957d0,3.5876d0, &
++             1.6382d0,0.49294d0,1.d0,rs,eu,eurs)
++        call gcor(0.01554535d0,0.20548d0,14.1189d0,6.1977d0, &
++             3.3662d0,0.62517d0,1.d0,rs,ep,eprs)
++        call gcor(0.0168869d0,0.11125d0,10.357d0,3.6231d0, &
++             0.88026d0,0.49671d0,1.d0,rs,alfm,alfrsm)
++        fspin=((1.d0+zeta)**thrd4+(1.d0-zeta)**thrd4-2.d0)/gamspin
++        z4=zeta**4
++        ec=eu*(1.d0-fspin*z4)+ep*fspin*z4- &
++             alfm*fspin*(1.d0-z4)/fzz
++
++        ks=sqrt(4.d0*fk/pi)
++        twoksphi=2.d0*ks*phi
++        tcor=gradtot/(twoksphi*rho)
++        t2=tcor*tcor
++        t4=t2*t2
++        delta=beta/gamma
++        b=delta/(exp(-ec/(phi3*gamma))-1.d0)
++        b2=b*b
++        q4=1.d0+b*t2
++        q5=1.d0+b*t2+b2*t4
++        q8=q5*q5+delta*q4*q5*t2
++        q9=1.d0+2.d0*b*t2
++
++! PBEC suppresses H completely if both spin channels are cut, and uses
++! H/2 if only one is cut.  Apply the same rule to dH/dsigma.
++        corr_factor=1.d0
++        if(cutup.and.cutdn) corr_factor=0.d0
++        if(cutup.neqv.cutdn) corr_factor=0.5d0
++        vsc=corr_scale*corr_factor*beta*phi3*q9/ &
++             (q8*twoksphi*twoksphi*rho)
++      endif
++
++      if(jspin.eq.1) then
++! In the non-spin-polarized interface the independent invariant is
++! |grad rho|^2.  vsxup was evaluated using rho_up=rho/2 and is twice
++! the derivative with respect to this total-density invariant.
++        vsigup=0.5d0*vsxup+vsc
++        vsigdn=vsigup
++        vsigud=0.d0
++      else
++        vsigup=vsxup+vsc
++        vsigdn=vsxdn+vsc
++! sigma_total=sigma_uu+2*sigma_ud+sigma_dd.
++        vsigud=2.d0*vsc
++      endif
++      return
++      end
+

@@ -18,7 +18,7 @@ CONTAINS
     COMPLEX*16, allocatable, intent(inout) :: aalm(:,:,:), bblm(:,:,:), cclm(:,:,:,:)
     !
     COMPLEX*16, allocatable :: YL(:),  phs(:)
-    COMPLEX*16 :: PHSHEL                     
+    COMPLEX*16 :: PHSHEL
     INTEGER    :: l,jlo,jneq,i,m,m1,num,index, nmult, nbands_dft, lmax2lmax2, l2l2
     real*8     :: Krot(3), twopi,arg1,arg2,argt2, BKROT2(3), rotloc_x_BR1(3,3), rotloc_x_BR1_x_rotij(3,3), xrotloc_x_BR1(3,3)
     complex*16 :: yp,ayp,byp,cyp
@@ -104,7 +104,7 @@ CONTAINS
                       alm(index,num)     = alm(index,num)     + ayp
                       blm(index,num)     = blm(index,num)     + byp
                       clm(index,num,jlo) = clm(index,num,jlo) + cyp
-                      
+
                       if (Qforce_j) then
                          aalm(index,num-nemin+1,:)     = aalm(index,num-nemin+1,:)     + ayp*Krot(:)
                          bblm(index,num-nemin+1,:)     = bblm(index,num-nemin+1,:)     + byp*Krot(:)
@@ -123,4 +123,112 @@ CONTAINS
     
     return
   END SUBROUTINE lomain
+
+
+  ! Explicit homogeneous-strain derivative of the LAPW local-orbital part of
+  ! the DMFT projector, at fixed eigenvector coefficients.  This is separate
+  ! from legacy lomain so ordinary charge and force paths retain the original
+  ! well-tested calling interface.
+  SUBROUTINE lomain_strain(XROTLOC,is,nemin,nemax,lfirst,latom,jatom, &
+       salm,sblm,sclm,lmax2)
+    USE param,ONLY: lomax,nume,nloat
+    USE defs,ONLY: TWO,PI,IMAG
+    USE structure,ONLY: mult,rotij,tauij,BR1,POS
+    USE lo,ONLY: nlov,ilo,Alo,Blo,Clo
+    USE xa3,ONLY: BK3lo,As_lo
+    USE dmfts,ONLY: shft
+    IMPLICIT NONE
+    REAL*8,intent(in) :: XROTLOC(3,3)
+    INTEGER,intent(in) :: is,nemin,nemax,lfirst,latom,jatom,lmax2
+    COMPLEX*16,allocatable,intent(inout) :: salm(:,:,:),sblm(:,:,:), &
+         sclm(:,:,:,:)
+    INTEGER,parameter :: strain_a(6)=(/1,2,3,2,1,1/), &
+         strain_b(6)=(/1,2,3,3,3,2/)
+    INTEGER :: l,jlo,jneq,i,m,m1,num,index,index1,nmult,iq,ia,ib, &
+         igamma,iv,it
+    REAL*8 :: twopi,arg1,arg2,argt2,bkrot(3),bkrot2(3),bkrot3(3), &
+         bkrloc(3),akg
+    COMPLEX*16 :: phshel,dy,dyp,ca_st_lm(3,-1:1,-1:1)
+    COMPLEX*16,allocatable :: yl(:)
+    INTEGER,allocatable :: iind(:,:,:)
+
+    allocate(yl((lomax+2)*(lomax+2)))
+    nmult=maxval(mult)
+    allocate(iind((lomax+1)*(lomax+1),nloat,nmult))
+    iind=0
+    i=nlov
+    do l=0,lomax
+       do jlo=1,ilo(l)
+          do jneq=1,mult(jatom)
+             do m1=-l,l
+                i=i+1
+                iind(l*(l+1)+m1+1,jlo,jneq)=i
+             enddo
+          enddo
+       enddo
+    enddo
+
+    twopi=TWO*PI
+    do l=0,min(lomax,lmax2)
+       do jlo=1,ilo(l)
+          do jneq=1,mult(jatom)
+             do m1=-l,l
+                i=iind(l*(l+1)+m1+1,jlo,jneq)
+                bkrot=BK3lo(:,i)
+                bkrot2=matmul(rotij(:,:,latom),bkrot)
+                bkrot3=matmul(BR1,bkrot2)
+                bkrloc=matmul(XROTLOC,bkrot3)
+                akg=sqrt(dot_product(bkrot3,bkrot3))
+                call YLM(bkrloc,lomax+1,yl,(lomax+2)*(lomax+2))
+                arg1=dot_product(bkrot2,POS(:,lfirst))*twopi
+                argt2=dot_product(bkrot,tauij(:,latom))*twopi
+                arg2=dot_product(bkrot,shft(latom,:))*twopi
+                phshel=exp(IMAG*(arg1+arg2+argt2))
+                do m=-l,l
+                   index=l*(l+1)+m+1
+                   call c_factor(l,m,ca_st_lm)
+                   do iq=1,6
+                      ia=strain_a(iq); ib=strain_b(iq)
+                      dy=(0.d0,0.d0)
+                      if (akg.gt.1.d-14) then
+                         do igamma=1,3
+                            do iv=-1,1,2
+                               if (l+iv.lt.0) cycle
+                               do it=-1,1
+                                  if (m+it.lt.-(l+iv) .or. &
+                                       m+it.gt.(l+iv)) cycle
+                                  index1=(l+iv)*(l+iv+1)+m+it+1
+                                  ! c_factor is |K| grad_K Y.  Division by
+                                  ! akg converts it to the Cartesian gradient.
+                                  dy=dy-0.5d0* &
+                                       conjg(ca_st_lm(igamma,iv,it))* &
+                                       (XROTLOC(igamma,ia)*bkrot3(ib)+ &
+                                        XROTLOC(igamma,ib)*bkrot3(ia))* &
+                                       conjg(yl(index1))/akg
+                               enddo
+                            enddo
+                         enddo
+                      endif
+                      do num=nemin,nemax
+                         ! Fractional k and atomic coordinates make the phase
+                         ! invariant under affine strain.  R_MT and the radial
+                         ! LO coefficients are fixed; their remaining common
+                         ! 1/sqrt(Omega) derivative is added later together
+                         ! with the APW contribution.
+                         dyp=dy*phshel*As_lo(i,num,is)
+                         salm(index,num-nemin+1,iq)= &
+                              salm(index,num-nemin+1,iq)+Alo(l,jlo)*dyp
+                         sblm(index,num-nemin+1,iq)= &
+                              sblm(index,num-nemin+1,iq)+Blo(l,jlo)*dyp
+                         sclm(index,num-nemin+1,jlo,iq)= &
+                              sclm(index,num-nemin+1,jlo,iq)+Clo(l,jlo)*dyp
+                      enddo
+                   enddo
+                enddo
+             enddo
+          enddo
+       enddo
+    enddo
+    deallocate(iind,yl)
+  END SUBROUTINE lomain_strain
 END module mod_lo

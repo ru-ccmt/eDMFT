@@ -1,0 +1,30 @@
+--- a/SRC_lapw0/finl_elect_str.F
++++ b/SRC_lapw0/finl_elect_str.F
+@@ -494,7 +494,11 @@
+            ENDIF
+            c1 = c_kub(IABS(lm1(1,i)),lm1(2,i) )
+            c2 = c_kub(IABS(lm1(1,i)),lm1(2,i)+4 )
+-           c1 = c_kub(IABS(lm1(1,i)),lm1(2,i)+8 )
++           ! l=8 and l=10 cubic harmonics contain three ordinary
++           ! spherical-harmonic components.  The third coefficient belongs
++           ! in c3.  Assigning it to c1 overwrote the first coefficient and
++           ! left c3 undefined, corrupting the stress-only conversion.
++           c3 = c_kub(IABS(lm1(1,i)),lm1(2,i)+8 )
+            DO j = 1, imax
+               clm2(j,i)   = clm2(j,i)*c1 + clm2(j,i+1)*c2 + clm2(j,i+2)*c3
+               clm2(j,i+1) = clm2(j,i)*c2/sqrt2
+--- a/SRC_lcore/core_corr_stress.f
++++ b/SRC_lcore/core_corr_stress.f
+@@ -537,7 +537,11 @@
+            ENDIF
+            c1 = c_kub(IABS(lm1(1,i)),lm1(2,i) )
+            c2 = c_kub(IABS(lm1(1,i)),lm1(2,i)+4 )
+-           c1 = c_kub(IABS(lm1(1,i)),lm1(2,i)+8 )
++           ! l=8 and l=10 cubic harmonics have three components.  Preserve
++           ! the first two coefficients and store the third in c3.  The old
++           ! assignment overwrote c1 and used an uninitialized c3 in the
++           ! core-stress conversion.
++           c3 = c_kub(IABS(lm1(1,i)),lm1(2,i)+8 )
+            DO j = 1, imax
+               clm2(j,i)   = clm2(j,i)*c1 + clm2(j,i+1)*c2 + clm2(j,i+2)*c3
+               clm2(j,i+1) = clm2(j,i)*c2/sqrt2

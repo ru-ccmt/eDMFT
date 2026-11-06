@@ -108,9 +108,14 @@ contains
     IMPLICIT NONE
     CHARACTER*180, intent(in) :: fname
     INTEGER, intent(in)       :: ifhn_
+    INTEGER :: ios
     ifhn = ifhn_
-    open(ifhn, file=fname, status='old', err=89)
-    read(ifhn,'(//)',err=89)
+    open(ifhn,file=fname,status='old',form='unformatted',access='sequential', &
+         action='read',iostat=ios)
+    if (ios.ne.0) goto 89
+    ! The first unformatted record contains documentary header strings.
+    read(ifhn,iostat=ios)
+    if (ios.ne.0) goto 89
     return
 89  continue
     WRITE(6,*) 'ERROR opening file case.nsh'
@@ -120,40 +125,80 @@ contains
     close(ifhn)
   END SUBROUTINE close_V_nsh
 
-  SUBROUTINE read_V_nsh(Vts,lv,lpv,mv,mpv,ihmx,jatom,lomax,ngau)
+  SUBROUTINE read_V_nsh(Vts,Wts,VPts,WPts,lv,lpv,llv,mv,mpv,mmv,ihmx, &
+       jatom,lomax,ngau,nloat)
     IMPLICIT NONE
-    COMPLEX*16, intent(out):: Vts(3,3,ngau)       ! non-spherical potential matrix elements
-    INTEGER, intent(out)   :: lpv(ngau), lv(ngau), mpv(ngau), mv(ngau)
+    INTEGER, intent(in)    :: jatom,ngau,lomax,nloat
+    ! Basis indices are 1=u, 2=udot, 2+j=LO_j.  Keeping the full LO matrix
+    ! is essential for atoms with more than one local orbital.  The four
+    ! blocks are, respectively, Gaunt-weighted V and W and phase-weighted
+    ! bare V and W.  Forces use Vts; analytic stress needs all four.
+    COMPLEX*16, intent(out):: Vts(2+nloat,2+nloat,ngau)
+    COMPLEX*16, intent(out):: Wts(2+nloat,2+nloat,ngau)
+    COMPLEX*16, intent(out):: VPts(2+nloat,2+nloat,ngau)
+    COMPLEX*16, intent(out):: WPts(2+nloat,2+nloat,ngau)
+    INTEGER, intent(out)   :: lpv(ngau),lv(ngau),llv(ngau), &
+                              mpv(ngau),mv(ngau),mmv(ngau)
     INTEGER, intent(out)   :: ihmx                ! How many matrix elements for this jatom
-    INTEGER, intent(in)    :: jatom, ngau, lomax
     ! locals
-    INTEGER :: jatom_read, ih, ll, mm
-    ! reading in thir order  : tuu,tdd,tud,tdu,tuu21,tuu12,tuu22,tud21,tdu12
-    ! which is equivalent to : t11,t22,t12,t21, t31,  t13,  t33,  t32,  t23
-    ! The potential is stored in this order
-    !Vts[:,:]=[[Vtuu,   Vtud,  Vtuu12],
-    !          [Vtdu,   Vtdd,  Vtdu12],
-    !          [Vtuu21, Vtud21,Vtuu22]]
-    !
-    ! Vtuu,   Vtud,   Vtuu12
-    ! Vtdu,   Vtdd,   Vtdu12
-    ! Vtuu21, Vtud21, Vtuu22
-    !
+    INTEGER :: jatom_read,ih,jlo,klo,ios
     Vts(:,:,:)=0.d0
-    read(ifhn,*) jatom_read
+    Wts(:,:,:)=0.d0
+    VPts(:,:,:)=0.d0
+    WPts(:,:,:)=0.d0
+    read(ifhn,iostat=ios) jatom_read
+    if (ios.ne.0) goto 668
     if (jatom_read.ne.jatom) then
        WRITE(6,*) "ERROR: reading case.nsh, jatom_read != jatom"
        WRITE(6,*) 'jatom_read=', jatom_read, 'jatom=', jatom
     endif
     DO ih=1,ngau
-       ! first 4 complex numbers are tuu,tdd,tud,tdu
-       read(ifhn,'(6i3,4e19.12,/,6(3x),4e19.12)',end=669) lpv(ih),ll,lv(ih),mpv(ih),mm,mv(ih),Vts(1,1,ih),Vts(2,2,ih),Vts(1,2,ih),Vts(2,1,ih)
-       if (ll.eq.0) EXIT
-       ! next 5 complex numbers are tuu21, tuu12, tuu22, tud21, tdu12
-       IF ((LPV(IH).LE.LOMAX).OR.(LV(IH).LE.LOMAX)) read(ifhn,'(6(3x),6e19.12,/,6(3x),4e19.12)',end=669) Vts(3,1,ih),Vts(1,3,ih),Vts(3,3,ih),Vts(3,2,ih),Vts(2,3,ih)
+       read(ifhn,iostat=ios) lpv(ih),llv(ih),lv(ih),mpv(ih),mmv(ih),mv(ih), &
+            Vts(1,1,ih),Vts(2,2,ih),Vts(1,2,ih),Vts(2,1,ih), &
+            Wts(1,1,ih),Wts(2,2,ih),Wts(1,2,ih),Wts(2,1,ih), &
+            VPts(1,1,ih),VPts(2,2,ih),VPts(1,2,ih),VPts(2,1,ih), &
+            WPts(1,1,ih),WPts(2,2,ih),WPts(1,2,ih),WPts(2,1,ih)
+       if (ios.ne.0) goto 668
+       if (llv(ih).eq.0) EXIT
+       IF ((LPV(IH).LE.LOMAX).OR.(LV(IH).LE.LOMAX)) THEN
+          read(ifhn,iostat=ios) &
+               (Vts(2+jlo,1,ih),jlo=1,nloat), &
+               (Wts(2+jlo,1,ih),jlo=1,nloat), &
+               (VPts(2+jlo,1,ih),jlo=1,nloat), &
+               (WPts(2+jlo,1,ih),jlo=1,nloat)
+          if (ios.ne.0) goto 668
+          read(ifhn,iostat=ios) &
+               (Vts(1,2+jlo,ih),jlo=1,nloat), &
+               (Wts(1,2+jlo,ih),jlo=1,nloat), &
+               (VPts(1,2+jlo,ih),jlo=1,nloat), &
+               (WPts(1,2+jlo,ih),jlo=1,nloat)
+          if (ios.ne.0) goto 668
+          read(ifhn,iostat=ios) &
+               (Vts(2+jlo,2,ih),jlo=1,nloat), &
+               (Wts(2+jlo,2,ih),jlo=1,nloat), &
+               (VPts(2+jlo,2,ih),jlo=1,nloat), &
+               (WPts(2+jlo,2,ih),jlo=1,nloat)
+          if (ios.ne.0) goto 668
+          read(ifhn,iostat=ios) &
+               (Vts(2,2+jlo,ih),jlo=1,nloat), &
+               (Wts(2,2+jlo,ih),jlo=1,nloat), &
+               (VPts(2,2+jlo,ih),jlo=1,nloat), &
+               (WPts(2,2+jlo,ih),jlo=1,nloat)
+          if (ios.ne.0) goto 668
+          read(ifhn,iostat=ios) &
+               ((Vts(2+jlo,2+klo,ih),jlo=1,nloat),klo=1,nloat), &
+               ((Wts(2+jlo,2+klo,ih),jlo=1,nloat),klo=1,nloat), &
+               ((VPts(2+jlo,2+klo,ih),jlo=1,nloat),klo=1,nloat), &
+               ((WPts(2+jlo,2+klo,ih),jlo=1,nloat),klo=1,nloat)
+          if (ios.ne.0) goto 668
+       ENDIF
     ENDDO
-669 continue
     ihmx=ih-1
+    return
+668 continue
+    WRITE(6,*) 'ERROR reading unformatted case.nsh for atom/record ', &
+         jatom,ih,' IOSTAT=',ios
+    STOP 'read_V_nsh: incompatible or truncated case.nsh; rerun lapw1'
   END SUBROUTINE read_V_nsh
 
   Function CheckFilesExist(filename_V_nsh, filename_V_vns) result(exist)
@@ -162,8 +207,10 @@ contains
     LOGICAL :: exist
     ! locals
     INTEGER :: ios
-    open(9902, file=filename_V_nsh, status='old', err=88)
-    read(9902,'(//)',IOSTAT=ios)
+    open(9902,file=filename_V_nsh,status='old',form='unformatted', &
+         access='sequential',action='read',iostat=ios)
+    if (ios.ne.0) goto 88
+    read(9902,IOSTAT=ios)
     close(9902)
     if (ios.ne.0) goto 88
     open(9919, file=filename_V_vns, status='old', err=88)

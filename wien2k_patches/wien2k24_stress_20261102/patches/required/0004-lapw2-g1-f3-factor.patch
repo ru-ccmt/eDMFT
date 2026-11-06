@@ -1,0 +1,45 @@
+--- a/SRC_lapw2/val_kinstrmt.F
++++ b/SRC_lapw2/val_kinstrmt.F
+@@ -48,1 +48,5 @@
+-    DO l = 0, lmax
++    ! WIEN2k stress Eq. (G1) F3 factor correction:
++    ! the first-radial-derivative term has one overall factor 1/2.
++    ! Its angular expression below contains two identical pairs, so a
++    ! second ohalf is required before the explicitly duplicated sum.
++    DO l = 0, lmax
+@@ -246,7 +251,7 @@
+                                      F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
+                                      (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) +&
+                                       c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*&
+-                                      ohalf*gaunt1*(ALM(index2,num)*(conjg(ALM(index1,num))*TC2S00(l,lp)+&
++                                      ohalf*ohalf*gaunt1*(ALM(index2,num)*(conjg(ALM(index1,num))*TC2S00(l,lp)+&
+                                       +conjg(BLM(index1,num))*TC2S10(l,lp)) + BLM(index2,num)*&                                      
+                                     (conjg(ALM(index1,num))*TC2S01(l,lp)+conjg(BLM(index1,num))*TC2S11(l,lp))) - &
+                                      (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
+@@ -278,7 +283,7 @@
+                                            F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
+                                            (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) +&
+                                            c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*&
+-                                           ohalf*gaunt1* &
++                                           ohalf*ohalf*gaunt1* &
+                                            conjg( clm(index1,num,jlo) )*(ALM(index2,num)*judu_20(jlo,l,lp) + &
+                                            BLM(index2,num)*judu_21(jlo,l,lp) ) - &
+                                            (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
+@@ -292,7 +297,7 @@
+                                             F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
+                                            (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) +&
+                                            c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*&
+-                                           ohalf*gaunt1* &
++                                           ohalf*ohalf*gaunt1* &
+                                            clm(index2,num,jlop)*(conjg(ALM(index1,num))*judu_02(jlop,lp,l) + &
+                                            conjg(BLM(index1,num))*judu_12(jlop,lp,l) ) - &
+                                            (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
+@@ -308,7 +313,7 @@
+                                                F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
+                                                (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) +&
+                                                c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*&
+-                                               ohalf*gaunt1*2.d0* &
++                                               ohalf*ohalf*gaunt1*2.d0* &
+                                                conjg( clm(index1,num,jlo) )*clm(index2,num,jlop)*&
+                                                judu_22(jlo,jlop,l,lp)- &
+                                                (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&

@@ -192,7 +192,7 @@ def PrepareDefinitionFile_dmft2(idmf, mode, case, cixs, updn, dnup, so, para, sc
     print("%3d, %-15s, %-10s, %-13s, %-4d" % (29, "'"+case+".energy"+sodum+"'",  "'unknown'", "'formatted'",0), file=fdef)
     print("%3d, %-15s, %-10s, %-13s, %-4d" % (30, "'"+case+".energy"+so+updn+para+"'","'old'", "'formatted'",0), file=fdef)
     print("%3d, %-15s, %-10s, %-13s, %-4d" % (31, "'"+case+".energy"+so+dnup+para+"'","'unknown'", "'formatted'",0), file=fdef)
-    print("%3d, %-15s, %-10s, %-13s, %-4d" % (9902, "'"+case+".nsh"+updn+"'","'unknown'", "'formatted'",0), file=fdef)
+    print("%3d, %-15s, %-10s, %-13s, %-4d" % (9902, "'"+case+".nsh"+updn+"'","'unknown'", "'unformatted'",0), file=fdef)
     print("%3d, %-15s, %-10s, %-13s, %-4d" % (9919, "'"+case+".vns"+updn+"'","'unknown'", "'formatted'",0), file=fdef)
     
     # Appending to the def file for correlated atoms
@@ -213,7 +213,7 @@ def PrepareDefinitionFile_lapw1(widmf, case, updn, para, scratch, band, cmplx):
     print("%3d, %-15s, %-10s, %-13s, %-4d" % (20, "'"+case+".struct"+"'",                  "'old'",     "'formatted'", 0), file=fdef)
     print("%3d, %-15s, %-10s, %-13s, %-4d" % (21, "'"+case+".scf1"+updn+"'",               "'unknown'", "'formatted'", 0), file=fdef)
     print("%3d, %-15s, %-10s, %-13s, %-4d" % (55, "'"+case+".vec"+"'",                     "'unknown'", "'formatted'", 0), file=fdef)
-    print("%3d, %-15s, %-10s, %-13s, %-4d" % (71, "'"+case+".nsh"+updn+"'",                "'unknown'", "'formatted'", 0), file=fdef)
+    print("%3d, %-15s, %-10s, %-13s, %-4d" % (71, "'"+case+".nsh"+updn+"'",                "'unknown'", "'unformatted'", 0), file=fdef)
     #print >> fdef, "%3d, %-15s, %-10s, %-13s, %-4d" % (71, "'"+case+".nsh"+updn+"'",                "'unknown'", "'formatted'", 0)
     #print >> fdef, "%3d, %-15s, %-10s, %-13s, %-4d" % (200,"'"+scratch+"/"+case+".storeHinv"+updn+"'",  "'replace'", "'unformatted'", 9000)
     writehs=False

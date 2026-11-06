@@ -16,10 +16,11 @@ GEN = cputim.o zeroin.o romb.o splines.o spline.o reallocate.o zinv.o \
       sphbes.o ylm.o stern.o sortag.o readselfenergy.o eigsys.o dfrad.o sorttodiag.o inverss.o
 
 # These routines are tightly coupled, mostly through modules.f90
-OBJSMOD =  modules.o structure.o dmfts.o forces.o mod_mpi.o t3j.o rotdef.o w_atpar.o angle.o charge.o \
+OBJSMOD =  modules.o structure.o stress_modules.o dmfts.o forces.o mod_mpi.o stress_mpi.o t3j.o rotdef.o w_atpar.o angle.o charge.o \
            p_project.o csplit.o d5splt.o f7splt.o gtfnam.o \
            harmon.o kdelta.o lomain.o l2mainSubs.o alm_blm_clm.o \
-	   cmp_mt_density.o cmp_dmft_weights.o l2main.o dmft2.o init_energy_file.o lda_fermi.o \
+	   stress_integrals.o stress_kernels.o stress_rela.o stress_interstitial.o stress_symmetry.o \
+	   cmp_mt_density.o cmp_dmft_stress.o cmp_dmft_weights.o l2main.o dmft2.o init_energy_file.o lda_fermi.o \
            latgen.o p3splt.o psplit.o recfil.o recpr.o \
            spin_rotate.o cmp_log_gdloc.o print_pre_atpar.o fomai3.o symmetrize.o
 

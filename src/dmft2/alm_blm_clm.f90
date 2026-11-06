@@ -5,12 +5,13 @@ contains
     USE defs,  ONLY: pi, imag
     USE param, ONLY: lmax2, lomax, nume, nloat, iblock, nmat
     USE xa,    ONLY: bkrloc, fj, dfj
-    USE xa3,   ONLY: bk3, k3, As
+    USE xa3,   ONLY: bk3, k3, As, A, bkx, bky, bkz
     USE structure, ONLY: rmt, vol, rotij, br1, pos, tauij, rotloc
     USE atspdt,ONLY: p, dp, pe, dpe
     USE lo,    ONLY: nlo, lapw, ilo
     USE dmfts, ONLY: iso, shft
     USE mod_lo, ONLY: lomain
+    USE dmft_stress, ONLY: Qstress, apw_surface_coeff
     IMPLICIT NONE
     COMPLEX*16, intent(out) :: alm((lmax2+1)*(lmax2+1),nume),blm((lmax2+1)*(lmax2+1),nume),clm((lomax+1)*(lomax+1),nume,nloat)
     COMPLEX*16, intent(in)  :: Aweight(nbands,nbands)
@@ -30,9 +31,9 @@ contains
     REAL*8 :: h_al(iblock),h_bl(iblock)
     COMPLEX*16:: h_yl
     COMPLEX*16 :: yl((LMAX2+1)*(LMAX2+1)), h_alyl((LMAX2+1)*(LMAX2+1),iblock), h_blyl((LMAX2+1)*(LMAX2+1),iblock)
-    COMPLEX*16, allocatable :: xlm_tmp(:,:)
+    COMPLEX*16, allocatable :: xlm_tmp(:,:), pw_tmp(:,:)
     REAL*8, allocatable     :: h_k(:,:)
-    complex*16, allocatable :: h_ablyl_hk(:,:)
+    complex*16, allocatable :: h_ablyl_hk(:,:), h_surfyl(:,:)
     complex*16, allocatable :: ylm_tmp(:,:)
     LOGICAL :: nonzero_shft
     REAL*8  :: rotloc_x_BR1(3,3), rotloc_x_BR1_x_rotij(3,3)
@@ -59,6 +60,19 @@ contains
     alm(:,:)=0.d0
     blm(:,:)=0.d0
     clm(:,:,:)=0.d0
+
+    if (Qstress) then
+       ! Keep the plane-wave vector synchronized with the pseudo-band basis
+       ! used for ALM/BLM/CLM.  The WIEN2k stress kernels require both views
+       ! of the same state when differentiating the LAPW matching.
+       A(:,:)=0.d0
+       A(1:n0-nnlo,nemin:nemax)=As(1:n0-nnlo,nemin:nemax,is)
+       bkx(1:n0-nnlo)=bk3(1,1:n0-nnlo)
+       bky(1:n0-nnlo)=bk3(2,1:n0-nnlo)
+       bkz(1:n0-nnlo)=bk3(3,1:n0-nnlo)
+       apw_surface_coeff(:,:)=0.d0
+       allocate(h_surfyl(lmax2lmax2,iblock))
+    endif
 
     if (Qforce_j) then
        allocate( h_ablyl_hk(lmax2lmax2,iblock) )
@@ -140,6 +154,8 @@ contains
              ENDDO
              ! !$OMP END PARALLEL DO
              DO i3=1,ibb ! size of this block                    
+                if (Qstress) h_surfyl(l**2+1:(l+1)**2,i3) = &
+                     rmt2*dfj(l,ii+i3-1,jatom)*h_alyl(l**2+1:(l+1)**2,i3)
                 h_blyl(l**2+1:(l+1)**2,i3)=h_bl(i3)*h_alyl(l**2+1:(l+1)**2,i3)
                 h_alyl(l**2+1:(l+1)**2,i3)=h_al(i3)*h_alyl(l**2+1:(l+1)**2,i3)
              ENDDO
@@ -160,6 +176,9 @@ contains
           !---- Where C(k+G,iband,is) are eigenvectors, and Apw and Bpw are expansion coefficients defined in Shick et.al., PRB 60, 10763 (1999).
           CALL zgemm('N','N',lmax2lmax2,nemax-nemin+1,ibb,cone,h_alyl,lda,As(ii,nemin,is),ldb,cone,alm(1,nemin),ldc)
           CALL zgemm('N','N',lmax2lmax2,nemax-nemin+1,ibb,cone,h_blyl,lda,As(ii,nemin,is),ldb,cone,blm(1,nemin),ldc)
+          if (Qstress) CALL zgemm('N','N',lmax2lmax2,nemax-nemin+1,ibb,cone, &
+               h_surfyl,lda,As(ii,nemin,is),ldb,cone, &
+               apw_surface_coeff(1,nemin),ldc)
           IF (Qforce_j) THEN 
              do i_h_k=1,3
                 !$OMP PARALLEL DO SHARED(h_ablyl_hk,h_alyl,h_k) SCHEDULE(STATIC)
@@ -185,6 +204,7 @@ contains
        deallocate( h_k )
        deallocate( h_ablyl_hk )
     endif
+    if (Qstress) deallocate(h_surfyl)
 
     CALL cputim(time2)
     CALL walltim(time2_w)
@@ -203,6 +223,8 @@ contains
        cfac=fac*imag**l
        alm(l**2+1:(l+1)**2,nemin:nemax)=alm(l**2+1:(l+1)**2,nemin:nemax)*cfac
        blm(l**2+1:(l+1)**2,nemin:nemax)=blm(l**2+1:(l+1)**2,nemin:nemax)*cfac
+       if (Qstress) apw_surface_coeff(l**2+1:(l+1)**2,nemin:nemax) = &
+            apw_surface_coeff(l**2+1:(l+1)**2,nemin:nemax)*cfac
     ENDDO
     !$OMP END PARALLEL DO
     !$OMP PARALLEL DO PRIVATE(cfac) SHARED(clm) SCHEDULE(STATIC)
@@ -238,6 +260,17 @@ contains
     alm(:,DM_nemin:DM_nemaxx)=xlm_tmp(:,:)
     CALL zgemm('N','N',lmax2lmax2,nbandsx,nbands,cone,blm(1,DM_nemin),lmax2lmax2,Aweight,nbands,czero,xlm_tmp,lmax2lmax2)
     blm(:,DM_nemin:DM_nemaxx)=xlm_tmp(:,:)
+    if (Qstress) then
+       CALL zgemm('N','N',lmax2lmax2,nbandsx,nbands,cone, &
+            apw_surface_coeff(1,DM_nemin),lmax2lmax2,Aweight,nbands, &
+            czero,xlm_tmp,lmax2lmax2)
+       apw_surface_coeff(:,DM_nemin:DM_nemaxx)=xlm_tmp(:,:)
+       allocate(pw_tmp(n0-nnlo,nbandsx))
+       CALL zgemm('N','N',n0-nnlo,nbandsx,nbands,cone, &
+            As(1,DM_nemin,is),nmat,Aweight,nbands,czero,pw_tmp,n0-nnlo)
+       A(1:n0-nnlo,DM_nemin:DM_nemaxx)=pw_tmp(:,:)
+       deallocate(pw_tmp)
+    endif
     IF (Qforce_j) THEN
        ! Chenging aalm,bblm,cclm to make them DMFT-like
        do ik=1,3

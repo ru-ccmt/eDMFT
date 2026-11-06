@@ -1,4 +1,4 @@
-SUBROUTINE OUTWINC(A,B,Nodes,VAL,SLO,REL,V,RNET,DH,JRI,EH,FL,Z,nrad)
+SUBROUTINE OUTWINC(A,B,AP,BP,Nodes,VAL,SLO,REL,V,RNET,DH,JRI,EH,FL,Z,nrad)
   !         Integration der skalarrel. Schroedingergleichung
   ! ----------------------------------------------------------------
   !  Input:
@@ -20,6 +20,7 @@ SUBROUTINE OUTWINC(A,B,Nodes,VAL,SLO,REL,V,RNET,DH,JRI,EH,FL,Z,nrad)
   ! ----------------------------------------------------------------
   IMPLICIT NONE
   REAL*8,  intent(out) :: A(NRAD), B(NRAD)    ! solution with large and small component
+  REAL*8,  intent(out) :: AP(NRAD), BP(NRAD)  ! r*d(A/r)/dr and r*d(B/r)/dr
   INTEGER, intent(out) :: nodes               ! number of nodes
   REAL*8,  intent(out) :: val, slo            ! value at the spherical boundary:
   LOGICAL, intent(in)  :: REL
@@ -41,6 +42,8 @@ SUBROUTINE OUTWINC(A,B,Nodes,VAL,SLO,REL,V,RNET,DH,JRI,EH,FL,Z,nrad)
   E=EH*2.d0
   A(:)=0.d0
   B(:)=0.d0
+  AP(:)=0.d0
+  BP(:)=0.d0
   Nodes = 0
   ZZ = Z + Z
   C = 2.d0 * 137.0359895d0
@@ -72,6 +75,9 @@ SUBROUTINE OUTWINC(A,B,Nodes,VAL,SLO,REL,V,RNET,DH,JRI,EH,FL,Z,nrad)
      B(K) = (R**SF)*F0
      D(1,K) = DRDI*A(K)*S/R
      D(2,K) = DRDI*B(K)*SF/R
+     ! A and B are r*u.  AP and BP are r*du/dr, not d(r*u)/dr.
+     AP(K) = D(1,K)/DRDI - A(K)/R
+     BP(K) = D(2,K)/DRDI - B(K)/R
   ENDDO
   !
   !
@@ -100,14 +106,17 @@ SUBROUTINE OUTWINC(A,B,Nodes,VAL,SLO,REL,V,RNET,DH,JRI,EH,FL,Z,nrad)
      DG1 = DG2
      DG2 = DG3
      DG3 = U*B(K) - X*A(K)
+     AP(K) = DG3/DRDI - A(K)/R
      DF1 = DF2
      DF2 = DF3
      DF3 = X*B(K) - Y*A(K)
+     BP(K) = DF3/DRDI - B(K)/R
   ENDDO
   !
   !     
   do iiij=1,JRI
      B(iiij)=B(iiij)*c/2.d0
+     BP(iiij)=BP(iiij)*c/2.d0
   ENDDO
   !
   VAL = A(JRI)/RNET(JRI)

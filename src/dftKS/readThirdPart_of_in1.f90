@@ -1,16 +1,30 @@
 ! @Copyright 2007 Kristjan Haule
 ! 
-SUBROUTINE ReadThirdPart_of_in1(ITAPE,Emin,Emax,nband,sproj_limit,eshift_iter,fh_in1)
+SUBROUTINE ReadThirdPart_of_in1(ITAPE,Emin,Emax,nband,fixed_nbands, &
+     sproj_limit,eshift_iter,fh_in1)
   IMPLICIT NONE
   REAL*8,  intent(out) :: Emin, Emax, sproj_limit, eshift_iter
   INTEGER, intent(out) :: ITAPE, nband
   INTEGER, intent(in)  :: fh_in1
+  LOGICAL, intent(out) :: fixed_nbands
   ! locals
-  CHARACTER*80 :: line
-  INTEGER      :: ios
+  CHARACTER*80 :: line, keyword_line
+  INTEGER      :: ios, i, code
   REAL*8       :: test1, test2
   
   read(fh_in1,'(a)')line
+  ! Preserve the legacy numerical input exactly.  Fixed-band selection is
+  ! enabled only by an explicit, case-insensitive trailing keyword, e.g.
+  !   K-VECTORS FROM UNIT:4 -10.0 2.0 66 FIXED_NBANDS
+  ! List-directed input ignores the trailing word after reading the four
+  ! numerical fields, so the line remains readable by an unpatched WIEN2k.
+  keyword_line=line
+  do i=1,len(keyword_line)
+     code=iachar(keyword_line(i:i))
+     if (code.ge.iachar('a') .and. code.le.iachar('z')) &
+          keyword_line(i:i)=achar(code-iachar('a')+iachar('A'))
+  enddo
+  fixed_nbands=index(keyword_line,'FIXED_NBANDS').gt.0
   nband=99999999
   read(line(21:),*,IOSTAT=ios) ITAPE,Emin,Emax,nband  ! ITAPE==klist unit ; Emin==min_E ; Emax==max_E ; nband==maximum number of bands
   if (ios.ne.0) then

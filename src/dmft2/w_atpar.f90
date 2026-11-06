@@ -1,5 +1,11 @@
 module w_atpar
   IMPLICIT NONE
+  TYPE nsp_geometry_atom
+     LOGICAL :: ready=.FALSE.
+     INTEGER :: nterm=0
+     INTEGER, ALLOCATABLE :: ih(:),ibra(:),iket(:)
+     COMPLEX*16, ALLOCATABLE :: radial(:,:,:),angular(:,:,:)
+  END TYPE nsp_geometry_atom
   REAL*8 , ALLOCATABLE :: w_alo(:,:,:)
   REAL*8 , ALLOCATABLE :: w_blo(:,:,:)
   REAL*8 , ALLOCATABLE :: w_clo(:,:,:)
@@ -24,11 +30,39 @@ module w_atpar
   REAL*8 , ALLOCATABLE :: w_RRAD2(:,:,:)
   REAL*8 , ALLOCATABLE :: w_RADE1(:,:,:)
   REAL*8 , ALLOCATABLE :: w_RADE2(:,:,:)
+  ! Exact radial derivatives returned by OUTWIN.  These are r*d(u/r)/dr,
+  ! not finite differences reconstructed later.  The scalar-relativistic
+  ! Koelling-Harmon stress needs the corresponding flux at every radial
+  ! mesh point, including for energy derivatives and local orbitals.
+  REAL*8 , ALLOCATABLE :: w_RADP1(:,:,:)
+  REAL*8 , ALLOCATABLE :: w_RADP2(:,:,:)
+  REAL*8 , ALLOCATABLE :: w_RADPE1(:,:,:)
+  REAL*8 , ALLOCATABLE :: w_RADPE2(:,:,:)
+  REAL*8 , ALLOCATABLE :: w_ap1lo(:,:,:,:)
+  REAL*8 , ALLOCATABLE :: w_bp1lo(:,:,:,:)
+  ! Spherical potential in ATPAR's Hartree-r convention.  Keep an atom
+  ! cache because dmft2 loops over k points outside the atom loop.
+  REAL*8 , ALLOCATABLE :: w_VR(:,:)
 
   REAL*8 , ALLOCATABLE :: w_rholm(:,:,:)
   
-  COMPLEX*16, allocatable :: Vts(:,:,:,:)
-  INTEGER,    allocatable :: lpv(:,:), lv(:,:), mpv(:,:), mv(:,:), Nhmx(:)
+  ! Full nonspherical radial matrices in the basis
+  ! (u,udot,LO_1,...,LO_n).  Vts is used by forces; all four blocks are
+  ! retained because the analytic nonspherical stress needs W and the
+  ! phase-weighted bare matrices as well.
+  COMPLEX*16, allocatable :: Vts(:,:,:,:),Wts(:,:,:,:), &
+       VPts(:,:,:,:),WPts(:,:,:,:)
+  ! Angular labels for every nonspherical radial channel.  Forces only need
+  ! the bra/ket (l,m) labels.  Stress also needs the potential-harmonic
+  ! (L,M) labels to recouple the radial matrix with the two rank-one strain
+  ! tensors in the fifth and sixth lines of Blaha et al. Eq. (G2).
+  INTEGER,    allocatable :: lpv(:,:),lv(:,:),llv(:,:), &
+       mpv(:,:),mv(:,:),mmv(:,:),Nhmx(:)
+  ! Sparse, atom-dependent angular recouplings for the nonspherical stress.
+  ! They depend on (l,L,M,l') but not on k, band, spin, rho, or rhoE.  Without
+  ! this cache the same thousands of Gaunt products were rebuilt at every k
+  ! point, making a single dmft2 stress step unnecessarily expensive.
+  TYPE(nsp_geometry_atom), ALLOCATABLE :: nsp_geometry(:)
   
 CONTAINS
 
@@ -66,6 +100,13 @@ CONTAINS
     ALLOCATE( w_RRAD2(1:nrad,0:lmax2,1:nat) )
     ALLOCATE( w_RADE1(1:nrad,0:lmax2,1:nat) )
     ALLOCATE( w_RADE2(1:nrad,0:lmax2,1:nat) )
+    ALLOCATE( w_RADP1(1:nrad,0:lmax2,1:nat) )
+    ALLOCATE( w_RADP2(1:nrad,0:lmax2,1:nat) )
+    ALLOCATE( w_RADPE1(1:nrad,0:lmax2,1:nat) )
+    ALLOCATE( w_RADPE2(1:nrad,0:lmax2,1:nat) )
+    ALLOCATE( w_ap1lo(1:nrad,1:nloat,0:lomax,1:nat) )
+    ALLOCATE( w_bp1lo(1:nrad,1:nloat,0:lomax,1:nat) )
+    ALLOCATE( w_VR(1:nrad,1:nat) )
 
     ALLOCATE( w_rholm(1:NRAD,1:LM_MAX,1:nat) )
 
@@ -97,6 +138,13 @@ CONTAINS
     DEALLOCATE( w_RRAD2 )
     DEALLOCATE( w_RADE1 )
     DEALLOCATE( w_RADE2 )
+    DEALLOCATE( w_RADP1 )
+    DEALLOCATE( w_RADP2 )
+    DEALLOCATE( w_RADPE1 )
+    DEALLOCATE( w_RADPE2 )
+    DEALLOCATE( w_ap1lo )
+    DEALLOCATE( w_bp1lo )
+    DEALLOCATE( w_VR )
 
     DEALLOCATE( w_rholm )
   END SUBROUTINE w_deallocate
@@ -122,6 +170,13 @@ CONTAINS
     DEALLOCATE( w_RRAD2 )
     DEALLOCATE( w_RADE1 )
     DEALLOCATE( w_RADE2 )
+    DEALLOCATE( w_RADP1 )
+    DEALLOCATE( w_RADP2 )
+    DEALLOCATE( w_RADPE1 )
+    DEALLOCATE( w_RADPE2 )
+    DEALLOCATE( w_ap1lo )
+    DEALLOCATE( w_bp1lo )
+    DEALLOCATE( w_VR )
   END SUBROUTINE w_deallocate1
   SUBROUTINE w_deallocate2
     IMPLICIT NONE
@@ -138,6 +193,7 @@ CONTAINS
     USE atspdt,ONLY: e_store, el 
     USE readPotential, ONLY: init_V_vsp, read_V_vsp, close_V_vsp
     USE com_mpi
+    USE stress_kb, ONLY: STRESS, init_stress_cache, save_stress_integrals
     IMPLICIT NONE
     CHARACTER*4, intent(in)  :: cform
     REAL*8, intent(in)       :: ZZ(*)
@@ -149,6 +205,11 @@ CONTAINS
     LOGICAL :: qprint_
     
     qprint_ = myrank.EQ.master
+
+    ! lapw2 keeps one atom's stress integrals because its outer loop is over
+    ! atoms.  dmft2 loops over k points first, so cache every atom here while
+    ! the radial functions and spherical potential are already available.
+    if (STRESS) call init_stress_cache(nat)
     
     CALL init_V_vsp(filename_V_sph, 18, ISCF)
 !!! BRISI
@@ -165,6 +226,8 @@ CONTAINS
        Vr(:)=0.d0
        nr = jri(jatom)
        CALL read_V_vsp(Vr(:nr),jatom,nr)
+       w_VR(:,jatom)=0.d0
+       w_VR(:nr,jatom)=Vr(:nr)/2.d0
        
        if (qprint_) then
           lfirst=1
@@ -174,7 +237,27 @@ CONTAINS
           CALL Print_pre_atpar(jatom,lfirst,el,lmax2)
        endif
        ! calculates radial functions U(r), UE(R), ..., overlaps, coefficients,....
-       CALL ATPARN(w_RRAD1(:,:,jatom),w_RADE1(:,:,jatom),w_RRAD2(:,:,jatom),w_RADE2(:,:,jatom),w_a1lo(:,:,:,jatom),w_b1lo(:,:,:,jatom),ul_Rmt(:,:,jatom),dul_Rmt(:,:,jatom),ri_mat(:,:,:,jatom),w_alo(:,:,jatom),w_blo(:,:,jatom),w_clo(:,:,jatom), Vr,nr,el,elo,loor,rlo,lapw,nlov,nlo,nlon,ilo,rel,ZZ(jatom),qprint_,jri(jatom),r0(jatom),dx(jatom),Rmt(jatom),lmax2,lomax,nloat,NRAD)
+       CALL ATPARN(w_RRAD1(:,:,jatom),w_RADE1(:,:,jatom), &
+            w_RRAD2(:,:,jatom),w_RADE2(:,:,jatom), &
+            w_RADP1(:,:,jatom),w_RADPE1(:,:,jatom), &
+            w_RADP2(:,:,jatom),w_RADPE2(:,:,jatom), &
+            w_a1lo(:,:,:,jatom),w_b1lo(:,:,:,jatom), &
+            w_ap1lo(:,:,:,jatom),w_bp1lo(:,:,:,jatom), &
+            ul_Rmt(:,:,jatom),dul_Rmt(:,:,jatom), &
+            ri_mat(:,:,:,jatom),w_alo(:,:,jatom),w_blo(:,:,jatom), &
+            w_clo(:,:,jatom),Vr,nr,el,elo,loor,rlo,lapw,nlov,nlo, &
+            nlon,ilo,rel,ZZ(jatom),qprint_,jri(jatom),r0(jatom), &
+            dx(jatom),Rmt(jatom),lmax2,lomax,nloat,NRAD)
+
+       if (STRESS) then
+          call val_corr_integrals(rel,w_RRAD1(:,:,jatom),w_RRAD2(:,:,jatom), &
+               w_RADE1(:,:,jatom),w_RADE2(:,:,jatom),w_a1lo(:,:,:,jatom), &
+               w_b1lo(:,:,:,jatom),jatom,jri(jatom),dx(jatom))
+          call kin_str_integrals(rel,w_RRAD1(:,:,jatom),w_RRAD2(:,:,jatom), &
+               w_RADE1(:,:,jatom),w_RADE2(:,:,jatom),w_a1lo(:,:,:,jatom), &
+               w_b1lo(:,:,:,jatom),jatom,jri(jatom),dx(jatom),Vr)
+          call save_stress_integrals(jatom)
+       endif
        
        nnlo=nlo+nlon+nlov
 
@@ -353,18 +436,24 @@ CONTAINS
     IMPLICIT NONE
     ! locals
     INTEGER :: jatom, ihmx, ihmx_max
-    COMPLEX*16, allocatable :: Vts_(:,:,:)
-    INTEGER,    allocatable :: lpv_(:), lv_(:), mpv_(:), mv_(:)
+    COMPLEX*16, allocatable :: Vts_(:,:,:),Wts_(:,:,:), &
+         VPts_(:,:,:),WPts_(:,:,:)
+    INTEGER,    allocatable :: lpv_(:),lv_(:),llv_(:), &
+         mpv_(:),mv_(:),mmv_(:)
     ! We first read the entire potential to determine maximal number of nonzero components (ngau)
-    allocate( Vts_(3,3,ngau) )      ! non-spherical potential matrix elements
-    allocate( lpv_(ngau), lv_(ngau), mpv_(ngau), mv_(ngau) )
+    allocate(Vts_(2+nloat,2+nloat,ngau),Wts_(2+nloat,2+nloat,ngau), &
+         VPts_(2+nloat,2+nloat,ngau),WPts_(2+nloat,2+nloat,ngau))
+    allocate(lpv_(ngau),lv_(ngau),llv_(ngau), &
+         mpv_(ngau),mv_(ngau),mmv_(ngau))
     !write(6,*) 'in Read_nsh : nloat=', nloat
     ihmx_max=0
     CALL init_V_nsh(filename_V_nsh, 9902) 
     !WRITE(6,*) 'First read_V_nsh'
     do jatom=1,nat
        !WRITE(6,*) 'jatom=', jatom
-       CALL read_V_nsh(Vts_,lv_,lpv_,mv_,mpv_,ihmx, jatom,lomax,ngau)
+       CALL read_V_nsh(Vts_,Wts_,VPts_,WPts_,lv_,lpv_,llv_, &
+            mv_,mpv_,mmv_, &
+            ihmx,jatom,lomax,ngau,nloat)
        !WRITE(6,*) 'ihmx=', ihmx
        if (ihmx.GT.ihmx_max) ihmx_max=ihmx
     enddo
@@ -372,18 +461,27 @@ CONTAINS
     ngau = ihmx_max+1  ! CAREFUL: NGAU was constant in original code. Here we change it to the smallest acceptable number.
     write(6,*) 'after first reading case.nsh NGAU set to', ngau
     
-    deallocate( Vts_ )
-    deallocate( lpv_, lv_, mpv_, mv_ )
+    deallocate(Vts_,Wts_,VPts_,WPts_)
+    deallocate(lpv_,lv_,llv_,mpv_,mv_,mmv_)
 
     ! Here we reread non-spherical potential to store it in Vts(:,:,:,:)
-    allocate( Vts(3,3,ngau,nat) )      ! non-spherical potential matrix elements
-    allocate( lpv(ngau,nat), lv(ngau,nat), mpv(ngau,nat), mv(ngau,nat) )
+    allocate(Vts(2+nloat,2+nloat,ngau,nat), &
+         Wts(2+nloat,2+nloat,ngau,nat), &
+         VPts(2+nloat,2+nloat,ngau,nat), &
+         WPts(2+nloat,2+nloat,ngau,nat))
+    allocate(lpv(ngau,nat),lv(ngau,nat),llv(ngau,nat), &
+         mpv(ngau,nat),mv(ngau,nat),mmv(ngau,nat))
     allocate( Nhmx(nat) )
+    allocate(nsp_geometry(nat))
     CALL init_V_nsh(filename_V_nsh, 9902) 
     !WRITE(6,*) 'Second read_V_nsh'
     do jatom=1,nat
        !WRITE(6,*) 'jatom=', jatom
-       CALL read_V_nsh(Vts(:,:,:,jatom),lv(:,jatom),lpv(:,jatom),mv(:,jatom),mpv(:,jatom),Nhmx(jatom), jatom,lomax,ngau)
+       CALL read_V_nsh(Vts(:,:,:,jatom),Wts(:,:,:,jatom), &
+            VPts(:,:,:,jatom),WPts(:,:,:,jatom),lv(:,jatom), &
+            lpv(:,jatom),llv(:,jatom),mv(:,jatom),mpv(:,jatom), &
+            mmv(:,jatom),Nhmx(jatom), &
+            jatom,lomax,ngau,nloat)
        !WRITE(6,*) 'ihmx=', ihmx
     enddo
     CALL close_V_nsh()
@@ -391,9 +489,25 @@ CONTAINS
   
   SUBROUTINE Deallocate_nsh()
     IMPLICIT NONE
-    deallocate( Vts )
-    deallocate( lpv, lv, mpv, mv )
+    INTEGER :: jatom
+    deallocate(Vts,Wts,VPts,WPts)
+    deallocate(lpv,lv,llv,mpv,mv,mmv)
     deallocate( Nhmx )
+    if (allocated(nsp_geometry)) then
+       do jatom=1,size(nsp_geometry)
+          if (allocated(nsp_geometry(jatom)%ih)) &
+               deallocate(nsp_geometry(jatom)%ih)
+          if (allocated(nsp_geometry(jatom)%ibra)) &
+               deallocate(nsp_geometry(jatom)%ibra)
+          if (allocated(nsp_geometry(jatom)%iket)) &
+               deallocate(nsp_geometry(jatom)%iket)
+          if (allocated(nsp_geometry(jatom)%radial)) &
+               deallocate(nsp_geometry(jatom)%radial)
+          if (allocated(nsp_geometry(jatom)%angular)) &
+               deallocate(nsp_geometry(jatom)%angular)
+       enddo
+       deallocate(nsp_geometry)
+    endif
   END SUBROUTINE Deallocate_nsh
   
 end module w_atpar

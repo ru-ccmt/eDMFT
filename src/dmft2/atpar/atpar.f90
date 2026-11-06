@@ -1,4 +1,7 @@
-SUBROUTINE ATPARN(RRAD1,RADE1,RRAD2,RADE2,a1lo,b1lo,ul_Rmt,dul_Rmt,ri_mat,alo,blo,clo, Vr_input,nr,el,elo,loor,rlo,lapw,nlov,nlo,nlon,ilo,rel,ZZ,qprint_,jri_,r0_,dx_,rmt_,lmax2,lomax,nloat,nrad)
+SUBROUTINE ATPARN(RRAD1,RADE1,RRAD2,RADE2,RADP1,RADPE1,RADP2,RADPE2, &
+     a1lo,b1lo,ap1lo,bp1lo,ul_Rmt,dul_Rmt,ri_mat,alo,blo,clo, &
+     Vr_input,nr,el,elo,loor,rlo,lapw,nlov,nlo,nlon,ilo,rel,ZZ, &
+     qprint_,jri_,r0_,dx_,rmt_,lmax2,lomax,nloat,nrad)
   !USE param,  ONLY: lmax2, lomax, nloat, nrad
   !use struk,  ONLY: jri, r0, dx, rmt ! V
   !use lo,     ONLY: plo, dplo, pi12lo, pe12lo, pr12lo, a1lo, b1lo, alo, blo, clo
@@ -41,7 +44,9 @@ SUBROUTINE ATPARN(RRAD1,RADE1,RRAD2,RADE2,a1lo,b1lo,ul_Rmt,dul_Rmt,ri_mat,alo,bl
   !        alo, blo, clo                                       
   !
   REAL*8, intent(out) :: RRAD1(nrad,0:lmax2),RADE1(nrad,0:lmax2),RRAD2(nrad,0:lmax2),RADE2(nrad,0:lmax2)
+  REAL*8, intent(out) :: RADP1(nrad,0:lmax2),RADPE1(nrad,0:lmax2),RADP2(nrad,0:lmax2),RADPE2(nrad,0:lmax2)
   REAL*8, intent(out) :: a1lo(nrad,nloat,0:lomax),b1lo(nrad,nloat,0:lomax)
+  REAL*8, intent(out) :: ap1lo(nrad,nloat,0:lomax),bp1lo(nrad,nloat,0:lomax)
   REAL*8, intent(out) :: ul_Rmt(nloat+2,0:lmax2), dul_Rmt(nloat+2,0:lmax2), ri_mat(2+nloat,2+nloat,0:lmax2)
   REAL*8, intent(out) :: alo(0:lomax,nloat), blo(0:lomax,nloat), clo(0:lomax,nloat)
   !
@@ -73,6 +78,7 @@ SUBROUTINE ATPARN(RRAD1,RADE1,RRAD2,RADE2,a1lo,b1lo,ul_Rmt,dul_Rmt,ri_mat,alo,bl
   REAL*8 :: P(0:lmax2), PE(0:lmax2), DP(0:lmax2), DPE(0:lmax2), PLO(nloat,0:lomax), DPLO(nloat,0:lomax)
   REAL*8 :: pei(0:lmax2), pi12lo(nloat,0:lomax), pe12lo(nloat,0:lomax), pr12lo(nloat,nloat,0:lomax)
   REAL*8     :: A(NRAD), B(NRAD), AE(NRAD), BE(NRAD)
+  REAL*8     :: AP(NRAD), BP(NRAD), APE(NRAD), BPE(NRAD)
   real*8     :: VR(NRAD), dele, delei, L_, EI, E1, UVB, DUVB, OVLP, TRX, UVE, DUVE, UV, DUV, CROSS, TRY, r_m
   INTEGER    :: IDUMMY, I, J, K, L, M, JC, JR, IDEST, JROW, JCOL, INDEX, NODEL, IMAX, NODE, NODES, jlo, kappa, jlop, lp
   !---------------------------------------------------------------------  
@@ -90,38 +96,46 @@ SUBROUTINE ATPARN(RRAD1,RADE1,RRAD2,RADE2,a1lo,b1lo,ul_Rmt,dul_Rmt,ri_mat,alo,bl
      ! outputs: UVB, DUVB, NODEL
      !     CALCULATE FUNCTION AT EI-DELE
      !print *, 'EI=', EI, 'L=', L_
-     CALL OUTWIN(A,B,NODEL,UVB,DUVB,REL,VR,R0_,DX_,JRI_,EI-DELE,L_,ZZ,NRAD)
+     CALL OUTWIN(A,B,AP,BP,NODEL,UVB,DUVB,REL,VR,R0_,DX_,JRI_,EI-DELE,L_,ZZ,NRAD)
      OVLP = RINT13(REL,A,B,A,B,NRAD,DX_,JRI_,R0_) ! OVLP = A**2+B**2
      TRX=1.0D0/SQRT(OVLP)                ! normalization=1/sqrt(A**2+B**2)
      AE(1:JRI_) = A(1:JRI_)*TRX
      BE(1:JRI_) = B(1:JRI_)*TRX
+     APE(1:JRI_) = AP(1:JRI_)*TRX
+     BPE(1:JRI_) = BP(1:JRI_)*TRX
      UVB  = UVB*TRX
      DUVB = DUVB*TRX
      ! results are: AE(:), BE(:), UVB, DUVB, E1
      ! outputs: UVE, DUVE, NODE, OVLP
      !     CALCULATE FUNCTION AT EI+DELE
-     CALL OUTWIN(A,B,NODE,UVE,DUVE, REL,VR,R0_,DX_,JRI_,EI+DELE,L_,ZZ,NRAD)
+     CALL OUTWIN(A,B,AP,BP,NODE,UVE,DUVE, REL,VR,R0_,DX_,JRI_,EI+DELE,L_,ZZ,NRAD)
      OVLP = RINT13(REL,A,B,A,B,NRAD,DX_,JRI_,R0_)
      TRX=1.0d0/SQRT(OVLP)
      UVE=DELEI*(TRX*UVE-UVB)                                           
      DUVE=DELEI*(TRX*DUVE-DUVB)
      AE(1:JRI_)=DELEI*( A(1:JRI_)*TRX-AE(1:JRI_))
      BE(1:JRI_)=DELEI*( B(1:JRI_)*TRX-BE(1:JRI_))
+     APE(1:JRI_)=DELEI*( AP(1:JRI_)*TRX-APE(1:JRI_))
+     BPE(1:JRI_)=DELEI*( BP(1:JRI_)*TRX-BPE(1:JRI_))
      !     CALCULATE FUNCTION AT EI
      ! results are: A(:), B(:), P(:), DP(:), UV, DUV
-     CALL OUTWIN(A,B,NODES,UV,DUV,REL,VR,R0_,DX_,JRI_,EI,L_,ZZ,NRAD)
+     CALL OUTWIN(A,B,AP,BP,NODES,UV,DUV,REL,VR,R0_,DX_,JRI_,EI,L_,ZZ,NRAD)
      OVLP = RINT13(REL,A,B,A,B,NRAD,DX_,JRI_,R0_)
      TRX=1.0d0/SQRT(OVLP)
      P(l)=TRX*UV
      DP(l)=TRX*DUV
      A(1:JRI_) = A(1:JRI_)*TRX
      B(1:JRI_) = B(1:JRI_)*TRX
+     AP(1:JRI_) = AP(1:JRI_)*TRX
+     BP(1:JRI_) = BP(1:JRI_)*TRX
      !                                                                       
      !     INSURE ORTHOGONALIZATION                                          
      !                                                                       
      CROSS = RINT13(REL,A,B,AE,BE,NRAD,DX_,JRI_,R0_)
      AE(1:JRI_) = AE(1:JRI_)-CROSS*A(1:JRI_)
      BE(1:JRI_) = BE(1:JRI_)-CROSS*B(1:JRI_)                                            
+     APE(1:JRI_) = APE(1:JRI_)-CROSS*AP(1:JRI_)
+     BPE(1:JRI_) = BPE(1:JRI_)-CROSS*BP(1:JRI_)
      ! stores into : 
      !    RRAD1(r,l), RRAD2(r,l), RRADE1(r,l), RRADE2(r,l)
      !    P(l), DP(l), PE(l), DPE(l), PEI(l)
@@ -129,6 +143,10 @@ SUBROUTINE ATPARN(RRAD1,RADE1,RRAD2,RADE2,a1lo,b1lo,ul_Rmt,dul_Rmt,ri_mat,alo,bl
      RRAD2(1:JRI_,l) = B(1:JRI_)
      RADE1(1:JRI_,l) = AE(1:JRI_)
      RADE2(1:JRI_,l) = BE(1:JRI_)
+     RADP1(1:JRI_,l) = AP(1:JRI_)
+     RADP2(1:JRI_,l) = BP(1:JRI_)
+     RADPE1(1:JRI_,l) = APE(1:JRI_)
+     RADPE2(1:JRI_,l) = BPE(1:JRI_)
      PE(l)=UVE-CROSS*P(l)
      DPE(l)=DUVE-CROSS*DP(l)
      PEI(l) = RINT13(REL,AE,BE,AE,BE,NRAD,DX_,JRI_,R0_)                         
@@ -145,6 +163,8 @@ SUBROUTINE ATPARN(RRAD1,RADE1,RRAD2,RADE2,a1lo,b1lo,ul_Rmt,dul_Rmt,ri_mat,alo,bl
   pe12lo(1:nloat,0:lomax)=0.0d0
   a1lo(1:nrad,1:nloat,0:lomax)=0.0d0
   b1lo(1:nrad,1:nloat,0:lomax)=0.0d0
+  ap1lo(1:nrad,1:nloat,0:lomax)=0.0d0
+  bp1lo(1:nrad,1:nloat,0:lomax)=0.0d0
   plo(:,:)  = 0.d0
   dplo(:,:) = 0.d0
   DO l=0,lomax 
@@ -166,14 +186,25 @@ SUBROUTINE ATPARN(RRAD1,RADE1,RRAD2,RADE2,a1lo,b1lo,ul_Rmt,dul_Rmt,ri_mat,alo,bl
               r_m = R0_*exp(DX_*(m-1))
               B(m) = B(m)*r_m/(2.d0*clight+(elo(l,jlo)-2.d0*VR(m)/r_m)/(2.d0*clight))
            ENDDO
+           ! DERGL returns d(A/r)/dr.  ATPAR and the RELA stress store
+           ! r*d(A/r)/dr, matching OUTWIN's AP/BP convention.
+           CALL dergl(A,AP,R0_,DX_,jri_,nrad)
+           CALL dergl(B,BP,R0_,DX_,jri_,nrad)
+           DO m=1,jri_
+              r_m=R0_*exp(DX_*(m-1))
+              AP(m)=AP(m)*r_m
+              BP(m)=BP(m)*r_m
+           ENDDO
         ELSE
-           CALL OUTWIN(A,B,NODES,UV,DUV,REL,VR,R0_,DX_,jri_,ei,L_,zz,NRAD) 
+           CALL OUTWIN(A,B,AP,BP,NODES,UV,DUV,REL,VR,R0_,DX_,jri_,ei,L_,zz,NRAD)
         ENDIF
         ovlp = rint13(rel,a,b,a,b,NRAD,DX_,JRI_,R0_)
         ! TRX is used to normalize the wave functions.
         TRX=1.0d0/SQRT(OVLP)
         a1lo(1:JRI_,jlo,l) = A(1:JRI_)*TRX   ! this is called rf1 in other atpar
         b1lo(1:JRI_,jlo,l) = B(1:JRI_)*TRX   ! this is called rf2 in other atpar
+        ap1lo(1:JRI_,jlo,l) = AP(1:JRI_)*TRX
+        bp1lo(1:JRI_,jlo,l) = BP(1:JRI_)*TRX
         plo(jlo,l)  = UV*trx
         dplo(jlo,l) = DUV*trx
         pi12lo(jlo,l) = RINT13(REL,rrad1(1,l),rrad2(1,l),a1lo(1,jlo,l),b1lo(1,jlo,l),NRAD,DX_,JRI_,R0_)

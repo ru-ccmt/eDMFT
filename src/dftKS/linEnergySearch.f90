@@ -1,5 +1,5 @@
 SUBROUTINE SELECT(L,EI,DE,EMAIN,REL,VR,RNOT,DX,JRI,ZZ,jatom,efermi)
-  use radial, only: A,B
+  use radial, only: A,B,AP,BP
   use param
   use mpi, only: Qprint, stop_MPI
   IMPLICIT NONE
@@ -57,7 +57,7 @@ SUBROUTINE SELECT(L,EI,DE,EMAIN,REL,VR,RNOT,DX,JRI,ZZ,jatom,efermi)
   FL = L
   EI = EI*0.5D+0
   DE = DE*0.5D+0
-  CALL OUTWINC(A,B,NODE,U,DU,REL,VR,Rnet,DX,JRI,EI,FL,ZZ,nrad)        ! value at Ei
+  CALL OUTWINC(A,B,AP,BP,NODE,U,DU,REL,VR,Rnet,DX,JRI,EI,FL,ZZ,nrad)        ! value at Ei
   
   numcalls=numcalls+1
   EIUP = EI
@@ -71,7 +71,7 @@ SUBROUTINE SELECT(L,EI,DE,EMAIN,REL,VR,RNOT,DX,JRI,ZZ,jatom,efermi)
   DO while (EIup.LT.upper)
 10   CONTINUE
      EIUP = EIUP + DE
-     CALL OUTWINC(A,B,NODE,UUP,DUUP,REL,VR,Rnet,DX,JRI,EIUP,FL,ZZ,nrad)  ! value at EI+dE
+     CALL OUTWINC(A,B,AP,BP,NODE,UUP,DUUP,REL,VR,Rnet,DX,JRI,EIUP,FL,ZZ,nrad)  ! value at EI+dE
      numcalls=numcalls+1
      IF ((UPOLD*UUP) .LT. 0.0D+0) THEN   ! change of sign for U(R) occured between EIUP and EIUP+DE
         E2 = EIUP
@@ -90,7 +90,7 @@ SUBROUTINE SELECT(L,EI,DE,EMAIN,REL,VR,RNOT,DX,JRI,ZZ,jatom,efermi)
 20      CONTINUE
          
         EIDN = EIDN - DE
-        CALL OUTWINC(A,B,NODE,UDN,DUDN,REL,VR,Rnet,DX,JRI,EIDN,FL,ZZ,nrad)
+        CALL OUTWINC(A,B,AP,BP,NODE,UDN,DUDN,REL,VR,Rnet,DX,JRI,EIDN,FL,ZZ,nrad)
         numcalls=numcalls+1
         IF ((DNOLD*UDN) .LT. 0.0D+0) THEN  ! change of sign for U(R) occured between EIDN and EIDN+DE
            E2 = EIDN
@@ -198,6 +198,7 @@ REAL*8 Function SearchDN(A,B,REL,VR,RNET,DX,JRI,FL,ZZ ,EI_Low, EI_High, Up, DE, 
   REAL*8,           intent(out):: A(nrad), B(nrad)
   INTEGER,          intent(out):: ifail
   REAL*8 :: DDE, EA, EB, DDNOLD, DUDN, EI, UDN, EIout
+  REAL*8 :: AP(NRAD),BP(NRAD)
   INTEGER:: node
   IFAIL=0
   IF( UP )then
@@ -209,12 +210,12 @@ REAL*8 Function SearchDN(A,B,REL,VR,RNET,DX,JRI,FL,ZZ ,EI_Low, EI_High, Up, DE, 
      EA=EI_High
      EB=EI_Low
   ENDIF
-  CALL OUTWINC(A,B,NODE,UDN,DDNOLD,REL,VR,Rnet,DX,JRI,EA,FL,ZZ,nrad)
+  CALL OUTWINC(A,B,AP,BP,NODE,UDN,DDNOLD,REL,VR,Rnet,DX,JRI,EA,FL,ZZ,nrad)
   if(debug)write(6,*)'DN',EA,DDNOLD
   EI = EA
   DO WHILE(EI.LT.EB)
      EI = EI + DDE
-     CALL OUTWINC(A,B,NODE,UDN,DUDN,REL,VR,Rnet,DX,JRI,EI,FL,ZZ,nrad)
+     CALL OUTWINC(A,B,AP,BP,NODE,UDN,DUDN,REL,VR,Rnet,DX,JRI,EI,FL,ZZ,nrad)
      numcalls=numcalls+1
      if(debug)write(6,*)'DN',EI,DUDN
      !
@@ -243,6 +244,7 @@ REAL*8 Function SearchUP(A,B,REL,VR,RNET,DX,JRI,FL,ZZ,EI_Low, EI_High, Up, DE, n
   INTEGER,          intent(out):: ifail
   ! locals
   REAL*8 :: DDE, EA, EB, DDNOLD, DUDN, EI, UPOLD, UUP, EIOUT
+  REAL*8 :: AP(NRAD),BP(NRAD)
   INTEGER:: node
   IFAIL=0
   IF( UP )then  ! Energy will be increasing from Ei_low to Ei_high in increments DE
@@ -254,12 +256,12 @@ REAL*8 Function SearchUP(A,B,REL,VR,RNET,DX,JRI,FL,ZZ,EI_Low, EI_High, Up, DE, n
      EA=EI_High
      EB=EI_Low
   ENDIF
-  CALL OUTWINC(A,B,NODE,UPOLD,DDNOLD,REL,VR,Rnet,DX,JRI,EA,FL,ZZ,nrad)
+  CALL OUTWINC(A,B,AP,BP,NODE,UPOLD,DDNOLD,REL,VR,Rnet,DX,JRI,EA,FL,ZZ,nrad)
   if(debug)write(6,*)'UP',EA,UPOLD
   EI = EA
   DO WHILE(EI.LT.EB)
      EI = EI+DDE 
-     CALL OUTWINC(A,B,NODE,UUP,DUDN,REL,VR,Rnet,DX,JRI,EI,FL,ZZ,nrad)
+     CALL OUTWINC(A,B,AP,BP,NODE,UUP,DUDN,REL,VR,Rnet,DX,JRI,EI,FL,ZZ,nrad)
      numcalls=numcalls+1
      if(debug)write(6,*)'UP',EI,UUP
      !

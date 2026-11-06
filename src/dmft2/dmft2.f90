@@ -12,6 +12,8 @@ PROGRAM DMFT2
   USE char, only: efmod, modus, modus1
   USE dmfts, only: Qcomplex, iso, natom, crotloc, DM_EF, DM_Emin, DM_Emax, shft, iatom, Read_indmf2, Read_indmfl, DeallocateDmf
   USE sym2,  only: init_sym2, iord, iz, tau
+  USE dmft_stress, only: Qstress
+  USE stress_kb, only: STRESS
   USE com_mpi
   IMPLICIT NONE
   REAL*8        :: GMAX
@@ -159,7 +161,10 @@ PROGRAM DMFT2
   
   !.....READING case.in2 file
   READ(5,1003)  MODUS, MODUS1, coord                                        
+  Qstress = (trim(MODUS).eq.'STR' .or. trim(MODUS).eq.'STRF')
+  STRESS = Qstress
   if (Qprint) write(6,*)  ' Modus: ', MODUS
+  if (Qprint) write(6,*)  ' Analytic stress: ', Qstress
   esepermin=0.5d0
   eseper0=0.05d0
 
@@ -233,7 +238,8 @@ PROGRAM DMFT2
   ! Reading case.indmf2
   call Read_indmf2(2)
   ! Reading case.indmfl
-  call Read_indmfl(7, 6, nemin0, nemax0, loro, rotloc, mult, nat, natm, (modus.eq.'FOR '), Qprint )
+  call Read_indmfl(7, 6, nemin0, nemax0, loro, rotloc, mult, nat, natm, &
+       (trim(modus).eq.'FOR' .or. trim(modus).eq.'STRF'), Qprint )
 
   ! For spin-orbit coupling crates transformation "rot_spin_quantization", which rotates from spin quantization axis to global cartesian coordinate system
   !....reading *.inso

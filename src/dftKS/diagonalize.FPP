@@ -13,6 +13,7 @@
 #endif
 SUBROUTINE Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, LCOLZ, Qprint)
   use omp_lib
+  use comi, only: nemax_it, fixed_nbands
   IMPLICIT NONE
   !..................................................................
   ! The interface between matrix set up in LAPW1 and LAPACK (BLAS) matrix subroutines
@@ -23,7 +24,9 @@ SUBROUTINE Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, LCOLZ, Qpri
   !   the diagonal. The diagonal of H is stored in the 
   !   one dimensional array HSDIAG.
   !   HSROWS is the dimension of the secular matrices
-  !   NE is returned as the number of Eigenvalues between Elow and Eup
+  !   With the explicit FIXED_NBANDS keyword, the lowest nband eigenpairs
+  !   are returned exactly.  Otherwise NE is the number of eigenvalues
+  !   between Elow and Eup, preserving the historical energy-window behavior.
   !..................................................................
   REAL*8,  intent(in) :: Elow, Eup
   INTEGER, intent(in) :: HSROWS, LCOLZ
@@ -41,12 +44,41 @@ SUBROUTINE Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, LCOLZ, Qpri
   REAL*8,  allocatable :: rwork(:)
 #endif  
   REAL*8             :: t1, t2, t1w, t2w, abstol, Flop
-  INTEGER            :: i, j, info, lwork, ierr
+  INTEGER            :: i, j, info, lwork, ierr, il, iu
   CHARACTER*67       :: ERRMSG
-  LOGICAL            :: out, out2
+  CHARACTER(len=1)   :: eig_range
+  LOGICAL            :: out, out2, fixed_band_count
   
   out =.false.
   out2=.false.
+  ! A finite nemax_it alone retains the historical energy-window behavior.
+  ! Index selection is deliberately opt-in through FIXED_NBANDS in case.in1.
+  fixed_band_count=fixed_nbands
+  if (fixed_band_count) then
+     ! RANGE='I' makes the fourth field of the K-VECTORS line in case.in1 a
+     ! genuine fixed band count.  Selecting by eigenvalue index avoids a
+     ! discontinuous number of stored bands when a dispersive high-energy
+     ! state crosses Eup under strain.
+     eig_range='I'
+     il=1
+     iu=nemax_it
+     if (nemax_it.lt.1 .or. nemax_it.gt.HSROWS) then
+        WRITE(ERRMSG,'(A,I8,A,I8)') 'Requested nband=',nemax_it, &
+             ' is incompatible with matrix size=',HSROWS
+        CALL OUTERR('diagonalize',ERRMSG)
+        STOP 'invalid fixed band count'
+     endif
+     if (nemax_it.gt.LCOLZ) then
+        WRITE(ERRMSG,'(A,I8,A,I8)') 'Requested nband=',nemax_it, &
+             ' exceeds allocated eigenvector columns=',LCOLZ
+        CALL OUTERR('diagonalize',ERRMSG)
+        STOP 'increase NUME for fixed band count'
+     endif
+  else
+     eig_range='V'
+     il=0
+     iu=0
+  endif
   !out=.true.
   if (out) then
      open(86,FILE='_eigvals_',status='unknown')
@@ -89,14 +121,18 @@ SUBROUTINE Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, LCOLZ, Qpri
   ! First we do a query for the best size of lwork
   lwork=-1  ! Set lwork to -1 for query
 #ifdef _REAL  
-  call DSYGVX(1, 'V', 'V', 'L', HSROWS, HS, HSROWS, Olap, HSROWS, Elow, Eup, 0, 0, abstol, NE, EIGVAL, Z, HSROWS, WORK, lwork, IWORK, ifail, info)
+  call DSYGVX(1, 'V', eig_range, 'L', HSROWS, HS, HSROWS, Olap, &
+       HSROWS, Elow, Eup, il, iu, abstol, NE, EIGVAL, Z, HSROWS, &
+       WORK, lwork, IWORK, ifail, info)
 #else
   allocate( rwork(7*HSROWS), STAT=IERR )
   if(IERR.ne.0) THEN
      write(6,*) 'not enough memory for ZHEGVX real workspace: ', IERR
      stop 'not enough memory'
   end if
-  call ZHEGVX(1, 'V', 'V', 'L', HSROWS, HS, HSROWS, Olap, HSROWS, Elow, Eup, 0, 0, abstol, NE, EIGVAL, Z, HSROWS, WORK, lwork, RWORK, IWORK, ifail, info)
+  call ZHEGVX(1, 'V', eig_range, 'L', HSROWS, HS, HSROWS, Olap, &
+       HSROWS, Elow, Eup, il, iu, abstol, NE, EIGVAL, Z, HSROWS, &
+       WORK, lwork, RWORK, IWORK, ifail, info)
 #endif
   if (info.ne.0) then
      write(6,*) routine_name, ' workspace query failed, INFO = ', info
@@ -114,9 +150,13 @@ SUBROUTINE Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, LCOLZ, Qpri
   t1w = omp_get_wtime ( )
   call cpu_time ( t1 )
 #ifdef _REAL  
-  call DSYGVX(1, 'V', 'V', 'L', HSROWS, HS, HSROWS, Olap, HSROWS, Elow, Eup, 0, 0, abstol, NE, EIGVAL, Z, HSROWS, WORK, lwork, IWORK, ifail, info)
+  call DSYGVX(1, 'V', eig_range, 'L', HSROWS, HS, HSROWS, Olap, &
+       HSROWS, Elow, Eup, il, iu, abstol, NE, EIGVAL, Z, HSROWS, &
+       WORK, lwork, IWORK, ifail, info)
 #else  
-  call ZHEGVX(1, 'V', 'V', 'L', HSROWS, HS, HSROWS, Olap, HSROWS, Elow, Eup, 0, 0, abstol, NE, EIGVAL, Z, HSROWS, WORK, lwork, RWORK, IWORK, ifail, info)
+  call ZHEGVX(1, 'V', eig_range, 'L', HSROWS, HS, HSROWS, Olap, &
+       HSROWS, Elow, Eup, il, iu, abstol, NE, EIGVAL, Z, HSROWS, &
+       WORK, lwork, RWORK, IWORK, ifail, info)
   deallocate( rwork )
 #endif
   t2w = omp_get_wtime ( )
@@ -131,6 +171,12 @@ SUBROUTINE Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, LCOLZ, Qpri
      CALL OUTERR(routine_name,'diagonalize(LAPACK) failed.')
      STOP 'diagonalize - Error'
   ENDIF
+  if (fixed_band_count .and. NE.ne.nemax_it) then
+     WRITE(ERRMSG,'(A,I8,A,I8)') 'FIXED_NBANDS requested ',nemax_it, &
+          ' eigenpairs but solver returned ',NE
+     CALL OUTERR('diagonalize',ERRMSG)
+     STOP 'FIXED_NBANDS count mismatch'
+  endif
   IF (NE>LCOLZ) THEN
      CALL OUTERR('diagonalize','More than NUME eigenvalues.')
      WRITE (ERRMSG,'(A,i4,A,i4,A)') 'Increase NUME from',LCOLZ,'to',NE,'   OR'
@@ -141,6 +187,8 @@ SUBROUTINE Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, LCOLZ, Qpri
   ENDIF
   
   if (Qprint) then
+     if (fixed_band_count) WRITE(6,'(A,I8)') &
+          ':FIXED_NBANDS: exact number of lowest eigenpairs =',nemax_it
      write(6,*) NE, ' Eigenvalues computed '
      write(6,*)  'info=', info
   endif

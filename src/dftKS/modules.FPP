@@ -412,6 +412,13 @@ module radial
   DOUBLE PRECISION, allocatable ::   BE(:), BE1(:,:)
   DOUBLE PRECISION, allocatable ::   BE1LO(:,:,:)
   DOUBLE PRECISION, allocatable ::   BP(:), VLM(:,:)
+  ! Radial derivatives needed by the WIEN2k-24 force/stress auxiliary
+  ! file.  A and B store r*u; AP and BP store r*du/dr.  APE/BPE are the
+  ! energy derivatives of AP/BP.  Keeping these arrays separate avoids
+  ! changing any radial functions used by the Hamiltonian itself.
+  DOUBLE PRECISION, allocatable ::   APE(:), BPE(:)
+  DOUBLE PRECISION, allocatable ::   AP1(:,:), BP1(:,:), APE1(:,:), BPE1(:,:)
+  DOUBLE PRECISION, allocatable ::   AP1LO(:,:,:), BP1LO(:,:,:)
 contains
   SUBROUTINE init_radial(NRAD, LOMAX, NSLMAX, NLOAT, LMMX)
     IMPLICIT NONE
@@ -430,6 +437,10 @@ contains
     allocate( BE1(NRAD,NSLMAX) )
     allocate( BE1LO(NRAD,nloat,0:LOMAX) )
     allocate( BP(NRAD) )
+    allocate( APE(NRAD), BPE(NRAD) )
+    allocate( AP1(NRAD,NSLMAX), BP1(NRAD,NSLMAX) )
+    allocate( APE1(NRAD,NSLMAX), BPE1(NRAD,NSLMAX) )
+    allocate( AP1LO(NRAD,nloat,0:LOMAX), BP1LO(NRAD,nloat,0:LOMAX) )
     allocate( VLM(NRAD,LMMX) )
     A=0.0D0
     A1=0.0D0
@@ -444,10 +455,19 @@ contains
     BE1=0.0D0
     BE1LO=0.0D0
     BP=0.0D0
+    APE=0.0D0
+    BPE=0.0D0
+    AP1=0.0D0
+    BP1=0.0D0
+    APE1=0.0D0
+    BPE1=0.0D0
+    AP1LO=0.0D0
+    BP1LO=0.0D0
     VLM=0.0D0
   END SUBROUTINE init_radial
   SUBROUTINE end_radial
-    deallocate(A, A1, A1LO, AE, AE1, AE1LO, AP, B, B1, B1LO, BE, BE1, BE1LO, BP, VLM)
+    deallocate(A, A1, A1LO, AE, AE1, AE1LO, AP, B, B1, B1LO, BE, BE1, BE1LO, BP, VLM, &
+         APE, BPE, AP1, BP1, APE1, BPE1, AP1LO, BP1LO)
   END SUBROUTINE end_radial
 end module radial
 
@@ -563,9 +583,12 @@ module atspdt
   !      DOUBLE PRECISION   VNS3(NSLMAX,LMMX,NSLMAX,NATO)
   !      COMPLEX*16         GFAC(NGAU,NATO)
   INTEGER                       :: NL
-  INTEGER, allocatable          :: LMMAX(:), LQIND(:), LM(:,:,:), LQNS(:,:,:)
+  INTEGER, allocatable          :: LMMAX(:), LQIND(:), LM(:,:,:), LQNS(:,:,:), LQMM(:,:)
   DOUBLE PRECISION, allocatable :: DP(:,:), DPE(:,:), E(:,:), P(:,:), PE(:,:), PEI(:,:)
   DOUBLE PRECISION, allocatable :: VNS1(:,:,:,:), VNS2(:,:,:,:), VNS3(:,:,:,:)
+  ! W has the radial derivative on the bra and is not symmetric under
+  ! bra/ket exchange.  Four independent APW channels are therefore needed.
+  DOUBLE PRECISION, allocatable :: WNS1(:,:,:,:), WNS2(:,:,:,:), WNS3(:,:,:,:), WNS4(:,:,:,:)
   DOUBLE COMPLEX, allocatable   :: GFAC(:,:)
 contains
   SUBROUTINE init_atspdt(NATO, LMMX, NGAU, LMAX, NSLMAX)
@@ -575,6 +598,7 @@ contains
     allocate( LQIND(NATO) )
     allocate( LM(2,LMMX,NATO) )
     allocate( LQNS(6,NGAU,NATO) )
+    allocate( LQMM(NGAU,NATO) )
     allocate( DP(LMAX,NATO) )
     allocate( DPE(LMAX,NATO) )
     allocate( E(LMAX,NATO) )
@@ -584,11 +608,16 @@ contains
     allocate( VNS1(NSLMAX,LMMX,NSLMAX,NATO) )
     allocate( VNS2(NSLMAX,LMMX,NSLMAX,NATO) )
     allocate( VNS3(NSLMAX,LMMX,NSLMAX,NATO) )
+    allocate( WNS1(NSLMAX,LMMX,NSLMAX,NATO) )
+    allocate( WNS2(NSLMAX,LMMX,NSLMAX,NATO) )
+    allocate( WNS3(NSLMAX,LMMX,NSLMAX,NATO) )
+    allocate( WNS4(NSLMAX,LMMX,NSLMAX,NATO) )
     allocate( GFAC(NGAU,NATO) )
     LMMAX=0
     LQIND=0
     LM=0
     LQNS=0
+    LQMM=0
     DP=0.0D0
     DPE=0.0D0
     E=0.0D0
@@ -598,6 +627,10 @@ contains
     VNS1=0.0D0
     VNS2=0.0D0
     VNS3=0.0D0
+    WNS1=0.0D0
+    WNS2=0.0D0
+    WNS3=0.0D0
+    WNS4=0.0D0
     GFAC=(0.0D0,0.0D0)
   END SUBROUTINE init_atspdt
 end module atspdt
@@ -624,6 +657,10 @@ module comi
   !                 (l+1 of ul) for the spherical contribution
   !        NVAA   - number of plane waves
   INTEGER :: NVAA, NE, NBELW, NAT, NT, LNSMAX,nemax_it
+  ! Explicit opt-in for index-based eigenpair selection.  Keep this
+  ! separate from nemax_it: historically a fourth numeric value on the
+  ! K-VECTORS line did not change dftKS's energy-window diagonalization.
+  LOGICAL :: fixed_nbands
 end module comi
 
 !--------------------------------------------------------------
@@ -679,6 +716,8 @@ module loint
   !      COMMON  /LOINT/    VNS1LO, VNS2LO, VNS3LO
   !      SAVE    /LOINT/
   DOUBLE PRECISION, allocatable :: VNS1LO(:,:,:,:,:), VNS2LO(:,:,:,:,:), VNS3LO(:,:,:,:,:,:)
+  DOUBLE PRECISION, allocatable :: WNS1LO(:,:,:,:,:), WNS2LO(:,:,:,:,:), WNS3LO(:,:,:,:,:,:), &
+       WNS4LO(:,:,:,:,:), WNS5LO(:,:,:,:,:)
 contains
   SUBROUTINE init_loint(LOMAX, LMMX, NSLMAX, NATO,nloat)
     IMPLICIT NONE
@@ -686,9 +725,20 @@ contains
     allocate( VNS1LO(LOMAX+1, LMMX, NSLMAX, nloat, NATO) )
     allocate( VNS2LO(LOMAX+1, LMMX, NSLMAX, nloat, NATO) )
     allocate( VNS3LO(LOMAX+1, LMMX, NSLMAX, nloat, nloat,NATO) )
+    allocate( WNS1LO(LOMAX+1, LMMX, NSLMAX, nloat, NATO) )
+    allocate( WNS2LO(LOMAX+1, LMMX, NSLMAX, nloat, NATO) )
+    allocate( WNS3LO(LOMAX+1, LMMX, NSLMAX, nloat, nloat,NATO) )
+    ! Independent APW-bra/LO-ket derivative channels.
+    allocate( WNS4LO(NSLMAX, LMMX, LOMAX+1, nloat, NATO) )
+    allocate( WNS5LO(NSLMAX, LMMX, LOMAX+1, nloat, NATO) )
     VNS1LO=0.0D0
     VNS2LO=0.0D0
     VNS3LO=0.0D0
+    WNS1LO=0.0D0
+    WNS2LO=0.0D0
+    WNS3LO=0.0D0
+    WNS4LO=0.0D0
+    WNS5LO=0.0D0
   END SUBROUTINE init_loint
 end module loint
 

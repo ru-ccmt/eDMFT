@@ -1,0 +1,55 @@
+--- a/SRC_lapw0/finl_elect_str.F
++++ b/SRC_lapw0/finl_elect_str.F
+@@ -18,7 +18,9 @@
+    real*8    ,intent(in) :: E_xc_m_V_xc
+    real*8               ::  exc_vxc(1:9)
+    real*8               ::  exc_vxc_buf(1:9)
+-   logical              :: HEXA,CUBIC
++   logical              :: HEXA,CUBIC, stress_debug
++   character(len=32)    :: stress_debug_env
++   integer              :: stress_debug_status
+    integer, external    :: NOTRI
+    real*8 , external    :: GAUNT
+    integer              :: lmmax_2,lm1,lm1p, m0,l0,l0p,m0p,t,tp,v1,s, lmtot1,        &
+@@ -53,6 +55,16 @@
+    madelung_final = zero
+    col_pot_1      = zero   
+    col_pot_final  = zero
++
++   ! Optional, machine-readable stress diagnostics.  Keep the normal
++   ! production output unchanged unless WIEN_STRESS_DEBUG is set to a
++   ! nonempty value other than "0".
++   stress_debug_env = ''
++   call get_environment_variable('WIEN_STRESS_DEBUG',stress_debug_env, &
++                                 status=stress_debug_status)
++   stress_debug = stress_debug_status.eq.0 .and. &
++                  len_trim(stress_debug_env).gt.0 .and. &
++                  trim(stress_debug_env).ne.'0'
+    
+    madelung_1_buf = zero
+    madelung_2_buf = zero
+@@ -378,6 +390,15 @@
+                                    coulomb_str_int(index2)      + &
+                                    exc_vxc(index2)              - &
+                                    gga_fin_str(index2)                                        
++         if(stress_debug .and. myid.eq.0) then
++            write(21,81) alpha,beta, &
++                         0.5d0*REAL(col_pot_1(index2))/vol, &
++                         madelung_final(index2)/vol, &
++                         REAL(coulomb_str_int(index2))/vol, &
++                         exc_vxc(index2)/vol, &
++                         -gga_fin_str(index2)/vol, &
++                         tot_stress(alpha,beta)/vol
++         endif
+                          write(6,'(2i3,5f15.6)') alpha,beta, col_pot_1(index2)  , &
+                                    madelung_final(index2)       , &
+                                    real(coulomb_str_int(index2))      , &
+@@ -413,6 +434,7 @@
+ 78 FORMAT(':ELE_CORE_',i3.3,':',2x,f20.12,2x,f20.12,2x,f20.12)   
+ 79 FORMAT(':GGA_CORR_',i3.3,':',2x,3f20.12)    
+ 80 FORMAT(':STRESS (Ry/Bohr^3)')
++81 FORMAT(':DBG_STR_DENS:',2I3,6(1X,ES23.15))
+    
+ RETURN
+ end subroutine finl_elect_str
+

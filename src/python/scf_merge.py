@@ -21,6 +21,62 @@ def scf(case, wopt, outfile='.scf'):
             return line_up[:30]+("%20.9f"%aSUM)+line_up[50:]
         else:
             return ' '
+
+    def GetAverageTensor(KEY, dat_up, dat_dn):
+        """Remove two spin-resolved 3x3 tensors and return their average.
+
+        In the antiferromagnetic DMFT workflow, dmft2 and dmft2dn each
+        describe a complete, 62-electron MnTe cell with the two opposite
+        assignments of the local self-energy.  Therefore every extensive
+        valence quantity is averaged, rather than added.  GetSum applies this
+        rule to the scalar Klein-functional terms and the force merger applies
+        it to atomic forces.  Analytic stress introduced the three
+        :STR_VAL001--003 rows, which need exactly the same treatment.
+
+        The rows are removed from dat_up/dat_dn so that a downstream reader
+        cannot accidentally select one spin mapping merely because it occurs
+        last in the merged SCF stream.
+        """
+        rows_up = []
+        rows_dn = []
+        indices_up = []
+        indices_dn = []
+
+        for alpha in range(1, 4):
+            tag = KEY + ('%03d:' % alpha)
+            line_up, iu_ = SearchScf(0, tag, dat_up)
+            line_dn, id_ = SearchScf(0, tag, dat_dn)
+
+            # Stress is optional.  Return no rows unless both dmft2 channels
+            # contain a complete tensor; silently mixing a partial tensor
+            # would be much more dangerous than omitting it.
+            if not line_up.startswith(tag) or not line_dn.startswith(tag):
+                return []
+
+            fields_up = line_up.split()
+            fields_dn = line_dn.split()
+            if len(fields_up) < 4 or len(fields_dn) < 4:
+                return []
+
+            rows_up.append([float(x) for x in fields_up[1:4]])
+            rows_dn.append([float(x) for x in fields_dn[1:4]])
+            indices_up.append(iu_)
+            indices_dn.append(id_)
+
+        # Delete in reverse order so the recorded indices remain valid.
+        for index in sorted(indices_up, reverse=True):
+            del dat_up[index]
+        for index in sorted(indices_dn, reverse=True):
+            del dat_dn[index]
+
+        averaged = []
+        for alpha in range(3):
+            tag = KEY + ('%03d:' % (alpha + 1))
+            values = [0.5 * (rows_up[alpha][beta] + rows_dn[alpha][beta])
+                      for beta in range(3)]
+            averaged.append(tag + '  ' + ''.join('%20.12f' % value
+                                                   for value in values) + '\n')
+        return averaged
     
     # First merger case.scf0, case.scf1 and case.scfso
     dat=[]
@@ -42,6 +98,12 @@ def scf(case, wopt, outfile='.scf'):
         dat_dn = open(case+'.scf2'+wopt['m_extn'],'r').readlines()
         fu=case+'.scf2'+up__
         fd=case+'.scf2'+wopt['m_extn']
+
+        # dmft2 and dmft2dn are the two complete antiferromagnetic spin
+        # mappings.  Keep one physical valence-stress tensor, their mean.
+        # GetAverageTensor also removes the two unaveraged copies from the
+        # channel-specific sections appended below.
+        lines_stress = GetAverageTensor(':STR_VAL', dat_up, dat_dn)
     
         line_s1 = GetSum(':SUM ', dat_up, dat_dn)
         line_s2 = GetSum(':XSUM ', dat_up, dat_dn)
@@ -52,6 +114,9 @@ def scf(case, wopt, outfile='.scf'):
         line_s7 = GetSum(':VSUM ', dat_up, dat_dn)
         
         dat += '\n------- '+fu+' and '+fd+' --------\n'
+        if lines_stress:
+            dat += '\n------- averaged dmft2/dmft2dn valence stress -------\n'
+            dat += lines_stress
     
         lineu, iu_ = SearchScf(0,':NOE ',dat_up)
         lined, id_ = SearchScf(0,':NOE ',dat_dn)

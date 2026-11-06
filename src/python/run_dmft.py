@@ -536,7 +536,7 @@ if __name__ == '__main__':
               'max_dmft_iterations': 1,    # number of iteration of the dmft-loop only
               'max_lda_iterations' : 1,    # number of iteration of the LDA-loop only
               'max_lda_iterations_optimize' : 1000,    # number of iteration of the LDA-loop when structure should be optimized
-              'finish'        : 50,        # number of iterations of the charge loop
+              'finish'        : 50,        # number of charge-loop iterations; 0 gives a one-shot non-charge-SC run
               'da'            : 0.0,       # experimental
               'wbroad'        : 0.0,       # broadening of sigma on the imaginary axis
               'kbroad'        : 0.0,       # broadening of sigma on the imaginary axis
@@ -588,7 +588,7 @@ if __name__ == '__main__':
         dftKS          [True|False]  True     # uses internal lapw1 & lapwso rather than w2k equivalent
         solver         [CTQMC| OCA ] CTQMC    # impurity solver
         max_iterations [int]         1        # number of iteration of the dmft-loop only
-        finish         [int]         100      # number of iterations of the charge+dmft loop
+        finish         [int]         100      # number of charge+dmft iterations; 0 gives a one-shot non-charge-SC run
         cc             [float]       1e-5,    # the charge density precision to stop the LDA+DMFT run
         ec             [float]       1e-5,    # the energy precision to stop the LDA+DMFT run
         broyd          [True| False] True     # Are we using broyden for charge mixing
@@ -872,7 +872,12 @@ if __name__ == '__main__':
     
     shutil.copy2('sig.inp', 'sig.inp.0')
     
-    if p['finish']>1: # Charge self-consistent
+    # finish=0 preserves the one-shot, non-charge-self-consistent calculation.
+    # Every positive value performs that many complete charge-SC cycles and
+    # therefore requires an initial LAPW calculation.
+    charge_cycles = builtins.max(1, p['finish'])
+
+    if p['finish']>=1: # Charge self-consistent
         
         if os.path.isfile(w2k.case+'.clmsum_old'): shutil.copy2(w2k.case+'.clmsum_old', w2k.case+'.clmsum')
         if not os.path.isfile(w2k.case+'.clmsum'):
@@ -892,7 +897,7 @@ if __name__ == '__main__':
         print('\n   start'+(' '*8)+ time.asctime()+' with lapw0 ('+str(1)+'/'+str(p['riter'])+' to go)', file=fday)
         
         # Starting with LAPW
-        print('\n   cycle %s \t%s %s/%s to go\n' % (0,time.asctime(),p['finish'],(p['finish'])%p['riter']), file=fday)
+        print('\n   cycle %s \t%s %s/%s to go\n' % (0,time.asctime(),charge_cycles,charge_cycles%p['riter']), file=fday)
         lapw0(fday,w2k.case,w2k.WIENROOT,para, fh_info); fday.flush()
         lapw1(fday,w2k.case,w2k.WIENROOT,para,p['dftKS'],dmfe,wopt,fh_info); fday.flush()
         if wopt['so']: lapwso(fday,w2k.case,w2k.WIENROOT,para,p['dftKS'],dmfe, fh_info)
@@ -910,7 +915,7 @@ if __name__ == '__main__':
     (RelaxingStructure, mix_method) = fstc.AreWeRelaxingStructure2(w2k.case)
     print('Relaxing Structure=', RelaxingStructure, file=fh_info)
     
-    while icycle < p['finish']:
+    while icycle < charge_cycles:
 
         if (icycle>0): # Does not exists yet. Will find it after dmft1
             (nl_imp,nd_imp) = FindLatticeNd(w2k.case, wopt['m_extn'], inl.siginds, imp2latt, fh_info, scf_name='scf2')
@@ -1105,7 +1110,8 @@ if __name__ == '__main__':
                 istep1 += 1
                 istep2 = 1
             
-            print('\n:ITT%-2d   cycle %s \t%s %s/%s to go\n' % (istep2, istep1,time.asctime(),p['finish']-istep1,(p['finish']-istep1)%p['riter']), file=fday)
+            cycles_left = builtins.max(0, charge_cycles-istep1)
+            print('\n:ITT%-2d   cycle %s \t%s %s/%s to go\n' % (istep2, istep1,time.asctime(),cycles_left,cycles_left%p['riter']), file=fday)
             
             lapw0(fday,w2k.case,w2k.WIENROOT,para, fh_info); fday.flush()
             lapw1(fday,w2k.case,w2k.WIENROOT,para,p['dftKS'],dmfe,wopt,fh_info); fday.flush()

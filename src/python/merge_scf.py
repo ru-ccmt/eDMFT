@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Merge WIEN2k SCF component files before running mixer.
 
-This is the standalone equivalent of the ``scf()`` assembly step in
+This is the standalone equivalent of the ``scf()`` and ``scf1()`` steps in
 ``run_dft.py``.  By default, one newly assembled iteration is appended to
-``case.scf`` so that its convergence history is retained.  Use ``--replace``
-to create ``case.scf`` from only the current component files.
+``case.scf`` so that its convergence history is retained.  The current charge
+density and potential files are then copied to their ``*_old`` names, because
+WIEN2k mixer reads ``case.clmsum_old`` (or the spin-resolved equivalents) and
+writes the newly mixed density to ``case.clmsum``.  Use ``--replace`` to create
+``case.scf`` from only the current component files.
 """
 
 from __future__ import annotations
@@ -180,6 +183,38 @@ def merge(case: str, components: list[Path], replace: bool) -> Path:
     return destination
 
 
+def backup_mixer_inputs(case: str) -> list[tuple[Path, Path]]:
+    """Advance the charge/potential history expected by WIEN2k mixer.
+
+    This deliberately mirrors ``scf1(case)`` in ``run_dft.py``.  Omitting
+    this step leaves ``case.clmsum_old`` frozen at an earlier iteration, so
+    repeated manual ``dmft2 -> merge_scf.py -> mixer`` cycles keep mixing
+    every new density against that stale reference instead of converging.
+    ``copy2`` preserves WIEN2k's text/binary file contents and metadata.
+    """
+    suffixes = (
+        "clmsum",
+        "vsp",
+        "vns",
+        "vrespsum",
+        "vspdn",
+        "vnsdn",
+        "vspup",
+        "vnsup",
+        "clmup",
+        "clmdn",
+    )
+    copied: list[tuple[Path, Path]] = []
+    for suffix in suffixes:
+        source = Path(f"{case}.{suffix}")
+        if not nonempty(source):
+            continue
+        destination = Path(f"{source}_old")
+        shutil.copy2(source, destination)
+        copied.append((source, destination))
+    return copied
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Merge current WIEN2k SCF components before mixer"
@@ -223,8 +258,12 @@ def main() -> int:
         return 0
 
     destination = merge(case, components, options.replace)
+    backups = backup_mixer_inputs(case)
     action = "Replaced" if options.replace else "Appended one iteration to"
     print(f"{action} {destination}")
+    print("Prepared mixer history:")
+    for source, backup in backups:
+        print(f"  {source} -> {backup}")
     print(f"Now run: x mixer -f {case}")
     return 0
 

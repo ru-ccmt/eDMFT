@@ -1,0 +1,102 @@
+--- a/SRC_lcore/core_corr_stress.f
++++ b/SRC_lcore/core_corr_stress.f
+@@ -12,6 +12,9 @@
+       implicit REAL*8 (A-H,O-Z)
+       include 'param.inc'
+       integer             :: natm,nrp,jatm,mu,  ir, jatom, index_a
++      integer             :: stress_debug_status
++      logical             :: stress_debug
++      character(len=32)   :: stress_debug_env
+       REAL*8              :: dpot(nrad+141),r1(nrad+141),rhoc(nrad+141),          &
+                              V1(nrad+141),value1(nrad+141)                                   
+       REAL*8              :: one,two, pi, dx,  TC,TC1, sq4pi, sqrt2, sq4_pi 
+@@ -80,6 +83,18 @@
+       int_ns1     = zeroc
+       int_ns2     = zeroc
+ 
++      ! Optional diagnostics for the delicate spherical-harmonic
++      ! normalization in the core correction.  The first three numeric
++      ! columns are the spherical, I1, and I2 contributions after their
++      ! common 1/(4*pi) normalization; the next two are the independently
++      ! formed and accumulated totals, followed by their difference.
++      stress_debug_env = ''
++      call get_environment_variable('WIEN_STRESS_DEBUG',stress_debug_env, &
++                                    status=stress_debug_status)
++      stress_debug = stress_debug_status.eq.0 .and. &
++                     len_trim(stress_debug_env).gt.0 .and. &
++                     trim(stress_debug_env).ne.'0'
++      
+       call c_alpha_m(cabt)      !c-matrix of unit vector expansion
+                            
+       cor_corr_sph  = zero!zeroc      !spherical part
+@@ -114,6 +129,19 @@
+          ENDDO           
+          call chargel2(r1,1.d0,one,value(1),dx,counter,out2)    
+          int_ns2(lm1p) = out2
++
++         ! Expose the two radial integrals entering Blaha et al.
++         ! Eqs. (E4)-(E5) before any real-harmonic conversion or symmetry
++         ! rotation.  This is deliberately guarded by WIEN_STRESS_DEBUG so
++         ! normal lcore output remains unchanged.  Keeping these raw values
++         ! separate lets the angular algebra in Eq. (E3) be checked against
++         ! an independent Cartesian integration, especially for the l=2,m=0
++         ! term responsible for the tetragonal FeSe discrepancy.
++         if(stress_debug) then
++            write(6,'(A,3I4,2(1X,ES23.15))') &
++                 ':DBG_STR_CORE_RADIAL:',jatom,lm11(1,lm1p), &
++                 lm11(2,lm1p),out1,out2
++         endif
+          
+       ENDDO      
+ !================end reading non-spherical potential===================        
+@@ -258,7 +286,12 @@
+          call chargel2(r1,1.d0,one,val_real(1),dx,counter,out1)
+          call chargel2(r1,1.d0,one,val_cmplx(1),dx,counter,out2)                  
+          
+-         out_c = dcmplx(out1,out2)             
++         ! STR_CORE is stored with the opposite sign of the physical
++         ! sigma_core,corr in Eq. (21): mixer later forms
++         ! STR_DENS-STR_VAL-STR_CORE.  Therefore the leading minus signs in
++         ! Eqs. (E4)-(E5) are supplied by that final subtraction and the raw
++         ! radial integrals remain positive here.
++         out_c = dcmplx(out1,out2)
+          
+ !          IF( mm_p .ne. 0) CYCLE
+          
+@@ -305,7 +338,8 @@
+          call chargel2(r1,1.d0,one,val_real(1),dx,counter,out1)
+          call chargel2(r1,1.d0,one,val_cmplx(1),dx,counter,out2)
+          
+-         out_c = dcmplx(out1,out2)         
++         ! Same stored-sign convention as the I1 contribution above.
++         out_c = dcmplx(out1,out2)
+          
+ !          IF( mm_p .ne. 0) CYCLE
+          
+@@ -354,12 +369,25 @@
+                                   cor_corr_ns1(index2) + &
+                                   cor_corr_ns2(index2) )*sq4pi*sq4pi
+          sum_tot(index2,jatom) = sum_tot(index2,jatom) + cor_corr_tot(index2)
++         if(stress_debug) then
++            write(6,78) jatom,index2, &
++                 cor_corr_sph(index2)*sq4pi*sq4pi, &
++                 cor_corr_ns1(index2)*sq4pi*sq4pi, &
++                 cor_corr_ns2(index2)*sq4pi*sq4pi, &
++                 cor_corr_tot(index2), &
++                 sum_tot(index2,jatom), &
++                 cor_corr_tot(index2) - &
++                 (cor_corr_sph(index2) + &
++                  cor_corr_ns1(index2) + &
++                  cor_corr_ns2(index2))*sq4pi*sq4pi
++         endif
+          WRITE(6,77) index2, cor_corr_sph(index2)*sq4pi*sq4pi, cor_corr_ns1(index2)*sq4pi*sq4pi, &
+                                     cor_corr_ns2(index2)*sq4pi*sq4pi         
+       ENDDO
+      !===============================================         
+       
+ 77 FORMAT(':COR__CORR__',i3.3,':',2x,3ES21.12)   
++78 FORMAT(':DBG_STR_CORE_ATOM:',2I4,6(1X,ES23.15))
+     RETURN
+     END SUBROUTINE core_corr_stress
+ 
+

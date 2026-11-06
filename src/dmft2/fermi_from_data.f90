@@ -12,7 +12,7 @@ MODULE muzerox
   INTEGER,   ALLOCATABLE:: nemm(:,:)
   REAL*8,   ALLOCATABLE :: abom(:,:), w_omega(:)
   INTEGER,  ALLOCATABLE :: nomq(:), iomq(:,:), jomq(:)
-  REAL*8,   ALLOCATABLE :: womq(:,:)
+  REAL*8,   ALLOCATABLE :: womq(:,:), matsum_weight(:)
   REAL*8,     PARAMETER :: Ry2eV= 13.60569253d0 
   !
 CONTAINS
@@ -22,7 +22,9 @@ CONTAINS
     CHARACTER*180, allocatable, intent(in) :: filenames(:)
     ! 
     INTEGER :: fh(2)
-    INTEGER :: ikp, iikp, iom, j, qmax, max_nbands, ios, fi, i
+    INTEGER :: ikp, iikp, iom, j, qmax, max_nbands, ios, fi, i, &
+         frequencyRecordStatus
+    LOGICAL :: legacyFrequencyRecord
     !
     REAL*8  :: elecn_, DM_EF_, w_sum, w_gamma_, w_norm1, w_beta_
     INTEGER :: nkp_, max_nbands_, qmax_, w_nomega_, n0_om_, w_npomega_
@@ -63,14 +65,33 @@ CONTAINS
        endif
     endif
     
-    ALLOCATE( nomq(w_nomega), jomq(w_nomega), iomq(w_nomega,qmax), womq(w_nomega,qmax), w_omega(w_nomega) )
+    ALLOCATE( nomq(w_nomega), jomq(w_nomega), iomq(w_nomega,qmax), &
+         womq(w_nomega,qmax), matsum_weight(w_nomega), w_omega(w_nomega) )
     ALLOCATE( abom(2,w_nomega) )
     
     do i=MF,1,-1
        do iom=1,w_nomega
-          READ(fh(i)) w_omega(iom), abom(1,iom), abom(2,iom), nomq(iom), jomq(iom)
+          ! Matsubara cubic weights were added to this existing unformatted
+          ! record.  Reading an older .bnds file with six destinations raises
+          ! end-of-record; backspace and read its five-field form, then retain
+          ! the historical piecewise-linear cardinal weight.  Thus a new
+          ! fermif can still inspect/recompute EF from archived dmft2 data,
+          ! while new files carry the higher-order weights exactly.
+          legacyFrequencyRecord=.false.
+          READ(fh(i),IOSTAT=frequencyRecordStatus) w_omega(iom), &
+               abom(1,iom),abom(2,iom),nomq(iom),jomq(iom), &
+               matsum_weight(iom)
+          if (frequencyRecordStatus.ne.0) then
+             backspace(fh(i))
+             READ(fh(i)) w_omega(iom),abom(1,iom),abom(2,iom), &
+                  nomq(iom),jomq(iom)
+             legacyFrequencyRecord=.true.
+             matsum_weight(iom)=0.d0
+          endif
           do j=1,nomq(iom)
              READ(fh(i)) womq(iom,j), iomq(iom,j)
+             if (legacyFrequencyRecord) matsum_weight(iom)= &
+                  matsum_weight(iom)+womq(iom,j)
           enddo
        enddo
     enddo
@@ -95,7 +116,7 @@ CONTAINS
     deallocate( zEk )
     deallocate( wgh, nemm )
     DEALLOCATE( abom )
-    DEALLOCATE( nomq, jomq, iomq, womq, w_omega )
+    DEALLOCATE( nomq, jomq, iomq, womq, matsum_weight, w_omega )
   END SUBROUTINE deallocate_muzero
 
 
@@ -110,7 +131,8 @@ CONTAINS
     WRITE(fh,*) w_npomega, w_gamma
     WRITE(fh,*) wprint,wprint1,Qcheckbands
     do iom=1,w_nomega
-       WRITE(fh,*) w_omega(iom), abom(1,iom), abom(2,iom), nomq(iom), jomq(iom)
+       WRITE(fh,*) w_omega(iom), abom(1,iom), abom(2,iom), nomq(iom), &
+            jomq(iom), matsum_weight(iom)
        do j=1,nomq(iom)
           WRITE(fh,*) '  ', womq(iom,j), iomq(iom,j)
        enddo
@@ -166,45 +188,11 @@ CONTAINS
                    !if (wprint1) WRITE(*,'(I2,1x,I2,1x,I4,1x,I4,1x,I4,1x,f14.10,1x,2f20.15,1x,f20.15,1x,f20.15)') ikp,num,iom,iom, iom, aimag(omn), cek, dble(1./(omn-cek)-1./(omn-ek0)), dble(csum1)
                 enddo
 
-                do iom=n0_om,w_nomega-1
-                   j0 = jomq(iom-1)
-                   j1 = jomq(iom)
-                   j2 = jomq(iom+1)
-                   e0 = zEk(num0,iom-1,ikp,ii)-EF
-                   e1 = zEk(num0,iom,  ikp,ii)-EF
-                   e2 = zEk(num0,iom+1,ikp,ii)-EF
-                   do i=1,nomq(iom)
-                      omn = dcmplx(0, (2*iomq(iom,i)-1)*pi/w_beta)
-                      if (.False.) then
-                         if (iomq(iom,i).LT.j1) then
-                            cek = e1 + (e0-e1)*(iomq(iom,i)-j1)/(j0-j1) ! linear interpolation
-                         else if (iomq(iom,i).GT.j1) then
-                            cek = e1 + (e2-e1)*(iomq(iom,i)-j1)/(j2-j1) ! linear interolation
-                         else
-                            cek = e1
-                         endif
-                      else
-                         xx0 = iomq(iom,i)-j0
-                         xx1 = iomq(iom,i)-j1
-                         xx2 = iomq(iom,i)-j2
-                         x2x0 = j2-j0
-                         x2x1 = j2-j1
-                         cek = xx2/(j1-j0)*(e0*xx1/x2x0-e1*xx0/x2x1) + e2*xx0*xx1/(x2x0*x2x1)
-                      endif
-                      csum = csum + womq(iom,i)*(1./(omn-cek) - 1./(omn-ek0))
-                      !if (wprint1) WRITE(*,'(I2,1x,I2,1x,I4,1x,I4,1x,I4,1x,f14.10,1x,2f20.15,1x,f20.15,1x,f20.15)') ikp,num,iom,j1,iomq(iom,i),aimag(omn), cek, dble(womq(iom,i)*(1./(omn-cek) - 1/(omn-ek0))), dble(csum)
-                   enddo
-                enddo
-                iom = w_nomega
-                j0 = jomq(iom-1)
-                j1 = jomq(iom)
-                e0 = zEk(num0,iom-1,ikp,ii)-EF
-                e1 = zEk(num0,iom,  ikp,ii)-EF
-                do i=1,nomq(iom)
-                   omn = dcmplx(0, (2*iomq(iom,i)-1)*pi/w_beta)
-                   cek = e1 + (e0-e1)*(iomq(iom,i)-j1)/(j0-j1)
-                   csum = csum + womq(iom,i)*(1./(omn-cek) - 1./(omn-ek0))
-                   !if (wprint1) WRITE(*,'(I2,1x,I2,1x,I4,1x,I4,1x,I4,1x,f14.10,1x,2f20.15,1x,f20.15,1x,f20.15)') ikp,num,iom,j1,iomq(iom,i),aimag(omn), cek, dble(1./(omn-cek)), dble(csum)
+                do iom=n0_om,w_nomega
+                   omn = dcmplx(0.d0,w_omega(iom))
+                   cek = zEk(num0,iom,ikp,ii)-EF
+                   csum = csum + matsum_weight(iom)* &
+                        (1./(omn-cek)-1./(omn-ek0))
                 enddo
 
                 Om = (2*jomq(w_nomega)*pi/w_beta)
