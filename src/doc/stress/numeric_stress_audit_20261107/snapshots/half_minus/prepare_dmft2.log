@@ -1,9 +1,0 @@
-DmftEnvironment: mpi_prefix.dat exists -- running in parallel mode.
-   /opt/homebrew/bin/mpirun -n 4
-Found SrVO3.in1c file, hence assuming complex version needed. Switching -c switch!
-case= SrVO3
-root= /Users/haule/dbin
-cixs= [1]
-Temperature set to  0.020000000000000046
-NOE= 41.0
-Found DMFT-mu= 9.042047370554947

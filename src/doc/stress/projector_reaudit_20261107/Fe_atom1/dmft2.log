@@ -1,5 +1,0 @@
-nargs= 1
-argi=dmft2.def
- OpeningFeSe.outputdmf2                                                                                                                                                                     
-Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
-STOP  DMFT2 END

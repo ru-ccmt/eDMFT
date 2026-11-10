@@ -1,3 +1,0 @@
-mpif90  -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c outwin_response.f90 -o outwin_response.o
-mpif90  -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c lapw_radial_response.f90 -o lapw_radial_response.o
-ar  rcs libatpar.a outwin.o  outwin_response.o  lapw_radial_response.o  rint13.o  abc.o  diracout.o  dergl.o  inouh.o  inth.o atpar.o readPot.o

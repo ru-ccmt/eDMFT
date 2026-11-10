@@ -1,7 +1,0 @@
-{
-  "merger": "run_dmft two-spin SCF assembly",
-  "passed": true,
-  "max_error_Ry_Bohr3": 4.553426373747529e-11,
-  "charge_warning_recorded": true,
-  "stress_applied": true
-}

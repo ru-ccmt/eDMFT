@@ -1,6 +1,0 @@
-[MacBook-Pro-148][[5215,0],0][btl_tcp_component.c:1021:mca_btl_tcp_component_create_listen] bind() failed: Operation not permitted (1)
-Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
-STOP  LAPW1 END
-DmftEnvironment: mpi_prefix.dat does not exist -- running in single-processor mode.
-Found SrVO3.in1c file, hence assuming complex version needed. Switching -c switch!
-LAPW1C ..... running: /Users/haule/dbin/lapw1c lapw1.def

@@ -1,6 +1,0 @@
-FeSe 0.001 minus done 5.766362888865085
-FeSe 0.001 plus done 5.767424659290238
-{'step': 0.001, 'density_relative': 4.026236577152722e-07, 'density_maximum': 1.0685546186772754e-07, 'dmu_eV': 0.5308852125764929, 'target_number': 59.6304906272382}
-FeSe 0.0005 minus done 5.766628338692042
-FeSe 0.0005 plus done 5.767159223983886
-{'step': 0.0005, 'density_relative': 8.50372171559991e-07, 'density_maximum': 2.2035706936929245e-07, 'dmu_eV': 0.5308852918437523, 'target_number': 59.6304906272382}

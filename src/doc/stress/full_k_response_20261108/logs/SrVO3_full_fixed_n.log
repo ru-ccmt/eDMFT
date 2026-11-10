@@ -1,4 +1,0 @@
-SrVO3 0.001 {'mu_eV': np.float64(8.993317721190737), 'number_residual': 0.0}
-SrVO3 -0.001 {'mu_eV': np.float64(8.993713369835143), 'number_residual': -7.105427357601002e-15}
-SrVO3 0.0005 {'mu_eV': np.float64(8.993416630779155), 'number_residual': 0.0}
-SrVO3 -0.0005 {'mu_eV': np.float64(8.993614455095845), 'number_residual': 0.0}

@@ -1,3 +1,0 @@
-TOT  XC_PBE     (XC_LDA,XC_PBESOL,XC_WC,XC_MBJ,XC_SCAN)                         
-NR2V      IFFT      (R2V)
-   36   36   36    2.00  1 NCON 9  # min IFFT-parameters, enhancement factor, iprint, NCON n

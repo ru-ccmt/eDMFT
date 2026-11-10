@@ -1,3 +1,0 @@
-Installed the approved 35-source-file patch and 25 Python helpers.
-The original REPORT.txt documents the pre-install review; INSTALL.json records the completed installation.
-Native snapshots remain in /private/tmp/edmft_general_cells_20261109/native.

@@ -1,8 +1,0 @@
-.....................................................................................................................................................................................................................................................................................................................
-----------------------------------------------------------------------
-Ran 309 tests in 1.856s
-
-OK
-{"case": "SrVO3", "mpi": ["/Users/haule/miniconda3-clean/envs/work311/bin/mpiexec.hydra", "-genv", "FI_PROVIDER", "tcp", "-n", "4"], "native_mpi": ["/opt/homebrew/bin/mpirun", "-n", "4"]}
-{"case": "FeSe", "mpi": ["/Users/haule/miniconda3-clean/envs/work311/bin/mpiexec.hydra", "-genv", "FI_PROVIDER", "tcp", "-n", "6"], "native_mpi": ["/opt/homebrew/bin/mpirun", "-n", "6"]}
-Installed helpers and current config-free launch inheritance verified.

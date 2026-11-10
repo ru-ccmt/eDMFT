@@ -1,4 +1,0 @@
-Note: The following floating-point exceptions are signalling: IEEE_OVERFLOW_FLAG
-STOP  LAPW1 END
-DmftEnvironment: mpi_prefix.dat does not exist -- running in single-processor mode.
-LAPW1 ..... running: /Users/haule/dbin/lapw1 lapw1.def

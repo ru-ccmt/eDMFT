@@ -1,7 +1,0 @@
-{
-  "six_strain_FD_max_error": 2.554081390826468e-10,
-  "rotation_covariance_max_error": 7.105427357601002e-15,
-  "spin_representation_max_error": 7.105427357601002e-15,
-  "cases": 60,
-  "status": "PASS"
-}

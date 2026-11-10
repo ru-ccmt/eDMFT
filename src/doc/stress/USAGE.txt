@@ -1,0 +1,443 @@
+DFT+eDMFT STRESS TESTS: CONVERGENCE AND FINITE-DIFFERENCE COMPARISON
+=================================================================
+Updated: 9 November 2026
+
+This directory is a restart-input collection for frozen-self-energy stress
+tests. For each material, center is the reference structure, m001 contracts
+all lattice lengths by about 0.1%, and p001 expands them by about 0.1%.
+
+The intended experiment is:
+  1. Keep the same impurity self-energy and double counting in all three runs.
+  2. Converge the electronic charge and projector normalization separately
+     at each structure. Keep atomic fractional positions and RMT fixed.
+  3. Evaluate the complete analytic stress at center.
+  4. Use frozen_sigma_klein.py to differentiate the frozen-Sigma tangent Klein
+     functional. The impurity-minus-double-counting part is replaced by
+       Phi_corr^tan[eta] = Phi_corr[0]
+         + Tr[(Sigma_imp[0]-V_DC[0]) (G_loc[eta]-G_loc[0])].
+     Phi_corr is NOT the total free energy. Tr here includes the temperature-
+     weighted Matsubara sum and correlated-site, orbital and spin sums.
+     This is the first-order impurity-functional expansion at a consistent
+     reference; the frozen test uses the tangent defined by the saved inputs.
+  5. For the hydrostatic length strain eta used here, compare
+       (1/Omega0) dK/deta = tr(sigma) = 3 * mean tensile stress.
+     The script's normalized GPa result is tr(sigma), NOT 3*tr(sigma).
+     Divide it by 3 to compare with the patched mixer's :PRESSURE: in
+     case.scfm. Thermodynamic compression-positive pressure has the opposite
+     sign. See section 8 for the finite-difference formula and output details.
+
+No new impurity Monte Carlo calculation is required for this test. The test
+checks the derivative of the implemented frozen-Sigma functional, not the
+physical accuracy of a newly self-consistent impurity solution.
+
+To request the complete implemented stress, use STRT or STRFT in case.in2[c]
+and STR in case.in0. STR or STRF gives the faster ordinary analytic stress
+without the additional response pass. That pass includes screened delta V_KS
+and the associated charge, projector/window and radial response; its net
+correction is not just one isolated delta V_KS term.
+
+
+1. MEANING OF TOT, STR, STRF, STRT AND STRFT
+------------------------------------------
+These tokens are the FIRST token in case.in2 (real) or case.in2c (complex).
+
+Mode    Ordinary stress   Atomic forces   Screened total-stress response
+TOT     no                no              no
+STR     yes               no              no
+STRF    yes               yes             no
+STRT    yes               no              yes
+STRFT   yes               yes             yes
+
+Keep STRFT in center/case.in2[c] and STR in center/case.in0,
+then run run_dmft.py. The expensive response is deferred to ONE final pass.
+Leave m001 and p001 in TOT in case.in2[c]; they need converged scalar energies,
+not their own analytic stress.
+
+STR computes the ordinary implemented analytic stress contributions without
+the additional screened response calculation. STRF also computes the current
+atomic forces. Their stress can differ substantially from the complete result.
+
+STRT and STRFT request the complete frozen-Sigma stress, including the charge,
+potential, projector/window and radial-energy response implemented in the
+analytic backend. The Python wrapper translates STRT -> STR and STRFT -> STRF
+for the native dmft2 input, then performs the response step. The original
+user input is preserved. Use the wrappers rather than passing these extended
+tokens directly to an arbitrary WIEN2k/native executable.
+
+The letters F and T are independent: F requests atomic forces; the final T
+requests the total-stress response. T does NOT mean temperature. STRFT does
+not add this new screened strain response to the atomic-force formula; forces
+still use the currently implemented force machinery.
+
+Timing differs between the two launch paths:
+  run_dmft.py:
+    Intermediate dmft2 calls defer response even with STRT/STRFT. One extra
+    dmft2 -> response -> lcore -> SCF assembly -> mixer pass runs after the
+    outer loop ends. The ordinary STR/STRF work is still done along the way.
+  x_dmft.py dmft2:
+    STRT/STRFT trigger response immediately on this standalone execution.
+  x_dmft.py dmft2 --execute-only:
+    Same execution behavior, but reuses existing definitions, split Sigma
+    and prepared inputs instead of regenerating them.
+
+Reaching an iteration limit also ends the outer loop: final response is not
+proof that charge convergence was achieved. Always examine convergence logs.
+An explicit case.stress_response.json can override the default mode selection;
+these test copies presently have no such override.
+
+IN0 IS A SEPARATE CONTROL:
+For a center total-stress calculation, the FIRST token of case.in0 must be STR,
+for example "STR  XC_PBE" or "STR  XC_LDA". Keep the functional unchanged.
+This supplies the density/potential stress needed for full SCF assembly.
+Do not put STRFT in case.in0. Endpoints may use TOT in both IN0 and IN2.
+FeSe's copied endpoint IN0 files already use STR; that is harmless extra work
+and does not by itself trigger the expensive response.
+
+Recommended arrangement:
+  center: IN0=STR, IN2=STRFT (or STRT if forces are not wanted).
+  m001:   IN0=TOT, IN2=TOT.
+  p001:   IN0=TOT, IN2=TOT.
+
+There is no need to switch center to TOT merely to suppress repeated response.
+If all ordinary stress/force overhead is unwanted during convergence, TOT is
+an optional two-stage workflow; restore STR/STRFT and regenerate lapw0/lapw1
+before the final measurement. The simple arrangement above avoids that work.
+
+
+2. TESTS PRESENT
+---------------------------------------------------
+All four materials now have populated center, m001 and p001 directories.
+RELA denotes scalar-relativistic radial functions, not spin-orbit coupling.
+The listed RKMAX is the central value; endpoint values are slightly adjusted.
+
+Material   case name       Model        RKMAX
+SrVO3      SrVO3           NREL / LDA   8
+FeSe       FeSe            RELA / PBE   8
+MnO        MnO             RELA / PBE   7
+MnTe       0_800_MnTe      RELA / PBE   7
+
+3. RECORDED REFERENCE RESULTS
+---------------------------------------------------
+These are accumulated results from the original runs/saved snapshots, not
+new measurements in stress_tests. They are reference values, not guaranteed
+outcomes of reconvergence. All stresses are MEAN TENSILE stresses in GPa
+(trace/3), and h is the fractional change of each lattice length.
+Differences are analytic minus numerical. The corresponding thermodynamic
+compression-positive pressure has the opposite sign.
+
+Material/model     h        analytic        numerical       difference
+SrVO3 NREL/LDA    .001     +2.93395515     +2.93315290      +0.00080225
+FeSe  RELA/PBE    .001     -1.04884732     -1.04910410      +0.00025678
+MnO  RELA/PBE     .001    -72.31321306    -72.35171059      +0.03849754
+MnTe RELA/PBE     .001     -0.66817595     -0.66720930      -0.00096665
+
+MnO and MnTe's fixed band windows split some degenerate multiplets, so the
+unregularized window derivative is not uniquely defined there. The current
+code warns and omits only cross-window inverse energy denominators with
+|energy gap| <= 1e-10 Ry; it retains all k points, regular band pairs and the
+original window. The tested stresses have small cutoff sensitivity, which
+supports this numerical approximation but does not remove the degeneracy.
+
+The MnO row used an older center with a slightly different fixed mu from the
+endpoints. All three copied EF.dat files now agree at 6.609509262416999 eV;
+reconverge before assigning a new error estimate. The table's ~0.0385 GPa
+mismatch is not a final accuracy bound for that corrected triplet. These
+hydrostatic comparisons test the stress trace, not each tensor component.
+
+
+4. PARAMETERS FOR A CONTROLLED FROZEN-SIGMA COMPARISON
+----------------------------------------------------
+Keep these settings in params.dat in every directory:
+
+  runIMP = False
+  runGF = True                 # default; updates lattice G and SOlapm
+  max_dmft_iterations = 1
+  max_lda_iterations = 100
+
+The copied centers have finish=1; FeSe/SrVO3/MnTe endpoints have finish=6
+and MnO endpoints have finish=4. In the CURRENT run_dmft.py, finish=1 DOES
+perform a charge-self-consistent cycle with up to max_lda_iterations inner
+steps. The old inline comment "1 = no charge self-consistency" is obsolete. finish=0
+skips the initial lapw0/lapw1 preparation and requires existing LAPW outputs;
+it does not by itself force max_lda_iterations=1. Use finish>=1 here.
+
+For a careful new comparison, allow several outer cycles (for example
+finish=6 for all three structures) so dmft1 refreshes SOlapm after charge
+changes. Each outer cycle can have many charge iterations. The script may
+stop early when its criteria are satisfied; finish is not a guarantee of six
+executed cycles. Repeat or increase the limit if the projector normalization,
+charge, or scalar functional is still drifting. A single final dmft2 response
+does not itself establish convergence of the charge/projector fixed point.
+
+Existing thresholds:
+  SrVO3: cc=2e-6, ec=2e-6; nom=200, ntail=300; beta=50 eV^-1.
+  FeSe:  cc=1e-5, ec=1e-5; nom=300, ntail=300; beta=50 eV^-1.
+  MnO:   cc=5e-5, ec=5e-5; nom=300, ntail=300; beta=50 eV^-1.
+The copied MnTe inputs use beta=100 eV^-1, nom=200, ntail=300,
+cc=2e-4 and ec=1e-5.
+Here nom is iparams0['nom'][0]. Use identical frequency sampling and temperature
+within a triplet. Tighten/repeat convergence if the finite difference is not
+stable; a completed process alone is insufficient at this precision.
+
+The structures must stay fixed. MSR1 and PRATT mix charge without relaxing
+atoms. Do not use MSR1a for this benchmark: internal relaxation would change the
+path being differentiated. FeSe center currently uses PRATT and its endpoints
+MSR1; that affects convergence speed, not the target fixed point.
+
+Preserve the physical ensemble: MnO uses recomputeEF=0 and INM normalization
+NO, with the same EF.dat (in eV) at all strains. SrVO3, FeSe and MnTe use
+recomputeEF=1 and INM=YES, so their mu may change with strain. MnTe's two DMFT
+mappings share one mu and use Ferro=False/default; the separate Ferro=True
+policy is for ferro/ferrimagnetic runs. Do not normalize MnO merely to force
+the integrated charge to its target value.
+
+5. KEEP THE SAME DISCRETE BASIS AND WINDOW
+-----------------------------------------
+Existing fixed-band inputs:
+
+Material    Stored KS bands    DMFT window, inclusive    central GMAX
+SrVO3       43                [12,31]                   12
+FeSe        66                [21,44]                   12
+MnO         23                [6,16]                    12
+MnTe        64                [21,51]                   12
+
+MnTe's central DMFT RKMAX is 7. Do not confuse this with the separate
+DFT RKMAX=8 test.
+
+The last K-VECTORS line of IN1 contains FIXED_NBANDS, e.g. for FeSe:
+  K-VECTORS FROM UNIT:4  -10.0  2.0  66  FIXED_NBANDS ...
+Use our patched dftKS/lapw1 readers: the keyword requests a fixed stored count,
+while retaining the old WIEN2k behavior when the keyword is absent. Stored
+bands and the smaller DMFT window are distinct controls; both matter here.
+
+The copied endpoints deliberately use slightly adjusted cutoffs:
+  RKMAX: 8.008 / 8.000 / 7.992 for m001 / center / p001 (FeSe and SrVO3).
+         7.007 / 7.000 / 6.993 for MnO and MnTe.
+  GMAX: 12.012 / 12.000 / 11.988.
+These adjustments approximately compensate reciprocal-space rescaling so the
+same integer reciprocal vectors can be retained. Do NOT equalize these numbers
+without rechecking the generated basis. The same number of bands alone does
+not prove identical G-vector sets or LAPW dimensions.
+
+After regeneration, compare k-point labels/weights, stored band counts, LAPW
+basis dimensions and integer G labels at corresponding k points. Counts can
+vary with k, but must match between strains at the same k. Check density PW
+stars/FFT grids as well. The numeric script does not perform this basis audit.
+The copies currently lack vectors, so this inspection cannot certify the
+regenerated bases in advance. dmft2_info.out's "Finished k-point" records are
+useful for checking nemin/nemax and DM_nemin/DM_nemax; inspect every k point.
+
+Keep RMT, fractional atomic coordinates, projector definitions, local frames,
+functional, RELA/NREL setting and the k mesh consistent. SOlapm is refreshed
+at each geometry, not copied from center over the converged endpoints.
+
+The intended eta is +/-0.001 in LENGTH, not a 0.001 relative volume change:
+  a(eta)=(1+eta)*a0, b(eta)=(1+eta)*b0, c(eta)=(1+eta)*c0.
+  Omega(eta)=(1+eta)^3*Omega0.
+The six-decimal STRUCT lattice fields introduce tiny rounding differences
+from exactly 0.001. For tighter tests, track the actual imposed strain rather
+than interpreting a rounding floor as a missing analytic term.
+
+
+6. ENVIRONMENT AND CONVERGING THE THREE RUNS
+-------------------------------------------
+With the required Python/eDMFT/WIEN2k environment already active:
+
+  export OMP_NUM_THREADS=1
+  export OPENBLAS_NUM_THREADS=1
+  export MKL_NUM_THREADS=1
+  export VECLIB_MAXIMUM_THREADS=1
+
+To select MPI, put a suitable launcher in mpi_prefix.dat in EACH run directory,
+for example on this laptop:
+  /opt/homebrew/bin/mpirun -n 12
+
+Use a launcher/rank count appropriate to the machine. mpi_prefix.dat2, when
+present, overrides this for the electronic steps. Launch run_dmft.py once;
+it launches the MPI workers itself.
+
+After reviewing the preceding inputs, run each triplet, for example:
+
+  cd ~/projects/materials/stress_tests/SrVO3
+  (cd m001 && ~/dbin/run_dmft.py > run_dmft.log 2>&1)
+  (cd p001 && ~/dbin/run_dmft.py > run_dmft.log 2>&1)
+  (cd center && ~/dbin/run_dmft.py > run_dmft.log 2>&1)
+
+Check each command's exit status and logs before proceeding. Repeat this for
+FeSe, MnO and MnTe. These commands are deliberately sequential: simultaneous
+MPI jobs can exhaust laptop memory/oversubscribe CPUs.
+
+run_dmft.py regenerates lapw0/lapw1 data, prepares DMFT inputs, refreshes G and
+SOlapm through dmft1, and iterates dmft2 -> lcore -> SCF assembly -> mixer with
+frozen Sigma. It finishes center with the total-response pass when requested.
+No separate merge_scf.py/mixer command is needed after a successful full run.
+At startup it restores case.clmsum_old to case.clmsum when the old file exists;
+that is intentional restart behavior. It also removes old Broyden history.
+
+Inspect, for example from center:
+  tail -n 30 info.iterate
+  tail -n 40 run_dmft.log
+  tail -n 60 case.outputdmf2_response
+  rg ':DIS|:ENE|:PRESSURE:|:STRESS_GPa' case.scfm
+Replace "case" with SrVO3, FeSe, MnO or 0_800_MnTe in these filenames.
+Use case.dayfile and dmft_info.out for the detailed iteration sequence. Check
+that the last charge cycles meet cc/ec, that SOlapm is stable after refresh,
+and that the reported frozen functional does not drift significantly on repetition.
+With runIMP=False, an n_imp=0 entry in info.iterate is not a fresh impurity
+measurement and does not mean the lattice is empty.
+
+
+7. STANDALONE ANALYTIC MEASUREMENT AFTER CONVERGENCE
+--------------------------------------------------
+Normally the center run in section 6 already does this. If rerunning only the
+measurement, keep IN0=STR and IN2=STRT/STRFT. For NONMAGNETIC FeSe, an explicit
+sequence that regenerates the LAPW data is:
+
+  cd ~/projects/materials/stress_tests/FeSe/center
+  x lapw0 -f FeSe
+  ~/dbin/x_dmft.py lapw1
+  ~/dbin/x_dmft.py -n 300 -t 300 -m 1 dmft2
+  x lcore -f FeSe
+  ~/dbin/merge_scf.py -f FeSe
+  x mixer -f FeSe
+
+For SrVO3 use case SrVO3, -n 200 -t 300 -m 1.
+For MnO use case MnO, -n 300 -t 300 -m 0; preserve its fixed EF.dat.
+Explicit -n/-t/-m prevent the standalone defaults (100/30/1) from silently
+changing the frequency mesh or MnO's physical ensemble. If valid prepared
+DEF/input/split-Sigma files already have the intended settings, use instead:
+  ~/dbin/x_dmft.py dmft2 --execute-only
+That command does NOT regenerate missing inputs or fix stale vector layouts.
+run_dmft.py may clean up split vectors when it finishes; regenerate lapw1 data
+when needed. Use a consistent split/unsplit layout and freshly prepared DEFs.
+
+Always give WIEN's x the explicit -f case, because these directories are called
+center/m001/p001, not the material case. If a mistaken invocation creates an
+unwanted center.struct or m001.struct, remove that spurious file after checking
+it is not the real structure, and repeat with the correct -f case.
+
+MAGNETIC MnTe: prefer run_dmft.py for the full charge and SCF assembly workflow.
+The response-enabled x_dmft.py dmft2 can prepare/run both mappings and one shared
+response. --execute-only requires the companion dmft2dn.def and split inputs
+to be prepared already. Do not manually add a second response to its result.
+The current standalone merge_scf.py does not implement run_dmft.py's special
+case.scf2 + case.scf2dn averaging convention for a shared nonmagnetic KS basis;
+use run_dmft.py's magnetic SCF assembly for that case. One spin's SCFM/valence
+contribution is not the MnTe total. The response combines the two branch
+responses, with the native factor-of-two convention averaged once; it does not
+assume equal spin densities or conserve each spin population separately.
+
+
+8. NUMERICAL DERIVATIVE AND THE FUNCTIONAL BEING COMPARED
+-------------------------------------------------------
+After all three calculations have finished, run from the material directory:
+
+  cd ~/projects/materials/stress_tests/SrVO3
+  ~/dbin/frozen_sigma_klein.py center --minus m001 --plus p001 --strain 0.001
+  ~/dbin/frozen_sigma_klein.py center --minus m001 --plus p001 --strain 0.001 --json > numeric_stress.json
+
+Use the same commands in FeSe, MnO and MnTe. An alternative from
+center is --minus ../m001 --plus ../p001. --strain is required; the script does
+not infer it from directory names. These copies do not contain half-step
++/-0.0005 structures, so do not pass 0.0005 for them.
+
+The normal on-shell free-energy bookkeeping is
+  F = ENE - SUM + YSUM - EORB + XEORB.
+The frozen-Sigma tangent functional, up to a strain-independent reference
+constant, is
+  K = ENE - SUM + VSUM - EORB.
+Here ENE is the mixer's scalar, SUM/VSUM/YSUM are dmft2's lattice quantities,
+and EORB/XEORB come from Eorb_imp.dat. In this implementation
+  VSUM - YSUM = Tr[(Sigma_imp - V_DC) G_local].
+Replacing the impurity functional by its tangent about the frozen reference
+is what changes YSUM+XEORB into VSUM plus a constant. Consequently, ordinary
+ENE alone and the on-shell free-energy column of info.iterate are NOT the
+finite-difference quantity for this frozen-impurity test.
+
+The script reads the last ENE in case.scfm (falling back to case.scf), the
+current dmft2 scalar tags and Eorb_imp.dat. For magnetic MnTe it averages the
+paired scf2/scf2dn scalar quantities in the same convention as run_dmft.py.
+Keep those outputs from the same completed calculation; do not combine a new
+scf2 with an old scfm. The reference :VOL is the native primitive-cell volume
+in Bohr^3, especially important for FCC MnO. Do not substitute a^3 for MnO.
+
+sig.inp and Eorb_imp.dat must be identical between center and endpoints. The
+text command checks and warns/fails if they differ. Inspect the JSON
+frozen_input_checks too; its JSON path can return normally with a failed check.
+Do not use --no-check-frozen to hide a changed self-energy.
+
+This scalar postprocessing is read-only and is NOT inserted into mixer.
+It is separate from publishing the analytic stress tensor.
+
+Sign and factor of three:
+  D_num = [K(+h)-K(-h)] / (2h).
+  S_num = D_num / Omega0 approximates sigma_xx + sigma_yy + sigma_zz.
+  mean tensile stress = S_num / 3.
+  thermodynamic compression-positive pressure = -S_num / 3.
+
+frozen_sigma_klein.py's printed GPa value is S_num, the TRACE for these
+hydrostatic length strains. The response report's mean_tensile_stress_GPa
+and the patched mixer's :PRESSURE: are the mean tensile stress, S_num/3,
+despite the latter label. The report separately gives
+compression_pressure_GPa with the opposite sign. Compare like with like.
+For an axial or shear perturbation, contract the tensor with that perturbation;
+there is no universal factor of three for a different strain path.
+
+To compare automatically, after generating numeric_stress.json, run this from
+the material directory (set case to the actual case name):
+
+python - <<'PY'
+import json
+from pathlib import Path
+case = 'SrVO3'  # FeSe, MnO, or 0_800_MnTe
+numeric = json.loads(Path('numeric_stress.json').read_text())
+assert all(x['identical'] for x in numeric['frozen_input_checks']), 'Frozen inputs differ'
+status = json.loads(Path('center', case+'.stress_response.status.json').read_text())
+assert status['status'] == 'complete' and status['stress_ready'], 'Response incomplete'
+report = json.loads(Path(status['report']).read_text())
+assert report['converged'] and not report['diagnostic_only']
+analytic = sum(report['stress_GPa'][i][i] for i in range(3))/3
+numeric_mean = numeric['stress_derivative_gpa']/3
+print('Mean tensile stress, GPa')
+print('  analytic =', analytic)
+print('  numeric  =', numeric_mean)
+print('  difference (analytic - numeric) =', analytic-numeric_mean)
+print('  compression-positive pressures =', -analytic, -numeric_mean)
+print('  assembled into SCF =', status.get('stress_applied', False))
+print('  central charge check =', report.get('charge_fixed_point', 'not recorded'))
+PY
+
+
+9. WHERE THE RESPONSE AND CORRECTION ARE SAVED
+---------------------------------------------
+In each center calculation:
+  case.outputdmf2_response         readable live progress and final summary
+  case.stress_response.status.json current status and path to authoritative report
+  case.response_runs/<run-id>/     isolated inputs, native exports and response data
+
+Inside that run directory:
+  reference/                      copy of the physical input snapshot
+  central/                        isolated regenerated native central data
+  prepare.json, prepare.log       preparation settings and log
+  response.log                    detailed response log and traceback if any
+  total_stress/report.json         complete tensor, contractions, checks, timings
+
+The current analytic backend prepares native data and solves a linear screened
+adjoint; it does NOT perform two fully self-consistent +/-strain calculations
+inside dmft2. One adjoint is reused for the symmetry-allowed strain directions.
+Your explicitly converged m001/p001 runs provide the independent numerical test.
+
+The response does not overwrite ordinary case.scf2 with the complete tensor.
+SCF assembly reads the status/report and inserts a :STRRESP_BEGIN: block with
+the adjustment needed by mixer. This replaces the old total after its native
+VAL+CORE-DENS bookkeeping; it does not simply add the new total a second time.
+The final tensor is printed in case.scfm after mixer. Both the run_dmft.py
+merger and the supported standalone merger use this publication mechanism.
+
+After publication the readable summary includes the original ordinary total,
+the net response correction and the complete total, plus explicit/induced
+functional contractions, convergence and timing information. The induced
+contraction alone is NOT the net correction to the old stress. Use the
+summary's named totals instead of adding individual large cancelling terms.
+Input fingerprints prevent applying a response from a different iterate. Do
+not edit physical input files between the response and its SCF assembly.

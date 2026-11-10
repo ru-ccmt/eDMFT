@@ -1,9 +1,0 @@
-{
-  "/Users/haule/projects/eDMFT_new/src/python/lapw_hartree_periodic.py": "dc1bb6e84b7d8cd5b573550311371125016d551c310806f21cb07858e65195f2",
-  "/Users/haule/projects/eDMFT_new/src/python/lapw_potential_response.py": "43133420c99927ceb3232e96203ac18cc9c058daa390c0d50b0da0f10bf2899f",
-  "/Users/haule/projects/eDMFT_new/src/python/lapw_hartree_radial.py": "3e5024dd22043ad358d3e32727e0af9735d2e2be03566e929190e2848253436d",
-  "/Users/haule/projects/eDMFT_new/src/python/lapw_density_response.py": "85da2f9e7129502de4b994526584b2e9b0564a3ac4d8a323e9d179d50ab09828",
-  "/Users/haule/projects/eDMFT_new/src/python/lapw_response_chain.py": "709152a4d852373ff8f8370b5120f96a4a494d92ef4f77183de82851ef487e25",
-  "/Users/haule/projects/eDMFT_new/src/python/frozen_sigma_tangent.py": "504e7181b458e558d590e8519a046aa15352b63303ac7be3688c972c42cedd58",
-  "/Users/haule/projects/eDMFT_new/src/python/stress_response_adjoint.py": "6407b9ba44d93965e652bf94a9130ddbda0bba55312a55fb11afabd6e1c03036"
-}

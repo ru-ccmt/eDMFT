@@ -1,2 +1,0 @@
-FeSe 0.125 {'native_Hprime_minus_identity': 1.25837321877934e-09, 'native_minus_analytic_Hprime': 1.8826763258900876e-06, 'native_Oprime': 1.4842970920105054e-10, 'density_change_norm': 1.7572327555109458e-10, 'density_change_relative': 9.787502529850987e-13}
-FeSe -0.125 {'native_Hprime_minus_identity': 1.191797444120728e-09, 'native_minus_analytic_Hprime': 1.883414538957148e-06, 'native_Oprime': 1.0626095836694147e-10, 'density_change_norm': 1.5200729780640668e-10, 'density_change_relative': 8.466560887680598e-13}

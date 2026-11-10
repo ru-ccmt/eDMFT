@@ -1,2 +1,0 @@
-/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c lapw_radial_capi.f90 -o lapw_radial_capi.o
-/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -shared -o liblapw_response.so outwin.o outwin_response.o lapw_radial_response.o lapw_radial_capi.o

@@ -1,6 +1,0 @@
-SrVO3 0.001 minus root residual 0.0 mu correction eV -5.916615760743427e-11
-SrVO3 0.001 plus root residual 0.0 mu correction eV -5.95422808999424e-11
-{'step': 0.001, 'density_relative': 1.7619253355840958e-06, 'density_maximum': 4.959516923345184e-07, 'dmu_eV': np.float64(0.5292490701105379), 'root_residuals': [0.0, 0.0]}
-SrVO3 0.0005 minus root residual 7.105427357601002e-15 mu correction eV -3.3009728157350486e-11
-SrVO3 0.0005 plus root residual 7.105427357601002e-15 mu correction eV 5.947196548120243e-09
-{'step': 0.0005, 'density_relative': 1.0607821985004642e-06, 'density_maximum': 2.8615169377999104e-07, 'dmu_eV': np.float64(0.5292490755941515), 'root_residuals': [7.105427357601002e-15, 7.105427357601002e-15]}

@@ -1,6 +1,0 @@
-patching file 'src/dmft2/atpar/Makefile'
-patching file 'src/dmft2/atpar/lapw_radial_potential.f90'
-patching file 'src/dmft2/tests/check_radial_potential.py'
-patching file 'src/dmft2/tests/test_radial_potential.f90'
-patching file 'src/python/lapw_augmentation_response.py'
-patching file 'src/python/tests/test_lapw_augmentation_response.py'

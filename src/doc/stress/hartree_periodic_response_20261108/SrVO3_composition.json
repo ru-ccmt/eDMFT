@@ -1,9 +1,0 @@
-{
-  "scope": "fixed-N first-k valence map composed with Hartree only; XC/core absent",
-  "preparation_seconds": 9.068905459018424,
-  "input_size": 39222,
-  "potential_size": 39222,
-  "forward_seconds": 1.9673188750166446,
-  "transpose_error": 2.6995472445222406e-15,
-  "paired_check_seconds": 4.152464125072584
-}

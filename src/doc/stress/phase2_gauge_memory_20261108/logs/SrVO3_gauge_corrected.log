@@ -1,2 +1,0 @@
-SrVO3 0.125 {'native_Hprime_minus_identity': 2.209092592914669e-09, 'native_minus_analytic_Hprime': 2.2108081174302042e-09, 'native_Oprime': 1.0617173096642489e-10, 'density_change_norm': 9.172955992467087e-10, 'density_change_relative': 7.122733747747489e-12}
-SrVO3 -0.125 {'native_Hprime_minus_identity': 6.899215020032312e-10, 'native_minus_analytic_Hprime': 6.899727063391772e-10, 'native_Oprime': 1.398633056385281e-10, 'density_change_norm': 1.9703433396556736e-10, 'density_change_relative': 1.52995730182724e-12}
