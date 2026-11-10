@@ -1,0 +1,44 @@
+[
+  {
+    "source": "/private/tmp/edmft_functional_readout_20261109/stage/lapw_physical_potential.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_physical_potential.py",
+    "source_sha256": "45d0050ddccf498060a43a3d8442bb6d7bed4eeacd3431905ddd0e08d7733090",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_functional_readout_20261109/stage/lapw_physical_potential.py",
+    "destination": "/Users/haule/dbin/lapw_physical_potential.py",
+    "source_sha256": "45d0050ddccf498060a43a3d8442bb6d7bed4eeacd3431905ddd0e08d7733090",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_functional_readout_20261109/stage/tests/test_lapw_physical_potential.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_physical_potential.py",
+    "source_sha256": "cab97d24d427e4cdeb6b077d59c6dfe0e2fbbd65c7db14f10e5c08a7dbb740df",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_functional_readout_20261109/stage/lapw_strain_functional.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_strain_functional.py",
+    "source_sha256": "e55cd241e1303e050b87519d7f938ee578fcb019795c070ce4b2a33268cdae40",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_functional_readout_20261109/stage/lapw_strain_functional.py",
+    "destination": "/Users/haule/dbin/lapw_strain_functional.py",
+    "source_sha256": "e55cd241e1303e050b87519d7f938ee578fcb019795c070ce4b2a33268cdae40",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_functional_readout_20261109/stage/tests/test_lapw_strain_functional.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_strain_functional.py",
+    "source_sha256": "7cb21bc69798f3c1550c401e8f277272dea883407c1ca67ba3acfe22d2258ef2",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_functional_readout_20261109/stage/stress_response_roadmap_20261108.txt",
+    "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+    "source_sha256": "4fe1e9e1d8c6f32737f586177c647096352d777c58de86c1c2f0547361ae7593",
+    "before_sha256": "544302cf7f626c6d7d1c7f6e8f38d74659e67be0f7d714a91846e893bd5c03f0"
+  }
+]

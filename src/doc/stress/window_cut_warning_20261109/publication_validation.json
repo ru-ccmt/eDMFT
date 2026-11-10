@@ -1,0 +1,12 @@
+[
+  {
+    "merger": "merge_scf",
+    "passed": true,
+    "max_error_Ry_Bohr3": 1.2692707128392211e-11
+  },
+  {
+    "merger": "run_dmft_merger",
+    "passed": true,
+    "max_error_Ry_Bohr3": 1.2692707128392211e-11
+  }
+]

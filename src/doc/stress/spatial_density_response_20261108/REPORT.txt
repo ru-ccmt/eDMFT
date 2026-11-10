@@ -1,0 +1,294 @@
+SPATIAL VALENCE DENSITY AND IN-MEMORY RADIAL RESPONSE
+Checkpoint: 8 November 2026
+
+WHAT THIS STEP COMPLETES
+
+The fast response engine now has a native-convention spatial valence-density
+map, its direct moving-basis contribution and their discrete transposes.
+The radial contexts can be prepared once and reused from Python in memory.
+This replaces file/executable exchanges inside this part of the response.
+
+These are tested components, not a completed screened stress implementation.
+No new total-pressure comparison is reported here. Ordinary dmft2 stress and
+the existing reference wrapper have not been switched to this unfinished
+engine. In particular, stress_applied=false remains the wrapper's policy.
+
+The completed maps are:
+
+  R: weighted band density variation -> spatial valence density variation;
+  D_s: spherical basis potential variation -> direct basis density variation.
+
+Both provide analytic forward and reverse operations. D_s includes the
+radial primitive response AND matching/local-orbital coefficient response.
+The common potential adapter must still supply the selection/conversion S
+from its potential coordinates to r*delta V_spherical_Ry. The full D used
+in the charge chain is D_s S, with transpose S^T D_s^T. This avoids silently
+treating a scalar radial mesh as an entire KS-potential representation.
+
+POSITION IN THE FULL PLAN
+
+For the fixed-Sigma unmixed charge-map derivative, the intended chain is
+
+  J = N [ R E B + D + C_core ] K.
+
+K converts input charge to the Hartree/XC potential response. B assembles
+joint delta H, delta O and RAW orbital overlaps. E is the already prepared
+generalized electronic response, including the normalized-window projector.
+R reconstructs the density of that electronic response in the fixed central
+basis. D is the change of the basis density at fixed central band density.
+C_core supplies the core density response. N is the implemented output-charge
+normalization derivative, where applicable.
+
+This step advances R and D. Full material B wiring, K, C_core, consistent N,
+screening closure, the complete stress gradient and six physical strain
+sources remain. The screened forward/adjoint solver algebra already exists.
+
+DEFINITIONS AND PRODUCT RULE
+
+Let rho_k be the Hermitian density matrix in the fixed central KS coefficient
+representation. In this software it ALREADY contains spin and k-point weights.
+It need not be positive in a response calculation. Let Psi_k(r) be the row
+of central band trial functions. At fixed geometry,
+
+  n(r) = sum_k Psi_k(r) rho_k Psi_k(r)^dagger,
+
+  delta n(r) = sum_k [ Psi_k delta rho_k Psi_k^dagger
+                    + delta Psi_k rho_k Psi_k^dagger
+                    + Psi_k rho_k delta Psi_k^dagger ].
+
+The first term is R delta rho. The last two are the explicit basis term D.
+The change of band coefficients induced by the electronic problem belongs
+in delta rho in this representation; adding it again to delta Psi would
+double count it. At fixed geometry and coefficients, changes in the radial
+augmentation affect only the muffin tins, not the interstitial plane waves.
+
+All transposes below use real Euclidean/Frobenius pairings. Integration
+metrics, spin/k weights, star factors and equivalent-site averages must be
+included exactly where the native forward operation includes them.
+
+MUFFIN-TIN REPRESENTATION
+
+For each inequivalent atom a, k point k and equivalent site t, Z_atk maps
+central band coefficients to radial-angular components (l,m,i). The index i
+labels u_l, udot_l and ordinary LO radial primitives. phi_li,c(r) are the
+stored radial components, with c=large/small. They contain r times the
+physical radial function. A native real lattice harmonic is denoted h.
+
+First sum the small angular density matrix:
+
+  P_a = (1/MULT_a) sum_(t,k) Z_atk rho_k Z_atk^dagger.
+
+No extra k weight is applied. Rotate equivalent sites into the representative
+atom's harmonic frame before this sum. For each pair of angular channels,
+
+  A_(h,l i,l' j) = Re sum_(m,m') conj(G_h[l m,l' m'])
+                                     P_a[l m i,l' m' j],
+
+where G_h is the Gaunt matrix in the same harmonic convention as the native
+density. In particular, replacing G_h by its transpose changes sine-harmonic
+terms and is not permitted even if cosine-only tests would still pass.
+
+The radial density coefficient is
+
+  q_ah(r) = s_h sum_(l i,l' j,c) A_(h,l i,l' j)
+                           phi_li,c(r) phi_l'j,c(r) w_c.
+
+q is r^2 times a harmonic density. In the shared CLMSUM coordinates,
+s_(0,0)=sqrt(4*pi), while all nonspherical s_h=1. The native density uses
+w_large=1 and w_small=1/137.0359895^2 in RELA. Its NREL placeholder is 4e-22,
+not the different placeholder used by a radial integral routine.
+
+Differentiate P and both radial factors:
+
+  delta P = (1/MULT) sum_(t,k) [ Z delta rho Z^dagger
+                        + delta Z rho Z^dagger + Z rho delta Z^dagger ],
+
+  delta q = q(delta P,phi,phi) + q(P,delta phi,phi)
+                                 + q(P,phi,delta phi).
+
+The angular conversion is linear in P. Summing over k and sites BEFORE the
+radial contractions avoids repeating radial work at every k point. In the
+reverse operation, sum all spatial and matching covectors before calling
+the radial reverse solver once per atom/l. No pseudo-inverse is required.
+
+INTERSTITIAL REPRESENTATION
+
+Only plane-wave rows of the central coefficient matrix C_Gn are used; LO
+rows must be excluded. At fixed geometry the common Bloch phase cancels in
+the density. With native FFT conventions, evaluate the periodic functions
+by an unnormalized backward transform, form Psi rho Psi^dagger, and take
+the forward transform divided by N_grid*Omega.
+
+Apply the native STERN star SUM. For a distinct rotated reciprocal vector,
+average the translation phases of symmetry operations generating that same
+member. Sum all distinct members with conjugate phase. Do not divide by
+star multiplicity. Real-vector mode uses the native cosine phases; complex
+mode keeps complex phases. wstruct.timat must be transposed to obtain the
+native reciprocal rotation convention.
+
+The Fourier coefficients are a full-cell continuation of the interstitial
+density, as in the native file. Do not insert a muffin-tin exclusion mask
+into this reconstruction. The eventual charge integration must combine
+interstitial and muffin-tin representations with the appropriate geometry.
+
+The implementation transforms C*rho rather than forming all band-pair
+products separately on the real-space grid. Central wavefunctions may be
+cached; disabling that cache reduces memory. The grid is checked to prevent
+aliasing of the density products and requested star members.
+
+NATIVE RADIAL INTERFACE
+
+lapw_radial_capi.f90 wraps the existing tested discrete radial modules with
+process-local prepared contexts. lapw_radial_native.py supplies typed,
+validated array access, explicit resource cleanup and a lock around the
+native registry. MPI processes have independent registries. The current
+registry holds up to 512 simultaneous atom/l contexts per process.
+
+No Matsubara loops, diagonalizations, files or external program launches
+occur inside the new radial action/pullback. Preparation is done once. The
+underlying solver and its normalization, finite-energy udot stencil and ABC
+branches are unchanged. C-contiguous/noncontiguous user arrays are copied
+to the required Fortran layout at this interface.
+
+NativeRadialContext accepts r*V_spherical in Ry and radial energies in Ry.
+Its forward operation returns delta phi and delta ABC. Its reverse returns
+covectors of r*V, E and E_LO. BasisDensityResponse explicitly selects a
+fixed-energy policy and discards energy covectors only under that policy.
+Automatic energy-search differentiation is not approximated silently.
+
+Supported: scalar NREL/RELA, LAPW, ordinary LO and APW+lo branches tested
+below. Unsupported: DIRACOUT p1/2. Existing native fatal checks for singular
+radial/LO configurations are retained; this API is not an exception-safe
+replacement for all failures inside the Fortran solver.
+
+INDEPENDENT MATERIAL TESTS
+
+Fresh three-k-point exports were made in isolated scratch directories from
+the existing RKMAX=8 reference snapshots:
+
+  SrVO3: NREL, complex vectors, 43 stored bands, 4 inequivalent atoms;
+  FeSe:  RELA, real vectors,    66 stored bands, 2 inequivalent atoms.
+
+For both materials, use signed random Hermitian matrices in the COMPLETE
+stored band space. This tests off-diagonal terms and avoids a positive-only
+occupation test hiding response errors. Native dmft2_response consumes these
+matrices through its signed-density input. Their normalization is supplied
+once; the spatial map adds no spin or k weights.
+
+The reconstructed density agrees with native case.clmval as follows:
+
+                             SrVO3             FeSe
+  complete-vector relative   1.46e-12           7.84e-13
+  max MT absolute            1.76e-13           4.65e-14
+  interstitial relative      1.30e-12           7.99e-13
+
+For the moving-basis check, perturb the spherical basis-generating potential
+on each atom by delta(rV)=0.07*r*sin(1.3*r) Ry and simultaneously perturb the
+signed band density. Hold geometry, RMT, central coefficients and all radial
+energy headers fixed. Compare the joint analytic spatial derivative with
+native nonlinear endpoints at +/-h:
+
+  h               SrVO3 relative error       FeSe relative error
+  0.002           2.59e-8                     1.76e-7
+  0.001           6.42e-9                     4.39e-8
+  0.0005          1.69e-9                     1.13e-8
+
+The roughly fourfold reduction upon halving h is the expected central-
+difference behavior. The complete radial/matching/spatial reverse pairing
+agrees to 2.96e-15 in SrVO3 and 3.23e-15 in FeSe for this perturbation.
+
+If the basis-density term is omitted, the relative error is instead about
+4.39% in SrVO3 and 9.53% in FeSe for THESE chosen test directions. Those
+percentages are not estimates of the missing stress or its pressure error.
+
+The in-memory composed basis map reproduces the standalone native radial
+chain to 3.43e-16 and 7.41e-16 relative error, respectively. Random forward/
+transpose checks pass below 1e-16 in their norm-scaled convention. The
+physical-direction contractions agree below 8e-16 with unit-floor scaling.
+
+PORTABLE TESTS AND COST
+
+The 79 existing response Python tests pass. Thirteen added tests cover
+independent angular quadrature, explicit coefficient-pair Fourier sums,
+nonsymmorphic star phases, signed complex density matrices, product-rule
+terms, band gauge covariance, k/site pooling, full file coordinates, native
+NREL/RELA radial finite differences, potential/energy gauge cancellation,
+array layout, context cleanup/thread serialization and unsupported inputs.
+Native cases include zero LOs and ordinary LAPW/APW+lo branches.
+
+On this laptop, using one numerical-library thread and three k points,
+representative median times are:
+
+  operation                                   SrVO3         FeSe
+  R delta rho (density reconstruction)         0.088 s       0.133 s
+  R^T y                                       0.081 s       0.126 s
+  D_s delta(rV), including native radial work  0.087 s       0.050 s
+  D_s^T y, including native radial reverse     0.086 s       0.052 s
+
+These are component timings, not full-mesh timings or end-to-end stress
+speedups. Central setup and cached plane-wave contractions are separate.
+The future MPI driver must distribute k points and combine the small atomic
+covectors; that production parallel connection has not been made here.
+
+BUILD AND USE
+
+Build only the optional shared radial response library:
+
+  cd /Users/haule/projects/eDMFT_new/src/dmft2/atpar
+  make response PF90=/opt/homebrew/bin/mpif90
+
+RADIAL_SHARED_LDFLAGS defaults to -shared and can be overridden for another
+compiler/platform. Ordinary libatpar.a and the default dmft2 target do not
+depend on this optional C interface. Install liblapw_response.so alongside
+the Python helpers or pass library=/absolute/path/liblapw_response.so.
+Ordinary src/Makefile installation copies the Python files; the optional
+library must currently be built/copied explicitly.
+
+SpatialValenceDensity.fixed_basis_operator() returns (R,band_coordinates).
+BasisDensityResponse(...,energy_policy='fixed').operator returns D_s.
+The existing PairedOperator composition can connect these to E/B/S/K once
+the complete material coordinate adapters are supplied and validated.
+
+FILES
+
+  src/python/lapw_density_response.py
+  src/python/lapw_radial_native.py
+  src/python/lapw_basis_density_response.py
+  src/python/tests/test_lapw_density_response.py
+  src/python/tests/test_lapw_radial_native.py
+  src/dmft2/atpar/lapw_radial_capi.f90
+  src/dmft2/atpar/Makefile: optional response target and clean rule
+
+The checkpoint includes input/executable fingerprints, source snapshots,
+test scripts and small result files. Large native vectors/endpoints remain
+under /private/tmp/edmft_spatial_response_20261108/. Drivers retain their
+recorded scratch paths and dependencies on earlier checkpoint probes; the
+portable unit tests are the self-contained regression entry point.
+
+REMAINING VALIDATION AND NEXT WORK
+
+1. Connect the full material potential-to-H/O/raw-projector map B, including
+   spherical kinetic/surface, nonspherical and interstitial pieces in one
+   gauge, and the potential coordinate conversion S. Then combine R E B+D.
+   Compare the resulting potential-to-density operation with the native
+   one-step map, rather than only perturbing rho and radial potential as
+   independently supplied inputs.
+
+2. Check integrated charge with consistent native integration and angular
+   truncations; test the retained-band complement and cutoff convergence.
+   The present pointwise native agreement does not establish closure of
+   the entire charge-response map or eliminate retained-band errors.
+
+3. Add fast Hartree/XC (including GGA) and core operations and their exact
+   transposes. Validate one full unmixed charge-map Jacobian against the
+   existing native reference, including gauge shifts and particle number.
+
+4. Solve the physical screened response and compare delta n/delta V_KS.
+   Derive/connect the complete correction gradient and six geometric
+   strain sources; check the forward/adjoint stress contractions.
+
+5. Only after those checks, publish the corrected tensor through the shared
+   dmft2 executor before SCF merge, preserving final-only run_dmft scheduling
+   and the independent radial-response switch. Broaden to fixed-mu MnO,
+   magnetic MnTe and more general cell/SOC conventions after the initial
+   nonmagnetic FeSe/SrVO3 closure tests.

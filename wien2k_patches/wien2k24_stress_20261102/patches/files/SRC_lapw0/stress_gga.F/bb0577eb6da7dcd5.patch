@@ -1,0 +1,67 @@
+--- a/SRC_lapw0/stress_gga.F
++++ b/SRC_lapw0/stress_gga.F
+@@ -2,7 +2,7 @@
+     use densit  ,   only: clmsp, clm    !clmsp(j,lm1,jatom,ispin)
+     use parallel,   only: nstart, nstop, myid
+     use struct  ,   only: mult,jri,r0,dx,rmt,iatnr,nat
+-    use gga_str_kb, only: gga_fin_str   ! , sigma_str
++    use gga_str_kb, only: gga_fin_str, gga_mt_metric, gga_metric_full   ! , sigma_str
+     use work      , only: exc,vxc
+     implicit none
+    include 'param.inc'
+@@ -66,7 +66,38 @@
+        spin1 = .FALSE.
+     ENDIF
+     
++    ! ROTIJ is indexed over all atoms, not inequivalent atom types.  Account
++    ! for atom types assigned to earlier MPI ranks before rotating this
++    ! rank's GGA stress tensors.  Otherwise parallel LAPW0 uses rotations
++    ! belonging to the wrong equivalent atoms whenever nstart(myid)>1.
+     index_a = 0
++    DO jatom = 1, nstart(myid)-1
++       index_a = index_a + mult(jatom)
++    ENDDO
++    if(gga_metric_full.and.allocated(gga_mt_metric))then
++       ! Q was integrated on exactly the angular grid where VXCLM2 samples
++       ! the energy density. Products of different harmonics and tangential
++       ! density gradients are thus retained, without an intermediate
++       ! projection/truncation of the nonlinear derivative df/dsigma.
++       do jatom=nstart(myid),nstop(myid)
++          do mu=1,mult(jatom)
++             index_a=index_a+1
++             buf_str4=gga_mt_metric(:,jatom)
++             call symmetry_stress_rotij(index_a,jatom,buf_str4)
++             gga_fin_str=gga_fin_str+buf_str4
++          enddo
++       enddo
++#ifdef Parallel
++       gga_fin_str1=gga_fin_str
++       call mpi_reduce(gga_fin_str1,gga_fin_str,9,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,ierr)
++#endif
++       if(myid.eq.0)then
++          write(6,'(a,9es24.15)') ':GGA_METRIC_MT_RY:',gga_fin_str
++          write(6,'(a,9es24.15)') ':GGA_METRIC_INT_RY:',real(gga_str_int,8)
++          gga_fin_str=gga_fin_str+real(gga_str_int,8)
++       endif
++       return
++    endif
+     DO 29 jatom = nstart(myid), nstop(myid)
+     DO 29 mu    = 1, mult(jatom)
+           index_a = index_a + 1
+@@ -311,3 +342,16 @@
+      
+ return
+ END
++
++subroutine init_gga_metric(natom)
++  use gga_str_kb, only: gga_mt_metric,gga_metric_full
++  implicit none
++  integer,intent(in) :: natom
++  character(32) :: mode
++  integer :: status
++  if(allocated(gga_mt_metric))deallocate(gga_mt_metric)
++  allocate(gga_mt_metric(9,natom));gga_mt_metric=0.d0
++  mode=''
++  call get_environment_variable('WIEN_STRESS_GGA_MODE',mode,status=status)
++  gga_metric_full=trim(mode)/='LEGACY'
++end subroutine init_gga_metric

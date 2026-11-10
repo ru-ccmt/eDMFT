@@ -1,0 +1,19 @@
+test_01_pristine_check_is_read_only (__main__.BundleTests.test_01_pristine_check_is_read_only) ... ok
+test_02_pristine_apply_backup_and_idempotence (__main__.BundleTests.test_02_pristine_apply_backup_and_idempotence) ... ok
+test_03_all_historical_whole_tree_upgrades (__main__.BundleTests.test_03_all_historical_whole_tree_upgrades) ... ok
+test_04_every_registered_variant (__main__.BundleTests.test_04_every_registered_variant) ... ok
+test_05_site_flags_and_comments_preserved (__main__.BundleTests.test_05_site_flags_and_comments_preserved) ... ok
+test_06_unknown_source_refused_without_partial_writes (__main__.BundleTests.test_06_unknown_source_refused_without_partial_writes) ... ok
+test_07_ambiguous_makefile_refused_without_partial_writes (__main__.BundleTests.test_07_ambiguous_makefile_refused_without_partial_writes) ... ok
+test_08_missing_component_refused_without_partial_writes (__main__.BundleTests.test_08_missing_component_refused_without_partial_writes) ... ok
+test_09_optional_fftw_group (__main__.BundleTests.test_09_optional_fftw_group) ... ok
+test_10_integrity_detects_corruption (__main__.BundleTests.test_10_integrity_detects_corruption) ... ok
+test_11_all_reviewable_cumulative_patches (__main__.BundleTests.test_11_all_reviewable_cumulative_patches) ... ok
+test_12_failed_install_rolls_back (__main__.BundleTests.test_12_failed_install_rolls_back) ... ok
+test_13_current_sources_missing_object_is_repaired (__main__.BundleTests.test_13_current_sources_missing_object_is_repaired) ... ok
+test_14_legacy_entry_points_are_current (__main__.BundleTests.test_14_legacy_entry_points_are_current) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 12.012s
+
+OK

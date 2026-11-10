@@ -1,0 +1,314 @@
+[
+  {
+    "material": "MnO",
+    "name": "MnO_center",
+    "stage": "lapw0_definition",
+    "seconds": 0.04974104184657335,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_center",
+    "stage": "lcore_definition",
+    "seconds": 0.0414730841293931,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_center",
+    "stage": "lapw0",
+    "seconds": 0.5997775001451373,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_center",
+    "stage": "lapw1",
+    "seconds": 0.5458611249923706,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_center",
+    "stage": "dmft2",
+    "seconds": 0.5464745841454715,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_center",
+    "stage": "lcore",
+    "seconds": 0.01493766694329679,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_m_0.001",
+    "stage": "lapw0_definition",
+    "seconds": 0.043033207999542356,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_m_0.001",
+    "stage": "lcore_definition",
+    "seconds": 0.04010924999602139,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_m_0.001",
+    "stage": "lapw0",
+    "seconds": 0.6003510840237141,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_m_0.001",
+    "stage": "lapw1",
+    "seconds": 0.5309520410373807,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_m_0.001",
+    "stage": "dmft2",
+    "seconds": 0.5267569590359926,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_m_0.001",
+    "stage": "lcore",
+    "seconds": 0.013737125089392066,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_p_0.001",
+    "stage": "lapw0_definition",
+    "seconds": 0.04230120778083801,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_p_0.001",
+    "stage": "lcore_definition",
+    "seconds": 0.04143595788627863,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_p_0.001",
+    "stage": "lapw0",
+    "seconds": 0.6320950000081211,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_p_0.001",
+    "stage": "lapw1",
+    "seconds": 0.5289318331051618,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_p_0.001",
+    "stage": "dmft2",
+    "seconds": 0.534166167024523,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnO",
+    "name": "MnO_p_0.001",
+    "stage": "lcore",
+    "seconds": 0.01464174990542233,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft",
+    "stage": "lapw0_definition",
+    "seconds": 0.047080333111807704,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft",
+    "stage": "lcore_definition",
+    "seconds": 0.04451558296568692,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft",
+    "stage": "lapw0",
+    "seconds": 0.7760661668144166,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft",
+    "stage": "lapw1",
+    "seconds": 2.1619523339904845,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft",
+    "stage": "dmft2",
+    "seconds": 4.520467957947403,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft",
+    "stage": "dmft2dn",
+    "seconds": 4.543126708129421,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft",
+    "stage": "lcore",
+    "seconds": 0.024785750079900026,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_m_0.001",
+    "stage": "lapw0_definition",
+    "seconds": 0.047201958019286394,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_m_0.001",
+    "stage": "lcore_definition",
+    "seconds": 0.04111270792782307,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_m_0.001",
+    "stage": "lapw0",
+    "seconds": 0.8080213339999318,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_m_0.001",
+    "stage": "lapw1",
+    "seconds": 2.1983016249723732,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_m_0.001",
+    "stage": "dmft2",
+    "seconds": 4.537479750113562,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_m_0.001",
+    "stage": "dmft2dn",
+    "seconds": 4.549196166917682,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_m_0.001",
+    "stage": "lcore",
+    "seconds": 0.025786542100831866,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_p_0.001",
+    "stage": "lapw0_definition",
+    "seconds": 0.04752095905132592,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_p_0.001",
+    "stage": "lcore_definition",
+    "seconds": 0.0444301669485867,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_p_0.001",
+    "stage": "lapw0",
+    "seconds": 0.8100326668936759,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_p_0.001",
+    "stage": "lapw1",
+    "seconds": 2.1857586668338627,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_p_0.001",
+    "stage": "dmft2",
+    "seconds": 4.544675916898996,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_p_0.001",
+    "stage": "dmft2dn",
+    "seconds": 4.5504654159303755,
+    "completed": true,
+    "returncode": 0
+  },
+  {
+    "material": "MnTe",
+    "name": "dmft_p_0.001",
+    "stage": "lcore",
+    "seconds": 0.02524587488733232,
+    "completed": true,
+    "returncode": 0
+  }
+]

@@ -1,0 +1,209 @@
+--- a/SRC_lapw2/stress_APW_surface.f
++++ b/SRC_lapw2/stress_APW_surface.f
+@@ -1,8 +1,12 @@
+-subroutine stress_APW_surface(nemin,nemax,jatom,rmt,ALM,BLM,CLM,A_surf2,buf_APW)
++subroutine stress_APW_surface(nemin,nemax,jatom,rmt,ALM,BLM,CLM,A_surf2, &
++                              T_surf2,buf_APW,buf_rmt_shape, &
++                              buf_rmt_operator)
+    
+    use param   
+-   use atspdt, only: P,DP,PE,DPE
+-   use lo    , only: loor,ilo,plo,dplo
++   use atspdt, only: P,DP,PE,DPE,EL
++   use lo    , only: loor,ilo,plo,dplo,a1lo
++   use radial_functions, only: VR
++   use struk, only: jri,r0,dx
+    use xa    , only: weight
+    implicit none
+    
+@@ -11,18 +15,26 @@
+    complex*16, intent(in)   :: CLM((lmax2+1)*(lmax2+1),nume,nloat),&
+                                ALM((lmax2+1)*(lmax2+1),nume),  &
+                                BLM((lmax2+1)*(lmax2+1),nume),  &                               
+-                               A_surf2((lmax2+1)*(lmax2+1),nume)
++                               A_surf2((lmax2+1)*(lmax2+1),nume), &
++                               T_surf2((lmax2+1)*(lmax2+1),nume)
+                                
+-   complex*16, intent(out)  :: buf_APW(3,3,nume)   
++   complex*16, intent(out)  :: buf_APW(3,3,nume), &
++                               buf_rmt_shape(3,3,nume), &
++                               buf_rmt_operator(3,3,nume)
+    
+    complex*16          :: c_am(3,-1:1), buf_temp1(3,3,nume),       &
+                           buf_temp2(3,3,nume),buf_temp3(3,3,nume), &
+                           buf_temp4(3,3,nume), zeroc
++   complex*16, allocatable :: dmt_surf(:,:),psi_surf(:,:),tmt_surf(:,:)
+                           
+    integer             :: l0,lp,s0,v0,t0,tp, alpha, beta, m0,mp,num, &
+                           index1,index2,jlo,jlop, index, index3,lmda,lmdap 
+                            
+-   real*8              :: gaunt1,gaunt2,rmt3,rmt2,tw_by_r                        
++   real*8              :: gaunt1,gaunt2,rmt3,rmt2,tw_by_r, &
++                          rmesh(nrad),frad(nrad),dfdr(nrad),d2fdr2(nrad), &
++                          tu(0:lmax2),tue(0:lmax2),tlo(nloat,0:lmax2), &
++                          vboundary,g0
++   integer             :: ir,imax
+    integer, external   :: NOTRI
+    real*8 , external   :: GAUNT
+    
+@@ -35,11 +47,102 @@
+    buf_temp3 = zeroc
+    buf_temp4 = zeroc
+    
+-   buf_APW   = zeroc        
++   buf_APW       = zeroc
++   buf_rmt_shape = zeroc
++   buf_rmt_operator = zeroc
+    
+    rmt3 = rmt*rmt*rmt
+    rmt2 = rmt*rmt
+    tw_by_r = 2.d0/rmt
++
++   ! A homogeneous strain can be differentiated using either of two
++   ! geometrical conventions for an LAPW partition.  In the usual analytic
++   ! derivation the muffin-tin is transported by the affine coordinate map.
++   ! A WIEN2k finite-difference calculation, however, normally keeps RMT
++   ! fixed in Bohr.  Reynolds' transport theorem then leaves a boundary
++   ! (shape-derivative) term
++   !
++   !   RMT^3 int dOmega n_alpha n_beta [L_I(RMT)-L_MT(RMT)] .
++   !
++   ! The potential and tangential-gradient pieces cancel when the augmented
++   ! wave function is continuous at the sphere.  In Rydberg units the
++   ! remaining kinetic candidate is therefore the jump in the squared radial
++   ! derivative.  A_surf2 is the interstitial radial derivative, while the
++   ! array below reconstructs the muffin-tin derivative including all local
++   ! orbitals.  We keep this contribution separate from buf_APW: the latter
++   ! is the familiar APW+lo derivative-discontinuity term and is not the
++   ! fixed-RMT shape derivative.
++   !
++   ! This is initially a guarded diagnostic.  l2main accumulates and
++   ! symmetrizes it, and symmetrization_stress applies it only when
++   ! WIEN_STRESS_RMT_SHAPE=GRAD is set explicitly.
++   allocate(dmt_surf((lmax2+1)*(lmax2+1),nume))
++   allocate(psi_surf((lmax2+1)*(lmax2+1),nume))
++   allocate(tmt_surf((lmax2+1)*(lmax2+1),nume))
++   dmt_surf = zeroc
++   psi_surf = zeroc
++   tmt_surf = zeroc
++
++   ! A second, mathematically distinct diagnostic implements the operator
++   ! form of the kinetic discontinuity discussed by Thonhauser et al.:
++   !
++   !   RMT^3 int dOmega n_alpha n_beta psi^* (T_I psi-T_MT psi).
++   !
++   ! It must not be confused with the gradient-density jump above.  For the
++   ! nonrelativistic radial functions, the spherical radial equation gives
++   ! T u=(E_l-V_sph)u and T udot=(E_l-V_sph)udot+u in Rydberg units.  A local
++   ! orbital is a linear combination and generally is not an eigenfunction
++   ! of one radial energy, so its boundary kinetic value is evaluated from
++   ! the stored radial function.  This diagnostic is printed but is not
++   ! applied to the production stress.
++   imax = jri(jatom)
++   do ir=1,imax
++      rmesh(ir) = r0(jatom)*exp(dx(jatom)*(ir-1))
++   enddo
++   vboundary = 2.d0*VR(imax)/rmt
++   tu = 0.d0
++   tue = 0.d0
++   tlo = 0.d0
++   do l0=0,lmax2
++      tu(l0) = (EL(l0)-vboundary)*P(l0)
++      tue(l0) = (EL(l0)-vboundary)*PE(l0) + P(l0)
++      do jlo=1,ilo(l0)
++         if(loor(jlo,l0)) then
++            do ir=1,imax
++               frad(ir) = a1lo(ir,jlo,l0)/rmesh(ir)
++            enddo
++            call dergl(imax,rmesh,frad,dfdr,.true.,g0)
++            call dergl(imax,rmesh,dfdr,d2fdr2,.true.,g0)
++            tlo(jlo,l0) = -d2fdr2(imax) - 2.d0*dfdr(imax)/rmt + &
++                           dble(l0*(l0+1))*frad(imax)/(rmt*rmt)
++         endif
++      enddo
++   enddo
++
++   index = 0
++   do l0 = 0,lmax2
++      do m0 = -l0,l0
++         index = index + 1
++         do num = nemin,nemax
++            dmt_surf(index,num) = ALM(index,num)*DP(l0) + &
++                                  BLM(index,num)*DPE(l0)
++            psi_surf(index,num) = ALM(index,num)*P(l0) + &
++                                  BLM(index,num)*PE(l0)
++            tmt_surf(index,num) = ALM(index,num)*tu(l0) + &
++                                  BLM(index,num)*tue(l0)
++            do jlo = 1,ilo(l0)
++               if(loor(jlo,l0)) then
++                  dmt_surf(index,num) = dmt_surf(index,num) + &
++                       CLM(index,num,jlo)*dplo(jlo,l0)
++                  psi_surf(index,num) = psi_surf(index,num) + &
++                       CLM(index,num,jlo)*plo(jlo,l0)
++                  tmt_surf(index,num) = tmt_surf(index,num) + &
++                       CLM(index,num,jlo)*tlo(jlo,l0)
++               endif
++            enddo
++         enddo
++      enddo
++   enddo
+    
+    index1 = 0
+    index2 = 0
+@@ -68,7 +171,37 @@
+                                     buf_APW(alpha,beta,num) = buf_APW(alpha,beta,num) + &
+                                     c_am(alpha,t0)*c_am(beta,tp)*gaunt1*gaunt2*rmt2*&
+                                     (conjg(ALM(index1,num))*P(l0)+conjg(BLM(index1,num))*PE(l0))*&
+-                                    (ALM(index2,num)*DP(l0)+BLM(index2,num)*DPE(l0)-A_surf2(index2,num))
++                                    (ALM(index2,num)*DP(lp)+BLM(index2,num)*DPE(lp)-A_surf2(index2,num))
++
++                                    ! INDEX1 is the bra (l0,m0) and INDEX2 is
++                                    ! the ket (lp,mp).  A rank-two strain
++                                    ! couples l0 and lp=l0,l0+/-2, so the ket
++                                    ! radial derivative must be evaluated in
++                                    ! its own lp channel.  Using DP(l0) and
++                                    ! DPE(l0) here silently mixed the bra
++                                    ! radial function into every off-diagonal
++                                    ! angular block of the APW surface term.
++
++                                    ! Physical fixed-RMT minus affine-RMT
++                                    ! stress numerator for this state.  The
++                                    ! factor 2 for spin and the occupation
++                                    ! weight are applied once in l2main.
++                                    buf_rmt_shape(alpha,beta,num) = &
++                                         buf_rmt_shape(alpha,beta,num) + &
++                                         c_am(alpha,t0)*c_am(beta,tp)* &
++                                         gaunt1*gaunt2*rmt3* &
++                                         (conjg(A_surf2(index1,num))* &
++                                          A_surf2(index2,num) - &
++                                          conjg(dmt_surf(index1,num))* &
++                                          dmt_surf(index2,num))
++
++                                    buf_rmt_operator(alpha,beta,num) = &
++                                         buf_rmt_operator(alpha,beta,num) + &
++                                         c_am(alpha,t0)*c_am(beta,tp)* &
++                                         gaunt1*gaunt2*rmt3* &
++                                         conjg(psi_surf(index1,num))* &
++                                         (T_surf2(index2,num)- &
++                                          tmt_surf(index2,num))
+                                  ENDDO
+                                  
+                                  DO num = nemin,nemax
+@@ -77,7 +210,7 @@
+                                          buf_APW(alpha,beta,num) = buf_APW(alpha,beta,num) + &
+                                          c_am(alpha,t0)*c_am(beta,tp)*gaunt1*gaunt2*rmt2*&
+                                          conjg(clm(index1,num,jlo))*plo(jlo,l0)*   &
+-                                         (ALM(index2,num)*DP(l0)+BLM(index2,num)*DPE(l0)-A_surf2(index2,num))                                                                                  
++                                         (ALM(index2,num)*DP(lp)+BLM(index2,num)*DPE(lp)-A_surf2(index2,num))
+                                        ENDIF
+                                     ENDDO
+                                  ENDDO
+@@ -118,6 +251,8 @@
+          ENDDO
+       ENDDO
+    ENDDO
++
++   deallocate(dmt_surf,psi_surf,tmt_surf)
+ 
+ !    !---from inside the sphere
+ !    index1 = 0

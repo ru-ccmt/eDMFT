@@ -1,0 +1,29 @@
+STRAIN PACKAGE INSTALLED AND VERIFIED — 9 NOVEMBER 2026
+
+Applied the approved patch to ~/projects/eDMFT_new and installed the matching
+19 Python helpers and four separate native response workers into ~/dbin.
+103 destinations were installed with original-hash checks and backups.
+Production WIEN executables and all user material inputs were left unchanged.
+
+Verification after installation:
+- All installed hashes and backups checked.
+- 256 tests pass using repository imports; no skips.
+- 256 tests pass using ~/dbin imports; no skips.
+- Installed merger plus native mixer reproduces the corrected SrVO3 tensor
+  within 0.000002882 GPa (printed output precision), in copied test inputs.
+- Actual SrVO3 and FeSe inputs pass the analytic-backend preflight.
+
+Both examples currently use STRF. Request the new response with STRFT in the
+active case.in2/case.in2c (or STRT without forces), keeping STR in case.in0.
+x_dmft.py dmft2 runs the requested response immediately after dmft2;
+run_dmft.py requests it only in the final measurement pass.
+Then lcore, SCF assembly and mixer publish the complete replacement tensor.
+The response uses isolated case.response_runs/<id>/ directories.
+
+Backups: before_installation/ below this directory.
+Installed file record: INSTALLATION.json.
+Reviewed payload record: INSTALL_MANIFEST.json.
+Results and speed: RESULTS.txt; equations/workflow: IMPLEMENTATION.txt.
+No new material self-consistency run was required for installation; the
+identical scientific payload was tested before approval. General shear,
+magnetic and fixed-mu publication remain outside the current supported scope.

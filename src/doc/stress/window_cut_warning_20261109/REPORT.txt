@@ -1,0 +1,53 @@
+WINDOW-CUT WARNING IN PRODUCTION STRESS — 9 November 2026
+
+Requested policy
+A split degeneracy at the DMFT window edge no longer aborts ordinary STRT/STRFT.
+For cross-window pairs with |epsilon_in-epsilon_out| <= 1e-10 Ry, set only the
+inverse denominator to zero. This matches the native DMFT2 threshold and the
+previous MnO/MnTe cutoff tests. Retain all k points, regular band pairs, central
+projectors, occupations and k weights. Apply the same mask in the forward and
+adjoint responses, including the projector-normalization derivative X'.
+
+This is an explicit numerical approximation, not a proof of differentiability
+of a hard window splitting a degenerate multiplet. The run issues a warning,
+records the counts/cutoff/affected total k weight in report.json, and prints
+them in case.outputdmf2_response. Default results may be assembled into SCF.
+No new input switch is required. Explicit --diagnostic-gap-cutoff overrides
+remain sensitivity diagnostics; those reports are not automatically published.
+All convergence, finite-tensor, fingerprint and symmetry checks remain active.
+
+Validation
+74 targeted tests passed, covering the regular and degenerate response,
+normalization, fixed-mu/fixed-N adjoints, metrics, caching, launch integration,
+SCF publication and readable summaries. The four-rank degenerate MPI regression
+agrees with the serial response/adjoint to 3.67e-15 maximum absolute error.
+An initial test command encountered an uninitialized noninteractive conda shell;
+a subsequent run from the unrelated atomh cwd imported its older merge_scf.py.
+The final suite ran from this isolated staging directory with verified import
+paths; neither was a production algorithm failure.
+
+Current MnO snapshot
+/Users/haule/projects/materials/MnO/MnO_center/MnO.response_runs/20261109T193747-dad3ff630c65/central
+Full default response completed on 12 MPI ranks, with no diagnostic flag.
+Mean tensile stress: -72.313213055139 GPa
+Compression-positive pressure: 72.313213055139 GPa
+Response driver wall time: 66.256 s
+Central fixed-point residual: 0.000707181817472
+Omitted pairs: 9; affected k points: 8/72; affected total k weight: 0.029513888889
+stress_ready=True; diagnostic_only=False.
+This reuses the newly prepared native snapshot; no parent calculation was
+rerun or overwritten. The earlier diagnostic was -72.3141607458 GPa on its
+older snapshot. This is not a fresh finite-difference stress determination.
+
+Both merge_scf.py and run_dmft.py's scf_merge.scf accepted the real new tensor
+in isolated SCF assembly tests. The resulting native tensor differs from the
+JSON value by only 1.27e-11 Ry/Bohr^3 (printed-row rounding). The warning is
+present in the readable summary for both paths. Parent SCF/status files remain
+untouched; rerun x_dmft.py dmft2 --execute-only to obtain a normal current run.
+
+Files
+Runtime changes: frozen_sigma_response.py, lapw_total_stress.py,
+lapw_total_stress_driver.py, stress_response_summary.py.
+Four test files accompany the change. No native rebuild or WIEN2k bundle
+change is required. Local source and dbin installation plus the rupc-01 source
+update are recorded in DEPLOYMENT.json. Remote dbin installation is separate.

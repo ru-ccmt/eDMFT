@@ -1,0 +1,501 @@
+--- a/SRC_lapw2/val_kinstrmt.F
++++ b/SRC_lapw2/val_kinstrmt.F
+@@ -1,4 +1,4 @@
+-SUBROUTINE val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,RMT)
++SUBROUTINE val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,F_buf_parts,RMT)
+   !  use param, only:lmax=>lmax2
+     use param
+     use atspdt,    only:p,dp,pe,dpe
+@@ -21,7 +21,8 @@
+                                   clm((lmax2+1)*(lmax2+1),nume,nloat)                                  
+     REAL*8, intent(in)         :: RMT                              
+     REAL*8                     :: FF(0:1,0:lmax2),DFF(0:1,0:lmax2)
+-    COMPLEX*16, intent(out)    :: F_buf_total(3,3,nume)
++    COMPLEX*16, intent(out)    :: F_buf_total(3,3,nume), &
++                                  F_buf_parts(3,3,nume,4)
+     integer                    :: l,ll,lp,llp,m,mp,t,tp,u,s,sp,v1,v2,v, &
+                                    jlo,jlop
+     integer                    :: alpha,beta, num, lmda,lmdap
+@@ -30,8 +31,13 @@
+     REAL*8,  external          :: GAUNT
+     real*8                     :: gaunt1,gaunt2,gaunt3,RMT2
+     REAL*8, PARAMETER          :: ohalf = 1.D0/2.D0    
++    real*8                     :: g1_deriv_scale, g1_lo_scale
++    integer                    :: g1_legacy_status
++    character(len=32)          :: g1_legacy_env
+     complex*16                 :: c_am(3,-1:1), ca_st_lm(3,-1:1,-1:1), &
+                                   ca_st_lm11(3,-1:1,-1:1)
++    complex*16                 :: angular_buf(3,3),angular_buf2(3,3), &
++                                  radial_buf1,radial_buf2
+     complex*16                 :: F1_buf(3,3,nume), F2_buf(3,3,nume), &
+                                   F3_buf(3,3,nume), F4_buf(3,3,nume), &
+                                   F5_buf(3,3,nume), F6_buf(3,3,nume), &                                  
+@@ -43,7 +49,30 @@
+ !=====================    
+     lmax = lmax2n        !at least lmax = 7 is needed
+ !=====================                                      
+-                                  
++
++    ! G1 product rule (audit 2026-11-07): F2 differentiates n_alpha only.
++    ! The derivative of Y in D_beta(n_alpha*Y) belongs in F3 as well as
++    ! the separate n_beta*D_alpha(Y) row. Thus F3 is
++    !       (2*R1-R0) * (n_alpha*D_beta+n_beta*D_alpha)/2,
++    ! R1=int r*u_bra*u'_ket dr, R0=int u_bra*u_ket dr.
++    ! Halving the R1 coefficient was an incorrect earlier correction.
++    ! In particular psi=r*Y_10 is proportional to z and has ZERO Hessian;
++    ! the halved coefficient gives a spurious, traceless tensor instead.
++    ! LO--LO products have no extra multiplicity: the ordered pair sum
++    ! already contains every primitive pair, just as for u and udot.
++    ! PREAUDIT explicitly reproduces the two old angular defects for
++    ! diagnostics only; the physical/default scales are both one.
++    g1_deriv_scale = 1.d0
++    g1_lo_scale = 1.d0
++    g1_legacy_env = ''
++    call get_environment_variable('WIEN_STRESS_G1_PREAUDIT',g1_legacy_env, &
++                                  status=g1_legacy_status)
++    if(g1_legacy_status.eq.0 .and. len_trim(g1_legacy_env).gt.0 .and. &
++       trim(g1_legacy_env).ne.'0') then
++       g1_deriv_scale = 0.5d0
++       g1_lo_scale = 2.d0
++    endif
++
+     DO l = 0, lmax
+        FF(0,l)   = P(l)
+        FF(1,l)   = PE(l)
+@@ -85,57 +114,51 @@
+                                IF((-m+mp+tp) .ne. 0) CYCLE
+                                gaunt1 = GAUNT(sp,1,1,tp,u,t)
+                                gaunt2 = GAUNT(l,lp,sp,m,mp,tp)
++                               ! The angular 3x3 tensor is independent of
++                               ! band number and of all radial/LO products.
++                               ! Historically the complete, expensive radial
++                               ! contraction below was repeated for every
++                               ! alpha,beta pair.  Factor it once and form the
++                               ! outer tensor product afterwards.  This is an
++                               ! exact rearrangement of Eq. (G1), not an
++                               ! approximation or a diagnostic shortcut.
++                               angular_buf = zeroc
+                                DO alpha = 1,3
+                                   DO beta = 1,3
+-                                     
+-                                     DO num = nemin,nemax
+-                                        !HERE IS THE FORMULA F1
+-                                        F1_buf(alpha,beta,num) = F1_buf(alpha,beta,num) + &                                        
+-                                        (c_am(alpha,t)*c_am(beta,u)+c_am(beta,t)*c_am(alpha,u))*ohalf*gaunt1*gaunt2*&
+-                                        (ALM(index2,num)*(conjg(ALM(index1,num))*TC1S00(l,lp)+&
+-                                        +conjg(BLM(index1,num))*TC1S10(l,lp))+BLM(index2,num)*&
+-                                        (conjg(ALM(index1,num))*TC1S01(l,lp)+conjg(BLM(index1,num))*TC1S11(l,lp)) )
+-                                        
+-                                       DO jlo = 1, ilo(l) 
+-                                         ! IF(.NOT. loor(jlo,l)) CYCLE
+-                                          IF(loor(jlo,l)) THEN
+-                                          F1_buf(alpha,beta,num) = F1_buf(alpha,beta,num) + & 
+-                                         ! F6_buf1(alpha,beta,num) = F6_buf1(alpha,beta,num) + &                                           
+-                                          (c_am(alpha,t)*c_am(beta,u)+c_am(beta,t)*c_am(alpha,u))*ohalf*gaunt1*gaunt2*&
+-                                          conjg(clm(index1,num,jlo))*( ALM(index2,num)*juddu_20(jlo,l,lp) + &
+-                                          BLM(index2,num)*juddu_21(jlo,l,lp)  )
+-                                          ENDIF
+-                                       ENDDO
+-                                       
+-                                       DO jlop = 1, ilo(lp)
+-                                         ! IF(.NOT.loor(jlop,lp)) CYCLE
+-                                          IF(loor(jlop,lp)) THEN
+-                                          F1_buf(alpha,beta,num) = F1_buf(alpha,beta,num) + & 
+-                                         ! F6_buf2(alpha,beta,num) = F6_buf2(alpha,beta,num) + &
+-                                          (c_am(alpha,t)*c_am(beta,u)+c_am(beta,t)*c_am(alpha,u))*ohalf*gaunt1*gaunt2*&
+-                                          clm(index2,num,jlop)*( conjg(ALM(index1,num))*juddu_02(jlop,lp,l) + &
+-                                          conjg(BLM(index1,num))*juddu_12(jlop,lp,l)  )
+-                                          ENDIF
+-                                       ENDDO
+-                                       
+-                                       DO jlo = 1, ilo(l)
+-                                         ! IF(.NOT. loor(jlo,l)) CYCLE
+-                                         IF(loor(jlo,l)) THEN
+-                                          DO jlop = 1, ilo(lp)
+-                                            ! IF(.NOT.loor(jlop,lp)) CYCLE
+-                                             IF(loor(jlop,lp)) THEN
+-                                             F1_buf(alpha,beta,num) = F1_buf(alpha,beta,num) + &                                               
+-                                          !   F6_buf3(alpha,beta,num) = F6_buf3(alpha,beta,num) + &
+-                                             (c_am(alpha,t)*c_am(beta,u)+c_am(beta,t)*c_am(alpha,u))*ohalf*gaunt1*gaunt2*&
+-                                             conjg(clm(index1,num,jlo))*clm(index2,num,jlop)*juddu_22(jlo,jlop,l,lp)
+-                                             ENDIF
+-                                          ENDDO
+-                                         ENDIF 
+-                                       ENDDO                                                                              
+-                                       
+-                                     ENDDO                                                                                !END num
++                                     angular_buf(alpha,beta) = &
++                                          (c_am(alpha,t)*c_am(beta,u)+ &
++                                           c_am(beta,t)*c_am(alpha,u))* &
++                                          ohalf*gaunt1*gaunt2
+                                   ENDDO                                                                                   !END beta
+                                ENDDO                                                                                      !END alpha
++                               DO num = nemin,nemax
++                                  radial_buf1 = &
++                                       ALM(index2,num)*(conjg(ALM(index1,num))*TC1S00(l,lp)+ &
++                                       conjg(BLM(index1,num))*TC1S10(l,lp))+BLM(index2,num)* &
++                                       (conjg(ALM(index1,num))*TC1S01(l,lp)+ &
++                                       conjg(BLM(index1,num))*TC1S11(l,lp))
++                                  DO jlo = 1,ilo(l)
++                                     IF(loor(jlo,l)) radial_buf1 = radial_buf1 + &
++                                          conjg(clm(index1,num,jlo))* &
++                                          (ALM(index2,num)*juddu_20(jlo,l,lp)+ &
++                                           BLM(index2,num)*juddu_21(jlo,l,lp))
++                                  ENDDO
++                                  DO jlop = 1,ilo(lp)
++                                     IF(loor(jlop,lp)) radial_buf1 = radial_buf1 + &
++                                          clm(index2,num,jlop)* &
++                                          (conjg(ALM(index1,num))*juddu_02(jlop,lp,l)+ &
++                                           conjg(BLM(index1,num))*juddu_12(jlop,lp,l))
++                                  ENDDO
++                                  DO jlo = 1,ilo(l)
++                                     IF(.NOT.loor(jlo,l)) CYCLE
++                                     DO jlop = 1,ilo(lp)
++                                        IF(loor(jlop,lp)) radial_buf1 = radial_buf1 + &
++                                             conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
++                                             juddu_22(jlo,jlop,l,lp)
++                                     ENDDO
++                                  ENDDO
++                                  F1_buf(:,:,num)=F1_buf(:,:,num)+angular_buf(:,:)*radial_buf1
++                               ENDDO
+                             ENDDO                                                                                         !END mp
+                          ENDDO                                                                                            !END m
+                       ENDDO                                                                                               !END t
+@@ -163,54 +186,42 @@
+                                                         
+                             gaunt1 = GAUNT(l,lp,1+v,m,mp,t+u)                             
+                             CALL c_factor(1,t,ca_st_lm)                            
++                            angular_buf = zeroc
+                             DO alpha = 1,3
+                                DO beta = 1,3
+-                                  DO num = nemin,nemax
+-                                  
+-                                     !HERE IS THE SUM OF F2
+-                                     F2_buf(alpha,beta,num) = F2_buf(alpha,beta,num) + &
+-                                     (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u))*ohalf*gaunt1*&
+-                                     (ALM(index2,num)*(conjg(ALM(index1,num))*TC2S00(l,lp)+&
+-                                    +conjg(BLM(index1,num))*TC2S10(l,lp))+BLM(index2,num)*&
+-                                    (conjg(ALM(index1,num))*TC2S01(l,lp)+conjg(BLM(index1,num))*TC2S11(l,lp)))
+-                                    
+-                                     DO jlo = 1, ilo(l)
+-                                        IF(loor(jlo,l)) THEN
+-                                        F2_buf(alpha,beta,num) = F2_buf(alpha,beta,num) + &
+-                                       ! F6_buf1(alpha,beta,num) = F6_buf1(alpha,beta,num) + &
+-                                        (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u))*ohalf*gaunt1*&
+-                                        conjg( clm(index1,num,jlo) )*( ALM(index2,num)*judu_20(jlo,l,lp) + &
+-                                        BLM(index2,num)*judu_21(jlo,l,lp) )
+-                                        ENDIF
+-                                     ENDDO
+-                                     
+-                                     DO jlop = 1, ilo(lp)
+-                                        IF(loor(jlop,lp)) THEN
+-                                           F2_buf(alpha,beta,num) = F2_buf(alpha,beta,num) + & 
+-                                         ! F6_buf2(alpha,beta,num) = F6_buf2(alpha,beta,num) + &
+-                                           (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u))*ohalf*gaunt1*&
+-                                            clm(index2,num,jlop) *(conjg( ALM(index1,num))*judu_02(jlop,lp,l) + &
+-                                              conjg( BLM(index1,num))*judu_12(jlop,lp,l) )
+-                                        ENDIF
+-                                     ENDDO
+-                                     
+-                                     DO jlo = 1, ilo(l)
+-                                        IF(loor(jlo,l)) THEN
+-                                          DO jlop = 1, ilo(lp)
+-                                             IF(loor(jlop,lp)) THEN
+-                                                F2_buf(alpha,beta,num) = F2_buf(alpha,beta,num) + & 
+-                                             !  F6_buf3(alpha,beta,num) = F6_buf3(alpha,beta,num) + &
+-                                                (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)* &
+-                                                 ca_st_lm(alpha,v,u))*ohalf*gaunt1*&
+-                                                 conjg( clm(index1,num,jlo) )*clm(index2,num,jlop)*judu_22(jlo,jlop,l,lp)
+-                                             ENDIF
+-                                          ENDDO
+-                                        ENDIF
+-                                     ENDDO
+-                                     
+-                                  ENDDO                                                                                   !END num
++                                  angular_buf(alpha,beta) = &
++                                       (c_am(alpha,t)*ca_st_lm(beta,v,u)+ &
++                                        c_am(beta,t)*ca_st_lm(alpha,v,u))*ohalf*gaunt1
+                                ENDDO                                                                                      !END beta
+                             ENDDO                                                                                         !END alpha                            
++                            DO num = nemin,nemax
++                               radial_buf1 = &
++                                    ALM(index2,num)*(conjg(ALM(index1,num))*TC2S00(l,lp)+ &
++                                    conjg(BLM(index1,num))*TC2S10(l,lp))+BLM(index2,num)* &
++                                    (conjg(ALM(index1,num))*TC2S01(l,lp)+ &
++                                    conjg(BLM(index1,num))*TC2S11(l,lp))
++                               DO jlo = 1,ilo(l)
++                                  IF(loor(jlo,l)) radial_buf1 = radial_buf1 + &
++                                       conjg(clm(index1,num,jlo))* &
++                                       (ALM(index2,num)*judu_20(jlo,l,lp)+ &
++                                        BLM(index2,num)*judu_21(jlo,l,lp))
++                               ENDDO
++                               DO jlop = 1,ilo(lp)
++                                  IF(loor(jlop,lp)) radial_buf1 = radial_buf1 + &
++                                       clm(index2,num,jlop)* &
++                                       (conjg(ALM(index1,num))*judu_02(jlop,lp,l)+ &
++                                        conjg(BLM(index1,num))*judu_12(jlop,lp,l))
++                               ENDDO
++                               DO jlo = 1,ilo(l)
++                                  IF(.NOT.loor(jlo,l)) CYCLE
++                                  DO jlop = 1,ilo(lp)
++                                     IF(loor(jlop,lp)) radial_buf1 = radial_buf1 + &
++                                          conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
++                                          judu_22(jlo,jlop,l,lp)
++                                  ENDDO
++                               ENDDO
++                               F2_buf(:,:,num)=F2_buf(:,:,num)+angular_buf(:,:)*radial_buf1
++                            ENDDO
+                          ENDDO                                                                                            !END t
+                       ENDDO                                                                                               !END u
+                    ENDDO                                                                                                  !END mp
+@@ -238,91 +249,66 @@
+                                                         
+                             gaunt1 = GAUNT(l,1,lp+v,m,t,mp+u)                                                         
+                             CALL c_factor(lp,mp,ca_st_lm)                                                       
+-                            
++                            angular_buf = zeroc
++                            angular_buf2 = zeroc
+                             DO alpha =1,3
+                                DO beta = 1,3
+-                                  DO num = nemin,nemax
+-                                     !HERE IS THE FORMULA F3+F4-F5                                     
+-                                     F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
+-                                     (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) +&
+-                                      c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*&
+-                                      ohalf*gaunt1*(ALM(index2,num)*(conjg(ALM(index1,num))*TC2S00(l,lp)+&
+-                                      +conjg(BLM(index1,num))*TC2S10(l,lp)) + BLM(index2,num)*&                                      
+-                                    (conjg(ALM(index1,num))*TC2S01(l,lp)+conjg(BLM(index1,num))*TC2S11(l,lp))) - &
+-                                     (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
+-                                     (ALM(index2,num)*(conjg(ALM(index1,num))*TC3S00(l,lp)+&
+-                                     +conjg(BLM(index1,num))*TC3S10(l,lp))+BLM(index2,num)*&
+-                                     (conjg(ALM(index1,num))*TC3S01(l,lp)+conjg(BLM(index1,num))*TC3S11(l,lp)))
+-                                     
+-                                 !commented lines below are for testing purpose and F3_buf is zero in LAPW and LO case. 
+-                               !     F4_buf(alpha,beta,num) = F4_buf(alpha,beta,num) + &
+-                               !      (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
+-                               !      (ALM(index2,num)*(conjg(ALM(index1,num))*TC2S00(l,lp)+&
+-                               !     +conjg(BLM(index1,num))*TC2S10(l,lp))+BLM(index2,num)*&
+-                               !     (conjg(ALM(index1,num))*TC2S01(l,lp)+conjg(BLM(index1,num))*TC2S11(l,lp)))
+-                                   
+-                               !     F5_buf(alpha,beta,num) = F5_buf(alpha,beta,num) - &
+-                               !     (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
+-                               !     (ALM(index2,num)*(conjg(ALM(index1,num))*TC3S00(l,lp)+&
+-                               !      +conjg(BLM(index1,num))*TC3S10(l,lp))+BLM(index2,num)*&
+-                               !       (conjg(ALM(index1,num))*TC3S01(l,lp)+conjg(BLM(index1,num))*TC3S11(l,lp)))
+-                                      
+-                                 !     F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
+-                                 !    (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) )*ohalf*gaunt1* &
+-                                 !     (ALM(index2,num)*(conjg(ALM(index1,num))*TC2S00(l,lp)+&
+-                                 !     +conjg(BLM(index1,num))*TC2S10(l,lp)) + BLM(index2,num)*&                                      
+-                                 !   (conjg(ALM(index1,num))*TC2S01(l,lp)+conjg(BLM(index1,num))*TC2S11(l,lp)))                                     
+-                                      
+-                                      DO jlo = 1, ilo(l)
+-                                         IF(loor(jlo,l)) THEN
+-                                           F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
+-                                           (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) +&
+-                                           c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*&
+-                                           ohalf*gaunt1* &
+-                                           conjg( clm(index1,num,jlo) )*(ALM(index2,num)*judu_20(jlo,l,lp) + &
+-                                           BLM(index2,num)*judu_21(jlo,l,lp) ) - &
+-                                           (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
+-                                           conjg( clm(index1,num,jlo) )*( ALM(index2,num)*juu_20(jlo,l,lp) + &
+-                                           BLM(index2,num)*juu_21(jlo,l,lp) )                                           
+-                                         ENDIF
+-                                      ENDDO
+-                                      
+-                                      DO jlop = 1, ilo(lp)
+-                                         IF(loor(jlop,lp)) THEN
+-                                            F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
+-                                           (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) +&
+-                                           c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*&
+-                                           ohalf*gaunt1* &
+-                                           clm(index2,num,jlop)*(conjg(ALM(index1,num))*judu_02(jlop,lp,l) + &
+-                                           conjg(BLM(index1,num))*judu_12(jlop,lp,l) ) - &
+-                                           (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
+-                                           clm(index2,num,jlop)*( conjg(ALM(index1,num))*juu_02(jlop,lp,l) + &
+-                                           conjg(BLM(index1,num))*juu_12(jlop,lp,l) )                                                                                                                       
+-                                         ENDIF
+-                                      ENDDO
+-                                      
+-                                      DO jlo = 1, ilo(l)
+-                                         IF(loor(jlo,l)) THEN
+-                                          DO jlop = 1, ilo(lp)
+-                                            IF(loor(jlop,lp)) THEN
+-                                               F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
+-                                               (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) +&
+-                                               c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*&
+-                                               ohalf*gaunt1*2.d0* &
+-                                               conjg( clm(index1,num,jlo) )*clm(index2,num,jlop)*&
+-                                               judu_22(jlo,jlop,l,lp)- &
+-                                               (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
+-                                               2.d0*conjg( clm(index1,num,jlo) )*clm(index2,num,jlop)*&
+-                                               juu_22(jlo,jlop,l,lp) 
+-                                            ENDIF
+-                                          ENDDO
+-                                         ENDIF
+-                                      ENDDO
+-                                      
+-                                      
+-                                  ENDDO
++                                  angular_buf(alpha,beta) = &
++                                       (c_am(alpha,t)*ca_st_lm(beta,v,u)+ &
++                                        c_am(beta,t)*ca_st_lm(alpha,v,u)+ &
++                                        c_am(beta,t)*ca_st_lm(alpha,v,u)+ &
++                                        c_am(alpha,t)*ca_st_lm(beta,v,u))* &
++                                       ohalf*g1_deriv_scale*gaunt1
++                                  angular_buf2(alpha,beta) = &
++                                       (c_am(beta,t)*ca_st_lm(alpha,v,u)+ &
++                                        c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1
+                                ENDDO                                                                                      !END beta
+                             ENDDO                                                                                         !END alpha                            
++                            DO num = nemin,nemax
++                               radial_buf1 = &
++                                    ALM(index2,num)*(conjg(ALM(index1,num))*TC2S00(l,lp)+ &
++                                    conjg(BLM(index1,num))*TC2S10(l,lp))+BLM(index2,num)* &
++                                    (conjg(ALM(index1,num))*TC2S01(l,lp)+ &
++                                    conjg(BLM(index1,num))*TC2S11(l,lp))
++                               radial_buf2 = &
++                                    ALM(index2,num)*(conjg(ALM(index1,num))*TC3S00(l,lp)+ &
++                                    conjg(BLM(index1,num))*TC3S10(l,lp))+BLM(index2,num)* &
++                                    (conjg(ALM(index1,num))*TC3S01(l,lp)+ &
++                                    conjg(BLM(index1,num))*TC3S11(l,lp))
++                               DO jlo = 1,ilo(l)
++                                  IF(.NOT.loor(jlo,l)) CYCLE
++                                  radial_buf1 = radial_buf1 + conjg(clm(index1,num,jlo))* &
++                                       (ALM(index2,num)*judu_20(jlo,l,lp)+ &
++                                        BLM(index2,num)*judu_21(jlo,l,lp))
++                                  radial_buf2 = radial_buf2 + conjg(clm(index1,num,jlo))* &
++                                       (ALM(index2,num)*juu_20(jlo,l,lp)+ &
++                                        BLM(index2,num)*juu_21(jlo,l,lp))
++                               ENDDO
++                               DO jlop = 1,ilo(lp)
++                                  IF(.NOT.loor(jlop,lp)) CYCLE
++                                  radial_buf1 = radial_buf1 + clm(index2,num,jlop)* &
++                                       (conjg(ALM(index1,num))*judu_02(jlop,lp,l)+ &
++                                        conjg(BLM(index1,num))*judu_12(jlop,lp,l))
++                                  radial_buf2 = radial_buf2 + clm(index2,num,jlop)* &
++                                       (conjg(ALM(index1,num))*juu_02(jlop,lp,l)+ &
++                                        conjg(BLM(index1,num))*juu_12(jlop,lp,l))
++                               ENDDO
++                               DO jlo = 1,ilo(l)
++                                  IF(.NOT.loor(jlo,l)) CYCLE
++                                  DO jlop = 1,ilo(lp)
++                                     IF(.NOT.loor(jlop,lp)) CYCLE
++                                     radial_buf1 = radial_buf1 + g1_lo_scale* &
++                                          conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
++                                          judu_22(jlo,jlop,l,lp)
++                                     radial_buf2 = radial_buf2 + g1_lo_scale* &
++                                          conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
++                                          juu_22(jlo,jlop,l,lp)
++                                  ENDDO
++                               ENDDO
++                               F3_buf(:,:,num)=F3_buf(:,:,num)+ &
++                                    angular_buf(:,:)*radial_buf1- &
++                                    angular_buf2(:,:)*radial_buf2
++                            ENDDO
+                          ENDDO                                                                                            !END t
+                       ENDDO                                                                                               !END m
+                    ENDDO                                                                                                  !END u
+@@ -351,52 +337,42 @@
+                                                                                              
+                                CALL c_factor(lp,mp,ca_st_lm)
+                                CALL c_factor(lp+v,mp+u,ca_st_lm11)                                                                                                                            
+-                               
++                               angular_buf = zeroc
+                                DO alpha = 1,3
+                                   DO beta = 1,3                                                                          
+-                                     DO num = nemin,nemax
+-                                     
+-                                        !HERE IS THE FORMULA FROM F6                                                                                                                        
+-                                        F6_buf(alpha,beta,num) = F6_buf(alpha,beta,num) + &
+-                                        (ca_st_lm(alpha,v,u)*ca_st_lm11(beta,v1,t)+ca_st_lm(beta,v,u)*ca_st_lm11(alpha,v1,t))*&
+-                                        ohalf*(ALM(index2,num)*(conjg(ALM(index1,num))*TC3S00(l,lp)+&
+-                                        +conjg(BLM(index1,num))*TC3S10(l,lp))+BLM(index2,num)*&
+-                                        (conjg(ALM(index1,num))*TC3S01(l,lp)+conjg(BLM(index1,num))*TC3S11(l,lp)))
+-                                       
+-                                       DO jlo = 1, ilo(l)
+-                                          IF(loor(jlo,l)) THEN
+-                                            F6_buf(alpha,beta,num) = F6_buf(alpha,beta,num) + &
+-                                            (ca_st_lm(alpha,v,u)*ca_st_lm11(beta,v1,t)+ca_st_lm(beta,v,u)*ca_st_lm11(alpha,v1,t))*&
+-                                            ohalf*conjg( clm(index1,num,jlo) )*( ALM(index2,num)*juu_20(jlo,l,lp) + &
+-                                            BLM(index2,num)*juu_21(jlo,l,lp))
+-                                          ENDIF
+-                                       ENDDO
+-                                       
+-                                       DO jlop = 1, ilo(lp)
+-                                          IF(loor(jlop,lp)) THEN
+-                                            F6_buf(alpha,beta,num) = F6_buf(alpha,beta,num) + &
+-                                            (ca_st_lm(alpha,v,u)*ca_st_lm11(beta,v1,t)+ca_st_lm(beta,v,u)*ca_st_lm11(alpha,v1,t))*&
+-                                            ohalf*clm(index2,num,jlop)*( conjg(ALM(index1,num))*juu_02(jlop,lp,l) + &
+-                                            conjg(BLM(index1,num))*juu_12(jlop,lp,l))
+-                                          ENDIF
+-                                       ENDDO
+-                                       
+-                                       DO jlo = 1, ilo(l)
+-                                          IF(loor(jlo,l)) THEN
+-                                            DO jlop = 1, ilo(lp)
+-                                               IF(loor(jlop,lp)) THEN
+-                                                  F6_buf(alpha,beta,num) = F6_buf(alpha,beta,num) + &
+-                                                  (ca_st_lm(alpha,v,u)*ca_st_lm11(beta,v1,t)+ca_st_lm(beta,v,u)*ca_st_lm11(alpha,v1,t))*&
+-                                                  ohalf*conjg( clm(index1,num,jlo) )*clm(index2,num,jlop)*juu_22(jlo,jlop,l,lp)
+-                                               ENDIF
+-                                            ENDDO
+-                                          ENDIF
+-                                       ENDDO
+-                                       
+-                                       
+-                                     ENDDO                                                                                !END num
++                                     angular_buf(alpha,beta) = &
++                                          (ca_st_lm(alpha,v,u)*ca_st_lm11(beta,v1,t)+ &
++                                           ca_st_lm(beta,v,u)*ca_st_lm11(alpha,v1,t))*ohalf
+                                   ENDDO                                                                                   !END beta
+                                ENDDO                                                                                      !END alpha
++                               DO num = nemin,nemax
++                                  radial_buf1 = &
++                                       ALM(index2,num)*(conjg(ALM(index1,num))*TC3S00(l,lp)+ &
++                                       conjg(BLM(index1,num))*TC3S10(l,lp))+BLM(index2,num)* &
++                                       (conjg(ALM(index1,num))*TC3S01(l,lp)+ &
++                                       conjg(BLM(index1,num))*TC3S11(l,lp))
++                                  DO jlo = 1,ilo(l)
++                                     IF(loor(jlo,l)) radial_buf1 = radial_buf1 + &
++                                          conjg(clm(index1,num,jlo))* &
++                                          (ALM(index2,num)*juu_20(jlo,l,lp)+ &
++                                           BLM(index2,num)*juu_21(jlo,l,lp))
++                                  ENDDO
++                                  DO jlop = 1,ilo(lp)
++                                     IF(loor(jlop,lp)) radial_buf1 = radial_buf1 + &
++                                          clm(index2,num,jlop)* &
++                                          (conjg(ALM(index1,num))*juu_02(jlop,lp,l)+ &
++                                           conjg(BLM(index1,num))*juu_12(jlop,lp,l))
++                                  ENDDO
++                                  DO jlo = 1,ilo(l)
++                                     IF(.NOT.loor(jlo,l)) CYCLE
++                                     DO jlop = 1,ilo(lp)
++                                        IF(loor(jlop,lp)) radial_buf1 = radial_buf1 + &
++                                             conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
++                                             juu_22(jlo,jlop,l,lp)
++                                     ENDDO
++                                  ENDDO
++                                  F6_buf(:,:,num)=F6_buf(:,:,num)+angular_buf(:,:)*radial_buf1
++                               ENDDO
+                                
+                             ENDDO                                                                                         !END t
+                          ENDDO                                                                                            !END u
+@@ -411,6 +387,17 @@
+        DO alpha = 1, 3
+           DO beta = 1, 3
+              DO num = nemin, nemax                              
++               ! Keep the four lines of Blaha et al. Eq. (G1) separately for
++               ! diagnostics.  The production result below is still their
++               ! unchanged sum.  The part ordering is:
++               !   1 = F1 (second radial derivative),
++               !   2 = F2 (first angular-gradient term),
++               !   3 = F3 (combined third line, including F4-F5 notation),
++               !   4 = F6 (two angular-gradient operators).
++               F_buf_parts(alpha,beta,num,1) = F1_buf(alpha,beta,num)
++               F_buf_parts(alpha,beta,num,2) = F2_buf(alpha,beta,num)
++               F_buf_parts(alpha,beta,num,3) = F3_buf(alpha,beta,num)
++               F_buf_parts(alpha,beta,num,4) = F6_buf(alpha,beta,num)
+                F_buf_total(alpha,beta,num) = F1_buf(alpha,beta,num) +F2_buf(alpha,beta,num)+&
+                                               F6_buf(alpha,beta,num)+F3_buf(alpha,beta,num)                
+                                               

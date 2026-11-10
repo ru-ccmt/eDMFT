@@ -1,0 +1,48 @@
+Automatic response MPI defaults — 2026-11-09
+
+Requested behavior
+x_dmft.py dmft2 should run the stress response with the configured MPI ranks,
+without requiring a separate per-case JSON file. The shared dmft2_step helper
+also gives run_dmft.py the same behavior on its final response pass.
+
+Implementation
+- Inherit DmftEnvironment.MPI2: mpi_prefix.dat2, when present, otherwise
+  mpi_prefix.dat. No prefix still means serial.
+- Native response DMFT2 inherits the exact argument list.
+- The Python k-point pool and response driver identify mpi4py's MPI library in
+  a short child process with MPI initialization disabled. A matching native
+  launcher is retained. A plain local command may use the matching launcher
+  beside the active Python, retaining its rank count.
+- On local macOS MPICH launches, select FI_PROVIDER=tcp to avoid the measured
+  OFI background CPU spin, unless the user has already selected a provider.
+- Preserve host/binding options and scheduler launch commands. Never translate
+  a mismatched complex prefix or an inherited cluster allocation into a local
+  command. Such configurations need an explicit Python MPI override.
+- Optional JSON solver.mpi and solver.native_mpi remain independent overrides;
+  [] explicitly requests serial. Explicit JSON commands are never rewritten.
+- Print both effective MPI commands and save them in reference.json.
+- Existing response BLAS thread limits remain one thread per rank.
+
+Scope
+No stress formulas, sigma mesh controls, vector layout flags, physical inputs,
+normal native dmft2 launch settings, or final-iteration policy were changed.
+Some preparation stages (LAPW0/LCORE and file assembly) remain serial.
+No 100–300-core scaling measurement was performed in this change.
+
+Validation
+309 component tests passed (the previous 294 plus 15 launcher tests), including
+inheritance, explicit overrides, cluster options and independent native/Python
+MPI settings. Physical SrVO3 and FeSe inputs passed response preflight using
+empty in-memory JSON settings. The automatically selected commands were then
+used for real distributed response/adjoint checks:
+  SrVO3 settings: 4 ranks, max difference from serial 2.220446049250313e-15
+  FeSe settings:  6 ranks, max difference from serial 1.7763568394002505e-15
+These are launcher and numerical component tests, not new full stress runs.
+The selected launch settings match the earlier tested per-case settings.
+
+Installation
+Three helpers: response_mpi.py (new), dmft2_step.py, x_dmft.py.
+Two source test files. Installed source and dbin copies are hash-checked.
+MPI-only overrides previously added to the SrVO3 and FeSe JSON files are
+removed after exact-content verification and backup. Their backend selection
+is retained. Future rank changes require only mpi_prefix.dat/dat2.

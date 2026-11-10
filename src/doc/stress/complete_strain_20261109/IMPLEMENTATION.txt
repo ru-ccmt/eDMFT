@@ -1,0 +1,164 @@
+COMPLETE NATIVE FROZEN-SIGMA STRESS — 9 NOVEMBER 2026
+
+This checkpoint connects the analytic screened response to a complete native
+Klein-functional tangent, including radial basis response. It is tested on
+nonmagnetic SrVO3 and scalar-relativistic FeSe at RKMAX=8. It does not claim
+validation for magnetic MnTe, fixed-mu MnO, SOC, general shear, moving RMT,
+rotating local frames, or changing the IN1 reference Fermi energy.
+
+1. Functional and sign conventions
+
+At fixed local Sigma-minus-double-counting and fixed impurity reference,
+  K = C_DEN[n,epsilon] + sum_c f_c E_c + L[H,O,U] + constant.
+Here L is the regularized lattice trace-log plus mu*N, not the band/internal
+energy SUM. C_DEN contains the native electrostatic double-counting/nuclear
+scalar and integral n*(e_xc-V_xc). All three pieces are differentiated together.
+The reference impurity constant drops out of a first derivative. This is the
+frozen-Sigma tangent approximation; it is not an impurity-vertex calculation.
+
+Let Omega be the central cell volume and epsilon=eta*e_nu. Then
+  D_nu = dK/deta = Omega sum_ij sigma_ij e_nu,ij.
+Our reported sigma is tensile-positive. For hydrostatic e_nu=I,
+  mean(sigma) = D_hydro/(3*Omega).
+Thermodynamic compression-positive pressure is minus this mean. The native
+WIEN :PRESSURE: label in these runs prints the mean tensile stress. Compare
+signs explicitly; never compare D_hydro/Omega to a single diagonal stress.
+
+2. Complete discrete density-functional derivative
+
+The electrostatic density scalar is written in native spherical r*V units as
+  C_es = -n^T W v_tilde/2 - sum_a m_a Z_a^2/R_a
+         -sum_a m_a Z_a b_a/2,
+  v_tilde = V_c - [-2 Z (1-r/R)],  b_a = v_tilde_a(R_a)/R_a.
+W is the actual native spatial integration pairing, m_a multiplicity, Z_a
+nuclear charge, and R_a the fixed muffin-tin radius. If H maps charge to the
+homogeneous Coulomb potential and t selects -m_a Z_a/(2 R_a) on the spherical
+boundary sample, then
+  grad_n C_es = -W v_tilde/2 + H^T(-W n/2 + t).
+The native discrete derivative of n*(e_xc-V_xc) is also retained. We do not
+replace it by a continuum cancellation with a separately discretized V_xc.
+The core derivative includes its exterior matching/normalization and shifts.
+
+3. Screened response and one common adjoint
+
+All coordinates are real isometric coordinates, with the appropriate factors
+for Hermitian RR/QR blocks. K_V denotes the native Hartree+XC potential map,
+B its full off-diagonal H/O/raw-projector basis map, E the frozen-Sigma
+electronic response, R the spatial density reconstruction, D the direct
+moving-basis density derivative, and N the native charge normalization.
+At fixed radial energy parameters,
+  J_0 = N (R E B + D) K_V,
+  (I-J_0) q_nu = s_0,nu,
+  D_nu = a_0,nu + c_0^T q_nu.
+The explicit source s includes cell geometry, the explicit Hartree/XC source,
+spatial basis motion, density transport, and native strained-cell normalization.
+It must NOT normalize a second time in central coordinates after inverse
+transport: I_0 q is generally nonzero because the integration measure changes.
+See COORDINATE_CORRECTION.txt for the derivation and the final FeSe correction.
+The complete functional c_0 includes lattice, core and C_DEN covectors.
+The normalized projector U=Pi_W Phi X is differentiated through Phi, fixed-
+index-window Pi_W, global symmetry-summed overlap and X=S^(-1/2). Retained and
+empty-complement blocks are included with their correct metric factors.
+
+One adjoint solves
+  (I-J)^T lambda = c,
+then every strain component is D_nu=a_nu+lambda^T s_nu. No separately relaxed
++/- structures or extra impurity solves are needed in the analytic workflow.
+The finite-difference calculations in the evidence are independent tests.
+
+4. Newly completed LAPW radial-energy search response
+
+Native SELECT chooses some ordinary radial energy parameters from
+  e=(e_bottom+e_top)/2,
+  u'(R,e_bottom)=0,  u(R,e_top)=0.
+For either root F(e,V)=0,
+  de = -F_V d(rV)/F_e.
+These are radial linearization energies, not KS eigenvalues. Previously
+holding them fixed made a large difference in FeSe. Native search roots and
+vector headers are checked before using the derivative.
+
+The few independent searched parameters define a small matrix A with de=A dV.
+For a unit energy change i, precompute a band derivative B_e,i and direct
+spatial derivative D_e,i, and form
+  P_i = N (R E B_e,i + D_e,i),  g_i=g_L^T B_e,i.
+Then complete ALL partners consistently:
+  J = J_0 + P A K_V,
+  s_nu = s_0,nu + P A v_exp,nu,
+  c = c_0 + K_V^T A^T g,
+  a_nu = a_0,nu + g^T A v_exp,nu.
+The implementation factors the common potential map; it is applied once per
+operator action. This is an analytic small-rank completion, not a fitted stress.
+
+SELECT's E(TOP)=-520 CONT sentinel is not a physical root. In the safely
+separated constant-input branch, e=max(e_bottom,e_input)=e_input and de=0.
+Ambiguous switches and unsupported branches are rejected. HDLO/p1/2 and moving
+RMT need additional policies. The IN1 reference EF is held fixed.
+
+5. Tensor scope
+
+The invariant subspace is found in all six symmetric Cartesian components.
+The current geometry adapter supports diagonal strains. If point symmetry
+allows shear, the driver stops rather than publishing an incomplete tensor.
+For these tetragonal charge layouts I and zz span the invariant subspace.
+
+Frozen Sigma is checked against the actual orbital/cix symmetry maps. The
+current inputs are slightly inconsistent with imposed charge symmetry: maximum
+relative residual ~0.0020 in SrVO3 and ~0.0054 in refined FeSe. We do not alter
+Sigma. The report therefore labels these as tensors projected onto the imposed
+charge symmetry, not validated unrestricted tensors. Hydrostatic comparisons
+use that same constrained native charge map.
+
+6. Execution and publication
+
+Ordinary STR/STRF keep the existing calculation. Requested STRT/STRFT use the
+analytic backend by default in this proposed patch. run_dmft.py still requests
+response only in its final measurement pass; x_dmft.py dmft2 requests it directly.
+The order is
+  production dmft2 -> isolated response -> production lcore -> SCF merge -> mixer.
+The wrapper aliases STRT/STRFT to native STR/STRF via temporary files, preserving
+editable user inputs. case.in0 must request STR and the central run must be
+charge-converged; normal core and density stress rows are required at assembly.
+
+case.response_runs/<id>/reference/ holds copied physical inputs.
+central/ holds one native lapw0/lapw1/dmft2/lcore export pass; dmft2 first obtains
+mu, then exports at that mu. All native products, including clmsum, vsp, vns,
+vector, native.ham.k*.bin, response.k*.bin, xc_*.bin and core_native.bin, remain
+inside central/. potential_core.npz is a portable validated archive.
+total_stress/source*.npz, adjoint.npz and report.json store the analytic result.
+case.stress_response.status.json records exact input and report hashes.
+
+The Python driver prepares J/J^T and sources, solves one linear adjoint, and
+writes the complete tensor. It does not iterate lapw0/lapw1 to charge convergence.
+The native preparation workers are separate *_response executables; ordinary
+WIEN executables are not replaced. Production dmft2 can run with MPI; response
+preparation and the Python response in this checkpoint are serial.
+
+Native mixer accumulates T=VAL+CORE-DENS and prints sigma=-T. SCF assembly adds
+  delta_VAL = -sigma_complete - T_old.
+This replaces the old TOTAL, rather than double counting the old DFT/eDMFT
+stress or adding a sign-reversed correction. Markers identify publication.
+Parent input/report hashes, complete native rows and completed response status
+are required. Ordinary/deferred steps publish no response rows. The mixer
+executable itself is unchanged by this checkpoint.
+
+Explicit solver paths can be configured in case.stress_response.json:
+  {"solver": {"backend": "analytic", "wien_root": "/path/to/wien",
+   "lapw0_worker": "/path/to/lapw0_response",
+   "lapw1_worker": "/path/to/lapw1_response",
+   "lcore_worker": "/path/to/lcore_response",
+   "dmft2": "/path/to/dmft2_response", "library": "/path/to/liblapw_response.so"}}
+Complex vectors use lapw1c_response by default. Native reference screening is
+still available with backend=native, but it does not publish a complete tensor.
+
+7. Speed changes
+
+Spherical pullbacks reuse repeated matrix products. Angular/radial leading
+indices are flattened to one BLAS GEMM; compact RR/QR columns avoid unused QQ
+matrices. Density FFTs use contiguous band-first storage and alias-free fast
+FFT lengths. The FFT change affects exact finite Fourier convolutions, not the
+XC quadrature. No approximate physical term is removed for speed.
+
+One common adjoint serves all invariant sources. Memory and serial preparation
+remain significant. A measured 1.42x speedup of the complete adjoint action is
+not a claim of 1.42x speedup of the entire SCF calculation. See RESULTS.txt for
+actual wall times and the unresolved FeSe accuracy residual.

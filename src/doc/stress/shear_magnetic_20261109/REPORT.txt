@@ -1,0 +1,162 @@
+GENERAL SYMMETRIC STRAIN AND AUTOMATIC MAGNETIC RESPONSE
+9 November 2026
+
+STATUS
+The preceding general-cell/magnetic diagnostic patch was installed after the
+user's explicit approval. This follow-up implements the requested general
+shear basis and automatic two-spin workflow. INSTALL.json records installation
+of this follow-up; without it this report describes the tested staged patch.
+No live material calculation was edited. Native tests use isolated copies.
+
+IMPLEMENTATION
+1. Tensor directions
+   invariant_strains projects all six Cartesian symmetric tensors onto the
+   point-group-invariant space, retaining a complete independent basis with
+   hydrostatic strain first. Triclinic P1/P-1 retains six components; the tested
+   monoclinic group retains four, including xz shear. Hexagonal MnTe has two.
+   Cartesian rotations and physical volumes use NativeLattice/wlatgen, including
+   primitive/conventional reciprocal-basis distinctions for centered cells.
+   The same single screened adjoint serves every independent strain direction.
+   Density/star layouts retain their native symmetry. This is a complete first
+   derivative tensor within that imposed symmetry, not a general symmetry-
+   breaking DFPT or elastic-constant implementation. A non-invariant self-energy
+   is explicitly reported as a symmetry projection. Local frames and RMT stay
+   fixed. Spin-polarized KS/core and spin-orbit inputs remain unsupported.
+
+2. Detecting spin and physical ensemble
+   lapw_response_policy.py detects a nonempty case.indmfldn. The two local
+   self-energies/projector mappings remain independent; their densities need
+   not be equal. Both channels share the unpolarized KS potential and core.
+   Ferro=True in params.dat selects a two-spectrum fermif search when physical
+   recomputeEF=1. The temporary recomputeEF=0 used for subsequent charge calls
+   must NOT turn the response into a fixed-mu calculation. Preparation metadata
+   records the physical policy separately. Ordinary compensated magnets retain
+   the existing first-spin EF search followed by the second spin at that EF.
+   Fixed-mu calculations reuse EF.dat in both channels without a number search.
+
+   The response imposes only delta(N_up+N_down)=0 for fixed-N runs. The common-mu
+   rank-one operation includes the overlap contribution Tr(rho O'). There is
+   one combined Hartree/XC/core/normalization response and one adjoint.
+   Native branch outputs each carry a factor two: (up+down)/2 is the physical
+   spin sum, not an assumption that the spin populations match.
+
+3. Execution and publication
+   x_dmft.py dmft2 with total response enabled prepares the companion definition
+   and split sigma, executes both channels, averages charge once via combineud,
+   then prepares and solves one shared response. --execute-only preserves input
+   generation behavior: companion definitions/sigma must already be prepared.
+   run_dmft.py continues deferring response during ordinary iterations and
+   performs the two-channel response measurement only at the final pass.
+   Live inputs are preserved by disposable DEF/control files. Both channels
+   are freshly exported in the isolated response workspace. All consumed spin
+   files participate in stale-input fingerprint checks.
+   SCF assembly publishes the complete tensor once, after lcore, using the
+   existing total replacement logic. No mixer source change is needed.
+   The exact-cutoff diagnostic cannot publish stress even if its solve converges.
+
+CHARGE NORMALIZATION: MnO
+The live MnO_center/MnO.inm first line is
+  MSR1   0.0   NO
+Rho_Renormalize=.FALSE. in src/dmft2/l2main.f90 (line 182 at audit time).
+The printed 'Ratio to renormalize' does not mean it was applied. The earlier
+MnO error was in our Python diagnostic, which enabled normalization despite
+INM=NO; it was not an accidental restoration of native DMFT2 normalization.
+The new response follows the actual INM policy and rejects a mismatch.
+Keep NO for this existing fixed-mu MnO map. For other calculations the response
+must likewise mirror their actual mixer policy; YES is not universally wrong.
+Projector normalization X (SOlapm, Qrenormalize) is separate and remains enabled.
+
+WINDOW-CUT DEGENERACY
+No bands or k points are added or discarded by the diagnostic. In the
+cross-window derivative, only factors 1/(epsilon_in-epsilon_out) whose absolute
+gap is at most the specified cutoff are replaced by zero. Regular pairs at
+the same k point remain; the normalized-projector derivative, including X',
+uses this same selected derivative. Central projectors/occupations are unchanged.
+Strict production behavior still rejects an unresolved window cut.
+
+At an exact split degeneracy the rank-fixed spectral projector is not generally
+a unique differentiable function. Pair omission is a controlled diagnostic, not
+an exact cure. The mathematically clean fixed-window remedy is an isolated
+subspace containing the whole degenerate cluster throughout the nearby strain
+path; a smooth/disentangled window is a different projector scheme. We have
+not changed the user's fixed-band scheme or expanded only one isolated k point.
+
+Previous hydrostatic cutoff tests (1e-10 to 1e-4 Ry) changed MnO by no resolved
+amount and MnTe by 2.82e-7 GPa. Dropping whole affected-k window responses is
+not equivalent: the isolated MnO window component changes about 8.03 GPa.
+Those checks do not prove general-shear differentiability at the cut.
+
+VALIDATION
+294 component tests passed without failures/skips in the final staged suite.
+This includes nonlinear LDA/PBE potential finite differences for full symmetric
+shear in an oblique cell, tensor reconstruction in triclinic/monoclinic groups,
+existing native H/O/projector geometry tests, fixed-N two-spin finite differences
+with unequal populations, transpose checks, input preservation, execution order,
+and refusal to publish a converged window-omission diagnostic.
+
+Native MnTe automatic preparation passed (four OpenMPI ranks): a common-mu
+search followed by separate up/down exports and one LAPW0/LAPW1/LCORE snapshot.
+Native Ferro test: an isolated MnTe-derived input with +0.2 eV on the down-spin
+self-energy produced unequal populations at a common mu:
+  mu = 6.185052644312638 eV
+  N_up = 31.06039556765, N_down = 30.93960441360
+  total N - 62 = -1.875e-8 electrons
+Actual combineud output differs from the coordinate-wise average by at most
+1.773e-11. This validates the native Ferro route with unequal populations; it
+is not a converged real ferrimagnetic-material stress comparison.
+
+The full two-direction MnTe tensor test and timing are in MnTe_total/report.json
+and NATIVE_RESULT.txt when present. That run explicitly uses diagnostic cutoff
+1e-10 Ry and fixed-point tolerance .01 because the current central density has
+known residual about .005. The unchanged production tolerance is .001.
+No claim is made that this particular saved MnTe state can yet publish STRT/STRFT
+without resolving its window cut and tightening its central fixed point.
+
+General low-symmetry material end-to-end strained SCF comparisons remain to be
+performed. Current evidence includes full-shear component finite differences,
+not a newly converged monoclinic/triclinic material triplet. Native F-cell MnO
+and H-cell MnTe comparisons belong to the preceding installed report.
+
+WHY CAN THIS MATCH FINITE DIFFERENCES BETTER THAN THE OLD DFT STRESS?
+The distinction is finite-basis derivative consistency versus basis convergence.
+The new engine differentiates the complete discrete scalar and its charge map,
+including H/O, matching/radial functions, normalization and successful SELECT
+energy searches. The older DFT path used frozen-augmentation approximations.
+A finite LAPW Ritz solution is stationary in its coefficient space, but its
+radial basis also depends on V_KS. Keeping every occupied state does not remove
+changes of that basis outside the represented subspace. Such changes produce
+  D_basis = 2 Re sum_kn w_k f_kn <d chi_kn | (H_KS-epsilon_kn) | psi_kn>,
+where d chi_kn is the basis change at fixed coefficients. The physical-potential
+terms cancel in variational DFT; the finite-basis remainder need not vanish.
+Native quadrature/charge conventions must also be differentiated consistently.
+
+Earlier independent DFT radial-only diagnostics, using the actual IN1-reference
+paths, reduced the FeSe residual from .09584 to .00752 GPa and SrVO3 from .22366
+to -.06011 GPa. See radial_basis_tests_20261108/REPORT.txt. They establish the
+importance of basis response, not a complete decomposition of today's result.
+Those older DFT controls used tetrahedron occupations. Finite-T Klein physics
+is not an intrinsic advantage: DFT Mermin free energy E-TS is also stationary
+in occupations, with the remaining occupation variation mu*dN=0 at fixed N.
+A finite-T internal-energy derivative is a different observable.
+
+A derivative can match finite differences accurately at RKMAX=7 while both
+remain far from the complete-basis stress. Increasing RKMAX remains necessary
+for physical convergence. A definitive comparison uses the same new engine
+on converged Sigma=0 DFT and the same finite-difference free energy, basis,
+occupation integration, and IN1-reference policy. Current searched-energy
+completion holds the IN1 reference EF fixed; the older DFT triplets had moving
+reference EF and cannot be used blindly for that test.
+
+REPRODUCIBILITY AND INSTALLATION
+manifest.json / shear_magnetic_integration.patch: exact source changes.
+tests_final.log: component test result.
+prepare_MnTe.json / prepare_Ferro.json: isolated native setup.
+Ferro_verification.json / verify_ferro.py: unequal-population native control.
+INSTALL.json: actual installed source/helper hashes after explicit authorization.
+backup/: prior source and installed helpers, preserved without deleting files.
+Large native snapshots remain under /private/tmp/edmft_shear_magnetic_20261109.
+
+POST-INSTALL VALIDATION
+Installed 17 source/test files and 11 helpers, with backups and exact hashes.
+All 294 tests also pass against ~/dbin helpers and repository tests, with no skips.
+Installed checks explicitly verify imports resolve to ~/dbin and hashes match INSTALL.json.

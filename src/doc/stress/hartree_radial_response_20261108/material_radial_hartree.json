@@ -1,0 +1,526 @@
+{
+  "FeSe": {
+    "channels": [
+      {
+        "atom": 0,
+        "ell": 0,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 4.872694638823068e-16,
+        "transpose": 8.256871058198481e-18
+      },
+      {
+        "atom": 0,
+        "ell": 2,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.7465930009447975e-15,
+        "transpose": 3.030520312283201e-18
+      },
+      {
+        "atom": 0,
+        "ell": -3,
+        "m": 2,
+        "nrad": 781,
+        "native_relative": 1.3329230731895757e-13,
+        "transpose": 4.977316934730063e-18
+      },
+      {
+        "atom": 0,
+        "ell": 4,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 3.9487480199074833e-13,
+        "transpose": 2.462377159908659e-17
+      },
+      {
+        "atom": 0,
+        "ell": 4,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 1.5351315602867804e-13,
+        "transpose": 2.462377159908659e-17
+      },
+      {
+        "atom": 0,
+        "ell": -5,
+        "m": 2,
+        "nrad": 781,
+        "native_relative": 2.0777554017622314e-15,
+        "transpose": 6.845445914828795e-18
+      },
+      {
+        "atom": 0,
+        "ell": 6,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 5.943230564310668e-11,
+        "transpose": 5.606463696224545e-18
+      },
+      {
+        "atom": 0,
+        "ell": 6,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 1.310298088914338e-11,
+        "transpose": 5.606463696224545e-18
+      },
+      {
+        "atom": 1,
+        "ell": 0,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 8.096813495491795e-16,
+        "transpose": 9.616733188374665e-19
+      },
+      {
+        "atom": 1,
+        "ell": 1,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 5.777111159707827e-16,
+        "transpose": 1.379981665329286e-17
+      },
+      {
+        "atom": 1,
+        "ell": 2,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 2.7337290365223287e-14,
+        "transpose": 6.0714045571612094e-18
+      },
+      {
+        "atom": 1,
+        "ell": 3,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.5596744120212022e-13,
+        "transpose": 7.477793434499558e-18
+      },
+      {
+        "atom": 1,
+        "ell": 4,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 8.471323756479128e-14,
+        "transpose": 3.522725814219591e-17
+      },
+      {
+        "atom": 1,
+        "ell": 4,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 2.4739919576667557e-14,
+        "transpose": 3.522725814219591e-17
+      },
+      {
+        "atom": 1,
+        "ell": 5,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 9.437365523418382e-16,
+        "transpose": 2.2846381912829177e-18
+      },
+      {
+        "atom": 1,
+        "ell": 5,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 7.614108797918944e-16,
+        "transpose": 2.2846381912829177e-18
+      },
+      {
+        "atom": 1,
+        "ell": 6,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.9395103802713046e-11,
+        "transpose": 5.612159808552382e-18
+      },
+      {
+        "atom": 1,
+        "ell": 6,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 4.8082488941277766e-12,
+        "transpose": 5.612159808552382e-18
+      }
+    ],
+    "whole_MT_forward_seconds": 0.0014312919229269028,
+    "whole_MT_reverse_seconds": 0.001534125069156289
+  },
+  "SrVO3": {
+    "channels": [
+      {
+        "atom": 0,
+        "ell": 0,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 8.360677716187785e-16,
+        "transpose": 5.042047877691511e-18
+      },
+      {
+        "atom": 0,
+        "ell": 1,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 5.106023828193708e-18,
+        "transpose": 2.7423656846821305e-17
+      },
+      {
+        "atom": 0,
+        "ell": 2,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 2.2067145611335616e-17,
+        "transpose": 3.0209329352986346e-18
+      },
+      {
+        "atom": 0,
+        "ell": 3,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 9.12945747577392e-16,
+        "transpose": 9.925395855601211e-18
+      },
+      {
+        "atom": 0,
+        "ell": 4,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.5710477626515e-14,
+        "transpose": 0.0
+      },
+      {
+        "atom": 0,
+        "ell": 4,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 2.5401797055021987e-14,
+        "transpose": 0.0
+      },
+      {
+        "atom": 0,
+        "ell": 5,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.5262642716150484e-15,
+        "transpose": 1.3659290995795808e-17
+      },
+      {
+        "atom": 0,
+        "ell": 5,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 1.5621646753096087e-16,
+        "transpose": 1.3659290995795808e-17
+      },
+      {
+        "atom": 0,
+        "ell": 6,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.4740538266288166e-11,
+        "transpose": 1.6787383855213214e-17
+      },
+      {
+        "atom": 0,
+        "ell": 6,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 5.417405078122423e-12,
+        "transpose": 1.6787383855213214e-17
+      },
+      {
+        "atom": 1,
+        "ell": 0,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 3.6084642215212505e-16,
+        "transpose": 4.4096132448122405e-18
+      },
+      {
+        "atom": 1,
+        "ell": 1,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 4.9496316404770554e-17,
+        "transpose": 2.222574871841818e-17
+      },
+      {
+        "atom": 1,
+        "ell": 2,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 7.105265284847296e-17,
+        "transpose": 9.152634350347655e-18
+      },
+      {
+        "atom": 1,
+        "ell": 3,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.2039887859252722e-15,
+        "transpose": 1.0016351229606767e-17
+      },
+      {
+        "atom": 1,
+        "ell": 4,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 5.206160373926788e-14,
+        "transpose": 2.4761710625594164e-17
+      },
+      {
+        "atom": 1,
+        "ell": 4,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 2.5250843693089376e-14,
+        "transpose": 2.4761710625594164e-17
+      },
+      {
+        "atom": 1,
+        "ell": 5,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.45929055069509e-16,
+        "transpose": 2.292808229671056e-17
+      },
+      {
+        "atom": 1,
+        "ell": 5,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 1.3851163962896702e-16,
+        "transpose": 2.292808229671056e-17
+      },
+      {
+        "atom": 1,
+        "ell": 6,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.2797085554514044e-13,
+        "transpose": 1.40713860705332e-17
+      },
+      {
+        "atom": 1,
+        "ell": 6,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 4.020070955342901e-14,
+        "transpose": 1.40713860705332e-17
+      },
+      {
+        "atom": 2,
+        "ell": 0,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 6.403209825487203e-16,
+        "transpose": 1.0484970318461426e-17
+      },
+      {
+        "atom": 2,
+        "ell": 1,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 6.518262119933267e-17,
+        "transpose": 2.886821072462492e-18
+      },
+      {
+        "atom": 2,
+        "ell": 2,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 6.627591414584701e-16,
+        "transpose": 3.1382411947899174e-18
+      },
+      {
+        "atom": 2,
+        "ell": 3,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 7.633022452552845e-17,
+        "transpose": 1.541292856239228e-17
+      },
+      {
+        "atom": 2,
+        "ell": 4,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.4917761167920463e-16,
+        "transpose": 5.42769425628792e-18
+      },
+      {
+        "atom": 2,
+        "ell": 4,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 9.98668116149625e-17,
+        "transpose": 5.42769425628792e-18
+      },
+      {
+        "atom": 2,
+        "ell": 5,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.361326247531948e-16,
+        "transpose": 4.673890226017461e-18
+      },
+      {
+        "atom": 2,
+        "ell": 5,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 1.2300923826982179e-16,
+        "transpose": 4.673890226017461e-18
+      },
+      {
+        "atom": 2,
+        "ell": 6,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 3.4058093410391044e-14,
+        "transpose": 1.428602235146581e-17
+      },
+      {
+        "atom": 2,
+        "ell": 6,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 9.919067129173256e-15,
+        "transpose": 1.428602235146581e-17
+      },
+      {
+        "atom": 3,
+        "ell": 0,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.5931657204348649e-15,
+        "transpose": 1.0484970318461426e-17
+      },
+      {
+        "atom": 3,
+        "ell": 1,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.9783176397765683e-17,
+        "transpose": 2.886821072462492e-18
+      },
+      {
+        "atom": 3,
+        "ell": 2,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 7.483340680419956e-16,
+        "transpose": 3.1382411947899174e-18
+      },
+      {
+        "atom": 3,
+        "ell": 2,
+        "m": 2,
+        "nrad": 781,
+        "native_relative": 1.5337143876658354e-15,
+        "transpose": 3.1382411947899174e-18
+      },
+      {
+        "atom": 3,
+        "ell": 3,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 8.360875223940327e-17,
+        "transpose": 1.541292856239228e-17
+      },
+      {
+        "atom": 3,
+        "ell": 3,
+        "m": 2,
+        "nrad": 781,
+        "native_relative": 8.36246923896747e-17,
+        "transpose": 1.541292856239228e-17
+      },
+      {
+        "atom": 3,
+        "ell": 4,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 9.292181784773685e-17,
+        "transpose": 5.42769425628792e-18
+      },
+      {
+        "atom": 3,
+        "ell": 4,
+        "m": 2,
+        "nrad": 781,
+        "native_relative": 1.3167313768482504e-16,
+        "transpose": 5.42769425628792e-18
+      },
+      {
+        "atom": 3,
+        "ell": 4,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 1.1878578253126465e-16,
+        "transpose": 5.42769425628792e-18
+      },
+      {
+        "atom": 3,
+        "ell": 5,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 1.339015862755344e-16,
+        "transpose": 4.673890226017461e-18
+      },
+      {
+        "atom": 3,
+        "ell": 5,
+        "m": 2,
+        "nrad": 781,
+        "native_relative": 1.2303958892347044e-16,
+        "transpose": 4.673890226017461e-18
+      },
+      {
+        "atom": 3,
+        "ell": 5,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 1.230362596554786e-16,
+        "transpose": 4.673890226017461e-18
+      },
+      {
+        "atom": 3,
+        "ell": 6,
+        "m": 0,
+        "nrad": 781,
+        "native_relative": 4.777875442718336e-14,
+        "transpose": 1.428602235146581e-17
+      },
+      {
+        "atom": 3,
+        "ell": 6,
+        "m": 2,
+        "nrad": 781,
+        "native_relative": 2.0297306457696016e-14,
+        "transpose": 1.428602235146581e-17
+      },
+      {
+        "atom": 3,
+        "ell": 6,
+        "m": 4,
+        "nrad": 781,
+        "native_relative": 1.3832425521203436e-14,
+        "transpose": 1.428602235146581e-17
+      },
+      {
+        "atom": 3,
+        "ell": 6,
+        "m": 6,
+        "nrad": 781,
+        "native_relative": 8.323179979192432e-15,
+        "transpose": 1.428602235146581e-17
+      }
+    ],
+    "whole_MT_forward_seconds": 0.003495417069643736,
+    "whole_MT_reverse_seconds": 0.004223832860589027
+  }
+}

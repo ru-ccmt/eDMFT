@@ -1,0 +1,11 @@
+{
+  "request": {
+    "density_sha256": "b27188dd58fb147f5618251a70cf380a460d4b5144166e015bcb39382950a55d",
+    "scale": 0.999875,
+    "target": 120.0,
+    "target_band": 62.579533783063994
+  },
+  "actual_scale": 0.9998750093353929,
+  "mu_Ry": 0.42532164981786297,
+  "number_residual": 0.0
+}

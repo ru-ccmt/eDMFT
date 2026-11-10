@@ -1,0 +1,138 @@
+ Euler-Maclaurian Coulomb
+ Consistent 3/8+Simpson combinations at start/end
+ New Mode for Coulomb Integral
+ Extension of core to zero
+ LDM version in phi
+ Fifth-order quadrature in outwin
+ Lebedev-Laikov Grid in lapw0
+
+
+            ---------
+:ITE545:545. ITERATION
+            ---------
+
+:NATO :    4 INDEPENDENT AND    5 TOTAL ATOMS IN UNITCELL
+       SUBSTANCE: SrVO3 single V z displacement +0.010 Angstrom               
+
+       LATTICE                      = P   
+:LAT  : LATTICE CONSTANTS=  7.26396  7.26396  7.26396    1.571    1.571    1.571
+:VOL  : UNIT CELL VOLUME =     383.28337
+:POT  : POTENTIAL OPTION EX_LDA EC_LDA VX_LDA VC_LDA
+       MODE OF CALCULATION IS       = NREL
+       NON-SPINPOLARIZED CALCULATION
+:IFFT  : FFT-parameters:   60   60   60 Factor: 2.00
+
+
+   CONVERGENCE PARAMETER FOR PSEUDOCHARGE: NCON=  9
+   MAXIMAL VALUE OF RMT(JATOM)*ABSK(NKK) : RK  =29.96382
+
+
+:VKCOUL :  VK-COUL convergence: 0.936E-06
+ Lebedev grid of          350
+ :rho_min:   2.0000000000000000E-008   1.0000000000000001E-009
+:VCOUL001 ATOMNUMBER=  1 Sr      VCOUL-ZERO =  0.46356E+00
+:EFG001:                        EFG         =    -0.00172   *10**21  V / m**2
+                               V20  TOT/SRF=    -0.00149    -0.00003
+                               V22  TOT/SRF=     0.00000     0.00000
+                               V22M TOT/SRF=     0.00000     0.00000
+                               V21  TOT/SRF=     0.00000     0.00000
+                               V21M TOT/SRF=     0.00000     0.00000
+
+              0.00086    0.00000    0.00000        0.00086    0.00000    0.00000
+              0.00000    0.00086    0.00000        0.00000    0.00086    0.00000
+              0.00000    0.00000   -0.00172        0.00000    0.00000   -0.00172
+
+         MAIN DIRECTIONS OF THE EFG   1.0000 -0.0000 -0.0000
+                                      0.0000  1.0000 -0.0000
+                                      0.0000  0.0000  1.0000
+:ANG001:  ANGLE WITH OLD X-AXIS =         0.0
+
+:ETA001:                         ASYMM. ETA =    -0.00000
+
+
+:VCOUL002 ATOMNUMBER=  2 V       VCOUL-ZERO = -0.34650E-01
+:EFG002:                        EFG         =     0.00178   *10**21  V / m**2
+                               V20  TOT/SRF=     0.00155     0.00031
+                               V22  TOT/SRF=     0.00000     0.00000
+                               V22M TOT/SRF=     0.00000     0.00000
+                               V21  TOT/SRF=     0.00000     0.00000
+                               V21M TOT/SRF=     0.00000     0.00000
+
+             -0.00089    0.00000    0.00000       -0.00089    0.00000    0.00000
+              0.00000   -0.00089    0.00000        0.00000   -0.00089    0.00000
+              0.00000    0.00000    0.00178        0.00000    0.00000    0.00178
+
+         MAIN DIRECTIONS OF THE EFG   1.0000 -0.0000  0.0000
+                                      0.0000  1.0000  0.0000
+                                      0.0000  0.0000  1.0000
+:ANG002:  ANGLE WITH OLD X-AXIS =         0.0
+
+:ETA002:                         ASYMM. ETA =     0.00000
+
+
+:VCOUL003 ATOMNUMBER=  3 O       VCOUL-ZERO =  0.59313E+00
+:EFG003:                        EFG         =     6.22146   *10**21  V / m**2
+                               V20  TOT/SRF=     5.38794     1.08495
+                               V22  TOT/SRF=     0.00000     0.00000
+                               V22M TOT/SRF=     0.00000     0.00000
+                               V21  TOT/SRF=     0.00000     0.00000
+                               V21M TOT/SRF=     0.00000     0.00000
+
+             -3.11073    0.00000    0.00000       -3.11073    0.00000    0.00000
+              0.00000   -3.11073    0.00000        0.00000   -3.11073    0.00000
+              0.00000    0.00000    6.22146        0.00000    0.00000    6.22146
+
+         MAIN DIRECTIONS OF THE EFG   1.0000 -0.0000  0.0000
+                                      0.0000  1.0000  0.0000
+                                      0.0000  0.0000  1.0000
+:ANG003:  ANGLE WITH OLD X-AXIS =         0.0
+
+:ETA003:                         ASYMM. ETA =     0.00000
+
+
+:VCOUL004 ATOMNUMBER=  4 O       VCOUL-ZERO =  0.59328E+00
+:EFG004:                        EFG         =     6.22384   *10**21  V / m**2
+                               V20  TOT/SRF=    -2.69498    -0.54206
+                               V22  TOT/SRF=    -4.66789    -0.93896
+                               V22M TOT/SRF=     0.00000     0.00000
+                               V21  TOT/SRF=     0.00000     0.00000
+                               V21M TOT/SRF=     0.00000     0.00000
+
+             -3.11194    0.00000    0.00000       -3.11194    0.00000    0.00000
+              0.00000    6.22384    0.00000        0.00000    6.22384    0.00000
+              0.00000    0.00000   -3.11189        0.00000    0.00000   -3.11189
+
+         MAIN DIRECTIONS OF THE EFG   1.0000  0.0000  0.0000
+                                      0.0000  1.0000 -0.0000
+                                      0.0000  0.0000  1.0000
+:ANG004:  ANGLE WITH OLD X-AXIS =         0.0
+
+:ETA004:                         ASYMM. ETA =     0.00001
+
+
+     HELLMANN-FEYNMAN-FORCE IN mRy/a.u. = |F|  Fx       Fy             Fz
+:FHF001:   1.ATOM      3.380078346083      0.000000000000      0.000000000000      3.380078346083
+
+     HELLMANN-FEYNMAN-FORCE IN mRy/a.u. = |F|  Fx       Fy             Fz
+:FHF002:   2.ATOM      8.095960009563      0.000000000000      0.000000000000     -8.095960009563
+
+     HELLMANN-FEYNMAN-FORCE IN mRy/a.u. = |F|  Fx       Fy             Fz
+:FHF003:   3.ATOM     16.717547141793      0.000000000000      0.000000000000     16.717547141793
+
+     HELLMANN-FEYNMAN-FORCE IN mRy/a.u. = |F|  Fx       Fy             Fz
+:FHF004:   4.ATOM      4.883297558491      0.000000000000      0.000000000000     -4.883297558491
+
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.5904367E-03
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.5904367E-03
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.4931947E-02
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.4931947E-02
+:FIT003: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  3  0.4786892E-03
+:FIT003: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  3  0.4786892E-03
+:FIT004: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  4  0.4739276E-03
+:FIT004: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  4  0.4739276E-03
+:DEN  : DENSITY INTEGRAL  =         -3608.83209022   (Ry)
+       ELS_POTENTIAL_AT Z=0 and Z=0.5:  -0.64905  -0.86714
+       ELS_POTENTIAL_AT Y=0 and Y=0.5:   0.00000   0.00000
+:VZERO:v0,v0c,v0x  -1.57114  -0.64905  -0.92209 v5,v5c,v5x  -1.89872  -0.86714  -1.03158
+:VZERY:v0,v0c,v0x  -0.85702   0.00000  -0.85702 v5,v5c,v5x  -0.85702   0.00000  -0.85702
+:VZERX:v0,v0c,v0x  -2.28519  -1.29802  -0.98718 v5,v5c,v5x  -2.94128  -1.73509  -1.20619

@@ -1,0 +1,11 @@
+  4, 'SrVO3.klist'  , 'old'     , 'formatted'  , 0   
+  5, 'SrVO3.in1c'   , 'old'     , 'formatted'  , 0   
+  6, 'SrVO3.output1', 'unknown' , 'formatted'  , 0   
+ 10, './SrVO3.vector_x', 'unknown' , 'unformatted', 9000
+ 11, 'SrVO3.energy_x', 'unknown' , 'formatted'  , 0   
+ 18, 'SrVO3.vsp'    , 'old'     , 'formatted'  , 0   
+ 19, 'SrVO3.vns'    , 'unknown' , 'formatted'  , 0   
+ 20, 'SrVO3.struct' , 'old'     , 'formatted'  , 0   
+ 21, 'SrVO3.scf1'   , 'unknown' , 'formatted'  , 0   
+ 55, 'SrVO3.vec'    , 'unknown' , 'formatted'  , 0   
+ 71, 'SrVO3.nsh'    , 'unknown' , 'unformatted', 0   

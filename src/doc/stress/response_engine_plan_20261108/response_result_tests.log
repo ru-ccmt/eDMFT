@@ -1,0 +1,15 @@
+test_already_corrected_baseline_is_rejected (test_stress_response_result.ResultTests.test_already_corrected_baseline_is_rejected) ... ok
+test_diagnostic_keeps_radial_separate (test_stress_response_result.ResultTests.test_diagnostic_keeps_radial_separate) ... ok
+test_failed_validation_is_rejected (test_stress_response_result.ResultTests.test_failed_validation_is_rejected) ... ok
+test_missing_requested_component_is_rejected (test_stress_response_result.ResultTests.test_missing_requested_component_is_rejected) ... ok
+test_nonfinite_values_are_rejected (test_stress_response_result.ResultTests.test_nonfinite_values_are_rejected) ... ok
+test_pressure_and_tensor_cannot_masquerade_as_mean_stress (test_stress_response_result.ResultTests.test_pressure_and_tensor_cannot_masquerade_as_mean_stress) ... ok
+test_radial_can_be_enabled_after_validation (test_stress_response_result.ResultTests.test_radial_can_be_enabled_after_validation) ... ok
+test_repeated_calls_are_identical_and_inputs_unchanged (test_stress_response_result.ResultTests.test_repeated_calls_are_identical_and_inputs_unchanged) ... ok
+test_stale_and_mismatched_records_are_rejected_even_when_off (test_stress_response_result.ResultTests.test_stale_and_mismatched_records_are_rejected_even_when_off) ... ok
+test_unvalidated_inclusion_is_rejected (test_stress_response_result.ResultTests.test_unvalidated_inclusion_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.001s
+
+OK

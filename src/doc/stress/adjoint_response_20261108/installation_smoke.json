@@ -1,0 +1,10 @@
+{
+  "installed_batch_shape": [
+    2,
+    75,
+    43,
+    43
+  ],
+  "uniform_shift_response_max": 4.440892098500626e-15,
+  "verified_installed_source_files": 18
+}

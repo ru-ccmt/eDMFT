@@ -1,0 +1,137 @@
+{
+  "case": "SrVO3",
+  "scope": "native unmixed charge map on 3 k points; not screened stress",
+  "k_weights": [
+    0.25,
+    0.25,
+    0.5
+  ],
+  "retained": 43,
+  "basis_sizes": [
+    703,
+    698,
+    709
+  ],
+  "preparation_seconds": 5.840910291066393,
+  "central_density_relative": 1.502648756790679e-12,
+  "complement": [
+    {
+      "complement_size": 660,
+      "retained_size": 43,
+      "minimum_gap_Ry": 5.1185846734469465e-06,
+      "omitted_charge_bound": 0.0,
+      "omitted_fermi_slope_bound_per_Ry": 0.0,
+      "reduction_relative_error": 1.4857121728860122e-15,
+      "preparation_seconds": 0.17658370919525623,
+      "stored_bytes": 14619632
+    },
+    {
+      "complement_size": 655,
+      "retained_size": 43,
+      "minimum_gap_Ry": 0.03910429445125185,
+      "omitted_charge_bound": 0.0,
+      "omitted_fermi_slope_bound_per_Ry": 0.0,
+      "reduction_relative_error": 1.4627513323957444e-15,
+      "preparation_seconds": 0.17889279196970165,
+      "stored_bytes": 14404072
+    },
+    {
+      "complement_size": 666,
+      "retained_size": 43,
+      "minimum_gap_Ry": 0.0250505795185898,
+      "omitted_charge_bound": 0.0,
+      "omitted_fermi_slope_bound_per_Ry": 0.0,
+      "reduction_relative_error": 1.4695105264415964e-15,
+      "preparation_seconds": 0.1857647500000894,
+      "stored_bytes": 14880416
+    }
+  ],
+  "fingerprints": {
+    "SrVO3.clmval": "1024201bdba67c65f605bde1dd717b370bcf5ed014b45b2d9f55b4d3a6ccd47e",
+    "SrVO3.in1c": "9523be1af1e74add6821d04dc2761816b3bcfb9b001f958ad760fe2f36095323",
+    "SrVO3.indmfl": "89211f1f20bda818963cb700a933b4105100bcf9ab9553c1e86423f3a0d344c4",
+    "SrVO3.struct": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563",
+    "SrVO3.vector": "45c27fe808340745c890f033da8a2c7ad544d39409cc12d0ca8bc9856ac21a87",
+    "SrVO3.vns": "1cf06ee9267bedf59165d2eab02732c425cec262d2105a0ce16a5fbd6bceefe8",
+    "SrVO3.vsp": "2e51e26fd9b834e3b43c66db9a97f7a3f2c4934f875c42b9a8d95379067881b4",
+    "native.ham.k00000001.bin": "552bfbdbc63f608a4eb5584d8386fe4821069f7249038ce56f34669a8f70f52c",
+    "native.ham.k00000002.bin": "f67c000c2a424e1d01c9b7dce74539ef04987f25121c17632529bd76429fa7b1",
+    "native.ham.k00000003.bin": "633c3724062400868a3dd27ea231d5d760788cbecab2365f2e8f43d981a692e7",
+    "native.k00000001.bin": "3879ff60e2089430276e3764eee58f36ed1b11ed81d06e7742bd7fbcd929c0f0",
+    "native.k00000002.bin": "32670ce2a8a97ea6ac9f7165d5f3747c913eaffd90f24433ffeba1e65184a0ad",
+    "native.k00000003.bin": "3de4e3cc4d71eab317e0ed485358a527f4ada8761de8566c871c8a4631f9db64",
+    "projectorw.dat": "2210ea1cc738767ec364ba400625b56761b1d734eb0a1ee1cee1848d2232b75b",
+    "response.k00000001.bin": "21a90c7955d0e90c109bd9e90ff2b846183c916f6b3b1b2225b616ce8b3ef82a",
+    "response.k00000002.bin": "2171edc9114f747cf33568d66d74b40fd12e282c75ab9691ccd92abb5b868a2d",
+    "response.k00000003.bin": "e4a973194a4b028743cc98c432f9be324ebb1f161b419b5f922426a7168d11c8",
+    "response.meta": "50261348bf0c9214d48783ac54c5e22fc99e2fbd993477f2c7eda0f38ebcffb2"
+  },
+  "potential_transpose": 2.443433906918069e-18,
+  "spatial_transpose": 1.7693030387997203e-17,
+  "branches": {
+    "fixed_mu": {
+      "metric_band_charge_derivative": 4.9273208740424685,
+      "chemical_potential_derivative_Ry": 0.0,
+      "forward_seconds": 0.8296079998835921,
+      "transpose": 4.901973427084009e-17,
+      "normalized_charge_derivative": -5.802417992396784e-20,
+      "steps": {
+        "0.001": {
+          "raw_relative": 3.228801204651882e-06,
+          "normalized_relative": 3.228802523949604e-06,
+          "maximum": 1.1948315055576586e-05
+        },
+        "0.0005": {
+          "raw_relative": 8.457563395615329e-07,
+          "normalized_relative": 8.45817778963615e-07,
+          "maximum": 3.157718942325971e-06
+        }
+      }
+    },
+    "fixed_N": {
+      "metric_band_charge_derivative": -1.7763568394002505e-15,
+      "chemical_potential_derivative_Ry": -0.014696347553462562,
+      "forward_seconds": 0.8625312498770654,
+      "transpose": 1.0818388637312733e-15,
+      "normalized_charge_derivative": -8.327528777572266e-17,
+      "steps": {
+        "0.001": {
+          "raw_relative": 7.802949752681945e-08,
+          "normalized_relative": 7.802959852074197e-08,
+          "maximum": 1.731738793336879e-08
+        },
+        "0.0005": {
+          "raw_relative": 4.5757052646366344e-07,
+          "normalized_relative": 4.574593905358531e-07,
+          "maximum": 2.2207208810417524e-07
+        }
+      }
+    }
+  },
+  "gauge": {
+    "radial_maximum": 1.3944079773268973e-14,
+    "H_identity_RR_norm": 2.7357611526301817e-13,
+    "H_QR_norm": 8.91885046114855e-12,
+    "O_derivative_norm": 6.701210059810061e-15,
+    "raw_projector_derivative_norm": 1.7642790047947888e-16,
+    "dmu": 0.9999999999999974,
+    "band_number_derivative": -1.738090749579499e-14,
+    "spatial_density_norm": 1.1330939401775407e-11,
+    "density_coefficient_norm": 2.7531871751050797e-13,
+    "policy": "constant +1 Ry potential; all valence linearization/LO energies and core shift +1 Ry; fixed N; not fixed-energy-policy probe"
+  },
+  "gauge_cutoff": {
+    "high_l_max": 24,
+    "original_H_minus_O_columns_norm": 8.924350162005461e-12,
+    "missing_high_l_columns_norm": 0.00043506464501279126,
+    "native_IR_minus_exact_mask_norm": 1.697328105727537e-12,
+    "residual_after_independent_cutoff_completion": 0.00043506464505783113
+  },
+  "normalization_alpha": 1.0000104116962814,
+  "target_charge": 88.87476071061762,
+  "triangles": {
+    "compact_bytes": 79842400,
+    "former_full_bytes": 1306002720
+  },
+  "peak_process_rss_bytes": 1152466944
+}

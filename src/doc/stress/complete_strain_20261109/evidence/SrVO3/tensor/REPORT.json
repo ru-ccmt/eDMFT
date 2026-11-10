@@ -1,0 +1,257 @@
+{
+  "observable": "complete native frozen-Sigma Klein tangent",
+  "stress_Ry_Bohr3": [
+    [
+      0.0002002149363517306,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0002002149363517306,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0001980403510453561
+    ]
+  ],
+  "stress_GPa": [
+    [
+      2.9452633510600785,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      2.9452633510600785,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      2.9132740972944804
+    ]
+  ],
+  "mean_tensile_stress_GPa": 2.9346002664715454,
+  "compression_pressure_GPa": -2.9346002664715454,
+  "derivatives_Ry": [
+    0.22903996636845347,
+    0.07579183314901675
+  ],
+  "strains": [
+    [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  ],
+  "explicit_Ry": [
+    0.25101461337758224,
+    0.08311326432066356
+  ],
+  "induced_Ry": [
+    -0.02197464700912876,
+    -0.0073214311716468155
+  ],
+  "fixed_energy_explicit_parts": {
+    "lattice_geometry_Ry": [
+      -2.0193719136473423,
+      -0.6723000443715509
+    ],
+    "lattice_explicit_potential_Ry": [
+      -320.52135540021425,
+      -106.83677858659264
+    ],
+    "core_explicit_Ry": [
+      -3256.3046141555783,
+      -1085.4337885732707
+    ],
+    "density_explicit_Ry": [
+      3579.081323805507,
+      1193.0209699713996
+    ]
+  },
+  "adjoint": {
+    "converged": true,
+    "gmres_info": 0,
+    "direction": "adjoint",
+    "residual_norm": 5.96004564165954e-11,
+    "threshold": 1.3883097331952688e-10,
+    "actions": 15,
+    "inner_residual_history": [
+      0.0076172955818297056,
+      0.0007213087893111868,
+      5.311499238294275e-05,
+      9.922457265989363e-06,
+      4.817731698760798e-06,
+      8.703600049795477e-07,
+      5.4858136564634814e-08,
+      1.949222846541211e-08,
+      1.131684770255263e-09,
+      2.797517923460212e-10,
+      1.0954429961369015e-10,
+      3.98521714027719e-12,
+      8.585870457069171e-13
+    ],
+    "seconds": 260.91239466588013
+  },
+  "central": {
+    "fixed_number": true,
+    "target_charge": 85.0,
+    "normalization_enabled": true,
+    "normalization_alpha": 1.000010233544444,
+    "central_valence_relative_error": 8.168302240957319e-10,
+    "central_core_relative_error": 8.83435153300431e-14,
+    "central_fixed_point_residual_norm": 0.00017810222741310432,
+    "kpoints": 75,
+    "retained_bands": 43,
+    "matrix_quadrature": "wien2k24",
+    "stress_applied": false
+  },
+  "search_details": [
+    {
+      "atom": 0,
+      "l": 0,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -2.1061414664393543,
+        -1.5213536561990384
+      ],
+      "native_energy_Ry": -1.8137475776672352,
+      "root_error_Ry": 1.634803892258674e-08
+    },
+    {
+      "atom": 0,
+      "l": 1,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -1.0547005349283787,
+        -0.10395340755286274
+      ],
+      "native_energy_Ry": -0.5793269920349116,
+      "root_error_Ry": 2.0794290844783347e-08
+    },
+    {
+      "atom": 1,
+      "l": 0,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -4.590986357215834,
+        -3.862947622862509
+      ],
+      "native_energy_Ry": -4.2269670104980595,
+      "root_error_Ry": 2.0458887917129687e-08
+    },
+    {
+      "atom": 1,
+      "l": 1,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -2.906707039197487,
+        -1.8895117138748723
+      ],
+      "native_energy_Ry": -2.398109397888183,
+      "root_error_Ry": 2.1352003276575715e-08
+    },
+    {
+      "atom": 2,
+      "l": 0,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -1.7389240126534975,
+        0.4328240972899688
+      ],
+      "native_energy_Ry": -0.6530499649047847,
+      "root_error_Ry": 7.223020404012459e-09
+    },
+    {
+      "atom": 3,
+      "l": 0,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -1.7388025847256472,
+        0.4329211942305114
+      ],
+      "native_energy_Ry": -0.6529407119750972,
+      "root_error_Ry": 1.6727529250637474e-08
+    }
+  ],
+  "contraction_seconds": 262.6896357908845,
+  "stress_applied": false,
+  "full_tensor_within_symmetry": true,
+  "sigma_symmetry_relative_error": 0.0020115047916452605,
+  "tensor_is_symmetry_projection": true,
+  "unrestricted_tensor_validated": false,
+  "scope": "nonmagnetic fixed-N primitive orthogonal; symmetry-enforced diagonal tensor",
+  "timings": {
+    "prepare_valence_seconds": 132.56026875018142,
+    "prepare_functional_and_searches_seconds": 43.705041208071634,
+    "source_seconds": [
+      1.8202757500112057,
+      130.0926645831205
+    ],
+    "JT_actions": [
+      18.20040616695769,
+      19.931060833856463,
+      18.518955792067572,
+      19.01699558389373,
+      18.300425624940544,
+      16.18455020803958,
+      16.16473054117523,
+      16.832146416883916,
+      18.109503749990836,
+      16.420970000093803,
+      16.658101875102147,
+      17.080417999997735,
+      16.09899904183112,
+      17.014790375018492,
+      16.36757841706276
+    ],
+    "total_seconds": 574.4712465831544
+  },
+  "peak_rss_bytes": 10909892608,
+  "forward_adjoint_mean_error_GPa": -4.014762211568268e-08
+}

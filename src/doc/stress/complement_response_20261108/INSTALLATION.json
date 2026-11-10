@@ -1,0 +1,40 @@
+{
+  "created": "2026-11-08T22:38:08.854427+00:00",
+  "files": [
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/python/lapw_complement_response.py",
+      "before": null,
+      "after": "081fa9c6c04ecfc26167eedc0380a9b8022a74e31e8121613f0857ffbb64e13a",
+      "source": "source/repo/src/python/lapw_complement_response.py"
+    },
+    {
+      "target": "/Users/haule/dbin/lapw_complement_response.py",
+      "before": null,
+      "after": "081fa9c6c04ecfc26167eedc0380a9b8022a74e31e8121613f0857ffbb64e13a",
+      "source": "source/dbin/lapw_complement_response.py"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_complement_response.py",
+      "before": null,
+      "after": "f2d6cda34ba0d767b2155a6bc96cabb3aed3ca467721d4335909f1580d3fa5df",
+      "source": "source/repo/src/python/tests/test_lapw_complement_response.py"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+      "before": "a00f05f6696b95c4e6ed971fc6321b0890ec1b071aa9b3ab66f220ec567143b0",
+      "after": "f13d4b13c1c5ef226737046835b8af859bbc36b8fd8577a040fec65dc6bedb7d",
+      "source": "source/repo/src/doc/stress/stress_response_roadmap_20261108.txt"
+    }
+  ],
+  "validation": {
+    "source": "----------------------------------------------------------------------\nRan 102 tests in 0.634s\n\nOK",
+    "dbin": "----------------------------------------------------------------------\nRan 40 tests in 0.208s\n\nOK"
+  },
+  "production_binaries_before": {
+    "/Users/haule/dbin/dmft2": "a95c3f7d4e95f0e0598d5a962f4a00b06e49644235c1cb1b0dbb0a2bf5f7abdc",
+    "/Users/haule/dbin/dmft2_response": "16844ec83836f27df60a605313993fef41b74dbf6048a040e063695e634f010c"
+  },
+  "scope": "optional static empty-complement response; no production stress switch",
+  "production_binaries_unchanged": true,
+  "complete": true
+}

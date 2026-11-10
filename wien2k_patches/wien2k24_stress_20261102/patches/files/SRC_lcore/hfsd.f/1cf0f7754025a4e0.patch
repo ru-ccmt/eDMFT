@@ -1,0 +1,30 @@
+--- a/SRC_lcore/hfsd.f
++++ b/SRC_lcore/hfsd.f
+@@ -520,8 +520,17 @@
+       GO TO 1   
+       
+   151  continue
+-!======modfication for the stress tensor, only in NREL case  
+-if(.not.rela) then
++!======core correction to the stress tensor
++!
++! The Hellmann-Feynman core correction depends on the core charge density
++! and on the strain derivative of the effective potential.  It remains valid
++! when the radial core equation is solved fully relativistically: the Dirac
++! kinetic operator has no explicit lattice-strain dependence in the atom-
++! centered coordinates used for a localized core orbital.  RELA only changes
++! RHOC and hence the numerical value of Eq. (21).  Suppressing :STR_CORE in
++! RELA mode caused mixer to retain stale NREL data, so write the freshly
++! evaluated tensor in both modes.  The separate scalar-relativistic valence
++! correction is implemented in LAPW2.
+   !below we calculate the total (spherical+non-spherical core correction)  
+   WRITE(21,*)
+   WRITE(21,*) ' TOTAL CORE CORRECTION STRESS TENSOR in Ry/Bohr^3, EQ. (6.48) '
+@@ -543,7 +552,6 @@
+   ENDDO  
+   WRITE(21,*) repeat('*',60)
+   WRITE(21,*)
+-endif        
+ !=======end modfication
+    
+    IF(NATT.EQ.0) THEN

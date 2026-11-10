@@ -1,0 +1,189 @@
+{
+  "case": "SrVO3",
+  "threads": 1,
+  "timings": {
+    "prepare_valence_seconds": 175.33589112502523,
+    "prepare_functional_seconds": 19.615342458011582,
+    "prepare_energy_policy_seconds": 38.65717695793137,
+    "J_actions": [
+      26.22869816608727,
+      26.44722104095854,
+      27.535910249920562,
+      26.472336542094126,
+      24.368879500078037,
+      21.45828220900148,
+      21.98560620797798,
+      19.643554375041276,
+      19.11570725007914,
+      18.88948162505403,
+      18.508312082849443,
+      21.804373417049646,
+      20.232700458029285,
+      17.525950625073165
+    ],
+    "total_seconds": 549.8793495411519
+  },
+  "root_checks": [
+    {
+      "atom": 0,
+      "l": 0,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -2.1061414664393543,
+        -1.5213536561990384
+      ],
+      "native_energy_Ry": -1.8137475776672352,
+      "root_error_Ry": 1.634803892258674e-08
+    },
+    {
+      "atom": 0,
+      "l": 1,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -1.0547005349283787,
+        -0.10395340755286274
+      ],
+      "native_energy_Ry": -0.5793269920349116,
+      "root_error_Ry": 2.0794290844783347e-08
+    },
+    {
+      "atom": 1,
+      "l": 0,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -4.590986357215834,
+        -3.862947622862509
+      ],
+      "native_energy_Ry": -4.2269670104980595,
+      "root_error_Ry": 2.0458887917129687e-08
+    },
+    {
+      "atom": 1,
+      "l": 1,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -2.906707039197487,
+        -1.8895117138748723
+      ],
+      "native_energy_Ry": -2.398109397888183,
+      "root_error_Ry": 2.1352003276575715e-08
+    },
+    {
+      "atom": 2,
+      "l": 0,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -1.7389240126534975,
+        0.4328240972899688
+      ],
+      "native_energy_Ry": -0.6530499649047847,
+      "root_error_Ry": 7.223020404012459e-09
+    },
+    {
+      "atom": 3,
+      "l": 0,
+      "slots": [
+        2
+      ],
+      "roots_Ry": [
+        -1.7388025847256472,
+        0.4329211942305114
+      ],
+      "native_energy_Ry": -0.6529407119750972,
+      "root_error_Ry": 1.6727529250637474e-08
+    }
+  ],
+  "direct_energy_gradient_Ry_per_Ry": [
+    -0.0001703498057161394,
+    -3.4204762224007788e-06,
+    -0.0007144574144786892,
+    -0.00021040452191010647,
+    3.3994925638775562e-06,
+    6.795145423408347e-06
+  ],
+  "readout": {
+    "observable": "complete frozen-Sigma native Klein tangent",
+    "units": "Ry per supplied perturbation parameter",
+    "explicit_Ry": [
+      0.2359823360648079
+    ],
+    "induced_Ry": [
+      -0.01032034011977867
+    ],
+    "parts": {
+      "lattice_geometry_Ry": [
+        -2.0193719136542967
+      ],
+      "lattice_explicit_potential_Ry": [
+        -320.52135540021345
+      ],
+      "core_explicit_Ry": [
+        -3256.3046141555747
+      ],
+      "density_explicit_Ry": [
+        3579.081323805507
+      ]
+    },
+    "full_klein_tangent": true,
+    "stress_applied": false,
+    "baseline_subtracted": false,
+    "radial_energy_policy": "fixed",
+    "central": {
+      "fixed_number": true,
+      "target_charge": 85.0,
+      "normalization_enabled": true,
+      "normalization_alpha": 1.000010233544444,
+      "central_valence_relative_error": 8.168302240957319e-10,
+      "central_core_relative_error": 8.83435153300431e-14,
+      "central_fixed_point_residual_norm": 0.00017810222741310432,
+      "kpoints": 75,
+      "retained_bands": 43,
+      "matrix_quadrature": "wien2k24",
+      "stress_applied": false
+    }
+  },
+  "screened": {
+    "converged": true,
+    "gmres_info": 0,
+    "direction": "forward",
+    "residual_norm": 4.46745749259865e-08,
+    "threshold": 1.4846725610418384e-07,
+    "actions": 14,
+    "inner_residual_history": [
+      0.0004504029618734928,
+      0.00017317460335611434,
+      3.688411210228052e-05,
+      1.183125933529355e-05,
+      1.299018424354074e-06,
+      2.6497416970050705e-07,
+      1.063750022841786e-07,
+      1.6202936794946286e-08,
+      1.2733829873717758e-09,
+      2.589038535376645e-10,
+      3.008179439388379e-11
+    ],
+    "seconds": 310.2310089170933
+  },
+  "derivative_Ry": 0.229039968584494,
+  "mean_tensile_stress_GPa": 2.9346003066191675,
+  "searched_energy_derivatives_Ry": [
+    -3.3247688616410516,
+    -3.272656105251243,
+    -3.056469931896606,
+    -3.02339982859214,
+    -1.9070118873814077,
+    -1.908253535920387
+  ],
+  "fixed_energy_mean_GPa": 2.8933234305725377,
+  "peak_rss_bytes": 10207920128
+}

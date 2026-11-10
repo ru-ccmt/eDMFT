@@ -1,0 +1,294 @@
+GENERAL NATIVE POTENTIAL INPUTS FOR THE FAST eDMFT RESPONSE
+Implementation and validation, 8 November 2026
+
+STATUS: INSTALLED AFTER EXPLICIT USER APPROVAL
+
+The user approved application and continuation on 8 November 2026. Source
+modules/tests were installed in eDMFT_new and helpers in ~/dbin/. All overwritten
+files were backed up under before_installation/. The staged baseline hashes
+were checked before the first write. Native executables and user material
+calculations were unchanged. See INSTALLATION.json for file records and the
+post-installation test log for verification.
+
+1. WHAT THIS ADDS
+
+The fast valence map previously accepted a spherical muffin-tin potential
+perturbation. It now also accepts nonspherical muffin-tin and interstitial
+potential perturbations, separately or together. All three feed the same
+normalized-projector electronic response, including the empty complement.
+The action and its discrete transpose are implemented and tested.
+
+This completes the general native-input substep of the valence-response work.
+It does NOT complete the native Hartree/XC or core response (roadmap step 2),
+or the full screened response validation (step 3). The reusable material loader,
+independent spatial charge/gauge checks and fixed-N material endpoint checks
+also remain. No new pressure or analytic-versus-numeric stress result is claimed.
+
+The implementation also speeds up the existing spherical assembly by choosing
+efficient matrix contraction order. Its equations and physical approximations
+are unchanged. The new nonspherical/interstitial operations directly assemble
+only retained-retained and complement-retained blocks, avoiding unused QQ work.
+The spherical operation still builds full matrices before extracting those
+blocks; optimizing that is a separate task.
+
+2. COORDINATES AND THE COUPLED MAP
+
+All equations here are at fixed geometry, sphere radii, k weights, local axes,
+radial linearization energies and LO energies. Energies are in Ry. Sigma, double
+counting and temperature remain fixed. Native material tests keep mu fixed.
+
+Write the input vector as x=(s,v_NS,v_I), where
+
+  s_a(r)       = delta[r V_spherical,a(r)],
+  v_NS,a,L(r)  = delta V_a,L(r), in native real-harmonic coordinates,
+  v_I,j        = delta V_j from the Fourier section of case.vns.
+
+a labels an inequivalent atom, L=(l,m) a native real harmonic, and j a native
+reciprocal-star representative. v_NS has no extra factor r. The interstitial
+coefficients have ALREADY undergone native reanalysis of theta_I V, with
+theta_I the interstitial indicator. They are not unmasked Fourier coefficients
+of V. No additional sphere mask, star-size factor or cell-volume factor belongs
+in this band assembly. Conversion from a physical potential to these exact
+coordinates belongs to the upstream potential operator.
+
+C_R are retained central generalized KS eigenvectors; C_Q spans their complete
+O-orthogonal coefficient-space complement, constructed from central H/O. Q is
+not a set of stored high-energy eigenvectors. R contains the entire DMFT window
+and all significantly occupied states. The existing gap/thermal checks reject
+an invalid complement.
+
+The new prepared potential operation B returns
+
+  B x = (h_RR, o_RR, Phi'_R, h_QR, o_QR),
+  h_AB = C_A^dagger delta H C_B,
+  o_AB = C_A^dagger delta O C_B.                           (1)
+
+Phi is the RAW correlated-orbital overlap, before window normalization. The
+electronic operation E, rather than B, applies window motion, overlap symmetry
+and normalization. These operations must not be applied a second time in B.
+
+Only s changes the radial and matching basis in this fixed-geometry policy.
+For explicit nonspherical/interstitial potential inputs at fixed s,
+
+  delta O = 0,          Phi'_R,explicit = 0.               (2)
+
+Equation (2) does NOT mean that the normalized projector stays fixed: H changes
+the KS eigenvectors and selected subspace, and E includes that change.
+
+Let R_density reconstruct spatial density from band-density blocks; D_s is the
+direct basis-density derivative at fixed band density, and S_s selects s from x.
+The complete valence operation in this checkpoint is
+
+  delta n = A x,
+  A = R_density E B + D_s S_s.                             (3)
+
+Its discrete transpose is
+
+  A^T = B^T E^T R_density^T + S_s^T D_s^T.                 (4)
+
+All adjoints use explicit real coordinate pairings, including both QR/RQ legs
+and real/imaginary Fourier components. They are not formed by probing every
+density coefficient separately.
+
+3. EXPLICIT NONSPHERICAL MUFFIN-TIN POTENTIAL
+
+For a fixed atom, let phi_l,i,c(r) be radial primitive i in angular channel l
+and native radial component c. The supplied native quadrature/metric is w_rc.
+Let G^(L)_(lm,l'm') be the real-harmonic Gaunt coefficient, in the same signed-l
+convention as the native code. The small angular/radial matrix is
+
+  delta K_(lmi,l'm'j)
+    = sum_(L,r,c) G^(L)_(lm,l'm') phi_l,i,c(r)
+                    w_rc v_NS,L(r) phi_l',j,c(r).         (5)
+
+For each equivalent site and k point, Z maps coefficient-space trial states to
+these augmented radial/angular coefficients. The explicit potential term is
+
+  delta H_NS,RR = Z_R^dagger delta K Z_R,
+  delta H_NS,QR = Z_Q^dagger delta K Z_R.                  (6)
+
+The response of the CENTRAL nonspherical potential through changing phi and Z
+already belongs to the spherical-input operation. Equation (6) adds only its
+explicit delta V leg, so no radial/matching terms are counted twice. The new
+joint adapter rejects a nonspherical (0,0) harmonic, already supplied by s.
+
+For Hermitian Y_RR and rectangular Y_QR, the full Hermitian pairing is
+
+  Re Tr(Y_RR^dagger delta H_RR)
+      + 2 Re Tr(Y_QR^dagger delta H_QR).                   (7)
+
+The small-kernel covector sums over sites/k before radial contractions:
+
+  K_bar = sum [Z_R Y_RR Z_R^dagger
+                + Z_Q Y_QR Z_R^dagger
+                + Z_R Y_QR^dagger Z_Q^dagger].            (8)
+
+Reverse (5) using K_bar to obtain v_NS,bar. The factor two in (7) is supplied
+by the two cross terms in (8); it must not be applied again.
+
+4. INTERSTITIAL FOURIER CONVENTION: BUG FOUND IN THE NEW STAGED MAP
+
+For representative g_j and distinct star member G=R g_j, native STERN/SETWAR
+form a mean over operations mapping g_j to that member:
+
+  p_G = mean_R exp(-2 pi i g_j dot tau_R),
+  W(G) = v_I,j p_G.                                      (9)
+
+Repeated operations are averaged, not summed. The real executable uses the
+corresponding cosine factor. These conventions were checked against STERN,
+SETWAR and the native potential reader, not inferred from the density stars.
+
+An essential convention appears at vector export: complex TAPEWF writes
+CONJG(Z), where Z is the solver eigenvector. For the coefficients actually read
+from case.vector, the upper Hamiltonian matrix is therefore
+
+  delta H_I,ij = conjugate[ W(G_i-G_j) ],   i <= j,       (10)
+
+with real diagonal and Hermitian copying to the lower triangle. Only PW rows
+occur: ordinary LOs vanish in the interstitial. Thus
+
+  delta H_I,RR = C_PW,R^dagger delta H_I C_PW,R,
+  delta H_I,QR = C_PW,Q^dagger delta H_I C_PW,R.          (11)
+
+The first staged version omitted the final conjugation in (10). FeSe's real
+potential did not expose it; the complex SrVO3 calculation did. Its interstitial
+band-H derivative differed by about 9.4%, and the resulting density derivative
+by 9.2e-4 relative. Native coefficient-space comparison and source inspection
+identified the cause. The corrected PW coefficient matrix matches native finite
+differences to 1.53e-9 relative in the separate sign diagnostic.
+
+Reversing G also fixes physical Hermitian fields, but the implemented operation
+conjugates W explicitly. That reproduces native upper-triangle behavior even
+for redundant coordinate directions used in adjoint checks. The reverse map
+also conjugates its upper-matrix covector. A dedicated complex regression test
+distinguishes the solver and exported-vector conventions.
+
+Native source evidence:
+  wien2k_24/SRC_lapw1/hamilt.F: WARPIN(G_row-G_column), HPANEL packing;
+  wien2k_24/SRC_lapw1/tapewf.F: CONJG(Z) on export;
+  wien2k_24/SRC_lapw1/calkpt.F: DumpAssembledMatrices conjugates packed H/O;
+  eDMFT_new/src/dftKS/tapewf.FPP: same complex-vector convention.
+
+This was an error in the NEW, uninstalled response module. It does not establish
+a corresponding bug in the existing production dmft2 stress calculation.
+
+5. THE EMPTY COMPLEMENT STILL FEEDS PROJECTOR NORMALIZATION
+
+The retained-plus-complement electronic operation is unchanged. For retained
+KS energies e_R and projected central H_Q, it solves
+
+  H_Q T - T e_R = -(h_QR-o_QR e_R),
+  Phi'_R,eff = Phi'_R + T^dagger Phi_Q,
+  rho'_QR = T rho_R,
+  rho'_RR = E_R(h_RR,o_RR,Phi'_R,eff).                    (12)
+
+The thermal-empty assumption makes rho'_QQ negligible within the explicit
+checks. E_R contains the complete normalized-window electronic derivative.
+Hence the new nonspherical/interstitial inputs change the projector even when
+their explicit raw derivative in (2) is zero. No extra Matsubara sum over Q is
+introduced. The cached static direct solve and its transpose are reused.
+
+6. VALIDATION
+
+108 distinct tests pass with staged modules and repository dependencies, with
+the native radial library explicitly loaded (no skipped native tests). The
+same 108 also pass with staged modules and dbin dependencies. This is two import
+environments, not 216 distinct tests. Six new tests cover:
+  native star/triangle assembly and full/rectangular transposes;
+  the complex exported-vector convention;
+  duplicate symmetry-operation averaging/systematic absence;
+  nonspherical rectangular action and transpose;
+  explicit input coordinate round trip and reality constraints;
+  ambiguous-star and duplicate-PW rejection.
+
+Thirty-two independent native endpoints were run in scratch. Each endpoint runs
+native LAPW1 and dmft2_response with fresh projector normalization. Geometry,
+PW labels, Sigma, mu and linearization energies are held fixed. No user material
+directory is modified. FeSe uses RELA, real vectors, 66 retained/509 total basis
+states; SrVO3 uses NREL, complex vectors, 43 retained/703 total basis states.
+Both fixtures have RKMAX=8 and one k point.
+
+Perturbations, with scalar amplitude h:
+  spherical:     delta(r V) = 0.07 r sin(1.3 r);
+  nonspherical:  delta V_L = 0.1 V_L, all native nonspherical channels;
+  interstitial:  delta V_j = 0.1 V_j, both real/imaginary components;
+  joint:         all three directions together.
+
+Native density differences are [n(+h)-n(-h)]/(2h). Relative errors use the
+Euclidean norm of the explicitly packed spatial-density coefficients; they are
+not real-space weighted norms or pressure errors.
+
+                              FeSe RELA             SrVO3 NREL
+  nonspherical, h=0.01        1.33007e-6            1.70595e-7
+  nonspherical, h=0.005       1.34353e-6            3.11600e-7
+  nonspherical, h=0.001       1.96469e-6            1.54636e-6
+  nonspherical, h=0.0005      3.11421e-6            2.83859e-6
+  interstitial, h=0.001       3.87526e-7            3.25952e-7
+  interstitial, h=0.0005      8.02543e-7            1.24687e-7
+  joint, h=0.001              3.78466e-7            2.24033e-6
+  joint, h=0.0005             1.37185e-7            5.65863e-7
+  coupled transpose          4.57e-18              1.13e-17
+  central density            9.50e-13              1.63e-12
+
+The joint SrVO3 error decreases approximately quadratically with h. Very small
+isolated nonspherical steps amplify finite endpoint/output precision. Increasing
+h reduces this noise but leaves a FeSe nonspherical residual near 1.3e-6. Its
+H-matrix residual is about 2.88e-6; SrVO3's is about 5.45e-7 in the complete
+RR/QR norm. The earlier nonspherical checkpoint also recorded small native/
+assembled differences. These are not fully attributed or claimed to vanish.
+They should be revisited if they materially limit the complete screened result.
+
+H/O are differenced in their shared coefficient gauge BEFORE projecting with
+the central LAPW coefficients, avoiding cancellation from subtracting two large
+separately projected matrices. Even then, large coefficient norms can amplify
+native/file precision. Complete raw step results are in the JSON files.
+
+7. PERFORMANCE, SCOPE AND NEXT WORK
+
+The benchmark compares the same complete spherical-potential-to-valence-density
+map, same central data, same direction and same retained/complement space. It
+runs baseline and optimized versions serially, one thread, and reports median
+of three warm actions/reverse actions. The optimization changes contraction
+order in PreparedSphericalBand, allowing BLAS to replace scalar multi-index
+loops. Both versions agree with the previous full-spectral reference near 1e-13.
+Detailed timing numbers are in TIMINGS.txt and *_benchmark_*.json.
+
+These timings exclude native central H/O generation, Hartree/XC/core, screening
+iterations and final stress contraction. They do not establish an end-to-end
+stress speedup. General nonorthogonal cells, SOC, magnetic spin assembly,
+automatic energy-search response, multiple-k MPI production loading and all six
+strain sources are not validated by these material probes.
+
+Immediate next work after approval/application:
+  1. Finish reusable native material loading and independent spatial charge,
+     gauge and fixed-N endpoint checks. Preserve all native potential units,
+     Fourier reanalysis and real-harmonic conventions established here.
+  2. Implement/connect native Hartree/GGA-XC and core forward/transposes so the
+     actual unmixed charge-map derivative J is available. The slow reference
+     already obtains these effects through native program evaluations.
+  3. Validate (I-J) q=b and the single-adjoint solve against that reference.
+     The generic linear solver exists; the physical J is what is incomplete.
+  4. Complete the stress-functional gradient, six strain sources and final
+     tensor publication. Existing STRT/STRFT scheduling remains unchanged.
+
+PROPOSED SOURCE CHANGES
+
+  src/python/lapw_potential_response.py          new native input/joint module
+  src/python/lapw_nonspherical_response.py      explicit RR/QR potential leg
+  src/python/lapw_spherical_response.py         equivalent optimized contractions
+  src/python/tests/test_lapw_general_potential.py  six new tests
+
+The three helper modules would also be installed in ~/dbin/. The proposed
+roadmap update and this checkpoint would be saved under src/doc/stress/.
+No ordinary dmft2/dftKS/LAPW native executable is rebuilt or replaced here.
+
+REPRODUCIBILITY AND REVIEW
+
+stage/ contains proposed source/doc versions; general_potential_response.patch
+contains the reviewable repository diff. expected.json records the unchanged
+installed-file hashes. Tests and JSON reports are saved here alongside the
+drivers. Native endpoint inputs/vectors/outputs remain in the scratch FeSe/
+and SrVO3/ subdirectories. Drivers explicitly reference the previous coupled,
+complement and augmentation fixtures; this is a diagnostic material adapter,
+not a standalone general production loader. Before applying, recheck baseline
+hashes and back up every overwritten file, preserving unrelated local changes.

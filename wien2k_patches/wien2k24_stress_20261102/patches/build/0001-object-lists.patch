@@ -1,0 +1,22 @@
+--- a/SRC_lapw0/Makefile
++++ b/SRC_lapw0/Makefile
+@@ -99,7 +99,7 @@
+         vxcpw2.o vx_screened.o wc05.o workf1.o W2kutils.o xcener.o \
+         xcpot.o xcpot1.o xcpot1Q.o xcpot3.o ykav.o ylm.o coulint.o \
+         c_alpha_m.o gaunt.o notri.o t3j0.o t3j.o ph.o finl_elect_str.o \
+-        kahan_summ_gxyz.o stress_gga.o \
++        kahan_summ_gxyz.o stress_gga.o gga_metric_tensor.o \
+         
+ #  Object file for parallel and sequential
+ SP_OBJS = modules.o libxc_mod.o W2kinit.o fft_modules.o reallocate.o energy.o finl_elect_str.o getff1.o getfft.o \
+--- a/SRC_lapw2/Makefile
++++ b/SRC_lapw2/Makefile
+@@ -112,7 +112,7 @@
+            OutputQ.o ALMDPrint.o WriteEFG.o \
+            fermi_totnos.o fermi_efi.o fermi_drval.o fermi_initdr.o fermi5_rtbis.o \
+            c_alpha_m.o val_corr_integrals.o val_corr_stress.o symmetrization_stress.o \
+-           val_kinstrmt.o kin_str_integrals.o stress_APW_surface.o step_fun_kb.o \
++           val_kinstrmt.o val_rela_kinstrmt.o kin_str_integrals.o stress_APW_surface.o step_fun_kb.o \
+            sumupfft_stress.o setfft_stress.o rean0.o rean3.o val_kin_interstitial.o \
+            write_stress.o
+ 

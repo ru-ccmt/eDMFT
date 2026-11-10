@@ -1,0 +1,257 @@
+EXPLICIT LAPW BAND GEOMETRY FOR THE SCREENED STRAIN RESPONSE
+9 November 2026; checkpoint identifier band_geometry_20261108
+
+STATUS: installed in eDMFT_new and dbin after explicit user approval.
+Post-install validation: 209/209 tests passed in each location, zero skips;
+all thirteen checked helpers and all seven checked tests imported from installed paths.
+
+The previously approved explicit hydrostatic POTENTIAL patch is installed in
+eDMFT_new and dbin, with 201/201 post-install tests passing in both locations.
+This new checkpoint adds the explicit BAND geometry source. It is a separate
+patch awaiting approval. No new stress correction was published, and no user
+material run was modified. We remain in point 3 of the response plan.
+
+WHAT THIS COMPLETES
+
+We now have analytic changes of native H, O and RAW projector overlaps under
+a homogeneous strain, holding native potential FILE coefficients fixed. The
+code retains off-diagonal matrix elements in the retained bands and their
+complete finite LAPW complement. It includes matching, ordinary local orbitals,
+spherical surface terms, the ordered native Wronskian correction, nonspherical
+matrix elements, interstitial overlap/kinetic terms, and raw projector 5.
+
+The scope is the prepared nonmagnetic, no-SOC, primitive orthogonal snapshots,
+fixed radial energies, fixed RMT and radial grids, fixed local axes, fixed
+integer plane-wave/local-orbital labels, and symmetry-preserving strain.
+The helper rejects a strain that breaks the stored ground-state symmetry.
+Low-level angular/matching/interstitial formulas also pass synthetic shear
+tests, but that does not establish a native symmetry-breaking tensor source.
+
+The production wrapper still uses the earlier native reference backend. The
+new prepared engine has not replaced it. Full source assembly, total-functional
+reconciliation and production publication remain to be done.
+
+DECOMPOSITION: KEEP GEOMETRY AND POTENTIAL RESPONSE SEPARATE
+
+Let F(eta)=I+eta e, with symmetric dimensionless strain direction e. The scalar
+eta is the deformation amplitude. Lattice vectors transform by F, reciprocal
+vectors by F^{-T}. Fractional atomic positions are fixed. For hydrostatic
+strain e=I, dOmega/deta=3 Omega. RMT is fixed in physical Bohr, not scaled.
+
+All derivatives below use the CENTRAL coefficient gauge. C contains central
+retained KS columns C_R and an O-orthonormal complement C_Q, arranged [R,Q].
+R denotes the exported/retained bands, NOT the smaller DMFT window W. Q is
+the rest of the same finite LAPW space. This construction does not claim
+completeness of the infinite one-electron Hilbert space.
+
+Define
+  b = (delta H_RR, delta O_RR, delta Phi_R,
+       delta H_QR, delta O_QR).
+Phi is the raw orbital overlap before DMFT window selection, symmetry and
+inverse-square-root normalization. H and O are covariant coefficient matrices,
+projected with central C; no derivative of C is included in their definition.
+The common electronic operation then calculates the eigenvector/window,
+overlap-metric and normalized-projector changes exactly once.
+
+Let B be the already implemented derivative of b with respect to native
+potential coefficients. Let K map a charge change to those potential changes.
+The installed hydrostatic potential helper supplies s_V. For induced material
+charge q, the joint perturbation is
+
+  b_total = b_geometry + B (s_V + K q).                       (1)
+
+b_geometry is the new helper's output. It holds potential FILE coefficients
+fixed, including the masked interstitial VNS coefficients. Therefore it has
+no separate explicit derivative of the interstitial potential matrix. The
+moving interstitial potential mask belongs in s_V. Fixed file coefficients
+are not identical to a fixed physical real-space potential. This distinction
+must also be preserved when subtracting the existing Blaha stress baseline.
+
+Notation in the code: raw=Phi; hrr/orr=RR blocks; hqr/oqr=QR blocks;
+nr=number of retained bands; npw=number of plane-wave rows. Rectangular columns
+carry Hermitian RR and unrestricted complex QR; their RQ adjoint is implicit.
+
+ANGULAR AND BOUNDARY MATCHING DERIVATIVE
+
+For q_i=k+G_i, q_i'=-e q_i and Omega'=tr(e) Omega. Write Q_i=|q_i|,
+Q_i'=q_i.q_i'/Q_i and n_i=q_i/Q_i. The phase exp(i G_i.R_a) is fixed under
+affine deformation; likewise the raw projector's exp(i (k+G_i).R_a) phase.
+An atom's local frame is held fixed in Cartesian coordinates in this adapter.
+
+For spherical harmonic Y_lm, define
+  n'=(q'-n(n.q'))/Q, omega=n cross n'.
+Then Y_lm'=i(omega.L Y_l)_m, evaluated using the angular-momentum ladder
+matrices. This avoids dividing by sin(theta) at a pole. The zero reciprocal
+vector stays zero under homogeneous strain and has zero angular derivative.
+
+The common augmentation factor is
+  g_mi = 4 pi i^l Y_lm(q_i)^* exp(i G_i.R_a)/sqrt(Omega),
+  g_mi' = 4 pi i^l exp(i G_i.R_a)/sqrt(Omega)
+          [Y_lm'^* - tr(e) Y_lm^*/2].                       (2)
+
+Let j_i=j_l(Q_i R), d_i=Q_i j_l'(Q_i R), R=RMT. A prime on j_l in these
+expressions denotes its argument derivative; a prime on a coefficient means
+the strain derivative. To avoid that ambiguity in implementation:
+  delta j_i = R delta Q_i j_l'(Q_i R),
+  delta d_i = delta Q_i [j_l'(Q_i R)+Q_i R j_l''(Q_i R)].   (3)
+The Bessel ODE gives j_l'', with analytic Q=0 limits and no division by j_l.
+
+Prepared augmentation sums are
+  F_mn=sum_PW g_mi j_i C_in,
+  D_mn=sum_PW g_mi d_i C_in,
+  L_j,mn=sum_(rows of LO j) g_mi C_in.
+Differentiate both g and matching in F,D, and g in L. Holding the central
+radial primitives and ordinary LO coefficients fixed, this gives Z', where
+Z[m,radial primitive,n] is the full augmentation coefficient. Z' includes
+the same RMT^2 local-orbital prefactor as the original channel.
+
+Spherical volume kernels S and K are held fixed in this partial derivative:
+  O_MT'=Z'^dagger S Z + Z^dagger S Z',
+  H_volume'=Z'^dagger K Z + Z^dagger K Z'.                   (4)
+Angular indices are summed. K here is a SMALL RADIAL Hamiltonian kernel,
+not the charge-to-potential operation K in (1); the code names it op.k.
+These formulas retain both off-diagonal Hermitian legs.
+
+Native spherical surface terms use p=boundary VALUE of the PW augmentation,
+d=boundary SLOPE of the full PW+LO augmentation. The native LO boundary value
+is set to zero, but its slope is retained. Thus
+  H_surface'=R^2/2 [p'^dagger d+p^dagger d'
+                    +d'^dagger p+d^dagger p'].             (5)
+
+The extra native LAPW Wronskian term is
+  H_W=R^2/2 w(w-1) T,
+  T=C^dagger F_upper{A_ij(d_i j_j-j_i d_j)} C,
+  A_ij=sum_m g_mi^* g_mj.                                  (6)
+w is the central radial Wronskian, fixed here. F_upper copies the coefficient
+matrix's upper triangle to its conjugate lower triangle. Differentiate A and
+both Bessel factors BEFORE this ordered copy and central-band projection.
+Symmetric averaging is not equivalent. APW has no Wronskian correction.
+
+For the nonspherical radial/angular kernel V_ns,
+  H_ns'=Z'^dagger V_ns Z + Z^dagger V_ns Z'.                 (7)
+Its radial and explicit potential changes are already handled by B, not here.
+For raw projector radial overlaps p_i and fixed local-frame transform T_ma,
+  Phi_na'=sum_mi Z_mi,n'^* p_i T_ma.                        (8)
+The projector does not need to vanish at RMT; its matching/boundary dependence
+is retained. Its radial response to changing spherical potential belongs in B.
+
+INTERSTITIAL OVERLAP AND KINETIC ENERGY
+
+With D_ij=q_i-q_j, x_a=|D_ij|R_a, f(x)=j_1(x)/x and f(0)=1/3,
+  Theta_ij=delta_ij-sum_a [4 pi R_a^3/Omega] f(x_a)
+                           exp(i (G_j-G_i).R_a).
+This is the exact sphere-exclusion overlap matrix, not LAPW0's finite-FFT
+potential mask. Define d_ij=D_ij.e.D_ij/|D_ij|^2 (zero for D_ij=0). Then
+  Theta_ij'=sum_a [4 pi R_a^3/Omega] phase_a
+       {tr(e) f(x_a)+d_ij [j_0(x_a)-3 f(x_a)]}.             (9)
+Native interstitial kinetic energy in Ry is (q_i.q_j)Theta_ij, hence
+  T_IR,ij'=-2(q_i.e.q_j)Theta_ij+(q_i.q_j)Theta_ij'.         (10)
+Project both derivatives as C^dagger(...)C_R. LO rows have no interstitial
+component. No derivative of masked VNS coefficients is added at this stage.
+
+INDEPENDENT NATIVE CHECKS
+
+Central three-k snapshots: SrVO3 NREL and FeSe RELA. Fixed potential files,
+fixed radial-energy policy, fixed integer G/LO lists, two strain magnitudes
+approximately 0.00025 and 0.000125. Both retain the full finite complement.
+FeSe's six-decimal cell rounding gives direction
+  diag(0.999874011760, 0.999874011760, 1.000251976481).
+The analytic calculation uses that actual direction, not an assumed I.
+Unequal-endpoint formulas use the actual cell-derived strain amplitudes.
+
+Native LAPW1 independently assembles strained H/O. They are projected with
+central C. For Phi only, scratch DMFT2 replays CENTRAL vector coefficients
+in the strained geometry. Exported coefficients are checked to be identical.
+This isolates raw operator motion from eigenvector/window motion. Replay
+energies/densities are NOT physical and are never used for total derivatives.
+No full charge SCF cycle or impurity solve is needed for these operator tests.
+
+Relative derivative errors at the smaller strain:
+                    SrVO3                  FeSe
+  H_RR              1.8792e-7              8.0088e-8
+  H_QR              5.7037e-7              1.9555e-7
+  O_RR              2.0463e-7              2.2823e-7
+  O_QR              4.5674e-7              3.8354e-7
+  Phi               3.8047e-8              9.3635e-8
+All sectors improve by approximately four on halving the step. Richardson
+extrapolation using the actual step ratio gives combined joint-coordinate
+relative errors 6.95e-11 (SrVO3) and 3.88e-10 (FeSe).
+
+Central reconstructed H closure: 1.30e-12 / 4.55e-9.
+Central reconstructed O closure: 7.66e-13 / 4.36e-13.
+The small central FeSe H residual has not been separately traced to a specific
+native representation. The derivative tests are much more accurate than
+their finite-step residuals after extrapolation; no correction was fitted.
+
+The previously checked PROJECTOR-ONLY covector g_joint contracts these new
+sources. It already accounts for metric, window and normalization response.
+Geometry-only contributions, in Ry per eta:
+  SrVO3 analytic -0.083713982640; small-step native error 4.09e-9;
+  FeSe  analytic -0.451251848346; small-step native error 6.01e-8.
+Extrapolated scalar errors are 2.72e-13 / 2.56e-11 Ry.
+These are NOT total Klein derivatives or pressure corrections. In particular,
+do not combine these three-k values with earlier full-mesh potential values.
+
+Assembly cost after valence preparation was about 5 seconds for SrVO3 and
+2.4 seconds for FeSe for three k points, on one BLAS thread. It performs no
+SCF cycle, native program launch or diagonalization. This is a preparation
+operation; it is not repeated inside the screened response solve. It currently
+builds transient PW matrices and recomputes angular geometry across channels.
+Full-mesh/MPI timings and six-component caching still need evaluation.
+
+REGRESSION TESTS
+
+209 tests pass with repository dependencies and again with installed dbin
+dependencies, zero skips. Eight new tests independently rebuild nonlinear
+matching and matrix blocks, covering Cartesian harmonics and poles, zero Q
+and Bessel zeros, APW/LAPW and ordinary LO response, complex rectangular
+off-diagonal matrices, non-unit Wronskian/surface terms, shear of interstitial
+kinetic/overlap matrices, and unsupported-symmetry rejection.
+The material checks additionally test nonspherical and actual raw-projector
+assembly, equivalent-site frames/phases and all finite-complement columns.
+
+NEXT: FORM THE COMPLETE ANALYTIC CHARGE SOURCE
+
+The installed full J is the derivative of the unmixed physical output-charge
+map at fixed geometry. It is not the mixer algorithm and not a DMFT impurity
+vertex susceptibility. The response equation is still
+  (I-J) q = s_charge.
+Numerical native hydrostatic s_charge and q are already available. The
+remaining task is to replace s_charge by a completely analytic source.
+
+Let E map joint perturbations to the density matrix, R reconstruct spatial
+valence charge, D_V be the explicit radial/basis-density potential response,
+C_V the core response, and N the native output-charge normalization map.
+At fixed input MATERIAL charge the unnormalized native-coordinate source is
+  d_out = R E [b_geometry+B s_V] + (D_V+C_V)s_V + d_val,geometry.
+The explicit valence spatial-geometry term d_val,geometry is not supplied by
+this band helper. Neither are the explicit geometry change of N nor the
+inverse density-transport contribution that converts native output charge
+back to the central material coordinates. Those must be included once:
+  s_charge = N' d_out + (partial_eta N)_explicit
+             - tau_(central normalized output).
+This is schematic notation for the existing discrete maps, not an instruction
+to replace them by continuum formulas. At a nonzero fixed-point residual, the
+last transport acts on the central OUTPUT, which need not equal input n0.
+
+Next validation sequence:
+1. Assemble explicit spatial valence geometry, output normalization geometry
+   and inverse transport with (1), then compare s_charge sector by sector
+   against the existing native hydrostatic source at two step sizes.
+2. Solve with the same J; compare q and forward/adjoint projector readout.
+3. Reconcile complete Klein/direct/radial terms with the current analytic
+   stress baseline, including the moving-mask term exactly once. Test the
+   zero-Sigma DFT limit and the matching frozen-Sigma functional derivative.
+4. Extend symmetry layouts to six physical strain sources, then replace the
+   reference backend and validate complete pressure/tensor publication.
+
+FILES TO INSTALL AFTER APPROVAL
+
+  src/python/lapw_geometry_response.py and ~/dbin/lapw_geometry_response.py
+  src/python/tests/test_lapw_geometry_response.py
+  src/doc/stress/stress_response_roadmap_20261108.txt
+  src/doc/stress/band_geometry_20261108/ : report and compact evidence
+
+No Fortran/native executable changes, force changes, run_dmft wrapper changes,
+new SCF runs or changes to user material directories are included in this patch.
+The deferred force window/normalization audit remains on the roadmap.

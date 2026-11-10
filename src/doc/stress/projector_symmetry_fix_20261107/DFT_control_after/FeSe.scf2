@@ -1,0 +1,88 @@
+:GMA  : POTENTIAL AND CHARGE CUT-OFF  12.00 Ry**.5
+
+
+:NLDA  : NUMBER OF ELECTRONS          =  64.000
+
+:FLDA  : F E R M I - ENERGY           =   0.00000
+
+
+:NOE  : NUMBER OF ELECTRONS          =  64.000
+
+:FER  : F E R M I - ENERGY           =   0.42386
+
+:POS001: ATOM   -1 X,Y,Z = 0.75000 0.25000 0.00000  MULT= 2  ZZ= 26.000  Fe        
+
+       LMMAX 10
+       LM=   0 0  2 0 -3 2  4 0  4 4 -5 2  6 0  6 4  0 0  0 0
+
+:POS002: ATOM   -2 X,Y,Z = 0.25000 0.25000 0.71835  MULT= 2  ZZ= 34.000  Se        
+
+       LMMAX 10
+       LM=   0 0  1 0  2 0  3 0  4 0  4 4  5 0  5 4  6 0  6 4
+
+
+   QTL-B VALUE .EQ.    2.86066 in Band of energy   11.1193eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02861, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+:DMFT_G2_MATCH_RY001:   -2.479680993198E-04  0.000000000000E+00  0.000000000000E+00
+:DMFT_G2_RADIAL_RY001:   -7.019402355486E-05  0.000000000000E+00  0.000000000000E+00
+:DMFT_G2_ANGULAR_RY001:    1.206399866881E-05  0.000000000000E+00  0.000000000000E+00
+:DMFT_G2_MATCH_RY002:    0.000000000000E+00 -2.479680993198E-04  0.000000000000E+00
+:DMFT_G2_RADIAL_RY002:    0.000000000000E+00 -7.019402355486E-05  0.000000000000E+00
+:DMFT_G2_ANGULAR_RY002:    0.000000000000E+00  1.206399866881E-05  0.000000000000E+00
+:DMFT_G2_MATCH_RY003:    0.000000000000E+00  0.000000000000E+00 -2.936591458336E-04
+:DMFT_G2_RADIAL_RY003:    0.000000000000E+00  0.000000000000E+00  5.084957517108E-04
+:DMFT_G2_ANGULAR_RY003:    0.000000000000E+00  0.000000000000E+00 -2.412799733762E-05
+
+ ==============TOTAL STRESS FOR VALENCES ELECTRONS=================
+:STR_VAL001:        1.842005564757      0.000000000000      0.000000000000
+:STR_VAL002:        0.000000000000      1.842005564757      0.000000000000
+:STR_VAL003:        0.000000000000      0.000000000000      1.833482341526
+
+
+:CHA001: TOTAL CHARGE INSIDE SPHERE   1 =    16.903200
+:PCS001: PARTIAL CHARGES SPHERE =  1 S,P,D,F,PZ,PXY,,D-Z2,D-XY,D-X2Y2,D-XZ,YZ 
+:QTL001: 2.2644 6.2910 8.3214 0.0214 2.0947 4.1962 0.0000 1.7423 1.6879 1.8695 3.0217 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL001:  2.2179 -5.4767    6.0127 -3.5417    0.1627 -0.1268    0.0053 -0.6231
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH001:  0.0466  0.2728    0.2783  0.2707    8.1586  0.2624    0.0161  0.2509
+:VZZ001: EFG INSIDE SPHERE   1 =    10.444718      UP TO R =   2.28000
+
+:CHA002: TOTAL CHARGE INSIDE SPHERE   2 =    13.735505
+:PCS002: PARTIAL CHARGES SPHERE =  2 S,P,D,F,PZ,PXY,,D-Z2,D-XY,D-X2Y2,D-XZ,YZ 
+:QTL002: 1.4025 2.261410.0578 0.0106 0.8738 1.3875 0.0000 2.0211 2.0019 2.0131 4.0217 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL002:  1.3411 -0.5781    0.2631 -0.0650    9.9884 -3.1093    0.0002 -3.0196
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH002:  0.0614  0.2491    1.9982  0.2212    0.0694  0.2205    0.0104  0.2672
+:VZZ002: EFG INSIDE SPHERE   2 =   -30.943340      UP TO R =   2.17000
+
+:CHA  : TOTAL CHARGE INSIDE UNIT CELL =      67.999431
+
+:NCOR    6.32810380  1    5       2.61177292  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.58612467      -0.00000000      -0.00000000       0.00000000       0.00000000   
+    0.00000000       1.15777396       0.00000000       0.00000000      -0.00000000   
+   -0.00000000       0.00000000       1.23113988       0.00000000       0.00000000   
+    0.00000000       0.00000000       0.00000000       1.23113988       0.00000000   
+    0.00000000      -0.00000000      -0.00000000       0.00000000       1.12192541   
+
+  rho-rho_expected in dmft2:
+:DRHO        3.999431395816
+WARNING : Electron charge density is very different than expected. You should change recomputeEF and set it to 1 (switch in on)
+
+:SUM  : SUM OF EIGENVALUES =        -126.000202129
+
+:XSUM : SUM OF EIGENVALUES =        -126.471943254   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)+Tr(G(D-w*dD))
+:YSUM : SUM OF EIGENVALUES =        -126.654571806   # Tr(log(G))+mu*N-Tr((Sig-Vdc)*G)
+:ZSUM : SUM OF EIGENVALUES =        -125.828586668   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)
+:WSUM : SUM OF EIGENVALUES =        -125.771394161   # Tr(log(G))-Tr(log(G_loc))+Tr(G(D-w*dD))
+:QSUM : SUM OF EIGENVALUES =        -125.636624890   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc+s_oo)G)
+:VSUM : SUM OF EIGENVALUES =        -127.173595679   # Tr(log(G))+mu*N
+       VALENCE-FORCE IN mRy/a.u. = |F|   Fx             Fy             Fz
+:FVA001:   1.ATOM      0.000000000      0.000000000      0.000000000      0.000000000
+       VALENCE-FORCE IN mRy/a.u. = |F|   Fx             Fy             Fz
+:FVA002:   2.ATOM    117.825746071      0.000000000      0.000000000    117.825746071
+:FSU001:   1.ATOM      0.000000000      0.000000000      0.000000000      0.000000000
+:FSU002:   2.ATOM    234.359475644      0.000000000      0.000000000    234.359475644

@@ -6,11 +6,54 @@
 ! extensive form accumulated by the LAPW kernels.  Dividing here by VOL makes
 ! every row directly comparable to :STR_VAL in Ry/Bohr^3.  None of these
 ! quantities is fed back into the production stress.
-subroutine print_dmft_stress_diagnostics(main,window,norm,sigma_moment, &
-     projector,rela_corr,rela_surf,vol)
+subroutine print_dmft_stress_diagnostics(main,window,norm,response_overlap, &
+     sigma_moment, &
+     sigma_match,sigma_radial,sigma_angular,sigma_interstitial, &
+     sigma_coeff_fd_mt, &
+     sigma_coeff_analytic_mt, &
+     paired_window_matching, &
+     paired_norm_matching, &
+     paired_main_correction_matching, &
+     paired_window_complete, &
+     paired_norm_complete, &
+     paired_main_correction_complete, &
+     paired_window_kinetic_matching, &
+     paired_norm_kinetic_matching, &
+     paired_main_correction_kinetic_matching, &
+     paired_window_kinetic_complete, &
+     paired_norm_kinetic_complete, &
+     paired_main_correction_kinetic_complete, &
+     paired_sigma_matching, &
+     paired_sigma_complete, &
+     paired_diagonal_reference, &
+     density_diagonal, &
+     density_offdiagonal,projector,rela_corr,rela_surf,vol)
   implicit none
   real*8,intent(in) :: main(3,3,4),window(3,3,4),norm(3,3,4)
+  real*8,intent(in) :: response_overlap(3,3,3)
   real*8,intent(in) :: sigma_moment(3,3),projector(3,3)
+  real*8,intent(in) :: sigma_match(3,3),sigma_radial(3,3)
+  real*8,intent(in) :: sigma_angular(3,3)
+  real*8,intent(in) :: sigma_interstitial(3,3)
+  real*8,intent(in) :: sigma_coeff_fd_mt(3,3)
+  real*8,intent(in) :: sigma_coeff_analytic_mt(3,3)
+  real*8,intent(in) :: paired_window_matching(3,3)
+  real*8,intent(in) :: paired_norm_matching(3,3)
+  real*8,intent(in) :: paired_main_correction_matching(3,3)
+  real*8,intent(in) :: paired_window_complete(3,3)
+  real*8,intent(in) :: paired_norm_complete(3,3)
+  real*8,intent(in) :: paired_main_correction_complete(3,3)
+  real*8,intent(in) :: paired_window_kinetic_matching(3,3)
+  real*8,intent(in) :: paired_norm_kinetic_matching(3,3)
+  real*8,intent(in) :: paired_main_correction_kinetic_matching(3,3)
+  real*8,intent(in) :: paired_window_kinetic_complete(3,3)
+  real*8,intent(in) :: paired_norm_kinetic_complete(3,3)
+  real*8,intent(in) :: paired_main_correction_kinetic_complete(3,3)
+  real*8,intent(in) :: paired_sigma_matching(3,3)
+  real*8,intent(in) :: paired_sigma_complete(3,3)
+  real*8,intent(in) :: paired_diagonal_reference(3,3,4)
+  real*8,intent(in) :: density_diagonal(3,3,4)
+  real*8,intent(in) :: density_offdiagonal(3,3,4)
   real*8,intent(in) :: rela_corr(3,3),rela_surf(3,3),vol
   real*8 :: main_total(3,3),window_total(3,3),norm_total(3,3)
   real*8 :: dft_like(3,3),assembled(3,3)
@@ -26,8 +69,60 @@ subroutine print_dmft_stress_diagnostics(main,window,norm,sigma_moment, &
   call print_one('MAIN_TOTAL',main_total)
   call print_one('MAIN_DFTLIKE',dft_like)
   call print_one('SIGMA_MOMENT_OVERLAP',sigma_moment)
+  call print_one('SIGMA_OVERLAP_MATCHING',sigma_match)
+  call print_one('SIGMA_OVERLAP_RADIAL',sigma_radial)
+  call print_one('SIGMA_OVERLAP_ANGULAR',sigma_angular)
+  call print_one('SIGMA_OVERLAP_INTERSTITIAL',sigma_interstitial)
+  call print_one('SIGMA_OVERLAP_FIXED_SPHERE', &
+       sigma_match+sigma_interstitial)
+  call print_one('SIGMA_OVERLAP_COEFF_FD_MT',sigma_coeff_fd_mt)
+  call print_one('SIGMA_OVERLAP_COEFF_FD_TOTAL', &
+       sigma_coeff_fd_mt+sigma_interstitial)
+  call print_one('SIGMA_OVERLAP_COEFF_ANALYTIC_MT', &
+       sigma_coeff_analytic_mt)
+  call print_one('SIGMA_OVERLAP_COEFF_ANALYTIC_TOTAL', &
+       sigma_coeff_analytic_mt+sigma_interstitial)
+  call print_one('PAIRED_WINDOW_MATCHING',paired_window_matching)
+  call print_one('PAIRED_NORM_MATCHING',paired_norm_matching)
+  call print_one('PAIRED_MAIN_CORRECTION_MATCHING', &
+       paired_main_correction_matching)
+  call print_one('PAIRED_WINDOW_COMPLETE',paired_window_complete)
+  call print_one('PAIRED_NORM_COMPLETE',paired_norm_complete)
+  call print_one('PAIRED_MAIN_CORRECTION_COMPLETE', &
+       paired_main_correction_complete)
+  call print_one('PAIRED_WINDOW_KINETIC_MATCHING', &
+       paired_window_kinetic_matching)
+  call print_one('PAIRED_NORM_KINETIC_MATCHING', &
+       paired_norm_kinetic_matching)
+  call print_one('PAIRED_MAIN_CORRECTION_KINETIC_MATCHING', &
+       paired_main_correction_kinetic_matching)
+  call print_one('PAIRED_WINDOW_KINETIC_COMPLETE', &
+       paired_window_kinetic_complete)
+  call print_one('PAIRED_NORM_KINETIC_COMPLETE', &
+       paired_norm_kinetic_complete)
+  call print_one('PAIRED_MAIN_CORRECTION_KINETIC_COMPLETE', &
+       paired_main_correction_kinetic_complete)
+  call print_one('PAIRED_SIGMA_MATCHING',paired_sigma_matching)
+  call print_one('PAIRED_SIGMA_COMPLETE',paired_sigma_complete)
+  call print_one('PAIRED_DIAGONAL_REFERENCE', &
+       sum(paired_diagonal_reference,dim=3))
+  call print_one('PAIRED_RECONSTRUCTED_MAIN', &
+       sum(paired_diagonal_reference,dim=3)+ &
+       paired_main_correction_complete)
+  call print_one('PAIRED_RECONSTRUCTED_MAIN_KINETIC', &
+       sum(paired_diagonal_reference,dim=3)+ &
+       paired_main_correction_kinetic_complete)
+  call print_one('DFTLIKE_DIAGONAL',sum(density_diagonal,dim=3))
+  call print_one('DFTLIKE_OFFDIAGONAL',sum(density_offdiagonal,dim=3))
   call print_one('WINDOW_TOTAL',window_total)
   call print_one('NORM_WINDOW_TOTAL',norm_total)
+  call print_one('MAIN_OVERLAP_PART',response_overlap(:,:,1))
+  call print_one('WINDOW_OVERLAP_PART',response_overlap(:,:,2))
+  call print_one('WINDOW_HAMILTONIAN_PART', &
+       window_total-response_overlap(:,:,2))
+  call print_one('NORM_OVERLAP_PART',response_overlap(:,:,3))
+  call print_one('NORM_HAMILTONIAN_PART', &
+       norm_total-response_overlap(:,:,3))
   call print_one('EXPLICIT_PROJECTOR',projector)
   ! These two tensors are included in MAIN_KIN_MT and are repeated here
   ! only to make the CALC=RELA audit explicit.

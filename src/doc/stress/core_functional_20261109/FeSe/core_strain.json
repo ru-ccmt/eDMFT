@@ -1,0 +1,27 @@
+{
+  "analytic_Ry": -4946.636504915281,
+  "steps": [
+    {
+      "step": 0.00025,
+      "offsets": [
+        -0.00024998132921416616,
+        0.0002499813292142772
+      ],
+      "fd_Ry": -4946.636591923239,
+      "error_Ry": -8.700795842742082e-05
+    },
+    {
+      "step": 0.000125,
+      "offsets": [
+        -0.0001249906646071386,
+        0.00012499066460702757
+      ],
+      "fd_Ry": -4946.636526683229,
+      "error_Ry": -2.1767948055639863e-05
+    }
+  ],
+  "richardson_Ry": -4946.636504936559,
+  "richardson_error_Ry": -2.1277628547977656e-08,
+  "scope": "explicit hydrostatic source, not screened total stress",
+  "stress_applied": false
+}

@@ -1,0 +1,9 @@
+{
+  "SrVO3": {
+    "max_density_difference": 0.0
+  },
+  "FeSe": {
+    "max_density_difference": 1.0000282733521083e-18
+  },
+  "gauge_rejected": true
+}

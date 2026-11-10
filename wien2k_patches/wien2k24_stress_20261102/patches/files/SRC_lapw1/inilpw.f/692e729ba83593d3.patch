@@ -1,0 +1,51 @@
+--- a/SRC_lapw1/inilpw.f
++++ b/SRC_lapw1/inilpw.f
+@@ -9,7 +9,7 @@
+       use atspdt, only  : INS, NL, E
+       use char, only    : LATTIC, NAME, init_char
+       use comc, only    : IPGR, KNAME, init_comc
+-      use comi, only    : NT, LNSMAX, NAT,nemax_it,NSLMAX
++      use comi, only    : NT, LNSMAX, NAT,nemax_it,NSLMAX,fixed_nbands
+       use coml, only    : SPRSWF, PRNTWF, WFTAPE, REL, ITER, NOHNS, mgga, &
+            mgga_central_correction
+       use comr, only    : RKM, EL, EU, WEIGHT, init_comr,sproj_limit,eshift_iter,readHinv,divide
+@@ -149,7 +149,7 @@
+ !        Local Scalars
+ !
+       INTEGER            KINDEX, ITAPE, IUNIT, INDEX, JATOM, J
+-      INTEGER            I, I1, I2, NT1, IA, M, IRECL,ios,isize
++      INTEGER            I, I1, I2, NT1, IA, M, IRECL,ios,isize,code
+       INTEGER            ISX, ISY, ISZ, IDV, JAT, L, M1, K
+       DOUBLE PRECISION   E1N, E2N, eorb_ind, test1, test2, efermi
+       DOUBLE PRECISION, allocatable :: ZZ(:)
+@@ -163,7 +163,7 @@
+       LOGICAL            RUNORB,nmat_only,there
+       LOGICAL            FORCE,newform,Hinv_open
+       INTEGER            NK1
+-      character          line*80 
++      character          line*80, keyword_line*80
+ 
+ !
+ !        External Subroutines
+@@ -468,6 +468,21 @@
+ !
+ !      READ (5,5090,err=71) ITAPE,e1n,e2n
+       read(5,'(a)')line
++!     Keep the fourth numerical field's legacy meaning unless the user
++!     explicitly requests index-based selection with a trailing keyword:
++!       K-VECTORS FROM UNIT:4 -10.0 2.0 66 FIXED_NBANDS
++!     Convert a copy to upper case so the keyword is case-insensitive.
++      keyword_line=line
++      do i=1,len(keyword_line)
++         code=iachar(keyword_line(i:i))
++         if(code.ge.iachar('a').and.code.le.iachar('z')) &
++              keyword_line(i:i)=achar(code-iachar('a')+iachar('A'))
++      enddo
++      fixed_nbands=.false.
++      do i=1,len(keyword_line)-len('FIXED_NBANDS')+1
++         if(keyword_line(i:i+len('FIXED_NBANDS')-1).eq.'FIXED_NBANDS') &
++              fixed_nbands=.true.
++      enddo
+       nemax_it=99999999
+       read(line(21:),*,IOSTAT=ios) ITAPE,e1n,e2n,nemax_it
+       if (ios.ne.0) then

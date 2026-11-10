@@ -1,0 +1,158 @@
+FIXED-GEOMETRY POTENTIAL STATIONARITY PROBE, SrVO3
+7 November 2026
+
+Question
+========
+Does convergence of the ordinary charge loop guarantee stationarity of the
+functional when the physical correlated orbitals are constructed by a finite
+KS band-window projection and subsequent matrix normalization?
+
+For density-independent physical orbitals the answer should be yes, subject
+to the other stationarity equations and numerical/basis convergence. For
+Phi_W[V]=Pi_W[V] phi X[V], fixed disk radial phi is not sufficient to make the
+physical projector independent of V. Window motion and normalization can
+produce an extra potential gradient. A change of KS representation alone
+does not do this; its connection terms cancel.
+
+At fixed geometry and fixed basis, with V=V_Hxc,
+
+  Gamma[n,V] = F_sp[H0+V,Sigma_tilde,U[V]]
+                  +E_Hxc[n]-integral V n + constant
+
+is the frozen-effective-self-energy tangent functional. Its independent
+variations give
+
+  delta_n Gamma = integral (V_Hxc[n]-V) delta n,
+  delta_V Gamma = integral (n_G-n) delta V
+                  + Re sum_k Tr[(R_k+R_k^N) delta V_k].
+
+R and R^N are the already k/spin-weighted Hermitian response matrices for
+the moving fixed-index window and its normalization. Ordinary charge
+iteration imposes n=n_G, but does not explicitly include this second term
+in its density update. Source inspected: l2main.f90 builds Aweight, computes
+charge through cmp_MT_density/cmp_interstitial, and uses rhoResponse and
+the normalization-window matrices only for force/stress contractions.
+
+The latest retained central SCF files have charge distance 5e-7 for SrVO3
+and 8e-7 for FeSe RELA. Those numbers do not measure the additional functional
+gradient, and cannot by themselves certify pressure accuracy. The earlier
+independent finite-model audit found a nonzero potential gradient even with
+exact ordinary charge consistency; it vanished for the complete window.
+
+Probe performed now
+===================
+An isolated copy of /private/tmp/projector_symmetry_fix_20261107/SrVO3 was
+placed in /private/tmp/projector_stationarity_probe_20261107/SrVO3. One pass
+of the current installed dmft2 was run using 4 MPI ranks, OMP_NUM_THREADS=1,
+EDMFT_STRESS_STERNHEIMER_DUMP=1, EDMFT_STRESS_RESPONSE_DUMP=1 and
+EDMFT_ONEPARTICLE_DUMP=1. It completed in 20.862 seconds. No charge iteration,
+impurity solve, source change, or modification of the original material
+directory was made. The first sandboxed MPI launch could not bind its local
+socket; the subsequent approved local run succeeded.
+
+The test perturbation is local and preserves the reference space group:
+
+  V(t,r)=V(0,r)+t Ry * Theta_I(r),
+
+where Theta_I is one in the interstitial and zero in every muffin-tin.
+Geometry, radial LAPW basis, local orbital functions, self-energy, and mu
+are held fixed. The step discontinuity is an allowed bounded test potential;
+it is not claimed to be the actual induced strain potential.
+
+Its exact matrix in the stored central KS space is
+
+  M_k = A_k^dagger O_I A_k,
+
+where the plane-wave interstitial overlap O_I is the full-cell identity
+minus analytic spherical Fourier integrals over all MT spheres. LO functions
+have no interstitial support. Exact reciprocal lengths from the cubic struct
+were used instead of rounded BR1 printed in output1. The eigenvalues of M_k
+range from 0.00348494 to 0.89019047, consistent with 0<=Theta_I<=1.
+
+75 irreducible k points, 43 stored bands, DMFT window [12,31]. Minimum
+inside/outside-window energy separation was 0.05641984 Ry; no denominator
+regularization or discarded pair was needed.
+
+Result
+======
+The computed projector contribution to dGamma/dt is:
+
+  Fixed-X window term       0.0208499861615462 Ry
+  Normalization term        0.0003559494879926 Ry
+  Sum                       0.0212059356495388 Ry
+
+A spatially uniform potential shift gives zero projector contribution,
+as required: it changes eigenvalues but not the selected spectral subspace.
+Reconstructed fixed-X response matrices match the production binary dumps
+to 1.1e-19 maximum elementwise error.
+
+Independent endpoint diagonalizations of diag(epsilon_k)+/-h M_k were used
+to form Pi_W(+/-h) acting on the fixed raw/normalized orbital coefficients
+in the original central Hilbert space. This avoids phase matching and
+arbitrary rotations inside degenerate occupied/window blocks. Their finite
+derivatives were contracted with the central functional gradients, including
+the exact normalization-symmetry adjoint exported by dmft2:
+
+  h=1e-3       0.0212059381031509 Ry
+  h=3e-4       0.0212059358701112 Ry
+  h=1e-4       0.0212059356726836 Ry
+  h=3e-5       0.0212059356539224 Ry
+
+The final discrepancy is 4.4e-12 Ry in the derivative. This verifies the
+spectral-projector derivative for a real material and a local potential
+direction, within the stored-band approximation.
+
+Important limits
+================
+This is NOT a finite difference of the full trace-log/free-energy functional.
+The endpoint projector differences are contracted with the central exact
+functional gradients. A full tangent-functional potential probe is still
+needed to establish all cancellations independently in this material.
+
+The ordinary residual integral (n_G-n)delta V was not evaluated here. Nor
+were radial-basis changes included. Thus the number above is the projector
+part of a proposed stationarity residual, not a fully measured total slope.
+It is not a stress and must not be converted to GPa without the actual
+strain-induced potential derivative and a verified separation from explicit
+geometric terms. The numerical pressure discrepancy is still unresolved.
+
+The next decisive fixed-geometry test compares two functional paths:
+  A. Hold the physical embedded projector operator fixed while varying V.
+  B. Rebuild Pi_W[V] and X[V] while varying the same V.
+Use the frozen-Sigma tangent impurity functional and a common fixed basis.
+At ordinary charge convergence A should be flat to integration/convergence
+errors. The slope of B minus A should equal the projector term above.
+Repeat perturbation amplitudes; use a uniform-potential gauge control and a
+larger-window control. This costs non-self-consistent evaluations, not an
+impurity or charge-convergence calculation.
+
+Density-to-potential clarification
+==================================
+Once a trial density variation is prescribed, its Hxc potential variation
+requires a Poisson solve and XC evaluation, not a self-consistent Sternheimer
+solve. In a fixed spatial representation delta V_Hxc=K_Hxc delta n; explicit
+ionic and metric/geometry changes belong to their separately accounted terms.
+The resulting potential then determines radial LAPW functions and KS
+eigenvector changes. Self-consistency is needed only to determine the density
+variation itself from the electronic output rather than prescribe it.
+
+The affine density ansatz n_eta(r)=(1+eta)^(-3)n0(r/(1+eta)) gives
+dn/deta=-3n0-r.grad(n0). This is linear in eta, but omitted electronic
+relaxation also enters at first order. It is an inexpensive trial direction,
+not the complete first-order response. In a genuinely stationary functional
+all implicit variational-density/Green-function terms cancel; a persistent
+projector-dependent potential residual would signal stationarity equations
+inconsistent with that composite finite-window functional, not necessarily
+insufficient iterations of the ordinary charge loop.
+
+Evidence
+========
+results.json includes per-k contributions, controls and hashes. The compact
+band_matrix_evidence.npz stores central band energies, potential matrices,
+raw/normalized projectors, gradients and both response matrices. The isolated
+scratch directory retains full binary dumps and logs. Production executable:
+a95c3f7d4e95f0e0598d5a962f4a00b06e49644235c1cb1b0dbb0a2bf5f7abdc
+
+The source equations and numerical interpretation are conditional on the
+finite-window functional described above. No claim is made that the exact
+real-space eDMFT functional intrinsically lacks stationarity.

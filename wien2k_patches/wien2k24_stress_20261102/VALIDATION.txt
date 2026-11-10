@@ -1,0 +1,38 @@
+LOCAL BUNDLE VALIDATION — 9 November 2026
+
+This release packages the existing audited sources; it introduces no new
+Fortran physics changes. Targets are byte-identical to the installed sources
+under /Users/haule/wien2k_24 at validation time.
+
+14 deployment tests PASS (12.012 seconds, initial staged run):
+- Pristine preflight is read-only.
+- Pristine application, original backups and repeat-application idempotence.
+- Upgrades from legacy-required, legacy-full, pre-cache and cached releases.
+- All 55 registered per-file transitions, including mixed historical states.
+- Exact preservation of site compiler/library settings and Makefile comments.
+- Unknown source, ambiguous Makefile and missing-component refusal without
+  partially modifying the destination.
+- Optional 3ddens/HF FFTW patches and default exclusion of those components.
+- Detection of corrupted/stale bundle contents before source changes.
+- Replay and reversal of all five reviewable cumulative source patches.
+- Rollback after an injected failure during source replacement.
+- Repair of missing object-list entries even when source hashes are current.
+- Legacy entry points delegate to the current audited installer.
+
+Read-only verification against /Users/haule/wien2k_24:
+  36 mandatory sources + 2 optional FFTW sources: exact target hashes.
+  Both required object-list additions present.
+  No source changes required.
+
+The initial/staged tests used original source files extracted from the local
+WIEN2k-24 distribution archives, in disposable /private/tmp trees. No native
+WIEN executable or material calculation was rebuilt or rerun. Source identity
+with the previously tested implementation is verified; fresh compiler/MPI and
+material tests on rupc remain a subsequent deployment step.
+
+To repeat against a complete pristine source tree:
+  python3 tests/test_bundle.py --pristine-root /path/to/pristine/WIEN2k24 -v
+
+The portable tests require Python 3, patch, and the original seven covered
+source directories including optional 3ddens/HF. They do not modify the input
+tree or require a Fortran compiler. The test log is validation/deployment_tests.log.

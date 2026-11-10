@@ -1,0 +1,16 @@
+{
+  "files": {
+    "SrVO3.vector": true,
+    "SrVO3.energy": true,
+    "SrVO3.nsh": true,
+    "SrVO3.clmval": true,
+    "EF.dat": true,
+    "response.meta": true
+  },
+  "matrix_max_absolute_errors": {
+    "native.k": 0.0,
+    "native.ham.k": 0.0
+  },
+  "k_exports": 75,
+  "response_records_identical": true
+}

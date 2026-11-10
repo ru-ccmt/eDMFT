@@ -290,10 +290,33 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--moments", required=True, type=Path)
     parser.add_argument("--strain", required=True, type=float)
     parser.add_argument("--volume", type=float, help="central volume in Bohr^3")
-    parser.add_argument(
+    dft_source = parser.add_mutually_exclusive_group()
+    dft_source.add_argument(
         "--dft-weight",
         type=Path,
         help="optional central case.weight; also report DFT and DMFT-minus-DFT pairs",
+    )
+    dft_source.add_argument(
+        "--dft-mu-ry",
+        type=float,
+        help=(
+            "construct diagonal fixed-mu DFT occupations from the central "
+            "eigenvalues; the irreducible-k weight is read from a fully "
+            "occupied band in the central DMFT moment dump"
+        ),
+    )
+    dft_source.add_argument(
+        "--dft-electrons",
+        type=float,
+        help=(
+            "solve a central finite-temperature DFT chemical potential for "
+            "this electron count, using the stored central bands"
+        ),
+    )
+    parser.add_argument(
+        "--temperature-ry",
+        type=float,
+        help="Fermi-Dirac temperature paired with --dft-mu-ry, in Ry",
     )
     parser.add_argument("--minus-energy", type=Path)
     parser.add_argument("--plus-energy", type=Path)
@@ -306,6 +329,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         parser.error("--minus-energy and --plus-energy must be supplied together")
     if args.minus_energy is not None and args.dft_weight is None:
         parser.error("endpoint energy comparison also requires --dft-weight")
+    fixed_mu_requested = args.dft_mu_ry is not None or args.dft_electrons is not None
+    if fixed_mu_requested != (args.temperature_ry is not None):
+        parser.error(
+            "--temperature-ry is required with --dft-mu-ry or --dft-electrons"
+        )
+    if args.dft_electrons is not None and (
+        not np.isfinite(args.dft_electrons) or args.dft_electrons <= 0
+    ):
+        parser.error("--dft-electrons must be positive")
+    if args.temperature_ry is not None and (
+        not np.isfinite(args.temperature_ry) or args.temperature_ry <= 0
+    ):
+        parser.error("--temperature-ry must be positive")
     return args
 
 
@@ -313,6 +349,51 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     moment_files = files(args.moments)
     dft_weights = read_dft_weights(args.dft_weight) if args.dft_weight else None
+    fixed_mu_dft = args.dft_mu_ry is not None or args.dft_electrons is not None
+    dft_mu_ry = args.dft_mu_ry
+    if args.dft_electrons is not None:
+        spectra: list[tuple[float, np.ndarray]] = []
+        for path in moment_files.values():
+            reference = read_one_particle(path)
+            lower_count = reference.dm_nemin - reference.nemin
+            if lower_count <= 0:
+                raise ValueError(
+                    "DFT chemical-potential search needs a fully occupied "
+                    "band below the DMFT window to recover w_k"
+                )
+            lower_diagonal = np.real(np.diag(reference.rho)[:lower_count])
+            k_weight = float(np.median(lower_diagonal))
+            if not np.allclose(lower_diagonal, k_weight, rtol=1.0e-9, atol=1.0e-12):
+                raise ValueError(
+                    f"lower-band occupations do not define one k weight at "
+                    f"k={reference.kpoint}"
+                )
+            spectra.append((k_weight, reference.energies))
+
+        def electron_count(mu: float) -> float:
+            result = 0.0
+            for k_weight, energies in spectra:
+                argument = (energies - mu) / args.temperature_ry
+                positive = argument >= 0
+                fermi = np.empty_like(argument)
+                exponential = np.exp(-argument[positive])
+                fermi[positive] = exponential / (1.0 + exponential)
+                exponential = np.exp(argument[~positive])
+                fermi[~positive] = 1.0 / (1.0 + exponential)
+                result += k_weight * float(np.sum(fermi))
+            return result
+
+        lower = min(float(np.min(energies)) for _, energies in spectra) - 50 * args.temperature_ry
+        upper = max(float(np.max(energies)) for _, energies in spectra) + 50 * args.temperature_ry
+        if not (electron_count(lower) <= args.dft_electrons <= electron_count(upper)):
+            raise ValueError("stored bands do not bracket the requested DFT electron count")
+        for _ in range(100):
+            midpoint = 0.5 * (lower + upper)
+            if electron_count(midpoint) < args.dft_electrons:
+                lower = midpoint
+            else:
+                upper = midpoint
+        dft_mu_ry = 0.5 * (lower + upper)
     endpoint_energies = None
     if args.minus_energy is not None:
         endpoint_energies = (
@@ -322,7 +403,12 @@ def main(argv: list[str] | None = None) -> int:
     h = args.strain
     totals = {"h": 0.0, "o": 0.0, "pair": 0.0, "minus": 0.0, "plus": 0.0}
     sigma_overlap = 0.0
+    sigma_overlap_diagonal = 0.0
+    sigma_overlap_offdiagonal = 0.0
     sigma_overlap_sides = {"minus": 0.0, "plus": 0.0}
+    dftlike_pair = 0.0
+    diagonal_pair = 0.0
+    window_diagonal_pair = 0.0
     dft_pair = 0.0
     dft_electrons = 0.0
     eigenvalue_dft_pair = 0.0
@@ -368,6 +454,65 @@ def main(argv: list[str] | None = None) -> int:
         ) * reference.rho
         msigma = reference.rhoe - energy_sum
         sigma_overlap += float(-np.real(np.trace(msigma @ do_band)))
+        msigma_diagonal = np.diag(np.diag(msigma))
+        sigma_overlap_diagonal += float(
+            -np.real(np.trace(msigma_diagonal @ do_band))
+        )
+        sigma_overlap_offdiagonal += float(
+            -np.real(np.trace((msigma - msigma_diagonal) @ do_band))
+        )
+        # Separate the exact stationary pair into three algebraically
+        # independent pieces:
+        #
+        #   diagonal rho,  off-diagonal rho,  and M_Sigma.
+        #
+        # Blaha's DFT formula is exact for the first piece.  The second piece
+        # is new in eDMFT even before M_Sigma is considered and is therefore a
+        # clean diagnostic for terms that vanish for ordinary band-diagonal
+        # occupations.  The identity
+        #
+        #   pair = diagonal + offdiagonal + M_Sigma
+        #
+        # is checked implicitly by printing all three contributions below.
+        this_dftlike = float(
+            np.real(
+                np.trace(reference.rho @ dh_band)
+                - np.trace(energy_sum @ do_band)
+            )
+        )
+        this_diagonal = float(
+            np.real(
+                np.sum(np.diag(reference.rho) * np.diag(dh_band))
+                - np.sum(
+                    np.diag(reference.rho)
+                    * reference.energies
+                    * np.diag(do_band)
+                )
+            )
+        )
+        # The analytic MATRIX_DECOMPOSITION diagnostic in dmft2 contains
+        # only the correlated fixed-index window.  Keep the fully occupied
+        # lower bands out of this companion number so that the direct H/O
+        # finite difference can be compared to that diagnostic without a
+        # large, irrelevant core-valence background.
+        window_start = reference.dm_nemin - reference.nemin
+        window_slice = slice(window_start, reference.nfull)
+        this_window_diagonal = float(
+            np.real(
+                np.sum(
+                    np.diag(reference.rho)[window_slice]
+                    * np.diag(dh_band)[window_slice]
+                )
+                - np.sum(
+                    np.diag(reference.rho)[window_slice]
+                    * reference.energies[window_slice]
+                    * np.diag(do_band)[window_slice]
+                )
+            )
+        )
+        dftlike_pair += this_dftlike
+        diagonal_pair += this_diagonal
+        window_diagonal_pair += this_window_diagonal
 
         # Keep the two one-sided metric derivatives separate.  The symmetric
         # number alone can look well converged even when a finite strain step
@@ -387,20 +532,42 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
 
-        if dft_weights is not None:
-            if kpoint not in dft_weights:
-                raise ValueError(f"k point {kpoint} is missing from {args.dft_weight}")
-            occupations = np.empty(reference.nfull)
-            for offset, band in enumerate(
-                range(reference.nemin, reference.dm_nemax + 1)
-            ):
-                try:
-                    occupations[offset] = dft_weights[kpoint][band]
-                except KeyError as error:
+        if dft_weights is not None or fixed_mu_dft:
+            if fixed_mu_dft:
+                lower_count = reference.dm_nemin - reference.nemin
+                if lower_count <= 0:
                     raise ValueError(
-                        f"band {band} at k point {kpoint} is missing from "
-                        f"{args.dft_weight}"
-                    ) from error
+                        "fixed-mu DFT occupations need at least one fully "
+                        "occupied band below the DMFT window to recover w_k"
+                    )
+                lower_diagonal = np.real(np.diag(reference.rho)[:lower_count])
+                k_weight = float(np.median(lower_diagonal))
+                if not np.allclose(lower_diagonal, k_weight, rtol=1.0e-9, atol=1.0e-12):
+                    raise ValueError(
+                        f"lower-band occupations do not define one k weight at k={kpoint}"
+                    )
+                argument = (reference.energies - dft_mu_ry) / args.temperature_ry
+                fermi = np.empty_like(argument)
+                positive = argument >= 0
+                exponential = np.exp(-argument[positive])
+                fermi[positive] = exponential / (1.0 + exponential)
+                exponential = np.exp(argument[~positive])
+                fermi[~positive] = 1.0 / (1.0 + exponential)
+                occupations = k_weight * fermi
+            else:
+                occupations = np.empty(reference.nfull)
+                if kpoint not in dft_weights:
+                    raise ValueError(f"k point {kpoint} is missing from {args.dft_weight}")
+                for offset, band in enumerate(
+                    range(reference.nemin, reference.dm_nemax + 1)
+                ):
+                    try:
+                        occupations[offset] = dft_weights[kpoint][band]
+                    except KeyError as error:
+                        raise ValueError(
+                            f"band {band} at k point {kpoint} is missing from "
+                            f"{args.dft_weight}"
+                        ) from error
             dft_electrons += float(np.sum(occupations))
             dft_pair += float(
                 np.real(
@@ -437,13 +604,33 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     print(f"k points                                      {len(moment_files)}")
+    if args.dft_electrons is not None:
+        print(f"solved DFT chemical potential                 {dft_mu_ry:+.12e} Ry")
     print(f"max |A^dagger O A-I|                          {norm_error:.12e}")
     print(f"max |A^dagger H A-diag(epsilon)|              {eigenpair_error:.12e} Ry")
     print(f"max H/O Hermiticity error                     {hermiticity:.12e}")
     print(f"Tr[rho H_,strain]                             {totals['h']:+.12e} Ry")
     print(f"Tr[rhoE O_,strain]                            {totals['o']:+.12e} Ry")
     print(f"stationary one-particle pair                  {totals['pair']:+.12e} Ry")
+    print(f"DFT-like pair with interacting rho            {dftlike_pair:+.12e} Ry")
+    print(f"diagonal-rho part of DFT-like pair             {diagonal_pair:+.12e} Ry")
+    print(
+        "window diagonal-rho part of DFT-like pair      "
+        f"{window_diagonal_pair:+.12e} Ry"
+    )
+    print(
+        "off-diagonal-rho part of DFT-like pair         "
+        f"{dftlike_pair-diagonal_pair:+.12e} Ry"
+    )
     print(f"-Tr[M_Sigma O_,strain]                        {sigma_overlap:+.12e} Ry")
+    print(
+        "  diagonal M_Sigma part                       "
+        f"{sigma_overlap_diagonal:+.12e} Ry"
+    )
+    print(
+        "  off-diagonal M_Sigma part                   "
+        f"{sigma_overlap_offdiagonal:+.12e} Ry"
+    )
     print(
         "one-sided M_Sigma overlap (-h,0)             "
         f"{sigma_overlap_sides['minus']:+.12e} Ry"
@@ -456,7 +643,7 @@ def main(argv: list[str] | None = None) -> int:
         "one-sided M_Sigma difference                  "
         f"{sigma_overlap_sides['plus']-sigma_overlap_sides['minus']:+.12e} Ry"
     )
-    if dft_weights is not None:
+    if dft_weights is not None or fixed_mu_dft:
         print(f"DFT electrons represented by stored bands           {dft_electrons:.12e}")
         print(f"DFT stationary one-particle pair              {dft_pair:+.12e} Ry")
         print(f"DMFT minus DFT one-particle pair               {totals['pair']-dft_pair:+.12e} Ry")
@@ -469,8 +656,32 @@ def main(argv: list[str] | None = None) -> int:
     if args.volume is not None:
         conversion = 14710.5164057 / (3.0 * args.volume)
         print(f"hydrostatic mean of pair                      {totals['pair']*conversion:+.9f} GPa")
+        print(
+            "hydrostatic mean of DFT-like pair              "
+            f"{dftlike_pair*conversion:+.9f} GPa"
+        )
+        print(
+            "hydrostatic mean of diagonal-rho part           "
+            f"{diagonal_pair*conversion:+.9f} GPa"
+        )
+        print(
+            "hydrostatic mean of window diagonal-rho part    "
+            f"{window_diagonal_pair*conversion:+.9f} GPa"
+        )
+        print(
+            "hydrostatic mean of off-diagonal-rho part       "
+            f"{(dftlike_pair-diagonal_pair)*conversion:+.9f} GPa"
+        )
         print(f"hydrostatic mean of M_Sigma overlap           {sigma_overlap*conversion:+.9f} GPa")
-        if dft_weights is not None:
+        print(
+            "  diagonal M_Sigma overlap mean               "
+            f"{sigma_overlap_diagonal*conversion:+.9f} GPa"
+        )
+        print(
+            "  off-diagonal M_Sigma overlap mean           "
+            f"{sigma_overlap_offdiagonal*conversion:+.9f} GPa"
+        )
+        if dft_weights is not None or fixed_mu_dft:
             print(f"hydrostatic mean of DFT pair                  {dft_pair*conversion:+.9f} GPa")
             print(
                 "hydrostatic mean of DMFT-minus-DFT pair       "

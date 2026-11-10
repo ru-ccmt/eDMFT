@@ -1,0 +1,320 @@
+XC AND CORE RESPONSE: ROADMAP STEP 2
+8 November 2026
+
+STATUS
+
+The preceding periodic-Hartree patch was installed with hash verification and
+backups. The new XC/core code has been prepared and tested; its installation
+status is recorded by INSTALLATION.json when applied. No new ordinary lapw0, lcore or dmft2 executable has been installed.
+All new material calculations ran in private scratch directories. The original
+FeSe/SrVO3 calculations were not modified.
+
+This checkpoint supplies prepared forward and transpose operations for native
+nonmagnetic LDA/PBE XC and spherical NREL/RELA core response. It connects them
+to the existing valence operation in first-k native controls. It does not yet
+supply the production screened response or a corrected stress tensor.
+
+WHY THESE OPERATIONS ARE NEEDED
+
+Let n be the total input density at fixed geometry. Define:
+  K_H  = derivative of the native Hartree potential with respect to n;
+  K_xc = derivative of the native exchange-correlation potential;
+  K    = K_H + K_xc;
+  B    = potential -> joint band perturbation (delta H, delta O, delta Phi);
+  E    = joint band perturbation -> DMFT density-matrix response at fixed Sigma;
+  R    = density-matrix response -> spatial valence density, fixed basis;
+  D    = direct spatial-density response of the changing radial/basis functions;
+  C    = potential -> occupied core-density response;
+  N    = derivative of the chosen output-charge normalization, still explicit.
+
+Phi here is the RAW orbital overlap. E already includes the window, overlap
+symmetrization, inverse-square-root normalization and moving overlap metric.
+Do not add a second normalization or second spin/k-point weight to R or C.
+
+The unmixed physical charge-map derivative will be
+  J = N [ R E B + D + C ] K.
+
+The new composition tests evaluate [R E B + D + C] K before the N operation,
+at the first k point. Fixed-N below means the electronic band particle count
+is fixed by mu; it does not silently implement the separate spatial/core
+normalization N. These distinctions matter for the final screened solve.
+
+XC: DIFFERENTIATE THE IMPLEMENTED DISCRETE MAP
+
+Native XC is not just a scalar derivative dv_xc/dn. For PBE write its local
+potential as a function
+  v_xc = f(n, g, L, t),
+  g = |grad n|,  L = Laplacian n,  t = grad n . grad|grad n|.
+The output is in Ry; n is total spin-summed density in electrons/Bohr^3.
+The routine unpolarized_xc implements the built-in nonmagnetic LDA/PBE
+formulas and their native low-density branches. It is not a generic LibXC
+adapter. Custom functional parameters, spin response, meta-GGA, SOC and other
+functional switches are outside its present scope.
+
+For local fields z obtained from the radial/angular or Cartesian stencil,
+  delta v_xc(x) = sum_j a_j(x) delta z_j(x),
+  a_j(x) = partial f / partial z_j, evaluated at the central fields.
+
+These partial derivatives are prepared once with complex-step differentiation
+of analytic formulas on the central active branch. This avoids subtracting
+nearby potentials. There are no per-density-coordinate probes, dense global
+Jacobian construction, repeated lapw0 launches or finite-difference SCF loops
+inside a response action. The active branches are held fixed; a true threshold
+crossing is not a differentiable point and should be checked with endpoint
+branch metadata when broadening supported material scope.
+
+Muffin tins
+-----------
+CLMSUM stores c_lm(r)=r^2*n_lm(r), with a special spherical convention:
+  n(r,Omega) = c_00(r)/(4*pi*r^2)
+              + sum_(lm != 00) c_lm(r) Y_lm(Omega)/r^2.
+Y_lm are the signed native real harmonics. Their actual native angular tables,
+polar derivatives and quadrature weights are explicit preparation inputs.
+The exact signed (l,m) order is checked in the periodic assembly.
+
+DFUNDR/DERGL differentiate c_lm/r^2 with native SPLINE endpoint conditions,
+parity extension through r=0, the first-three-point first-derivative
+replacement, and the first-five-point second-derivative replacement. These
+are cached tridiagonal solves, with their exact reverse operations.
+
+GRANS then forms n, g, L and t in the local spherical frame, including its
+polar branch. The ten local fields are
+  (n, n_r, n_rr, n_theta, n_thetatheta, n_phi, n_phiphi,
+   n_rtheta, n_rphi, n_thetaphi).
+For example,
+  g^2 = n_r^2 + n_theta^2/r^2 + n_phi^2/(r^2 sin(theta)^2),
+  L = n_rr + 2*n_r/r
+      + [n_thetatheta + cot(theta)*n_theta
+         + n_phiphi/sin(theta)^2]/r^2.
+
+If Y_aj is harmonic j at quadrature point a, with weight w_a, define
+  W_aj = w_a Y_aj,
+  P_aj = W_aj - W_a0 * (sum_b W_bj)/(sum_b W_b0)
+         + delta_j0 W_a0.
+This is the native angular-mean subtraction/projection. The new map evaluates
+  delta V_j(r) = sum_a P_aj delta v_xc(r,Omega_a).
+The spherical output is r*delta V_00/sqrt(4*pi), matching vsp; nonspherical
+outputs are delta V_lm, matching vns. No endpoint zero of a radial projector
+or density is assumed in these potential-response operations.
+
+Interstitial
+------------
+Native PWXAD4/5 uses a quadratic least-squares fit over 27 neighbouring FFT
+grid points, not a reciprocal-space spectral derivative. With offsets u_a,
+use the monomials
+  T(u) = (1,x,y,z,x^2,y^2,z^2,yz,zx,xy).
+The fitted coefficients are
+  b = (T T^T)^(-1) T [n_+(x+u_a)-n_+(x)],
+where n_+=max(n,0). The gradient is (b_x,b_y,b_z); the Hessian diagonal is
+2*(b_xx,b_yy,b_zz), with the mixed coefficients unchanged. The native tiny-
+gradient thresholds for the total density and half-density spin channels are
+kept separately. Preparation contracts the local Jacobian with this fit, so
+repeated PBE actions use a 27-point variable-coefficient stencil.
+
+Native low-density averaging is also differentiated. If the averaging set S
+is nonempty, v_xc at every low-density point is replaced by the mean over S.
+The reverse sends the sum of covectors from replaced points uniformly to S;
+it is not the same operation as the forward mean. The positivity and averaging
+sets are held at their central values. Default thresholds are explicit inputs.
+
+Fourier order is essential:
+  density star sums -> SETFFT expansion -> real-space density -> local XC
+  -> low-density average -> inverse FFT -> GETFF1 representative selection
+  -> truncated star expansion -> native interstitial mask -> GETFFT average.
+
+GETFF1 takes the representative Fourier coefficient times the star size;
+GETFFT after masking averages members. These two operations are different.
+The new transpose reverses this exact sequence, including all FFT factors,
+phases, star sizes, real-field projections and masking. INTERNAL REAN4 output
+is conjugated at the native-potential file-coordinate adapter: lapw0 writes
+conjg(cvalue) to a complex VNS file. The periodic Hartree
+adapter supplies the shared validated geometry and coordinate conventions.
+
+CORE: IMPLICITLY DIFFERENTIATE RADIAL MATCHING
+
+Native lcore uses a central spherical potential, fixed shell occupations and
+a fixed case.inc shift. The input vsp is r*V in Ry; core propagation uses
+Hartree units:
+  V_H(r) = [vsp(r) - shift_Ry*r]/(2*r).
+The exterior a/r+b/r^2 continuation and its central monotonic-clamp branch
+are differentiated too. The number of native exterior radial points is kept.
+
+For a point nucleus, let kappa be the Dirac angular quantum number, Z nuclear
+charge and c the speed of light (137.0359895 in RELA; 1e30 in NREL). The code
+propagates (P,c Q), which avoids NREL underflow in the small component.
+It differentiates the origin series, five-point predictor/corrector, exterior
+asymptotic start and inward/outward match at the stored central matching point.
+The matching and outer-end indices are fixed discrete branch metadata.
+
+Define the matching residual
+  F(E,V) = (c Q_out/P_out) - (c Q_in/P_in).
+At a converged central eigenvalue, F=0. Therefore
+  delta E = - F_V[delta V] / F_E.
+The origin includes its dependence on V(0)-E; the outer asymptotic start
+includes E. The energy response is not frozen. A nonconverged central match
+or singular F_E is rejected.
+
+After matching amplitudes, define
+  q(r) = P(r)^2 + Q(r)^2,
+  I = sum_i w_i q(r_i),
+  c_core(r) = occupation*q(r)/I.
+The w_i are the native CHARGE quadrature weights on the extended radial domain.
+Then
+  delta c_core(r) = occupation/I * [delta q(r) - q(r)*delta I/I].
+This includes both large and small components and exact normalization.
+Only the MT part is returned in the CLMCOR/CLMSUM spherical convention.
+An individual state's full-domain integrated derivative vanishes, but its
+inside-RMT charge may change through leakage. Exterior core treatment and
+output normalization must therefore remain explicit in the full charge map.
+
+All core propagation matrices, local forcings and the eigenvalue covector are
+cached. One forward/reverse pass scales linearly with the radial grid. There
+is no repeated root search in a core response call. Atoms without core must
+be explicitly declared; missing atoms never mean a silently frozen core.
+
+ADJOINT CONVENTION
+
+The operator interface uses real Euclidean coordinate vectors. Complex Fourier
+coefficients are packed as explicit real/imaginary coordinates; radial units,
+star factors, occupations and integration weights live inside each operation.
+Each operation supplies a genuine reverse action satisfying
+  y . A(x) = A^T(y) . x.
+A continuum symmetry assumption about the XC kernel is not substituted for
+this discrete transpose. That distinction matters with native interpolation,
+angular mean subtraction, cutoffs and representative selection.
+
+TESTS AND LIMITS
+
+The complete selected response suite passes 145 tests with zero skips: 124
+existing tests plus 20 new XC/core tests and one complex-VNS regression. Native radial/Hartree reference
+libraries were enabled. New tests include exact Coulomb densities in NREL/RELA,
+core normalization, localized-state gauge response, Coulomb scaling, exterior
+potential response, spline polynomial reproduction, forward/adjoint equality,
+uniform-density PBE->LDA, independent MT/IR finite differences and low-density
+averaging reversal.
+
+Independent native material controls use FeSe RELA/PBE and SrVO3 NREL/LDA,
+RKMAX=8, primitive orthogonal nonmagnetic no-SOC fixtures. Each native charge
+endpoint uses newly computed potentials, KS states and normalized projectors;
+self-energy, local frames, RMT, radial energies and band-window indices are
+fixed. Only the first k point is used in the valence controls; 66/43 retained
+states plus the full finite-LAPW complement are used in the response.
+
+At fixed N, endpoint mu is obtained from an independent nonlinear N(mu) root
+and native dmft2 is rerun at that value. The analytic tangent is not used to
+choose endpoint mu. Root residuals are at most 2.14e-14 electrons.
+
+These perturbation amplitudes multiply a density direction. They are NOT
+physical strains, so none of the numbers below are GPa or new pressures.
+
+RESULTS
+
+Relative norm errors (analytic response versus independently perturbed native
+programs; h is the density-direction amplitude):
+
+                                                   FeSe             SrVO3
+Native local XC point formula                      2.8e-16          8.7e-18
+Central MT XC projection                           9.9e-13          8.7e-14
+Central total interstitial Fourier potential       4.7e-16          1.3e-16
+Hartree+XC radial derivative, h=.01                 5.7e-7           1.4e-9
+Hartree+XC IR derivative, h=.005                    1.3e-7           2.1e-8
+Core density from native central states            5.7e-14          6.7e-14
+Hartree+XC->core derivative, h=.01                  3.9e-9           1.5e-8
+Complete first-k output charge, fixed mu, h=.001    3.29e-6          8.71e-7
+Complete first-k output charge, fixed mu, h=.0005   8.29e-7          2.68e-7
+Complete first-k output charge, fixed N, h=.001     2.89e-6          9.70e-8
+Complete first-k output charge, fixed N, h=.0005    6.99e-7          4.95e-7
+
+The worst complete-composition transpose error is 2.1e-14. FeSe central
+radial PBE derivatives involve large near-origin values; decreasing native
+finite-difference steps eventually magnifies roundoff and input-file
+precision. SrVO3's smallest fixed-N endpoint similarly reaches a numerical
+floor. Both finite-difference steps are retained; the better one is not
+silently substituted for the whole convergence record.
+
+NEW BUG FOUND BY THE COMPOSED TEST
+
+The internal Hartree and XC component checks originally compared native
+REAN4 arrays. The previous native-potential adapter then incorrectly copied
+the imaginary part to NativePotentialBands without changing its sign.
+Native LAPW0 explicitly writes CONJG(cvalue) to complex VNS files. This last
+conversion was missing in the new adapter, for both Hartree and XC response.
+A real FeSe potential cannot expose that error.
+
+In SrVO3, before this correction:
+  final interstitial file-potential derivative error: 1.18e-1;
+  band H derivative error:                           1.75e-4;
+  fixed-N charge derivative error at h=.0005:         7.12e-4.
+After conjugating at the file-coordinate boundary exactly once:
+  final interstitial file-potential derivative error: 2.81e-8;
+  band H derivative error:                           2.76e-8;
+  fixed-N charge derivative error at h=.0005:         4.95e-7.
+
+The inverse operation in the transpose includes the same imaginary sign.
+A sine-wave test independently verifies that internal Fourier expansion and
+native-file reconstruction describe the same real potential. Merely checking
+an operation against its own transpose would not catch this physical error.
+The issue was in the new prepared response adapter, not a newly discovered
+bug in WIEN2k's VNS writer or in the ordinary analytic dmft2 stress executable.
+
+A separate diagnostic reconstructing all l<=10 basis channels instead of
+native dmft2's l<=8 spatial density was also tested. It produces a different
+spatial map, already identified in the prior charge-consistency checkpoint.
+The native comparison retains l<=8, rather than silently changing that map.
+
+PERFORMANCE
+
+Representative single-thread cached forward times:
+                                        FeSe             SrVO3
+  Hartree+XC potential                  ~86 ms           ~19 ms
+  occupied core response alone          ~13 ms           ~19 ms
+  complete FIRST-K output-charge map    ~1.13 s           ~2.03 s
+
+Core preparation is about 0.14/0.19 s. XC+Hartree preparation is about
+4.35/0.37 s. Native NREL/RELA radial contexts and electronic preparation are
+shared with the existing engine. These are component/first-k measurements,
+not end-to-end stress speedups. The valence response remains the dominant
+operation in these fixtures. No extra self-consistent impurity solve is used.
+
+WHAT IS STILL NEEDED
+
+1. Replace the fixture-specific central-data extraction by a reusable loader.
+   Current angular quadrature and core matching metadata are exported by
+   scratch-instrumented native reference copies. Those always-on diagnostic
+   exports are NOT a proposed production patch. The eventual preparation
+   export should be optional, versioned and central-only.
+2. Finish spatial/core output normalization, number and gauge closure, and
+   full k-point accumulation with the same basis/window/energy policies.
+   Core leakage and the existing spatial angular cutoff must stay explicit.
+3. Assemble and validate the fully normalized physical J. Then compare the
+   screened (I-J) solve with the slow native reference before enabling it.
+4. Complete the stress gradient and all six physical strain sources, test
+   forward-versus-adjoint contractions and finite-difference free energies,
+   and only then publish a corrected tensor through the existing executor.
+5. Add MPI and broaden spin/SOC/cell/functionals only with corresponding
+   native tests. Magnetic MnTe and fixed-mu insulating workflows are not
+   newly enabled by the nonmagnetic first-k controls here.
+
+We are therefore still completing STEP 2, with its XC/core arithmetic and
+first-k native composition now validated. STEP 3 screening has not been
+claimed complete. No new analytic-versus-numeric pressure table is implied.
+
+EVIDENCE AND REPRODUCTION
+
+Core implementations:
+  src/python/lapw_xc_response.py
+  src/python/lapw_core_response.py
+  src/python/lapw_hartree_periodic.py (file-coordinate conjugation fix)
+Tests:
+  src/python/tests/test_lapw_xc_response.py
+  src/python/tests/test_lapw_core_response.py
+  src/python/tests/test_lapw_hartree_periodic.py
+
+The checkpoint contains full_tests.log, component/composition JSON reports,
+the native diagnostic patch, scripts for native endpoints, independent N(mu)
+roots and material comparisons, and selected compact binary reference inputs.
+The native diagnostic patch is for private reference copies only. Original
+central source/inputs and generated outputs are fingerprinted. The scripts
+record their scratch fixture dependencies explicitly; they are not a general
+end-user response command. Installation copies only reviewed helpers, tests
+and documentation, with preimage hashes, backups and post-copy verification.

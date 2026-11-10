@@ -1,0 +1,65 @@
+--- a/SRC_lapw2/val_kinstrmt.F
++++ b/SRC_lapw2/val_kinstrmt.F
+@@ -31,7 +31,7 @@
+     REAL*8,  external          :: GAUNT
+     real*8                     :: gaunt1,gaunt2,gaunt3,RMT2
+     REAL*8, PARAMETER          :: ohalf = 1.D0/2.D0    
+-    real*8                     :: g1_deriv_scale
++    real*8                     :: g1_deriv_scale, g1_lo_scale
+     integer                    :: g1_legacy_status
+     character(len=32)          :: g1_legacy_env
+     complex*16                 :: c_am(3,-1:1), ca_st_lm(3,-1:1,-1:1), &
+@@ -50,20 +50,29 @@
+     lmax = lmax2n        !at least lmax = 7 is needed
+ !=====================                                      
+ 
+-    ! Eq. (G1) has one overall factor 1/2 in front of all four
+-    ! muffin-tin terms.  In the historical F3 implementation the
+-    ! first-radial-derivative piece duplicated its angular factor and
+-    ! therefore lost this 1/2, whereas the accompanying -u/r**2 piece kept
+-    ! it.  Restoring the common 1/2 removes the full traceless discrepancy
+-    ! in the exact fixed-G FeSe finite-difference test.  The legacy switch is
+-    ! retained only to reproduce and diagnose historical WIEN2k results.
+-    g1_deriv_scale = 0.5d0
++    ! G1 product rule (audit 2026-11-07): F2 differentiates n_alpha only.
++    ! The derivative of Y in D_beta(n_alpha*Y) belongs in F3 as well as
++    ! the separate n_beta*D_alpha(Y) row. Thus F3 is
++    !       (2*R1-R0) * (n_alpha*D_beta+n_beta*D_alpha)/2,
++    ! R1=int r*u_bra*u'_ket dr, R0=int u_bra*u_ket dr.
++    ! Halving the R1 coefficient was an incorrect earlier correction.
++    ! In particular psi=r*Y_10 is proportional to z and has ZERO Hessian;
++    ! the halved coefficient gives a spurious, traceless tensor instead.
++    ! LO--LO products have no extra multiplicity: the ordered pair sum
++    ! already contains every primitive pair, just as for u and udot.
++    ! PREAUDIT explicitly reproduces the two old angular defects for
++    ! diagnostics only; the physical/default scales are both one.
++    g1_deriv_scale = 1.d0
++    g1_lo_scale = 1.d0
+     g1_legacy_env = ''
+-    call get_environment_variable('WIEN_STRESS_G1_LEGACY',g1_legacy_env, &
++    call get_environment_variable('WIEN_STRESS_G1_PREAUDIT',g1_legacy_env, &
+                                   status=g1_legacy_status)
+     if(g1_legacy_status.eq.0 .and. len_trim(g1_legacy_env).gt.0 .and. &
+-       trim(g1_legacy_env).ne.'0') g1_deriv_scale = 1.d0
+-                                  
++       trim(g1_legacy_env).ne.'0') then
++       g1_deriv_scale = 0.5d0
++       g1_lo_scale = 2.d0
++    endif
++
+     DO l = 0, lmax
+        FF(0,l)   = P(l)
+        FF(1,l)   = PE(l)
+@@ -288,10 +297,10 @@
+                                   IF(.NOT.loor(jlo,l)) CYCLE
+                                   DO jlop = 1,ilo(lp)
+                                      IF(.NOT.loor(jlop,lp)) CYCLE
+-                                     radial_buf1 = radial_buf1 + 2.d0* &
++                                     radial_buf1 = radial_buf1 + g1_lo_scale* &
+                                           conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
+                                           judu_22(jlo,jlop,l,lp)
+-                                     radial_buf2 = radial_buf2 + 2.d0* &
++                                     radial_buf2 = radial_buf2 + g1_lo_scale* &
+                                           conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
+                                           juu_22(jlo,jlop,l,lp)
+                                   ENDDO

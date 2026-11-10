@@ -10,14 +10,16 @@ SUBROUTINE read_and_initialize(NUMKPT,DEFFN,INFO,nmat_only)
   use coml, only    : SPRSWF, PRNTWF, WFTAPE, REL, ITER, NOHNS
   use comr, only    : RKM, ELow, EUp, WEIGHT, sproj_limit,eshift_iter,readHinv
   use kpts, only    : K3
-  use potnlc, only  : VR
+  use potnlc, only  : VR,basis_potential_enabled,basis_delta_vr, &
+       basis_restore_spherical,basis_restore_lmin
+  use response_run, only: response_matrices_only
   use mgaunt, only  : gaunt_init
   use structure, only: lattic, aname, alpha, alat, jri, r0, dx, POS, RMT, V, VOL, MULT, ndf, ZZ, BR1, BR2, ORTHO, ReadStructure, WriteInfoStructure, iord, imat, tau, rotij, tauij, spaceGroupInit, ReadStructureGroup
-  use readPotential, ONLY: init_V_vsp, read_V_vsp, read_V_vns_interstital_nk, read_V_vns_interstital_pot_real, read_V_vns_interstital_pot_cmplx
+  use readPotential, ONLY: close_V_vsp,init_V_vsp, read_V_vsp, read_V_vns_interstital_nk, read_V_vns_interstital_pot_real, read_V_vns_interstital_pot_cmplx
   use radial, only  : init_radial, end_radial
   use loint, only   : init_loint
   use nmr, only : dokorig, korig, writeham
-  use mpi, only : Qprint, mpi_bcast_V_vsp, vector_para, myrank, master
+  use mpi, only : Qprint, mpi_bcast_V_vsp, vector_para, myrank, master,stop_MPI
   IMPLICIT NONE
   !INCLUDE 'param.inc'
   !
@@ -31,6 +33,9 @@ SUBROUTINE read_and_initialize(NUMKPT,DEFFN,INFO,nmat_only)
   REAL*8         :: E1n, E2n, E1, E2, eorb_ind, efermi
   REAL*8         :: PI
   CHARACTER*67   :: ERRMSG
+  character(len=180) :: basis_vsp_file
+  integer :: basis_vsp_status
+  logical :: basis_file_exists
   LOGICAL        :: RUNORB
   LOGICAL        :: FORCE
   INTEGER        :: lxdos, iscf, tnlov
@@ -124,6 +129,46 @@ SUBROUTINE read_and_initialize(NUMKPT,DEFFN,INFO,nmat_only)
      Vr(:,:) = Vr(:,:)/2.d0    ! Converst from Rydbergs to Hartrees
   endif
   call mpi_bcast_V_vsp(Vr, NRAD,NAT)
+
+  ! A response probe can change trial functions without changing the
+  ! physical potential.  Keeping these separate is necessary for the
+  ! stationary radial Pulay derivative.  Use with MATRICES_ONLY to avoid
+  ! solving a second eigenproblem.  Ordinary runs take no extra radial work.
+  basis_vsp_file=''
+  call get_environment_variable('DFTKS_BASIS_VSP',basis_vsp_file,status=basis_vsp_status)
+  if (basis_vsp_status.eq.-1) then
+     if (Qprint) write(6,*) 'DFTKS_BASIS_VSP exceeds 180 characters'
+     call stop_MPI()
+     stop 1
+  endif
+  basis_potential_enabled=(basis_vsp_status.eq.0.and.len_trim(basis_vsp_file).gt.0)
+  if (basis_potential_enabled) then
+     inquire(file=trim(basis_vsp_file),exist=basis_file_exists)
+     if (.not.basis_file_exists.or.NOHNS) then
+        if (Qprint) write(6,*) 'Alternate radial basis requires a readable VSP and HNS enabled'
+        call stop_MPI()
+        stop 1
+     endif
+     allocate(basis_delta_vr(NRAD,NAT),basis_restore_spherical(3,NT,NAT))
+     basis_delta_vr=VR
+     basis_restore_spherical=0.d0
+     basis_restore_lmin=LNSMAX+1
+     if (myrank.eq.master) then
+        call close_V_vsp()
+        call init_V_vsp(basis_vsp_file,18,ISCF)
+        VR=0.d0
+        do jatom=1,nat
+           call read_V_vsp(VR(:jri(jatom),jatom),jatom,jri(jatom))
+        enddo
+        VR=VR/2.d0
+        call close_V_vsp()
+        write(6,'(A,1X,A)') ':DFTKS_BASIS_VSP:',trim(basis_vsp_file)
+        write(6,'(A)') ':DFTKS_BASIS_OPERATOR: restoring physical potential in all angular channels'
+     endif
+     call mpi_bcast_V_vsp(VR,NRAD,NAT)
+     basis_delta_vr=basis_delta_vr-VR
+  endif
+
   
   ! case.in1 contains information of how to choose linearization energies.
   ! The linearization energies E & Elo are determined here inside on the fly.
@@ -137,6 +182,18 @@ SUBROUTINE read_and_initialize(NUMKPT,DEFFN,INFO,nmat_only)
   !enddo
   ! call exit
 
+
+  if (basis_potential_enabled) then
+     do jatom=1,nat
+        do l=LNSMAX+1,LOMAX
+           if (ilo(l,jatom).gt.0) then
+              if (Qprint) write(6,*) 'Alternate-basis probe needs LNSMAX to include every LO'
+              call stop_MPI()
+              stop 1
+           endif
+        enddo
+     enddo
+  endif
 
   ! Compute how many localized orbitals appear before each atom nlov(jatom)
   allocate(nlov(nat+1))
@@ -231,7 +288,7 @@ SUBROUTINE read_and_initialize(NUMKPT,DEFFN,INFO,nmat_only)
         if(.not.lapw(j-1,i)) E(j,i)=E(j,i)+200.D+0
      enddo
 
-     if (vector_para .or. myrank.eq.master) then
+     if ((vector_para .or. myrank.eq.master) .and. .not.response_matrices_only) then
         WRITE(10) (E(j,i),j=1,lmax)
         WRITE(10) ((Elo(j,k,i),j=0,lomax),k=1,nloat_new)
         !keep compatibility with old scheme

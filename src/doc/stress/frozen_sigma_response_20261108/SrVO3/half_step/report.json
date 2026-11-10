@@ -1,0 +1,93 @@
+{
+  "converged": true,
+  "threshold": 0.02,
+  "iterations": [
+    {
+      "iteration": 0,
+      "residual_norm": 0.019185670596138953,
+      "seconds": 18.59748679213226
+    }
+  ],
+  "timings": [
+    {
+      "folder": "central",
+      "program": "lapw0",
+      "seconds": 0.85685645788908
+    },
+    {
+      "folder": "central",
+      "program": "lapw1",
+      "seconds": 15.33202329208143
+    },
+    {
+      "folder": "central",
+      "program": "dmft2",
+      "seconds": 2.1649235421791673
+    },
+    {
+      "folder": "central",
+      "program": "lcore",
+      "seconds": 0.08213458396494389
+    },
+    {
+      "folder": "source_plus",
+      "program": "lapw0",
+      "seconds": 0.7463122920598835
+    },
+    {
+      "folder": "source_plus",
+      "program": "lapw1",
+      "seconds": 14.654197667026892
+    },
+    {
+      "folder": "source_plus",
+      "program": "dmft2",
+      "seconds": 2.667970209149644
+    },
+    {
+      "folder": "source_plus",
+      "program": "lcore",
+      "seconds": 0.09403945901431143
+    },
+    {
+      "folder": "source_minus",
+      "program": "lapw0",
+      "seconds": 0.8789584168698639
+    },
+    {
+      "folder": "source_minus",
+      "program": "lapw1",
+      "seconds": 14.52949216705747
+    },
+    {
+      "folder": "source_minus",
+      "program": "dmft2",
+      "seconds": 2.1459724998567253
+    },
+    {
+      "folder": "source_minus",
+      "program": "lcore",
+      "seconds": 0.08217345806770027
+    },
+    {
+      "folder": "action_000",
+      "program": "lapw0",
+      "seconds": 0.7642260419670492
+    },
+    {
+      "folder": "action_000",
+      "program": "lapw1",
+      "seconds": 14.680200124857947
+    },
+    {
+      "folder": "action_000",
+      "program": "dmft2",
+      "seconds": 2.50156716699712
+    },
+    {
+      "folder": "action_000",
+      "program": "lcore",
+      "seconds": 0.09177437494508922
+    }
+  ]
+}

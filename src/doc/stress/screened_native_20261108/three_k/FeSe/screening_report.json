@@ -1,0 +1,107 @@
+{
+  "forward": {
+    "converged": true,
+    "gmres_info": 0,
+    "direction": "forward",
+    "residual_norm": 1.2906947135221068e-05,
+    "threshold": 3.745105277201869e-05,
+    "actions": 13,
+    "inner_residual_history": [
+      0.69311555054255,
+      0.2956433739186995,
+      0.0255788888584311,
+      0.007374036446074382,
+      0.0012876502176349823,
+      0.0002057088983861764,
+      1.610414466683721e-05,
+      1.5918653597547713e-06,
+      2.9037623825776356e-07,
+      4.8223345434387435e-08,
+      6.892688732448222e-09
+    ],
+    "seconds": 12.344542041886598,
+    "fixed_number": true,
+    "target_charge": 120.0,
+    "normalization_enabled": true,
+    "normalization_alpha": 1.2225760157655772,
+    "central_valence_relative_error": 9.508517861672094e-13,
+    "central_core_relative_error": 1.0474802877471612e-13,
+    "central_fixed_point_residual_norm": 2.5520947851647175,
+    "kpoints": 3,
+    "retained_bands": 66,
+    "matrix_quadrature": "wien2k24",
+    "stress_applied": false,
+    "source_charge": 7.66249286243692e-11,
+    "response_charge": 7.656451883582477e-11
+  },
+  "preparation_seconds": 3.9256232499610633,
+  "source_norm": 1872.5526386009346,
+  "response_norm": 1002.0783361925028,
+  "native_residuals": {
+    "1e-05": {
+      "norm": 0.00023344034664264212,
+      "relative_to_source": 1.2466423737869154e-07,
+      "jacobian_relative": 1.8984280052949708e-07
+    },
+    "5e-06": {
+      "norm": 6.734238982039158e-05,
+      "relative_to_source": 3.596288212795235e-08,
+      "jacobian_relative": 5.441774367135728e-08
+    }
+  },
+  "adjoint": {
+    "converged": true,
+    "gmres_info": 0,
+    "direction": "adjoint",
+    "residual_norm": 1.1354930679859165e-09,
+    "threshold": 7.56040587758006e-09,
+    "actions": 17,
+    "inner_residual_history": [
+      0.9999884726011982,
+      0.9988354548865728,
+      0.9944865103523242,
+      0.8471659967226335,
+      0.306556299104733,
+      0.10887426496979431,
+      0.014692930272439864,
+      0.004376137756270776,
+      0.001331344408214921,
+      0.00027967534767008923,
+      6.04686853495076e-05,
+      3.6300268403675246e-06,
+      3.776536845910047e-07,
+      3.340561021979812e-08,
+      3.0149520609722155e-09
+    ],
+    "seconds": 20.414003249956295,
+    "observable": "MT electron number on atom 1 including its multiplicity",
+    "forward_contraction": 2.5926153512026855,
+    "adjoint_contraction": 2.5926157411113273,
+    "absolute_difference": 3.89908641817982e-07
+  },
+  "second_source": {
+    "converged": true,
+    "gmres_info": 0,
+    "direction": "forward",
+    "residual_norm": 3.0095455073644853e-05,
+    "threshold": 3.74500422775628e-05,
+    "actions": 9,
+    "inner_residual_history": [
+      1.2586771651595389e-05,
+      5.327159627292881e-06,
+      1.674691742026478e-06,
+      2.2625320594737844e-07,
+      4.636433193512854e-08,
+      1.607231375451645e-08
+    ],
+    "seconds": 9.594967874931172,
+    "response_step_relative": 2.148500470321633e-05,
+    "forward_contraction": 2.589900008351739,
+    "adjoint_contraction": 2.589902551233923
+  },
+  "calls": {
+    "forward": 22,
+    "adjoint": 17
+  },
+  "peak_process_rss_bytes": 1852653568
+}

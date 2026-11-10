@@ -1,0 +1,13 @@
+ 5,'MnO.inm',       'old',    'formatted',-1
+ 6,'MnO.outputm',   'unknown','formatted',0
+ 7,'MnO.inc',       'old',    'formatted',-1
+10,'MnO.clmsum_old','unknown','formatted',0
+17,'MnO.clmval',    'unknown','formatted',-1
+18,'MnO.clmsc',     'unknown','formatted',0
+19,'MnO.clmcor',    'unknown','formatted',0
+20,'MnO.struct',    'old',    'formatted',0
+21,'MnO.scfm',      'unknown','formatted',0
+22,'MnO.scf',       'unknown','formatted',0
+31,'MnO.broyd1',    'unknown','unformatted',164896
+32,'MnO.broyd2',    'unknown','unformatted',164896
+51,'MnO.clmsum',    'unknown','formatted',0

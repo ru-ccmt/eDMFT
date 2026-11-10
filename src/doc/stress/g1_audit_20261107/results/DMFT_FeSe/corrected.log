@@ -1,0 +1,329 @@
+nargs= 1
+argi=dmft2.def
+ OpeningFeSe.outputdmf2                                                                                                                                                                     
+:MATSUBARA_CUBIC_WEIGHTS:     130    2387   2.38700000E+03   2.38700000E+03   4.41751983E+00   2.90986751E+02
+:MATSUBARA_CUBIC_WEIGHTS:     130    2387   2.38700000E+03   2.38700000E+03   4.41751983E+00   2.90986751E+02
+:MATSUBARA_CUBIC_WEIGHTS:     130    2387   2.38700000E+03   2.38700000E+03   4.41751983E+00   2.90986751E+02
+ after first reading case.nsh NGAU set to         306
+ after first reading case.nsh NGAU set to         306
+ after first reading case.nsh NGAU set to         306
+  1) Finished k-point number  36   1 with #bands=  24
+  2) Finished k-point number  71   1 with #bands=  24
+  1) Finished k-point number  37   2 with #bands=  24
+  3) Finished k-point number 106   1 with #bands=  24
+  2) Finished k-point number  72   2 with #bands=  24
+  1) Finished k-point number  38   3 with #bands=  24
+  3) Finished k-point number 107   2 with #bands=  24
+  2) Finished k-point number  73   3 with #bands=  24
+  1) Finished k-point number  39   4 with #bands=  24
+  3) Finished k-point number 108   3 with #bands=  24
+  2) Finished k-point number  74   4 with #bands=  24
+  1) Finished k-point number  40   5 with #bands=  24
+  3) Finished k-point number 109   4 with #bands=  24
+  2) Finished k-point number  75   5 with #bands=  24
+  1) Finished k-point number  41   6 with #bands=  24
+  3) Finished k-point number 110   5 with #bands=  24
+  2) Finished k-point number  76   6 with #bands=  24
+  1) Finished k-point number  42   7 with #bands=  24
+  3) Finished k-point number 111   6 with #bands=  24
+  2) Finished k-point number  77   7 with #bands=  24
+  1) Finished k-point number  43   8 with #bands=  24
+  3) Finished k-point number 112   7 with #bands=  24
+  2) Finished k-point number  78   8 with #bands=  24
+  1) Finished k-point number  44   9 with #bands=  24
+  3) Finished k-point number 113   8 with #bands=  24
+  2) Finished k-point number  79   9 with #bands=  24
+  1) Finished k-point number  45  10 with #bands=  24
+  3) Finished k-point number 114   9 with #bands=  24
+  2) Finished k-point number  80  10 with #bands=  24
+  1) Finished k-point number  46  11 with #bands=  24
+  2) Finished k-point number  81  11 with #bands=  24
+  3) Finished k-point number 115  10 with #bands=  24
+  1) Finished k-point number  47  12 with #bands=  24
+  2) Finished k-point number  82  12 with #bands=  24
+  3) Finished k-point number 116  11 with #bands=  24
+  1) Finished k-point number  48  13 with #bands=  24
+  2) Finished k-point number  83  13 with #bands=  24
+  3) Finished k-point number 117  12 with #bands=  24
+  1) Finished k-point number  49  14 with #bands=  24
+  2) Finished k-point number  84  14 with #bands=  24
+  1) Finished k-point number  50  15 with #bands=  24
+  3) Finished k-point number 118  13 with #bands=  24
+  2) Finished k-point number  85  15 with #bands=  24
+  1) Finished k-point number  51  16 with #bands=  24
+  3) Finished k-point number 119  14 with #bands=  24
+  2) Finished k-point number  86  16 with #bands=  24
+  1) Finished k-point number  52  17 with #bands=  24
+  3) Finished k-point number 120  15 with #bands=  24
+  2) Finished k-point number  87  17 with #bands=  24
+  1) Finished k-point number  53  18 with #bands=  24
+  3) Finished k-point number 121  16 with #bands=  24
+  2) Finished k-point number  88  18 with #bands=  24
+  1) Finished k-point number  54  19 with #bands=  24
+  3) Finished k-point number 122  17 with #bands=  24
+  1) Finished k-point number  55  20 with #bands=  24
+  2) Finished k-point number  89  19 with #bands=  24
+  3) Finished k-point number 123  18 with #bands=  24
+  1) Finished k-point number  56  21 with #bands=  24
+  2) Finished k-point number  90  20 with #bands=  24
+  3) Finished k-point number 124  19 with #bands=  24
+  2) Finished k-point number  91  21 with #bands=  24
+  1) Finished k-point number  57  22 with #bands=  24
+  3) Finished k-point number 125  20 with #bands=  24
+  2) Finished k-point number  92  22 with #bands=  24
+  1) Finished k-point number  58  23 with #bands=  24
+  3) Finished k-point number 126  21 with #bands=  24
+  2) Finished k-point number  93  23 with #bands=  24
+  1) Finished k-point number  59  24 with #bands=  24
+  3) Finished k-point number 127  22 with #bands=  24
+  2) Finished k-point number  94  24 with #bands=  24
+  1) Finished k-point number  60  25 with #bands=  24
+  3) Finished k-point number 128  23 with #bands=  24
+  2) Finished k-point number  95  25 with #bands=  24
+  1) Finished k-point number  61  26 with #bands=  24
+  3) Finished k-point number 129  24 with #bands=  24
+  2) Finished k-point number  96  26 with #bands=  24
+  1) Finished k-point number  62  27 with #bands=  24
+  3) Finished k-point number 130  25 with #bands=  24
+  2) Finished k-point number  97  27 with #bands=  24
+  1) Finished k-point number  63  28 with #bands=  24
+  3) Finished k-point number 131  26 with #bands=  24
+  2) Finished k-point number  98  28 with #bands=  24
+  1) Finished k-point number  64  29 with #bands=  24
+  3) Finished k-point number 132  27 with #bands=  24
+  2) Finished k-point number  99  29 with #bands=  24
+  3) Finished k-point number 133  28 with #bands=  24
+  1) Finished k-point number  65  30 with #bands=  24
+  2) Finished k-point number 100  30 with #bands=  24
+  3) Finished k-point number 134  29 with #bands=  24
+  1) Finished k-point number  66  31 with #bands=  24
+  2) Finished k-point number 101  31 with #bands=  24
+  1) Finished k-point number  67  32 with #bands=  24
+  3) Finished k-point number 135  30 with #bands=  24
+  2) Finished k-point number 102  32 with #bands=  24
+  1) Finished k-point number  68  33 with #bands=  24
+  3) Finished k-point number 136  31 with #bands=  24
+  2) Finished k-point number 103  33 with #bands=  24
+  1) Finished k-point number  69  34 with #bands=  24
+  3) Finished k-point number 137  32 with #bands=  24
+  2) Finished k-point number 104  34 with #bands=  24
+  1) Finished k-point number  70  35 with #bands=  24
+  3) Finished k-point number 138  33 with #bands=  24
+  2) Finished k-point number 105  35 with #bands=  24
+  3) Finished k-point number 139  34 with #bands=  24
+  3) Finished k-point number 140  35 with #bands=  24
+  1) Finished k-point number  36   1 with #bands=  24
+  2) Finished k-point number  71   1 with #bands=  24
+  3) Finished k-point number 106   1 with #bands=  24
+  1) Finished k-point number  37   2 with #bands=  24
+  2) Finished k-point number  72   2 with #bands=  24
+  3) Finished k-point number 107   2 with #bands=  24
+  1) Finished k-point number  38   3 with #bands=  24
+  2) Finished k-point number  73   3 with #bands=  24
+  3) Finished k-point number 108   3 with #bands=  24
+  1) Finished k-point number  39   4 with #bands=  24
+  3) Finished k-point number 109   4 with #bands=  24
+  2) Finished k-point number  74   4 with #bands=  24
+  1) Finished k-point number  40   5 with #bands=  24
+  3) Finished k-point number 110   5 with #bands=  24
+  2) Finished k-point number  75   5 with #bands=  24
+  1) Finished k-point number  41   6 with #bands=  24
+  3) Finished k-point number 111   6 with #bands=  24
+  2) Finished k-point number  76   6 with #bands=  24
+  1) Finished k-point number  42   7 with #bands=  24
+  3) Finished k-point number 112   7 with #bands=  24
+  2) Finished k-point number  77   7 with #bands=  24
+  1) Finished k-point number  43   8 with #bands=  24
+  3) Finished k-point number 113   8 with #bands=  24
+  2) Finished k-point number  78   8 with #bands=  24
+  1) Finished k-point number  44   9 with #bands=  24
+  3) Finished k-point number 114   9 with #bands=  24
+  2) Finished k-point number  79   9 with #bands=  24
+  1) Finished k-point number  45  10 with #bands=  24
+  3) Finished k-point number 115  10 with #bands=  24
+  2) Finished k-point number  80  10 with #bands=  24
+  1) Finished k-point number  46  11 with #bands=  24
+  3) Finished k-point number 116  11 with #bands=  24
+  2) Finished k-point number  81  11 with #bands=  24
+  1) Finished k-point number  47  12 with #bands=  24
+  3) Finished k-point number 117  12 with #bands=  24
+  2) Finished k-point number  82  12 with #bands=  24
+  1) Finished k-point number  48  13 with #bands=  24
+  3) Finished k-point number 118  13 with #bands=  24
+  2) Finished k-point number  83  13 with #bands=  24
+  3) Finished k-point number 119  14 with #bands=  24
+  1) Finished k-point number  49  14 with #bands=  24
+  2) Finished k-point number  84  14 with #bands=  24
+  3) Finished k-point number 120  15 with #bands=  24
+  1) Finished k-point number  50  15 with #bands=  24
+  2) Finished k-point number  85  15 with #bands=  24
+  3) Finished k-point number 121  16 with #bands=  24
+  1) Finished k-point number  51  16 with #bands=  24
+  2) Finished k-point number  86  16 with #bands=  24
+  3) Finished k-point number 122  17 with #bands=  24
+  1) Finished k-point number  52  17 with #bands=  24
+  2) Finished k-point number  87  17 with #bands=  24
+  3) Finished k-point number 123  18 with #bands=  24
+  1) Finished k-point number  53  18 with #bands=  24
+  2) Finished k-point number  88  18 with #bands=  24
+  3) Finished k-point number 124  19 with #bands=  24
+  1) Finished k-point number  54  19 with #bands=  24
+  2) Finished k-point number  89  19 with #bands=  24
+  3) Finished k-point number 125  20 with #bands=  24
+  1) Finished k-point number  55  20 with #bands=  24
+  2) Finished k-point number  90  20 with #bands=  24
+  3) Finished k-point number 126  21 with #bands=  24
+  1) Finished k-point number  56  21 with #bands=  24
+  2) Finished k-point number  91  21 with #bands=  24
+  3) Finished k-point number 127  22 with #bands=  24
+  1) Finished k-point number  57  22 with #bands=  24
+  2) Finished k-point number  92  22 with #bands=  24
+  3) Finished k-point number 128  23 with #bands=  24
+  1) Finished k-point number  58  23 with #bands=  24
+  2) Finished k-point number  93  23 with #bands=  24
+  3) Finished k-point number 129  24 with #bands=  24
+  1) Finished k-point number  59  24 with #bands=  24
+  2) Finished k-point number  94  24 with #bands=  24
+  3) Finished k-point number 130  25 with #bands=  24
+  1) Finished k-point number  60  25 with #bands=  24
+  2) Finished k-point number  95  25 with #bands=  24
+  3) Finished k-point number 131  26 with #bands=  24
+  1) Finished k-point number  61  26 with #bands=  24
+  2) Finished k-point number  96  26 with #bands=  24
+  3) Finished k-point number 132  27 with #bands=  24
+  1) Finished k-point number  62  27 with #bands=  24
+  2) Finished k-point number  97  27 with #bands=  24
+  3) Finished k-point number 133  28 with #bands=  24
+  1) Finished k-point number  63  28 with #bands=  24
+  2) Finished k-point number  98  28 with #bands=  24
+  3) Finished k-point number 134  29 with #bands=  24
+  1) Finished k-point number  64  29 with #bands=  24
+  2) Finished k-point number  99  29 with #bands=  24
+  3) Finished k-point number 135  30 with #bands=  24
+  1) Finished k-point number  65  30 with #bands=  24
+  2) Finished k-point number 100  30 with #bands=  24
+  3) Finished k-point number 136  31 with #bands=  24
+  1) Finished k-point number  66  31 with #bands=  24
+  2) Finished k-point number 101  31 with #bands=  24
+  3) Finished k-point number 137  32 with #bands=  24
+  1) Finished k-point number  67  32 with #bands=  24
+  2) Finished k-point number 102  32 with #bands=  24
+  3) Finished k-point number 138  33 with #bands=  24
+  1) Finished k-point number  68  33 with #bands=  24
+  3) Finished k-point number 139  34 with #bands=  24
+  2) Finished k-point number 103  33 with #bands=  24
+  1) Finished k-point number  69  34 with #bands=  24
+  3) Finished k-point number 140  35 with #bands=  24
+  2) Finished k-point number 104  34 with #bands=  24
+  1) Finished k-point number  70  35 with #bands=  24
+  2) Finished k-point number 105  35 with #bands=  24
+  1) Finished k-point  36    1 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  71    1 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 106    1 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 107    2 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  72    2 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  37    2 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 108    3 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  73    3 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  38    3 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 109    4 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  74    4 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  39    4 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 110    5 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  75    5 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  40    5 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 111    6 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  41    6 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  76    6 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 112    7 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  42    7 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  77    7 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 113    8 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  43    8 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  78    8 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 114    9 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  44    9 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  79    9 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 115   10 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  45   10 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  80   10 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 116   11 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  46   11 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  81   11 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 117   12 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  47   12 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  82   12 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 118   13 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  48   13 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  83   13 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 119   14 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  49   14 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  84   14 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 120   15 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  50   15 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  85   15 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 121   16 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  51   16 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  86   16 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 122   17 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  52   17 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  87   17 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 123   18 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  53   18 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  88   18 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 124   19 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  54   19 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  89   19 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 125   20 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  55   20 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  90   20 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 126   21 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  56   21 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  91   21 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 127   22 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  57   22 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  92   22 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 128   23 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  58   23 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  93   23 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 129   24 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  59   24 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  94   24 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 130   25 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  60   25 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  95   25 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 131   26 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  61   26 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  96   26 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 132   27 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  62   27 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  97   27 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 133   28 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  63   28 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  98   28 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 134   29 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point  99   29 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  64   29 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 135   30 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point 100   30 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  65   30 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 136   31 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point 101   31 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  66   31 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 137   32 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  67   32 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point 102   32 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 138   33 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  68   33 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point 103   33 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 139   34 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  69   34 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point 104   34 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  3) Finished k-point 140   35 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  70   35 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  2) Finished k-point 105   35 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+STOP  DMFT2 END
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO

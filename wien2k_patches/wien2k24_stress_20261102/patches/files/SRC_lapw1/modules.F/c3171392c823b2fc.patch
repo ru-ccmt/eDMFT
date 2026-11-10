@@ -1,0 +1,27 @@
+--- a/SRC_lapw1/modules.F
++++ b/SRC_lapw1/modules.F
+@@ -1135,6 +1135,14 @@
+ !                         VNS3(l,L,l') ...
+ !                            ... integral(u_{l'}_dot*V_{L}*u_{l} dr)
+ 
++        ! Alternate-basis diagnostics must keep the physical operator fixed.
++        ! The L=0 correction routed through HNS covers only l<=LNSMAX.
++        ! Store the three remaining spherical radial integrals separately;
++        ! HAMILT adds them using its existing Legendre/addition-theorem path.
++        ! Channels are uu, udot-udot, u-udot, in Ry (no Y00 factor).
++        logical :: basis_restore_high_l=.false.
++        integer :: basis_restore_lmin=0
++        real*8, allocatable :: basis_restore_spherical(:,:,:)
+         INTEGER                       :: INS, NL, NGAU
+         INTEGER, allocatable          :: LMMAX(:), LQIND(:), LM(:,:,:)
+         DOUBLE PRECISION, allocatable :: DP(:,:), DPE(:,:), E(:,:), P(:,:), PE(:,:), PEI(:,:)
+@@ -1171,6 +1179,9 @@
+         SUBROUTINE init_atspdt(NATO, LMMX, LMAX, NSLMAX)
+           IMPLICIT NONE
+           integer NATO, LMMX, LMAX, NSLMAX
++          allocate(basis_restore_spherical(3,LMAX,NATO))
++          basis_restore_spherical=0.d0
++          basis_restore_high_l=.false.
+           allocate( LMMAX(NATO) )
+           allocate( LQIND(NATO) )
+           allocate( LM(2,0:LMMX,NATO) )

@@ -1,0 +1,179 @@
+--- a/SRC_lapw0/fft_modules.F
++++ b/SRC_lapw0/fft_modules.F
+@@ -61,8 +61,10 @@
+     implicit none
+         include 'fftw3-mpi.f03'
+         logical, private, save :: need_to_plan = .true.
+-        type(C_PTR), private, save :: raw_data
+-        complex(C_DOUBLE_COMPLEX), pointer, save :: local_C(:,:,:)
++        type(C_PTR), private, save :: raw_data = C_NULL_PTR
++        type(C_PTR), private, save :: forward_plan = C_NULL_PTR
++        type(C_PTR), private, save :: backward_plan = C_NULL_PTR
++        complex(C_DOUBLE_COMPLEX), pointer, save :: local_C(:,:,:) => null()
+ 
+     contains
+         subroutine prepare_parallel_ffts (N1, N2, N3)
+@@ -70,6 +72,9 @@
+             integer, intent(in) :: N1, N2, N3
+             integer(C_INTPTR_T) :: n(3)
+             call fftw_mpi_init()
++
++            ! This routine is normally called once, but make repeated calls safe.
++            if (c_associated(raw_data)) call cleanup_ffts()
+ 
+             n = (/N1, N2, N3/)
+             
+@@ -79,22 +84,42 @@
+                                                      local_nlast,&
+                                                      local_last_start)
+             raw_data = fftw_alloc_complex(total_local_size)
++            if (.not. c_associated(raw_data)) then
++                write(6,*) 'ERROR: FFTW MPI work-buffer allocation failed'
++                stop 1
++            endif
+             call c_f_pointer(raw_data, local_C, (/n(1), n(2), local_nlast/))
+             return
+         end subroutine prepare_parallel_ffts
+ 
++        subroutine cleanup_ffts()
++            if (c_associated(forward_plan)) call fftw_destroy_plan(forward_plan)
++            if (c_associated(backward_plan)) call fftw_destroy_plan(backward_plan)
++            forward_plan = C_NULL_PTR
++            backward_plan = C_NULL_PTR
++            if (c_associated(raw_data)) call fftw_free(raw_data)
++            raw_data = C_NULL_PTR
++            nullify(local_C)
++            need_to_plan = .true.
++        end subroutine cleanup_ffts
++
+         subroutine c3fft (N1, N2, N3, C, LDC1, LDC2, ISIG, ispin, CWORK, DWORK, IERR)
+             include 'mpif.h'
+             integer, intent(in)                         :: N1, N2, N3
+-            integer, intent(in)                         :: ISIG, LDC1, LDC2, IERR, ispin
++            integer, intent(in)                         :: ISIG, LDC1, LDC2, ispin
++            integer, intent(out)                        :: IERR
+             complex(C_DOUBLE_COMPLEX), intent(in)       :: CWORK(:)
+             real(C_DOUBLE), intent(in)                  :: DWORK(:)
+             complex(C_DOUBLE_COMPLEX), intent(inout)    :: C(N1,N2,N3,2)
+ 
+             integer(C_INTPTR_T)                         :: N_old(3) = 0
+             logical                                     :: dimensions_changed = .true.
+-            type(C_PTR), save                           :: forward_plan
+-            type(C_PTR), save                           :: backward_plan 
++            IERR = 0
++
++            if (.not. associated(local_C)) then
++                IERR = 1
++                return
++            endif
+ 
+             dimensions_changed = any(N_old /= (/N1, N2, N3/))
+             N_old = (/N1, N2, N3/)
+@@ -116,6 +141,12 @@
+                                                      MPI_COMM_WORLD,&
+                                                      FFTW_BACKWARD,&
+                                                      FFTW_ESTIMATE)
++                if (.not. c_associated(forward_plan) .or. &
++                    .not. c_associated(backward_plan)) then
++                    call destroy_old_plans()
++                    IERR = 2
++                    return
++                endif
+                 need_to_plan = .false.
+             endif
+ 
+@@ -127,6 +158,8 @@
+             case (FFTW_BACKWARD)
+                 call fftw_mpi_execute_dft(backward_plan, local_C, local_C)
+             case default
++                ! ISIG=0 is used by legacy callers to request planning only.
++                if (ISIG /= 0) IERR = 3
+                 return
+             end select
+ 
+@@ -135,10 +168,10 @@
+         return
+         contains
+             subroutine destroy_old_plans ()
+-                if (.not. need_to_plan) then
+-                    call fftw_destroy_plan(forward_plan)
+-                    call fftw_destroy_plan(backward_plan)
+-                endif
++                if (c_associated(forward_plan)) call fftw_destroy_plan(forward_plan)
++                if (c_associated(backward_plan)) call fftw_destroy_plan(backward_plan)
++                forward_plan = C_NULL_PTR
++                backward_plan = C_NULL_PTR
+                 need_to_plan = .true.
+             end subroutine destroy_old_plans 
+         end subroutine c3fft 
+@@ -162,20 +195,31 @@
+     use, intrinsic :: ISO_C_BINDING
+     implicit none
+     include 'fftw3.f03'
+-    logical, private        :: need_to_plan = .true.
++    logical, private, save  :: need_to_plan = .true.
++    type(C_PTR), private, save :: forward_plan = C_NULL_PTR
++    type(C_PTR), private, save :: backward_plan = C_NULL_PTR
+     contains
+ 
++    subroutine cleanup_ffts()
++        if (c_associated(forward_plan)) call fftw_destroy_plan(forward_plan)
++        if (c_associated(backward_plan)) call fftw_destroy_plan(backward_plan)
++        forward_plan = C_NULL_PTR
++        backward_plan = C_NULL_PTR
++        need_to_plan = .true.
++    end subroutine cleanup_ffts
++
+     subroutine c3fft (N1, N2, N3, C, LDC1, LDC2, ISIG, ispin, CWORK, DWORK, IERR)
+ 
+         integer(C_INT), intent(in)                  :: N1, N2, N3
+-        integer, intent(in)                         :: ISIG, LDC1, LDC2, IERR, ispin
++        integer, intent(in)                         :: ISIG, LDC1, LDC2, ispin
++        integer, intent(out)                        :: IERR
+         complex(C_DOUBLE_COMPLEX), intent(in)       :: CWORK(:)
+         real(C_DOUBLE), intent(in)                  :: DWORK(:)
+         complex(C_DOUBLE_COMPLEX), intent(inout)    :: C(N1,N2,N3,2)
+ 
+         integer                                     :: N_old(3) = 0
+         logical                                     :: dimensions_changed = .true.
+-        type(C_PTR), save                           :: forward_plan, backward_plan
++        IERR = 0
+ 
+         dimensions_changed = any([N1, N2, N3] /= N_old)
+         N_old = [N1, N2, N3]
+@@ -188,6 +232,12 @@
+             backward_plan = fftw_plan_dft_3d(N3, N2, N1,&
+                                              C(:,:,:,1), C(:,:,:,1),&
+                                              FFTW_BACKWARD, FFTW_ESTIMATE)
++            if (.not. c_associated(forward_plan) .or. &
++                .not. c_associated(backward_plan)) then
++                call destroy_old_plans()
++                IERR = 1
++                return
++            endif
+             need_to_plan = .false.
+         endif
+ 
+@@ -197,16 +247,18 @@
+         case (FFTW_BACKWARD)
+             call fftw_execute_dft (backward_plan, C(:,:,:,ispin), C(:,:,:,ispin))
+         case default
++            ! ISIG=0 is used by legacy callers to request planning only.
++            if (ISIG /= 0) IERR = 2
+             return
+         end select
+ 
+         return
+     contains
+         subroutine destroy_old_plans ()
+-            if (.not. need_to_plan) then
+-                call fftw_destroy_plan(forward_plan)
+-                call fftw_destroy_plan(backward_plan)
+-            endif
++            if (c_associated(forward_plan)) call fftw_destroy_plan(forward_plan)
++            if (c_associated(backward_plan)) call fftw_destroy_plan(backward_plan)
++            forward_plan = C_NULL_PTR
++            backward_plan = C_NULL_PTR
+             need_to_plan = .true.
+         end subroutine destroy_old_plans
+         end subroutine c3fft

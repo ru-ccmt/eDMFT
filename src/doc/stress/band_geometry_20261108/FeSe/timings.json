@@ -1,0 +1,42 @@
+[
+  {
+    "folder": "m_0.00025",
+    "program": "lapw1",
+    "seconds": 0.18977049994282424
+  },
+  {
+    "folder": "m_0.00025",
+    "program": "dmft2",
+    "seconds": 0.4886042501311749
+  },
+  {
+    "folder": "p_0.00025",
+    "program": "lapw1",
+    "seconds": 0.1522795830387622
+  },
+  {
+    "folder": "p_0.00025",
+    "program": "dmft2",
+    "seconds": 0.4218167921062559
+  },
+  {
+    "folder": "m_0.000125",
+    "program": "lapw1",
+    "seconds": 0.14255245821550488
+  },
+  {
+    "folder": "m_0.000125",
+    "program": "dmft2",
+    "seconds": 0.42013333295471966
+  },
+  {
+    "folder": "p_0.000125",
+    "program": "lapw1",
+    "seconds": 0.14194495789706707
+  },
+  {
+    "folder": "p_0.000125",
+    "program": "dmft2",
+    "seconds": 0.4182413339149207
+  }
+]

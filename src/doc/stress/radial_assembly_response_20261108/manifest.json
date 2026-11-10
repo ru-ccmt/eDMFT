@@ -1,0 +1,51 @@
+{
+  "status": "staged, awaiting user permission; not installed",
+  "repository": "/Users/haule/projects/eDMFT_new",
+  "files": [
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/Makefile",
+      "staged": "/private/tmp/edmft_radial_assembly_20261108/stage/Makefile",
+      "before_sha256": "df1d275eb5d07ed949a7d6db0348f1d0186cc81d43c1f14e0788b5f448675dbd",
+      "after_sha256": "c9b7b2e6bd000781a58289e7c20b0def70257dd2c8fb3ea3f462531c6ddf7972"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/lapw_radial_response.f90",
+      "staged": "/private/tmp/edmft_radial_assembly_20261108/stage/lapw_radial_response.f90",
+      "before_sha256": null,
+      "after_sha256": "8a25cc347f528a47c6d943a46386959ae58b3095687202920629039c3e4aa626"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/dmft2/tests/test_lapw_radial_response.f90",
+      "staged": "/private/tmp/edmft_radial_assembly_20261108/stage/test_lapw_radial_response.f90",
+      "before_sha256": null,
+      "after_sha256": "41d85445bcd69550a3732b09de2cfb80c3fbd5f49854fc9789986dad1a7ae5a7"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/dmft2/tests/check_lapw_radial_response.py",
+      "staged": "/private/tmp/edmft_radial_assembly_20261108/stage/check_lapw_radial_response.py",
+      "before_sha256": null,
+      "after_sha256": "8af961981dcc4441d032364253bc8b4ea103c9bf1494a2780b6dd3b2ff1c4efd"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/python/frozen_sigma_tangent.py",
+      "staged": "/private/tmp/edmft_radial_assembly_20261108/stage/frozen_sigma_tangent.py",
+      "before_sha256": "efb33cfea28fc171ce0ffe22a5545efdf60538710c26897db562e249ade60094",
+      "after_sha256": "504e7181b458e558d590e8519a046aa15352b63303ac7be3688c972c42cedd58"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/python/tests/test_generalized_sigma_response.py",
+      "staged": "/private/tmp/edmft_radial_assembly_20261108/stage/test_generalized_sigma_response.py",
+      "before_sha256": null,
+      "after_sha256": "748af1283e4027be747704cc9b14bd51fdbef05572c096155da5b45ecca2c77e"
+    }
+  ],
+  "installed_python_before_sha256": "efb33cfea28fc171ce0ffe22a5545efdf60538710c26897db562e249ade60094",
+  "evidence": {
+    "REPORT.txt": "2f3baafb2208c37ae3f9acb581f75d7b5f77c07990d51b95d25f6d6c64479f95",
+    "source_changes.patch": "a5278c6e7b244a98cd07313e23b6ba15647dae0ac75ab3a49dfc66171bb007e4",
+    "generalized_materials.json": "a13b0472a384987239d697346b6f05ecf7a70e497326e3517bf28c27f761b273",
+    "python_tests.log": "53ff78ec6dd1d776bbdd57ac519dbe3231a14819bc6883e4231d100ecbf513c6",
+    "native_build.log": "6a22e2121e98cd112d6d9d7d3c048a35b8601f47beabb6a99191cb370b5dbd99",
+    "check1/report.json": "b3aa8ee5fbe14c2fbbbef4d1942e5d3b1acdb226d16e13b47117dc493ee08728"
+  }
+}

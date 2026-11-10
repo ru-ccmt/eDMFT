@@ -1,0 +1,9 @@
+CONTROLLED REPEATED VALENCE-RESPONSE TIMINGS
+One thread; identical spherical input and central fixture; median of three warm calls.
+Not an end-to-end screened-stress timing.
+
+Material   Forward before/after (s)   Speedup    Reverse before/after (s)   Speedup
+FeSe       5.488855 / 0.976183     5.623       2.687801 / 1.049478     2.561
+           Full-spectral relative error: 1.75881013e-13 before, 1.75800876e-13 after.
+SrVO3      12.134860 / 2.011224     6.034       5.699941 / 2.181410     2.613
+           Full-spectral relative error: 9.38402659e-14 before, 9.38963098e-14 after.

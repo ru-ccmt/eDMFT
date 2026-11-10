@@ -1,0 +1,722 @@
+rm -f *.o *_tmp_.* *.P .real .complex .sequential .parallel *.mod
+if [ -f .complex ]; then \
+	   rm -f .complex essl.o fourir.o fsumai1.o getfft.o l2main.o lapw2.o fft_modules.o modules.o qdmft.o read_vec.o recpr.o setfft1.o setfft2.o stern.o step_fun_kb.o setfft_stress.o rean0.o rean3.o val_kin_interstitial.o kin_str_integrals.o  *.mod; \
+	fi
+touch .real
+if [ -f .parallel ]; then \
+	   rm -f .parallel ALMDPrint.o atpar.o fermi5.o fermi.o fourir.o fsumai1.o gtfnam.o l2main.o lapw2.o fft_modules.o modules.o qdmft.o read_vec.o W2kinit.o rean0.o step_fun_kb.o val_kinstrmt.o symmetrization_stress.o *.mod; \
+	fi
+touch .sequential
+/Library/Developer/CommandLineTools/usr/bin/make TYPE='REAL' TYPE_COMMENT='\!_REAL' \
+	  ./lapw2 FORT=gfortran FFLAGS=' -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp'
+make[1]: *** No rule to make target `W2kinit.F', needed by `W2kinit.o'.  Stop.
+make: *** [real] Error 2
+if [ -f .complex ]; then \
+	   rm -f .complex essl.o fourir.o fsumai1.o getfft.o l2main.o lapw2.o fft_modules.o modules.o qdmft.o read_vec.o recpr.o setfft1.o setfft2.o stern.o step_fun_kb.o setfft_stress.o rean0.o rean3.o val_kin_interstitial.o kin_str_integrals.o  *.mod; \
+	fi
+touch .real
+if [ -f .parallel ]; then \
+	   rm -f .parallel ALMDPrint.o atpar.o fermi5.o fermi.o fourir.o fsumai1.o gtfnam.o l2main.o lapw2.o fft_modules.o modules.o qdmft.o read_vec.o W2kinit.o rean0.o step_fun_kb.o val_kinstrmt.o symmetrization_stress.o *.mod; \
+	fi
+touch .sequential
+/Library/Developer/CommandLineTools/usr/bin/make TYPE='REAL' TYPE_COMMENT='\!_REAL' \
+	  ./lapw2 FORT=gfortran FFLAGS=' -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp'
+make[1]: Circular fft_modules.o <- fft_modules.o dependency dropped.
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c cputim.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c addtinv.f
+modules.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c modules_tmp_.F
+c3fft.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c c3fft_tmp_.F
+mv c3fft_tmp_.o c3fft.o
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c dergl_rlo.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c deter.f
+rm c3fft_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c dvbes1.f
+dvbes1.f:16:72:
+
+   16 |    10 DJ(L)=ZERO
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 10 at (1)
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c errclr.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c gaunt.f
+essl.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c essl_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c ifflim.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c inth.f
+mv essl_tmp_.o essl.o
+rm essl_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c locmat.f
+inth.f:26:72:
+
+   26 |  13   DEQ(I-1)=DEQ(I)
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 13 at (1)
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c mag.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c mknam.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c notri.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c open_helpfile.f
+outerr.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c outerr_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c ph.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rotate.f
+mv outerr_tmp_.o outerr.o
+rm outerr_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rotmat_angular.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rotmat_dmft.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c spline.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c sumupfft.f
+mv modules_tmp_.o modules.o
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c SymmRot.f
+rm modules_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c timeinv1.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c t3j.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c t3j0.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c ylm.f
+gcc -c W2kutils.c
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi_totnos.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi_drval.f
+fermi_totnos.f:36:71:
+
+   36 |       DO 100 J=I+1,4
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 100 at (1)
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi_initdr.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c c_alpha_m.f
+val_rela_kinstrmt.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_rela_kinstrmt_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c sumupfft_stress.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c write_stress.f
+val_rela_kinstrmt_tmp_.F:14:6:
+
+   14 |  use TestCases, only: SimpInt,ConOpt
+      |      1
+Fatal Error: Cannot open module file 'testcases.mod' for reading at (1): No such file or directory
+compilation terminated.
+make[1]: *** [val_rela_kinstrmt.o] Error 1
+make[1]: *** Waiting for unfinished jobs....
+make: *** [real] Error 2
+if [ -f .complex ]; then \
+	   rm -f .complex essl.o fourir.o fsumai1.o getfft.o l2main.o lapw2.o fft_modules.o modules.o qdmft.o read_vec.o recpr.o setfft1.o setfft2.o stern.o step_fun_kb.o setfft_stress.o rean0.o rean3.o val_kin_interstitial.o kin_str_integrals.o  *.mod; \
+	fi
+touch .real
+if [ -f .parallel ]; then \
+	   rm -f .parallel ALMDPrint.o atpar.o fermi5.o fermi.o fourir.o fsumai1.o gtfnam.o l2main.o lapw2.o fft_modules.o modules.o qdmft.o read_vec.o W2kinit.o rean0.o step_fun_kb.o val_kinstrmt.o symmetrization_stress.o *.mod; \
+	fi
+touch .sequential
+/Library/Developer/CommandLineTools/usr/bin/make TYPE='REAL' TYPE_COMMENT='\!_REAL' \
+	  ./lapw2 FORT=gfortran FFLAGS=' -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp'
+make[1]: Circular fft_modules.o <- fft_modules.o dependency dropped.
+fft_modules.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fft_modules_tmp_.F
+mv fft_modules_tmp_.o fft_modules.o
+rm fft_modules_tmp_.F
+W2kinit.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c W2kinit_tmp_.F
+mv W2kinit_tmp_.o W2kinit.o
+rm W2kinit_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c reallocate.f
+qdmft.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c qdmft_tmp_.F
+mv qdmft_tmp_.o qdmft.o
+rm qdmft_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c abc.f
+atpar.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c atpar_tmp_.F
+mv atpar_tmp_.o atpar.o
+rm atpar_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c charge.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c csplit.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c dfrad.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c d5splt.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c dergl.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c diracout.f
+diracout.f:107:63:
+
+  107 |  30   dv(i)=dv(i)+z/dr(i)+z*((dr(i)/dr(nuc))**2-3.)/(2*dr(nuc))
+      |                                                               1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 30 at (1)
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c efgsplit.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c errflg.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c f7splt.f
+fermi.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi_tmp_.F
+fermi_tmp_.F:232:71:
+
+  232 |       DO 8 NN=1,NNN
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 8 at (1)
+fermi_tmp_.F:233:71:
+
+  233 |    8  WEIGH(KK,NN)=WEIGHT(KK)
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 8 at (1)
+fermi_tmp_.F:455:19:
+
+  455 |  2    e(j)=3000.0d0
+      |                   1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 2 at (1)
+fermi_tmp_.F:457:21:
+
+  457 |         do 3 i=1,nkpt
+      |                     1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 3 at (1)
+fermi_tmp_.F:458:23:
+
+  458 |           do 3 j=1,nume
+      |                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 3 at (1)
+fermi_tmp_.F:459:25:
+
+  459 |  3    eb(j,i,i1)=3000.0d0
+      |                         1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 3 at (1)
+fermi_tmp_.F:638:25:
+
+  638 |       do 10 ispin=1,jspin
+      |                         1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 10 at (1)
+fermi_tmp_.F:639:23:
+
+  639 |       do 10 ne1=1,nemax
+      |                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 10 at (1)
+fermi_tmp_.F:718:22:
+
+  718 |       DO 8 NN=1,NNN
+      |                      1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 8 at (1)
+fermi_tmp_.F:741:52:
+
+  741 |    8  WEIGH(KK,NN)=WEIGHT(nn,KK) *2.0d0 / jspin
+      |                                                    1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 8 at (1)
+fermi_tmp_.F:888:71:
+
+  888 |       DO 100 IB=1,NB
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 100 at (1)
+fermi_tmp_.F:1004:71:
+
+ 1004 |       DO 100 IB=1,NB
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 100 at (1)
+fermi_tmp_.F:1460:22:
+
+ 1460 |       DO 121 J=1,NE(I)
+      |                      1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 121 at (1)
+fermi_tmp_.F:1493:27:
+
+ 1493 |          do 40 j = 1, NE(i)
+      |                           1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 40 at (1)
+fermi_tmp_.F:1548:26:
+
+ 1548 |          do 60 j = 1,NE(i)
+      |                          1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 60 at (1)
+mv fermi_tmp_.o fermi.o
+rm fermi_tmp_.F
+fermi5.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi5_tmp_.F
+mv fermi5_tmp_.o fermi5.o
+rm fermi5_tmp_.F
+fftw_seq.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fftw_seq_tmp_.F
+mv fftw_seq_tmp_.o fftw_seq.o
+rm fftw_seq_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fomai1.f
+fomai2.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fomai2_tmp_.F
+mv fomai2_tmp_.o fomai2.o
+rm fomai2_tmp_.F
+fomai3.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fomai3_tmp_.F
+mv fomai3_tmp_.o fomai3.o
+rm fomai3_tmp_.F
+fourir.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fourir_tmp_.F
+mv fourir_tmp_.o fourir.o
+rm fourir_tmp_.F
+fsumai1.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fsumai1_tmp_.F
+mv fsumai1_tmp_.o fsumai1.o
+rm fsumai1_tmp_.F
+getfft.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c getfft_tmp_.F
+mv getfft_tmp_.o getfft.o
+rm getfft_tmp_.F
+gtfnam.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c gtfnam_tmp_.F
+mv gtfnam_tmp_.o gtfnam.o
+rm gtfnam_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c harmon.f
+harmon.f:38:72:
+
+   38 |     2 DF(J,I)=XM*DF(J,I)
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 2 at (1)
+harmon.f:58:20:
+
+   58 |     10 DDJ(L) = ZERO
+      |                    1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 10 at (1)
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c inouh.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c kdelta.f
+l2main.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c l2main_tmp_.F
+mv l2main_tmp_.o l2main.o
+rm l2main_tmp_.F
+lapw2.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c lapw2_tmp_.F
+lapw2_tmp_.F:514:31:
+
+  514 |                do 120 i2=1,nume
+      |                               1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 120 at (1)
+lapw2_tmp_.F:520:31:
+
+  520 |                do 110 i2=1,nume
+      |                               1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 110 at (1)
+mv lapw2_tmp_.o lapw2.o
+rm lapw2_tmp_.F
+latgen.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c latgen_tmp_.F
+mv latgen_tmp_.o latgen.o
+rm latgen_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c lomain.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c outp.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c outwin.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c p3splt.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c psplit.f
+read_vec.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c read_vec_tmp_.F
+mv read_vec_tmp_.o read_vec.o
+rm read_vec_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c recfil.f
+recpr.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c recpr_tmp_.F
+recpr_tmp_.F:49:77:
+
+   49 |       DO 199 I2=ILL2,LL2
+      |                                                                             1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 199 at (1)
+recpr_tmp_.F:51:72:
+
+   51 |       DO 199 I3=ILL3,LL3
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 199 at (1)
+recpr_tmp_.F:138:72:
+
+  138 |   23     AM(IND1)=AM(IND1)+M(IND2)*BR2(IND1,IND2)
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 23 at (1)
+recpr_tmp_.F:184:45:
+
+  184 |    8  KZZ(N,J)=IM(N)
+      |                                             1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 8 at (1)
+mv recpr_tmp_.o recpr.o
+rm recpr_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rint13.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rotdef.f
+setfft1.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c setfft1_tmp_.F
+mv setfft1_tmp_.o setfft1.o
+rm setfft1_tmp_.F
+setfft2.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c setfft2_tmp_.F
+mv setfft2_tmp_.o setfft2.o
+rm setfft2_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c sphbes.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c sortag.f
+stern.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c stern_tmp_.F
+mv stern_tmp_.o stern.o
+rm stern_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c symmetrization.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c vdrho.f
+xsplt.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c xsplt_tmp_.F
+mv xsplt_tmp_.o xsplt.o
+rm xsplt_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c OutputQ.f
+ALMDPrint.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c ALMDPrint_tmp_.F
+mv ALMDPrint_tmp_.o ALMDPrint.o
+rm ALMDPrint_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c WriteEFG.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi_efi.f
+fermi5_rtbis.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi5_rtbis_tmp_.F
+mv fermi5_rtbis_tmp_.o fermi5_rtbis.o
+rm fermi5_rtbis_tmp_.F
+val_corr_integrals.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_corr_integrals_tmp_.F
+mv val_corr_integrals_tmp_.o val_corr_integrals.o
+rm val_corr_integrals_tmp_.F
+val_corr_stress.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_corr_stress_tmp_.F
+mv val_corr_stress_tmp_.o val_corr_stress.o
+rm val_corr_stress_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c symmetrization_stress.f
+val_kinstrmt.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_kinstrmt_tmp_.F
+mv val_kinstrmt_tmp_.o val_kinstrmt.o
+rm val_kinstrmt_tmp_.F
+val_rela_kinstrmt.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_rela_kinstrmt_tmp_.F
+mv val_rela_kinstrmt_tmp_.o val_rela_kinstrmt.o
+rm val_rela_kinstrmt_tmp_.F
+kin_str_integrals.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c kin_str_integrals_tmp_.F
+mv kin_str_integrals_tmp_.o kin_str_integrals.o
+rm kin_str_integrals_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c stress_APW_surface.f
+step_fun_kb.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c step_fun_kb_tmp_.F
+mv step_fun_kb_tmp_.o step_fun_kb.o
+rm step_fun_kb_tmp_.F
+setfft_stress.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c setfft_stress_tmp_.F
+mv setfft_stress_tmp_.o setfft_stress.o
+rm setfft_stress_tmp_.F
+rean0.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rean0_tmp_.F
+mv rean0_tmp_.o rean0.o
+rm rean0_tmp_.F
+rean3.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rean3_tmp_.F
+rean3_tmp_.F:39:74:
+
+   39 |            DO 5000 I2=1,IFFT2
+      |                                                                          1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 5000 at (1)
+rean3_tmp_.F:42:77:
+
+   42 |               DO 5000 I1=1,IFFT1
+      |                                                                             1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 5000 at (1)
+mv rean3_tmp_.o rean3.o
+rm rean3_tmp_.F
+val_kin_interstitial.F: REAL version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_kin_interstitial_tmp_.F
+mv val_kin_interstitial_tmp_.o val_kin_interstitial.o
+rm val_kin_interstitial_tmp_.F
+gfortran  -o ./lapw2 W2kinit.o cputim.o reallocate.o fft_modules.o modules.o qdmft.o abc.o  addtinv.o atpar.o c3fft.o charge.o csplit.o dfrad.o d5splt.o dergl.o dergl_rlo.o deter.o diracout.o dvbes1.o efgsplit.o  errclr.o errflg.o essl.o f7splt.o fermi.o fermi5.o fftw_seq.o fomai1.o fomai2.o fomai3.o fourir.o fsumai1.o gaunt.o getfft.o gtfnam.o harmon.o ifflim.o inouh.o inth.o kdelta.o l2main.o lapw2.o latgen.o locmat.o lomain.o mag.o mknam.o notri.o open_helpfile.o outerr.o outp.o outwin.o p3splt.o ph.o psplit.o read_vec.o recfil.o recpr.o rint13.o rotate.o rotdef.o rotmat_angular.o rotmat_dmft.o setfft1.o setfft2.o sphbes.o spline.o sortag.o stern.o sumupfft.o  symmetrization.o SymmRot.o timeinv1.o t3j.o t3j0.o vdrho.o xsplt.o ylm.o W2kutils.o OutputQ.o ALMDPrint.o WriteEFG.o fermi_totnos.o fermi_efi.o fermi_drval.o fermi_initdr.o fermi5_rtbis.o c_alpha_m.o val_corr_integrals.o val_corr_stress.o symmetrization_stress.o val_kinstrmt.o val_rela_kinstrmt.o kin_str_integrals.o stress_APW_surface.o step_fun_kb.o sumupfft_stress.o setfft_stress.o rean0.o rean3.o val_kin_interstitial.o write_stress.o -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -L../SRC_lib -L/opt/homebrew/lib -lfftw3_omp -lfftw3 -framework Accelerate 
+if [ -f .real ]; then \
+	   rm -f .real essl.o fourir.o fsumai1.o getfft.o l2main.o lapw2.o fft_modules.o modules.o qdmft.o read_vec.o recpr.o setfft1.o setfft2.o stern.o step_fun_kb.o setfft_stress.o rean0.o rean3.o val_kin_interstitial.o kin_str_integrals.o  *.mod; \
+	fi
+touch .complex
+if [ -f .parallel ]; then \
+	   rm -f .parallel ALMDPrint.o atpar.o fermi5.o fermi.o fourir.o fsumai1.o gtfnam.o l2main.o lapw2.o fft_modules.o modules.o qdmft.o read_vec.o W2kinit.o rean0.o step_fun_kb.o val_kinstrmt.o symmetrization_stress.o *.mod; \
+	fi
+touch .sequential
+/Library/Developer/CommandLineTools/usr/bin/make TYPE='COMPLEX' TYPE_COMMENT='\!_COMPLEX' \
+	  ./lapw2c FORT=gfortran FFLAGS=' -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp'
+modules.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c modules_tmp_.F
+mv modules_tmp_.o modules.o
+rm modules_tmp_.F
+make[1]: Circular fft_modules.o <- fft_modules.o dependency dropped.
+fft_modules.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fft_modules_tmp_.F
+mv fft_modules_tmp_.o fft_modules.o
+rm fft_modules_tmp_.F
+W2kinit.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c W2kinit_tmp_.F
+mv W2kinit_tmp_.o W2kinit.o
+rm W2kinit_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c reallocate.f
+qdmft.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c qdmft_tmp_.F
+mv qdmft_tmp_.o qdmft.o
+rm qdmft_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c abc.f
+atpar.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c atpar_tmp_.F
+mv atpar_tmp_.o atpar.o
+rm atpar_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c charge.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c csplit.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c dfrad.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c d5splt.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c dergl.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c diracout.f
+diracout.f:107:63:
+
+  107 |  30   dv(i)=dv(i)+z/dr(i)+z*((dr(i)/dr(nuc))**2-3.)/(2*dr(nuc))
+      |                                                               1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 30 at (1)
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c efgsplit.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c errflg.f
+essl.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c essl_tmp_.F
+mv essl_tmp_.o essl.o
+rm essl_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c f7splt.f
+fermi.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi_tmp_.F
+fermi_tmp_.F:232:71:
+
+  232 |       DO 8 NN=1,NNN
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 8 at (1)
+fermi_tmp_.F:233:71:
+
+  233 |    8  WEIGH(KK,NN)=WEIGHT(KK)
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 8 at (1)
+fermi_tmp_.F:455:19:
+
+  455 |  2    e(j)=3000.0d0
+      |                   1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 2 at (1)
+fermi_tmp_.F:457:21:
+
+  457 |         do 3 i=1,nkpt
+      |                     1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 3 at (1)
+fermi_tmp_.F:458:23:
+
+  458 |           do 3 j=1,nume
+      |                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 3 at (1)
+fermi_tmp_.F:459:25:
+
+  459 |  3    eb(j,i,i1)=3000.0d0
+      |                         1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 3 at (1)
+fermi_tmp_.F:638:25:
+
+  638 |       do 10 ispin=1,jspin
+      |                         1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 10 at (1)
+fermi_tmp_.F:639:23:
+
+  639 |       do 10 ne1=1,nemax
+      |                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 10 at (1)
+fermi_tmp_.F:718:22:
+
+  718 |       DO 8 NN=1,NNN
+      |                      1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 8 at (1)
+fermi_tmp_.F:741:52:
+
+  741 |    8  WEIGH(KK,NN)=WEIGHT(nn,KK) *2.0d0 / jspin
+      |                                                    1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 8 at (1)
+fermi_tmp_.F:888:71:
+
+  888 |       DO 100 IB=1,NB
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 100 at (1)
+fermi_tmp_.F:1004:71:
+
+ 1004 |       DO 100 IB=1,NB
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 100 at (1)
+fermi_tmp_.F:1460:22:
+
+ 1460 |       DO 121 J=1,NE(I)
+      |                      1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 121 at (1)
+fermi_tmp_.F:1493:27:
+
+ 1493 |          do 40 j = 1, NE(i)
+      |                           1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 40 at (1)
+fermi_tmp_.F:1548:26:
+
+ 1548 |          do 60 j = 1,NE(i)
+      |                          1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 60 at (1)
+mv fermi_tmp_.o fermi.o
+rm fermi_tmp_.F
+fermi5.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi5_tmp_.F
+mv fermi5_tmp_.o fermi5.o
+rm fermi5_tmp_.F
+fftw_seq.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fftw_seq_tmp_.F
+mv fftw_seq_tmp_.o fftw_seq.o
+rm fftw_seq_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fomai1.f
+fomai2.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fomai2_tmp_.F
+mv fomai2_tmp_.o fomai2.o
+rm fomai2_tmp_.F
+fomai3.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fomai3_tmp_.F
+mv fomai3_tmp_.o fomai3.o
+rm fomai3_tmp_.F
+fourir.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fourir_tmp_.F
+mv fourir_tmp_.o fourir.o
+rm fourir_tmp_.F
+fsumai1.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fsumai1_tmp_.F
+mv fsumai1_tmp_.o fsumai1.o
+rm fsumai1_tmp_.F
+getfft.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c getfft_tmp_.F
+mv getfft_tmp_.o getfft.o
+rm getfft_tmp_.F
+gtfnam.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c gtfnam_tmp_.F
+mv gtfnam_tmp_.o gtfnam.o
+rm gtfnam_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c harmon.f
+harmon.f:38:72:
+
+   38 |     2 DF(J,I)=XM*DF(J,I)
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 2 at (1)
+harmon.f:58:20:
+
+   58 |     10 DDJ(L) = ZERO
+      |                    1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 10 at (1)
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c inouh.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c kdelta.f
+l2main.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c l2main_tmp_.F
+mv l2main_tmp_.o l2main.o
+rm l2main_tmp_.F
+lapw2.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c lapw2_tmp_.F
+lapw2_tmp_.F:514:31:
+
+  514 |                do 120 i2=1,nume
+      |                               1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 120 at (1)
+lapw2_tmp_.F:520:31:
+
+  520 |                do 110 i2=1,nume
+      |                               1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 110 at (1)
+mv lapw2_tmp_.o lapw2.o
+rm lapw2_tmp_.F
+latgen.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c latgen_tmp_.F
+mv latgen_tmp_.o latgen.o
+rm latgen_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c lomain.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c outp.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c outwin.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c p3splt.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c psplit.f
+read_vec.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c read_vec_tmp_.F
+mv read_vec_tmp_.o read_vec.o
+rm read_vec_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c recfil.f
+recpr.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c recpr_tmp_.F
+recpr_tmp_.F:49:77:
+
+   49 |       DO 199 I2=ILL2,LL2
+      |                                                                             1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 199 at (1)
+recpr_tmp_.F:51:72:
+
+   51 |       DO 199 I3=ILL3,LL3
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 199 at (1)
+recpr_tmp_.F:138:72:
+
+  138 |   23     AM(IND1)=AM(IND1)+M(IND2)*BR2(IND1,IND2)
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 23 at (1)
+recpr_tmp_.F:184:45:
+
+  184 |    8  KZZ(N,J)=IM(N)
+      |                                             1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 8 at (1)
+mv recpr_tmp_.o recpr.o
+rm recpr_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rint13.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rotdef.f
+setfft1.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c setfft1_tmp_.F
+mv setfft1_tmp_.o setfft1.o
+rm setfft1_tmp_.F
+setfft2.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c setfft2_tmp_.F
+mv setfft2_tmp_.o setfft2.o
+rm setfft2_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c sphbes.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c sortag.f
+stern.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c stern_tmp_.F
+mv stern_tmp_.o stern.o
+rm stern_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c symmetrization.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c vdrho.f
+xsplt.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c xsplt_tmp_.F
+mv xsplt_tmp_.o xsplt.o
+rm xsplt_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c OutputQ.f
+ALMDPrint.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c ALMDPrint_tmp_.F
+mv ALMDPrint_tmp_.o ALMDPrint.o
+rm ALMDPrint_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c WriteEFG.f
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi_efi.f
+fermi5_rtbis.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c fermi5_rtbis_tmp_.F
+mv fermi5_rtbis_tmp_.o fermi5_rtbis.o
+rm fermi5_rtbis_tmp_.F
+val_corr_integrals.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_corr_integrals_tmp_.F
+mv val_corr_integrals_tmp_.o val_corr_integrals.o
+rm val_corr_integrals_tmp_.F
+val_corr_stress.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_corr_stress_tmp_.F
+mv val_corr_stress_tmp_.o val_corr_stress.o
+rm val_corr_stress_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c symmetrization_stress.f
+val_kinstrmt.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_kinstrmt_tmp_.F
+mv val_kinstrmt_tmp_.o val_kinstrmt.o
+rm val_kinstrmt_tmp_.F
+kin_str_integrals.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c kin_str_integrals_tmp_.F
+mv kin_str_integrals_tmp_.o kin_str_integrals.o
+rm kin_str_integrals_tmp_.F
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c stress_APW_surface.f
+step_fun_kb.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c step_fun_kb_tmp_.F
+mv step_fun_kb_tmp_.o step_fun_kb.o
+rm step_fun_kb_tmp_.F
+setfft_stress.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c setfft_stress_tmp_.F
+mv setfft_stress_tmp_.o setfft_stress.o
+rm setfft_stress_tmp_.F
+rean0.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rean0_tmp_.F
+mv rean0_tmp_.o rean0.o
+rm rean0_tmp_.F
+rean3.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c rean3_tmp_.F
+rean3_tmp_.F:39:74:
+
+   39 |            DO 5000 I2=1,IFFT2
+      |                                                                          1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 5000 at (1)
+rean3_tmp_.F:42:77:
+
+   42 |               DO 5000 I1=1,IFFT1
+      |                                                                             1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 5000 at (1)
+mv rean3_tmp_.o rean3.o
+rm rean3_tmp_.F
+val_kin_interstitial.F: COMPLEX version extracted
+gfortran -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -c val_kin_interstitial_tmp_.F
+mv val_kin_interstitial_tmp_.o val_kin_interstitial.o
+rm val_kin_interstitial_tmp_.F
+gfortran  -o ./lapw2c W2kinit.o cputim.o reallocate.o fft_modules.o modules.o qdmft.o abc.o  addtinv.o atpar.o c3fft.o charge.o csplit.o dfrad.o d5splt.o dergl.o dergl_rlo.o deter.o diracout.o dvbes1.o efgsplit.o  errclr.o errflg.o essl.o f7splt.o fermi.o fermi5.o fftw_seq.o fomai1.o fomai2.o fomai3.o fourir.o fsumai1.o gaunt.o getfft.o gtfnam.o harmon.o ifflim.o inouh.o inth.o kdelta.o l2main.o lapw2.o latgen.o locmat.o lomain.o mag.o mknam.o notri.o open_helpfile.o outerr.o outp.o outwin.o p3splt.o ph.o psplit.o read_vec.o recfil.o recpr.o rint13.o rotate.o rotdef.o rotmat_angular.o rotmat_dmft.o setfft1.o setfft2.o sphbes.o spline.o sortag.o stern.o sumupfft.o  symmetrization.o SymmRot.o timeinv1.o t3j.o t3j0.o vdrho.o xsplt.o ylm.o W2kutils.o OutputQ.o ALMDPrint.o WriteEFG.o fermi_totnos.o fermi_efi.o fermi_drval.o fermi_initdr.o fermi5_rtbis.o c_alpha_m.o val_corr_integrals.o val_corr_stress.o symmetrization_stress.o val_kinstrmt.o val_rela_kinstrmt.o kin_str_integrals.o stress_APW_surface.o step_fun_kb.o sumupfft_stress.o setfft_stress.o rean0.o rean3.o val_kin_interstitial.o write_stress.o -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -L../SRC_lib -L/opt/homebrew/lib -lfftw3_omp -lfftw3 -framework Accelerate 

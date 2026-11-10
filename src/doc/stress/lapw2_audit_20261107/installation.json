@@ -1,0 +1,27 @@
+{
+  "/Users/haule/wien2k_24/SRC_lapw2/val_corr_stress.F": {
+    "before_sha256": "8c0a45f7db6f05b3fec920ff1c26e6690698d01469917371c308768a064a838f",
+    "backup": "/Users/haule/wien2k_24/SRC_lapw2/val_corr_stress.F.before_g2_audit_20261107",
+    "after_sha256": "1f5064f917dc479c7e7e243d2baa12f704dc7a7e7858e1023c3989cbe7127688"
+  },
+  "/Users/haule/wien2k_24/lapw2": {
+    "before_sha256": "826b0fe29d07a05e54ad9f6d0e18d5e44416579c4d17f1db36ec680fe5cf2657",
+    "backup": "/Users/haule/wien2k_24/lapw2.before_g2_audit_20261107",
+    "after_sha256": "f91b9fe23bffcfbdc644a64d59f9fde6e8a094744ddd2b92342d09b14ed53511"
+  },
+  "/Users/haule/wien2k_24/lapw2c": {
+    "before_sha256": "a10219eaa8d294dd3aecf0cabd7df351b5f3ccf781c7eaba205d285c184c00e4",
+    "backup": "/Users/haule/wien2k_24/lapw2c.before_g2_audit_20261107",
+    "after_sha256": "4dadf83d250a1bca421522718b84742ac5916078745ac9c35f465817158ec48e"
+  },
+  "/Users/haule/wien2k_24/SRC_lapw2/lapw2": {
+    "before_sha256": "826b0fe29d07a05e54ad9f6d0e18d5e44416579c4d17f1db36ec680fe5cf2657",
+    "backup": "/Users/haule/wien2k_24/SRC_lapw2/lapw2.before_g2_audit_20261107",
+    "after_sha256": "f91b9fe23bffcfbdc644a64d59f9fde6e8a094744ddd2b92342d09b14ed53511"
+  },
+  "/Users/haule/wien2k_24/SRC_lapw2/lapw2c": {
+    "before_sha256": "a10219eaa8d294dd3aecf0cabd7df351b5f3ccf781c7eaba205d285c184c00e4",
+    "backup": "/Users/haule/wien2k_24/SRC_lapw2/lapw2c.before_g2_audit_20261107",
+    "after_sha256": "4dadf83d250a1bca421522718b84742ac5916078745ac9c35f465817158ec48e"
+  }
+}

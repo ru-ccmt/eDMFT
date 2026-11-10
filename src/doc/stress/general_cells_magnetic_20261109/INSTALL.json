@@ -1,0 +1,246 @@
+{
+  "installed_utc": "2026-11-09T20:54:20.509026+00:00",
+  "authorization": "User: Please install.",
+  "files": [
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/frozen_sigma_response.py",
+      "sha256": "aedf0186941a43b49acef7131b298900ed6f8772653b63b10f5d6a094bd16b7d"
+    },
+    {
+      "path": "/Users/haule/dbin/frozen_sigma_response.py",
+      "sha256": "aedf0186941a43b49acef7131b298900ed6f8772653b63b10f5d6a094bd16b7d"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/frozen_sigma_tangent.py",
+      "sha256": "058ad8345cc122e788899d431edd25ddcd6132328b9e2e0b3eb1c64778757e89"
+    },
+    {
+      "path": "/Users/haule/dbin/frozen_sigma_tangent.py",
+      "sha256": "058ad8345cc122e788899d431edd25ddcd6132328b9e2e0b3eb1c64778757e89"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_charge_response.py",
+      "sha256": "a70f420d74509b11ec2076e069afa3e5b2913d060fe2a67b7824121970be0a05"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_charge_response.py",
+      "sha256": "a70f420d74509b11ec2076e069afa3e5b2913d060fe2a67b7824121970be0a05"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_complement_response.py",
+      "sha256": "e035a89eff5b029fe251020b3ac36528d12f4e9091ceb39133bf4e646fe2bbf9"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_complement_response.py",
+      "sha256": "e035a89eff5b029fe251020b3ac36528d12f4e9091ceb39133bf4e646fe2bbf9"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_cubic_harmonics.py",
+      "sha256": "cd2024dc53e596b6ccd3367d1bdb893fa5f0d5c73c450016904ac1708c6dee23"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_cubic_harmonics.py",
+      "sha256": "cd2024dc53e596b6ccd3367d1bdb893fa5f0d5c73c450016904ac1708c6dee23"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_density_functional.py",
+      "sha256": "d3fe5afbd834deec6ffe586ec53c1769e6a290f1c3170e650a45ec2666868f9a"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_density_functional.py",
+      "sha256": "d3fe5afbd834deec6ffe586ec53c1769e6a290f1c3170e650a45ec2666868f9a"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_energy_response.py",
+      "sha256": "911c6c09ebc2fbeb23765c95ef65c06f42aae2bf54b7269ff6f87f33e978bd49"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_energy_response.py",
+      "sha256": "911c6c09ebc2fbeb23765c95ef65c06f42aae2bf54b7269ff6f87f33e978bd49"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_functional_cancellation.py",
+      "sha256": "f3c333432794e516f6d8802a9d625d65791872abdb1c98012e74382191396584"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_functional_cancellation.py",
+      "sha256": "f3c333432794e516f6d8802a9d625d65791872abdb1c98012e74382191396584"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_geometry_response.py",
+      "sha256": "2d3ba109fa44b354eccdbfe57b8fe9116716a2be63d04a453a283bc1ef4521fc"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_geometry_response.py",
+      "sha256": "2d3ba109fa44b354eccdbfe57b8fe9116716a2be63d04a453a283bc1ef4521fc"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_hartree_periodic.py",
+      "sha256": "3d8d4ef56aa104abb8a11b15e641565de96d8fac0638cbc6dcbd77f3a2289263"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_hartree_periodic.py",
+      "sha256": "3d8d4ef56aa104abb8a11b15e641565de96d8fac0638cbc6dcbd77f3a2289263"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_hydrostatic_potential.py",
+      "sha256": "40d3a7e5e6847826c002ef4c7be8703a86300059963ec2e1eaf8eccdf49754d9"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_hydrostatic_potential.py",
+      "sha256": "40d3a7e5e6847826c002ef4c7be8703a86300059963ec2e1eaf8eccdf49754d9"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_lattice.py",
+      "sha256": "02ea7c91b3615cab2008dcf046cb787c07efa54bf7d0ac0ac600f89f6aacd834"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_lattice.py",
+      "sha256": "02ea7c91b3615cab2008dcf046cb787c07efa54bf7d0ac0ac600f89f6aacd834"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_magnetic_response.py",
+      "sha256": "307605e83b9c1282ad8acc6ed9f018ecfa70e1c7020e7ff0ce1586e425d3fe9c"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_magnetic_response.py",
+      "sha256": "307605e83b9c1282ad8acc6ed9f018ecfa70e1c7020e7ff0ce1586e425d3fe9c"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_native_potential_export.py",
+      "sha256": "2952f2108815f70e5255715c72ce0a1be1755f783873fe37f7ddf3460808a86d"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_native_potential_export.py",
+      "sha256": "2952f2108815f70e5255715c72ce0a1be1755f783873fe37f7ddf3460808a86d"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_nonspherical_response.py",
+      "sha256": "ce45aa377fd723969f11dc9ed6d026afec03e70b7ad566561077753e8747f71c"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_nonspherical_response.py",
+      "sha256": "ce45aa377fd723969f11dc9ed6d026afec03e70b7ad566561077753e8747f71c"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_potential_core_state.py",
+      "sha256": "a8f2c985b8e97ac51b70dad6ed9d5b10b022f21b63cef8e733397e49b0f793e3"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_potential_core_state.py",
+      "sha256": "a8f2c985b8e97ac51b70dad6ed9d5b10b022f21b63cef8e733397e49b0f793e3"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_screened_state.py",
+      "sha256": "a64059e83ed614179fed46de1ff1f4aa2c5f53e7b3d238a75f7aa0c79ce85da2"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_screened_state.py",
+      "sha256": "a64059e83ed614179fed46de1ff1f4aa2c5f53e7b3d238a75f7aa0c79ce85da2"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_strain_charge.py",
+      "sha256": "b1b1a7a68632205aec542394a385d3fb8c241e83f878180d65f50e53d32c7e33"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_strain_charge.py",
+      "sha256": "b1b1a7a68632205aec542394a385d3fb8c241e83f878180d65f50e53d32c7e33"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_strain_field.py",
+      "sha256": "6dd19a9af001405977c0b9257b04efc88e2b20350d15bdd8af065511ea55d83f"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_strain_field.py",
+      "sha256": "6dd19a9af001405977c0b9257b04efc88e2b20350d15bdd8af065511ea55d83f"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_strain_functional.py",
+      "sha256": "0135543a3af9badc02711f9ca83decc68730274f0ea49fd8d869ec021d635428"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_strain_functional.py",
+      "sha256": "0135543a3af9badc02711f9ca83decc68730274f0ea49fd8d869ec021d635428"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_strain_potential.py",
+      "sha256": "cf6ce69221ba9293330f0df85129a97335303c49a13f19e4fa47f3f09693f363"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_strain_potential.py",
+      "sha256": "cf6ce69221ba9293330f0df85129a97335303c49a13f19e4fa47f3f09693f363"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_total_stress.py",
+      "sha256": "e98c4e1746887755afd46d79f77cd2ff9e5abc4618ba362c34f7b545b7e3a308"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_total_stress.py",
+      "sha256": "e98c4e1746887755afd46d79f77cd2ff9e5abc4618ba362c34f7b545b7e3a308"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_valence_state.py",
+      "sha256": "02d983db77072eda20e101b9ecbc5ad4b3e222ba6eb1368026652a673a9b3eb4"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_valence_state.py",
+      "sha256": "02d983db77072eda20e101b9ecbc5ad4b3e222ba6eb1368026652a673a9b3eb4"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_xc_response.py",
+      "sha256": "8bec6181341f5f9687ed705809e8e1d61ba5376b430424531edac111acc20466"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw_xc_response.py",
+      "sha256": "8bec6181341f5f9687ed705809e8e1d61ba5376b430424531edac111acc20466"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_empty_complement_degeneracy.py",
+      "sha256": "f3e759499421295a505b27ea0397d30b3eb233a75612c45257df164565ee3369"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_charge_response.py",
+      "sha256": "517988ead83ac6e58c246304db60520b6def2a606b7212846a9c5cd3a86cb4db"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_geometry_response.py",
+      "sha256": "c30bdcac16ccfbc3235567735d87ec8e570663c3c4a9221b920a2c2d32c261cc"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_hartree_periodic.py",
+      "sha256": "23bfc321cafebaeb5a7570f2534ba17174a86189da500751ff9f260f9648b2a8"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_lattice.py",
+      "sha256": "30f837e2c304637847924d99272f2143a8bf2a0343b4372135a8f9b9c024fe0e"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_magnetic_response.py",
+      "sha256": "a4f2de679b9e9fc5da865983cc3c1ae9d8bb19fe384abf620b9aa45a6cdca994"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_screened_state.py",
+      "sha256": "bd70d0c056f90684d752310eafe12e1da3e7cb736ef93fed8efca13cbd742c78"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_total_stress.py",
+      "sha256": "d858f980ee0271cc2fefd740bb4e082f0ee40d274a68b6ab6d6020591495551c"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_xc_response.py",
+      "sha256": "7d8630d011b8a4ad5163ada957c5a0df1d988cc3c258a372116dd921c5217886"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_window_omission_diagnostic.py",
+      "sha256": "cd8ec79904dc6fce175aaec1205336416ad927cb7a69bf39164ac3a6bf4786a3"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/wien_response_operators.py",
+      "sha256": "ba36f4df8be2ceae6da0f6c0637049d621001c5929553872151fd7f8f6b7ba8c"
+    },
+    {
+      "path": "/Users/haule/dbin/wien_response_operators.py",
+      "sha256": "ba36f4df8be2ceae6da0f6c0637049d621001c5929553872151fd7f8f6b7ba8c"
+    }
+  ]
+}

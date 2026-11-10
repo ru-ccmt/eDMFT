@@ -1,0 +1,81 @@
+--- a/SRC_3ddens/3ddens.F
++++ b/SRC_3ddens/3ddens.F
+@@ -20,6 +20,7 @@
+      use fftpack
+ #endif     
+      use four
++     use, intrinsic :: ISO_C_BINDING, only: C_INT
+ 
+      implicit none
+      
+@@ -48,7 +49,8 @@
+      complex*16, allocatable :: rho_intg(:)
+ 
+ #ifdef FFTW_OMP
+-     integer omp_error, omp_get_max_threads
++     integer(C_INT) omp_error
++     integer omp_get_max_threads
+ #endif
+ 
+ !    error handling  
+@@ -364,8 +366,12 @@
+ !      call haveinversion 
+ 
+ #ifdef FFTW_OMP
+-     call dfftw_init_threads(omp_error)
+-     call dfftw_plan_with_nthreads(omp_get_max_threads())
++     omp_error = fftw_init_threads()
++     if (omp_error.eq.0_C_INT) then
++        write(*,*) 'ERROR: FFTW thread initialization failed in 3DDENS'
++        stop 1
++     endif
++     call fftw_plan_with_nthreads(int(omp_get_max_threads(),C_INT))
+ #endif
+ 
+      call setfft2(nsg,fftx,ffty,fftz,rho_intg,fft,ngxyzsl)
+--- a/SRC_hf/hf.F
++++ b/SRC_hf/hf.F
+@@ -3,6 +3,7 @@
+       use data, only : band_plotting, calc_evv, diaghf, kli, &
+         mode, newklist, nonself, slater
+       use parallel, only : myid, npe
++      use, intrinsic :: ISO_C_BINDING, only: C_INT
+       implicit none
+ 
+       real*8 :: time1_c, time2_c, time1_w, time2_w, time_c(2), time_w(2), &
+@@ -12,9 +13,17 @@
+       logical :: fl(5)
+ 
+ #ifdef FFTW_OMP
+-      integer omp_error, omp_get_max_threads
+-     call dfftw_init_threads(omp_error)
+-     call dfftw_plan_with_nthreads(omp_get_max_threads())
++      integer(C_INT) omp_error
++      integer omp_get_max_threads
++      interface
++        subroutine fftw_plan_with_nthreads(nthreads) bind(C, name='fftw_plan_with_nthreads')
++          import :: C_INT
++          integer(C_INT), value :: nthreads
++        end subroutine fftw_plan_with_nthreads
++        integer(C_INT) function fftw_init_threads() bind(C, name='fftw_init_threads')
++          import :: C_INT
++        end function fftw_init_threads
++      end interface
+ #endif      
+ 
+       time_c = 0d0
+@@ -23,6 +32,14 @@
+       call walltim(timetot1_w)
+ 
+       call w2kinit
++#ifdef FFTW_OMP
++      omp_error = fftw_init_threads()
++      if (omp_error.eq.0_C_INT) then
++        write(*,*) 'ERROR: FFTW thread initialization failed in HF'
++        stop 1
++      endif
++      call fftw_plan_with_nthreads(int(omp_get_max_threads(),C_INT))
++#endif
+       call opnfs(deffn,errfn,fl)
+       call errflg(errfn,'error in hf')
+       call read_struct

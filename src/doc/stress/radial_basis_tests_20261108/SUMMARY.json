@@ -1,0 +1,54 @@
+{
+  "SrVO3": {
+    "DFT": {
+      "analytic_fresh_GPa": 8.627203675650556,
+      "numeric_saved_GPa": 8.403541158276836,
+      "before_residual_GPa": 0.2236625173737199,
+      "radial_fixed_Eref_GPa": 0.008170312201238202,
+      "radial_with_Eref_GPa": -0.2837684972406941,
+      "radial_with_Eref_fullstep_GPa": -0.2837812061111327,
+      "diagnostic_sum_GPa": 8.343435178409862,
+      "diagnostic_sum_minus_numeric_GPa": -0.060105979866973414,
+      "legacy_radial_fixed_Eref_GPa": 0.107648437
+    },
+    "eDMFT": {
+      "analytic_with_previous_potential_response_GPa": 2.690161085247642,
+      "numeric_saved_GPa": 2.933836407,
+      "before_residual_GPa": -0.24367532175235773,
+      "radial_fullstep_GPa": -0.052352333394768205,
+      "radial_halfstep_GPa": -0.052377958621280515,
+      "diagnostic_sum_GPa": 2.6377831266263616,
+      "diagnostic_sum_minus_numeric_GPa": -0.2960532803736382,
+      "legacy_HO_plus_projector_GPa": 0.47027155676999977,
+      "legacy_minus_free_energy_GPa": 0.5226495153912802
+    },
+    "zero_DFT_energy_error_Ry": 0.0,
+    "zero_DMFT_VSUM_error_Ry": 0.0
+  },
+  "FeSe": {
+    "DFT": {
+      "analytic_fresh_GPa": 12.234726020720684,
+      "numeric_saved_GPa": 12.138890191714445,
+      "before_residual_GPa": 0.09583582900623888,
+      "radial_fixed_Eref_GPa": -0.07403322903859146,
+      "radial_with_Eref_GPa": -0.0883186841904505,
+      "radial_with_Eref_fullstep_GPa": -0.08832568830007044,
+      "diagnostic_sum_GPa": 12.146407336530233,
+      "diagnostic_sum_minus_numeric_GPa": 0.007517144815787802,
+      "legacy_radial_fixed_Eref_GPa": -0.007952897
+    },
+    "eDMFT": {
+      "analytic_with_previous_potential_response_GPa": -1.118667459278174,
+      "numeric_saved_GPa": -1.0491512951,
+      "before_residual_GPa": -0.06951616417817408,
+      "radial_fullstep_GPa": -0.06911740283611667,
+      "radial_halfstep_GPa": -0.06911740336305733,
+      "diagnostic_sum_GPa": -1.1877848626412313,
+      "diagnostic_sum_minus_numeric_GPa": -0.13863356754123135,
+      "legacy_HO_plus_projector_GPa": 0.04271702656000054,
+      "legacy_minus_free_energy_GPa": 0.11183442992305787
+    },
+    "zero_DFT_energy_error_Ry": 0.0,
+    "zero_DMFT_VSUM_error_Ry": 0.0
+  }
+}

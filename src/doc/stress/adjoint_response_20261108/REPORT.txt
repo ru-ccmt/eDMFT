@@ -1,0 +1,325 @@
+FROZEN-SELF-ENERGY FORWARD AND ADJOINT RESPONSE
+Implementation checkpoint, 8 November 2026
+
+STATUS AND SCOPE
+
+Implemented: cached electronic tangent and exact discrete transpose, normalized
+finite-window projector gradient, a paired-operator screening solver, six-source
+adjoint contractions, engineering-shear conventions, interstitial charge
+normalization and its transpose, and analytic hydrostatic density transport.
+Also implemented: native discrete NREL/RELA radial tangent and adjoint, radial
+normalization, the actual finite-energy udot construction/orthogonalization,
+and derivatives of all three ordinary ABC local-orbital coefficient branches.
+
+This is a verified computational foundation, NOT completion of the full native
+stress-response plan. The native Hartree/XC, spatial density reconstruction,
+core, and complete radial-basis assembly chains still require paired
+forward/transpose adapters. The isolated radial solver is now differentiated;
+its assembly into all basis/projector/density contributions remains unfinished. Six physical anisotropic strain sources are not implemented here.
+The six-source tests below are algebraic controls, not six physical strains.
+No new total material pressure is reported by this checkpoint.
+
+The production dmft2 -> finite-difference WIEN response integration retains its
+existing final-iteration-only policy. It is not silently switched to a frozen-
+radial approximation. No mixer stress tensor is changed by these additions.
+The existing radial response policy is unchanged.
+
+SOURCE FILES
+
+src/python/frozen_sigma_tangent.py
+  CachedFrozenSigmaResponse: central context, electronic JVP/VJP, normalized
+  projector VJP and scalar gradient, bounded cache, independent lattice scalar
+  oracle. CLI accepts one direction or a batch in the same central context.
+
+src/python/stress_response_adjoint.py
+  PairedOperator, HermitianCoordinates, ScreenedResponse (GMRES), six-source
+  contractions and tensor conversion. No explicit spatial Jacobian is formed.
+
+src/python/wien_response_operators.py
+  Charge covectors in WIEN file coordinates, exact interstitial-only
+  normalization derivative/transpose, and hydrostatic spline-transport source.
+
+src/python/frozen_sigma_response.py
+  Existing reference implementation retained. Export factory accepts context
+  options; its CLI adds opt-in --backend cached and --cache-mb. The reference
+  backend remains the default. No existing density/stress formula is changed.
+
+Three new Python test files and native radial/ATPAR/ABC harnesses accompany these modules. Existing orchestration and
+report-policy tests were also rerun. Exact previous files and hashes are in
+INSTALLATION.json and before_installation/.
+
+DERIVATION AND BOOKKEEPING
+
+At fixed local self-energy S(w)=Sigma_imp(w)-V_DC, use the same exported
+temperature, Matsubara nodes/weights, k weights, and orbital symmetrization
+as dmft2. The central band basis is orthonormal. U has bands as rows and local
+orbitals as columns. W is the fixed-index DMFT window, Q the stored complement.
+
+  P_k = Pi_W,k phi_k,
+  A = Sym sum_k w_k P_k^dagger P_k,
+  X = A^(-1/2),
+  U_k = P_k X.
+
+For a Hermitian band-potential perturbation dH in a fixed LAPW basis,
+
+  a_QW = dH_QW/(epsilon_W-epsilon_Q),
+  dP_Q = a_QW phi_W,  dP_W = a_QW^dagger phi_Q,
+  dA = Sym sum_k w_k (P_k^dagger dP_k + dP_k^dagger P_k),
+  dU = dP X + P dX.
+
+The inverse-square-root Frechet derivative is evaluated on the saved active
+orbital support. In the eigenbasis of X, let r_i=1/x_i (eigenvalues of sqrt(A)):
+
+  (dX)_ij = -(dA)_ij/[r_i r_j (r_i+r_j)].
+
+This map is self-adjoint on Hermitian matrices. The actual Sym map need NOT
+be treated as complex-linear or assumed self-adjoint; its real/imaginary
+matrix-unit action is exported by dmft2 and transposed explicitly.
+
+The fixed-mu electronic derivative is
+
+  dG_k(w) = G_k(w) [dH_k + dU_k S(w) U_k^dagger
+                            + U_k S(w) dU_k^dagger] G_k(w).
+
+Subtract the static resolvent response before summing. Restore its density
+with the Frechet derivative of the Fermi matrix function. Exported quadrature
+weights occur ONCE, after the two resolvents have been multiplied. The returned
+band density contains spin factor 2 and w_k. Its caller must not reweight it.
+
+For fixed N, b=d(rho)/dmu, a^T rho=sum_k Tr(rho_k), kappa=a^T b:
+
+  drho_N = [I - b a^T/kappa] drho_mu.
+
+Reverse this as [I-a b^T/kappa], not as the same forward projection. Small
+compressibility is rejected; fixed-mu calculations remain a separate branch.
+
+ALL TRANSPOSES use the real Frobenius pairing Re sum(conj(y)*x). In particular,
+
+  (D -> G D G)^* Y = G^dagger Y G^dagger.
+
+The reverse projector chain undoes compacting, U=P X, the Frechet derivative,
+orbital symmetry, the weighted k sum, and window mixing, in that order. The
+last Hermitian projection supplies the factor 1/2 required by the two QW/WQ
+blocks. Complex, non-self-adjoint symmetry controls test this explicitly.
+
+COMMON PROJECTOR GRADIENT AND ONE ADJOINT
+
+An independent scalar oracle is implemented:
+
+  L(H,U) = 2 sum_k w_k { Omega(H_inf,k)
+       + 2T sum_n w_n Re[log det(iw_n-H_inf,k)
+                       -log det(iw_n-H_k-Sigma_emb,k(w_n))] },
+  Omega(H_inf) = -T Tr log(1+exp(-H_inf/T)).
+
+All Hamiltonians in this expression are relative to the same fixed mu.
+This is the regularized LATTICE SCALAR, NOT the full Klein functional.
+Its direct derivative with respect to H at fixed U is the weighted density.
+Its additional H -> U(H) derivative is a common Hermitian covector R:
+
+  dL = Re sum_k Tr[(rho_k+R_k) dH_k].
+
+projector_potential_gradient() returns R alone. Both its isolated derivative
+and the full rho+R derivative agree with independent scalar finite differences.
+It is the same covector for every strain direction. This supplies an explicit
+proof of the common-gradient property for the WINDOW/NORMALIZATION chain.
+It does not establish the radial and moving-basis parts of that property.
+
+For band-potential map B, spatial potential response K, and charge response q_nu,
+
+  v_nu = v_exp,nu + K q_nu,
+  c = K^T B^T R,
+  Delta D_nu = a_nu + c^T q_nu,
+  (I-J) q_nu = b_nu,
+  (I-J)^T lambda = c,
+  Delta D_nu = a_nu + lambda^T b_nu.
+
+This is the correction after removing already implemented stationary terms;
+R must not be confused with rho or added again as a direct Tr(rho dH) term.
+Different observable gradients require different solves. The total of several
+validated scalar corrections can use the sum of their gradients in one solve.
+
+For eta=(exx,eyy,ezz,2eyz,2exz,2exy), energy derivatives divided by Omega give
+the corresponding tensile stress components, including shear without another
+factor of two. Hydrostatic dGamma/deta=sum_nu=xx,yy,zz D_nu; mean tensile
+stress divides this by 3*Omega, pressure is minus that mean.
+
+WHY THE SPEEDUP IS LARGE
+
+The first implementation cached only central eigensystems and Green functions.
+That improved the electronic action by only 1.1-1.3x. The larger improvement
+comes from precontracting the Matsubara dependence once per central context:
+
+  * WW response to Hermitian dH_WW: a real Nw^2 by Nw^2 map.
+  * WW response to complex dU_W: a real Nw^2 by 2*Nw*Norb map.
+  * WQ response: independent small maps for each excluded stored band.
+  * QQ dynamic/static contribution: cancels identically, so is not stored.
+
+The global normalization coupling remains an explicit small orbital operation;
+we do not build a dense charge susceptibility. Reverse actions transpose these
+same precontracted maps. Static Fermi divided differences remain exact within
+the exported band space. If the memory cap does not fit all k points, the rest
+use the original frequency-block operation; partial-cache results are tested.
+
+TIMINGS ON SAVED MATERIAL EXPORTS, ONE BLAS THREAD, 1 GiB CACHE CAP
+
+                       SrVO3                    FeSe
+k points               75                       140
+stored bands           43                       66
+window bands           20                       24
+kept frequencies       500                      600
+old electronic action  2.702 s                  13.742 s
+new setup              6.402 s                  31.582 s
+new repeated action    0.0188 s                  0.0894 s
+new adjoint action     0.0198 s                  0.0873 s
+contraction memory     157.8 MB                  758.0 MB (decimal units)
+forward relative error 5.35e-16                  1.79e-15
+adjoint relative error 1.29e-14                  4.24e-14
+
+These are electronic-kernel timings, NOT full stress-workflow speedups. Setup
+is amortized over repeated screening actions and directions. The CLI default
+memory cap is 256 MiB; use --cache-mb 1024 to reproduce full caching in FeSe.
+The cache is tied to one central context; changed inputs require a new one.
+
+SIX-SOURCE ALGEBRAIC CONTROL USING EACH MATERIAL'S ELECTRONIC KERNEL
+
+The potential/reconstruction projection is synthetic and eight-dimensional.
+The six source vectors are NOT physical strains. This deliberately separates
+correctness of the adjoint solve from unfinished native LAPW adapters.
+
+  SrVO3: six forwards 0.910 s, one adjoint 0.159 s;
+         maximum contraction difference 3.26e-17.
+  FeSe:  six forwards 3.721 s, one adjoint 0.632 s;
+         maximum contraction difference 1.20e-17.
+
+The common projector gradient also agrees closely with the saved Fortran
+window+normalization covector in an IDENTICAL coefficient gauge:
+  SrVO3 relative matrix difference 1.07e-5;
+        contraction 0.02120588863 vs 0.02120593565 Ry.
+  FeSe relative matrix difference 4.79e-7;
+        contraction -0.10811341683 vs -0.10811341570 Ry.
+This small difference is recorded, not assumed to be roundoff. The precise
+production finite-tail correction is not yet reproduced by the lattice scalar
+oracle; its possible contribution must be separated from these sum differences.
+
+CHARGE ASSEMBLY CHECKS
+
+MT/interstitial charge covectors reproduce the existing integration routine
+within 1.42e-14 electrons in SrVO3 and 1.78e-15 in FeSe. The interstitial-only
+normalization transpose passes. The derivative retains alpha0 even when the
+central output is not exactly normalized. Analytic hydrostatic transport agrees
+with centered differences to 2.5e-10 relative in both actual density files.
+
+53 tests pass: nonlinear derivative checks; complex symmetry and normalization;
+fixed N and fixed mu; zero Sigma; empty complement; full/partial/zero caches;
+no diagonalization/inversion on a fully cached action; changed-mu rejection;
+six-forward/one-adjoint equivalence; nonconvergence; shear conventions; and
+existing final-iteration orchestration/report-policy regressions.
+
+USAGE FOR DEVELOPERS
+
+Read a central EDMFT_RESPONSE_EXPORT:
+  from frozen_sigma_tangent import CachedFrozenSigmaResponse
+  model, records = CachedFrozenSigmaResponse.from_export(prefix, cache_mb=1024)
+  model.prepare()
+  drho, info = model.response(dH, fixed_number=True)
+  dH_covector = model.adjoint(density_covector, fixed_number=True)
+  R = model.projector_potential_gradient()
+
+For a batch of band-potential directions saved as [direction,k,band,band]:
+  python ~/dbin/frozen_sigma_tangent.py --export PREFIX --input directions.npy \
+      --output responses.npy --cache-mb 1024
+Add --adjoint for the reverse action, or --fixed-mu for that ensemble.
+Use --projector-gradient instead of --input to export the common covector.
+The output density matrices are signed, k/spin weighted, in the central gauge.
+
+The old signed-density-file interface also accepts --backend cached:
+  python ~/dbin/frozen_sigma_response.py --export PREFIX --potential dH.npy \
+      --output response_rho --backend cached --cache-mb 1024
+
+NEXT REQUIRED NATIVE WORK
+
+1. Supply the actual potential and density-reconstruction maps with matching
+   integration weights, and verify their discrete transpose relation. Do not
+   assume continuum self-adjointness automatically holds for the file maps.
+2. Wire the verified discrete radial and ABC derivatives into all basis,
+   projector, and density terms. Differentiate the core solver, automatic
+   energy searches and DIRACOUT relativistic local orbitals. The saved fixed-radial/stored-band
+   response tests fail badly compared with the full native charge map; this
+   approximation cannot be promoted to total stress just because the electronic
+   algebra and adjoint tests pass. Increasing stored bands alone did not close
+   the saved discrepancy.
+3. Resolve the saved FeSe RELA radial contraction mismatch against native H/O.
+4. Construct six physical sources with orbital/tensor symmetry and fixed-RMT
+   boundary terms; no scalar hydrostatic shortcut is used for shear.
+5. Connect the completed maps to the screened adjoint and test physical stress
+   against six forward calculations and finite differences. Only then enable
+   it in dmft2_step and add the validated tensor before SCF assembly.
+
+Evidence JSON files, the material validation driver, and the test log accompany
+this report. Benchmarks read existing exports and leave material calculations
+untouched. Source and installed-script hashes are in INSTALLATION.json.
+
+NATIVE RADIAL EXTENSION COMPLETED IN THE SAME DEVELOPMENT PASS
+
+src/dmft2/atpar/outwin_response.f90 is included in libatpar's object list.
+It does not replace OUTWIN or change ordinary ATPARN execution. The native
+response worker can reuse its prepared contexts later; production stress does
+not call it yet. Its independent test driver is
+  python src/dmft2/tests/check_radial_response.py --work NEW_DIRECTORY
+Optional --case-directory PATH entries test actual VSP potentials read-only.
+
+Let y_k=(A_k,B_raw,k) and f_k=L_k y_k. An implicit Adams step is
+
+  (s I-L_k)y_k = s y_(k-1) + sum_j w_j f_j.
+
+The startup uses the actual fourth-order coefficients; subsequent steps use
+the fifth-order coefficients already installed in OUTWIN. At fixed radial
+mesh, nuclear charge and l,
+
+  dy_k = (s I-L_k)^(-1) [s dy_(k-1) + sum_j w_j df_j + dL_k y_k],
+  df_k = L_k dy_k + dL_k y_k.
+
+L=[[-x,u],[-y,x]], x=-dx, u=c*dx*r+phi,
+y=-l(l+1)*x^2/u+phi, phi=(2E-2V/r)*dx*r/c. Thus
+
+  dphi = (2 dx/c)(r dE-dV),
+  dL = [[0,dphi],[-(1+l(l+1)x^2/u^2)dphi,0]].
+
+V here is r times the spherical potential in Hartree; E is Hartree. The
+reverse action uses (s I-L_k)^(-T) and accumulates covectors backward through
+the derivative history. Complexity and storage are O(Nrad), not O(Nrad^2).
+The stored small-component scaling and AP/BP radial derivatives are included.
+
+Normalization is differentiated using the exact discrete RINT13 weights,
+including the origin term, even/odd grid convention and NREL 1e-22 small
+component metric. The radial pair differentiates the actual +/-0.002 Hartree
+energy stencil (factor 0.25/0.002, yielding the Ry energy derivative), followed
+by ATPARN's orthogonalization. It does not invoke a continuous differential
+identity that the implemented finite stencil only approximately satisfies.
+
+The local-orbital coefficient helper returns the tiny 3-by-10 Jacobian of
+ABC with inputs (p,dp,pe,dpe,pei,plo,dplo,pi12lo,pe12lo,RMT). It handles LAPW
+LO, first APW+lo, and higher APW+LO. The CLO=200 cap is differentiated on each
+smooth branch; evaluation at the nondifferentiable join is rejected. We follow
+the actual RMT^2 factors in ABC; replacing them with an exact boundary-matrix
+inverse would change the basis algorithm and requires a separate audit.
+
+Native validation:
+* 16 NREL/RELA, even/odd grid, l=0..3 controls: maximum finite-difference
+  relative error 2.78e-7; maximum transpose error 5.51e-13. At the smaller
+  energy/strain differences, roundoff in the nested udot stencil prevents
+  clean quadratic scaling in every channel; this is reported in the logs.
+* The central normalized (u,udot,AP,BP) arrays match independently compiled
+  current ATPARN to at most 4.57e-12 absolute, including RELA.
+* All four ABC controls (three coefficient branches plus capped CLO) agree
+  with native ABC0; finite-difference Jacobian errors are below 9.7e-10.
+* 18 controls using actual SrVO3/FeSe spherical potentials, all atoms and
+  l=0,2,4, at the explicitly chosen test energy 0.17 Ha: maximum directional
+  error 8.18e-8 and transpose error 2.93e-12. Cached radial-pair actions and
+  adjoints each take about 0.1 ms or less in these runs. These are radial
+  operator controls, not material stress calculations.
+
+This establishes a fast native radial derivative without freezing the radial
+functions. It does NOT yet resolve the previously saved FeSe RELA stress
+contraction discrepancy: the new derivatives still need to be assembled with
+matching, H/O, projectors, core and density in the full response calculation.

@@ -1,0 +1,143 @@
+--- a/SRC_lapw1/modules.F
++++ b/SRC_lapw1/modules.F
+@@ -1135,6 +1135,14 @@
+ !                         VNS3(l,L,l') ...
+ !                            ... integral(u_{l'}_dot*V_{L}*u_{l} dr)
+ 
++        ! Alternate-basis diagnostics must keep the physical operator fixed.
++        ! The L=0 correction routed through HNS covers only l<=LNSMAX.
++        ! Store the three remaining spherical radial integrals separately;
++        ! HAMILT adds them using its existing Legendre/addition-theorem path.
++        ! Channels are uu, udot-udot, u-udot, in Ry (no Y00 factor).
++        logical :: basis_restore_high_l=.false.
++        integer :: basis_restore_lmin=0
++        real*8, allocatable :: basis_restore_spherical(:,:,:)
+         INTEGER                       :: INS, NL, NGAU
+         INTEGER, allocatable          :: LMMAX(:), LQIND(:), LM(:,:,:)
+         DOUBLE PRECISION, allocatable :: DP(:,:), DPE(:,:), E(:,:), P(:,:), PE(:,:), PEI(:,:)
+@@ -1171,6 +1179,9 @@
+         SUBROUTINE init_atspdt(NATO, LMMX, LMAX, NSLMAX)
+           IMPLICIT NONE
+           integer NATO, LMMX, LMAX, NSLMAX
++          allocate(basis_restore_spherical(3,LMAX,NATO))
++          basis_restore_spherical=0.d0
++          basis_restore_high_l=.false.
+           allocate( LMMAX(NATO) )
+           allocate( LQIND(NATO) )
+           allocate( LM(2,0:LMMX,NATO) )
+--- a/SRC_lapw1/atpar.F
++++ b/SRC_lapw1/atpar.F
+@@ -1,4 +1,6 @@
+       SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,efermi)
++      use atspdt, only: basis_restore_spherical,basis_restore_high_l, &
++           basis_restore_lmin
+ !
+       use reallocate, only: doreallocate
+       use loabc, only : ALO, BLO, CLO, ELO, PLO, DPLO, PELO, DPELO, PEILO, &
+@@ -76,6 +78,8 @@
+       character*512 ::   basis_vsp_file
+       integer       ::   basis_vsp_status,basis_vsp_ios,basis_vsp_unit
+       logical       ::   basis_vsp_enabled,basis_vsp_exists
++      character(len=16) :: basis_restore_env
++      integer :: basis_restore_status
+       real*8, allocatable :: VRB(:,:)
+       real*8 :: basis_vr_solve(NRAD)
+       character(len=16) :: basis_low_l_env
+@@ -188,6 +192,25 @@
+            basis_vsp_file,status=basis_vsp_status)
+       basis_vsp_enabled=(basis_vsp_status.eq.0 .and. &
+            len_trim(basis_vsp_file).gt.0)
++      ! This is active only inside the optional alternate-basis probe.
++      ! Disabling high-l restoration reproduces the OLD, incomplete probe
++      ! solely for comparisons; it is never a valid fixed-H reference.
++      basis_restore_high_l=basis_vsp_enabled.and..not.basis_low_l_only
++      basis_restore_lmin=LNSMAX+1
++      basis_restore_env=''
++      call get_environment_variable('WIEN_LAPW1_BASIS_RESTORE_HIGH_L', &
++           basis_restore_env,status=basis_restore_status)
++      if (basis_restore_status.eq.0) then
++         select case(trim(basis_restore_env))
++         case('','1')
++         case('0')
++            basis_restore_high_l=.false.
++         case default
++            error stop 'WIEN_LAPW1_BASIS_RESTORE_HIGH_L must be 0 or 1'
++         end select
++      else if (basis_restore_status.eq.-1) then
++         error stop 'WIEN_LAPW1_BASIS_RESTORE_HIGH_L value too long'
++      endif
+       basis_vsp_ios=0
+       basis_vsp_unit=98
+       if (basis_vsp_enabled.and.myid.eq.0) then
+@@ -556,6 +579,20 @@
+             PE(J,JATOM) = UVE + TRY*P(J,JATOM)
+             DPE(J,JATOM) = DUVE + TRY*DP(J,JATOM)
+             CALL RINT13(CFEIN1,CFEIN2,AE,BE,AE,BE,PEI(J,JATOM),JATOM)
++            if (basis_restore_high_l.and.L.gt.LNSMAX) then
++               ! VR is r*V in Hartree.  HAMILT is in Ry, so DeltaV is
++               ! 2*(VR-VRB)/r.  Do not multiply by sqrt(4*pi): HAMILT
++               ! already sums the normalized Y_lm products analytically.
++               ! Use the same normalized large/small components and RINT13
++               ! metric as HNS, including the scalar-relativistic factor.
++               AW(1:JRI)=A(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               BW(1:JRI)=B(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               AEW(1:JRI)=AE(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               BEW(1:JRI)=BE(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               call RINT13(CFEIN1,CFEIN2,AW,BW,A,B,basis_restore_spherical(1,J,JATOM),JATOM)
++               call RINT13(CFEIN1,CFEIN2,AEW,BEW,AE,BE,basis_restore_spherical(2,J,JATOM),JATOM)
++               call RINT13(CFEIN1,CFEIN2,AW,BW,AE,BE,basis_restore_spherical(3,J,JATOM),JATOM)
++            endif
+             IF (J .LE. NSLMAX) THEN
+                A1(1:JRI,J) = A(1:JRI)
+                B1(1:JRI,J) = B(1:JRI)
+@@ -582,6 +619,15 @@
+                  NODEU
+  150     CONTINUE
+ !     
++!     The high-l path below covers plane-wave augmentation.  Existing
++!     HNS restoration includes all LOs in the tested LNSMAX>=LOMAX setup.
++!     Refuse an uncovered high-l LO rather than report an incomplete probe.
++         if (basis_vsp_enabled) then
++            do l=LNSMAX+1,LOMAX
++               if (ilo(l,JATOM).gt.0) &
++                    error stop 'alternate-basis probe needs LNSMAX to include every LO'
++            enddo
++         endif
+ !     and now for local orbitals
+ !     
+          IF(myid.eq.0) write(6,6021)
+--- a/SRC_lapw1/hamilt.F
++++ b/SRC_lapw1/hamilt.F
+@@ -21,6 +21,8 @@
+       use rotmat, only: ROTIJ, ROTLOC
+       use struk, only : NDF,multmax
+       use coml, only   : mgga
++      use atspdt, only: basis_restore_spherical,basis_restore_high_l, &
++           basis_restore_lmin
+       use albl
+       use stdmath
+       IMPLICIT NONE
+@@ -663,7 +665,22 @@
+                              TMP3*(ATMP1*AL_r(J,L)+Btmp1*BL_r(J,L))
+                      end do
+                   endif
+-                  
++
++                  if (basis_restore_high_l.and.L.ge.basis_restore_lmin) then
++                     ! Complete the fixed-operator probe above the HNS
++                     ! orbital cutoff.  Spherical DeltaV is diagonal in
++                     ! (l,m); the sum over m supplies P_l and (2l+1).
++                     ! Both mixed terms are required.  BL is zero for APW,
++                     ! so the same expression also covers that channel.
++                     ! No overlap, surface or ordinary stress term changes.
++                     do J=1,j_end(ihelp)
++                        TMP1(J)=TMP1(J)+DLL1*P(J,L,ihelp)*( &
++                             basis_restore_spherical(1,L+1,JNEQ)*AL_c(L,ihelp)*AL_r(J,L) &
++                            +basis_restore_spherical(2,L+1,JNEQ)*BL_c(L,ihelp)*BL_r(J,L) &
++                            +basis_restore_spherical(3,L+1,JNEQ)*( &
++                                 AL_c(L,ihelp)*BL_r(J,L)+BL_c(L,ihelp)*AL_r(J,L)))
++                     enddo
++                  endif
+                enddo
+ !$omp simd
+                DO J = 1, j_end(ihelp)

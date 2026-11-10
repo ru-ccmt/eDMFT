@@ -1,0 +1,23 @@
+[
+  {
+    "step": 0.002,
+    "H_nonspherical_relative": 5.727476123579852e-07,
+    "H_nonspherical_max": 1.994375290132258e-09,
+    "raw_projector_relative": 1.542994451609318e-07,
+    "raw_projector_max": 2.1784570924943125e-08
+  },
+  {
+    "step": 0.001,
+    "H_nonspherical_relative": 5.116118795304227e-07,
+    "H_nonspherical_max": 1.7725860874603927e-09,
+    "raw_projector_relative": 3.852438031232621e-08,
+    "raw_projector_max": 5.438542227675924e-09
+  },
+  {
+    "step": 0.0005,
+    "H_nonspherical_relative": 4.993876786951751e-07,
+    "H_nonspherical_max": 1.7229117816675368e-09,
+    "raw_projector_relative": 9.628140262189862e-09,
+    "raw_projector_max": 1.3594093628555015e-09
+  }
+]

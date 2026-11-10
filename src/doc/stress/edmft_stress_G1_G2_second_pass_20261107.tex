@@ -1,0 +1,362 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=23mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,microtype,amsmath,amssymb,bm,booktabs,longtable,array,xurl,hyperref,needspace}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\allowdisplaybreaks\raggedbottom
+\newcommand{\Tr}{\operatorname{Tr}}
+\newcommand{\Rea}{\operatorname{Re}}
+\newcommand{\Herm}{\operatorname{Herm}}
+\newcommand{\dd}{\mathrm d}
+\newcommand{\Id}{\mathbb I}
+\newcommand{\ii}{\mathrm i}
+\newcommand{\ns}{\mathrm{ns}}
+\newcommand{\MT}{\mathrm{MT}}
+\title{Second derivation and audit of LAPW stress:\\Blaha Eqs. (19), (20), (G1), and (G2)\\with full DFT+eDMFT density matrices}
+\author{Working derivation and reproducible implementation checks\\for Kristjan Haule}
+\date{7 November 2026}
+\begin{document}
+\maketitle
+\begin{abstract}
+This is an independent second pass after the first G1/G2 corrections. Starting from the operator derivatives in Eqs. (19) and (20) of Belbase, Tr\"oster, and Blaha, we reconstruct G1 and G2 without using a diagonal occupation or a Kohn--Sham equation for a DMFT pseudo-band. The central new regression differentiates independently assembled full Hamiltonian and overlap matrices and compares with the sum of the actual G1 and G2 Fortran kernels. It includes noncommuting complex density matrices and the cancellation between geometric terms. Separate endpoint tests cover the matching coefficients and direct quadrature tests cover the APW boundary contribution. All these checks pass the current code. No additional production-source correction was justified by this second pass. Fresh material reruns reproduce the remaining discrepancies; this note does not certify the complete RELA or charge-relaxed stress.
+\end{abstract}
+\tableofcontents
+\clearpage
+
+\section{Conventions and the question being tested}
+The reference is K. Belbase, A. Tr\"oster, and P. Blaha, \emph{Phys. Rev. B} \textbf{104}, 174113 (2021), particularly Eqs. (13), (19), (20), and Appendix G. The local PDF supplied for this audit is \nolinkurl{Blahas_stress_tensor.pdf}. We use the paper's equations as the starting point, rather than treating earlier notes or source comments as independent evidence.
+
+Let $a$ label atoms, $\bm k$ label wave vectors with fixed weights $w_k$, and $m,n$ label central KS bands. Spin is included in $k$ when needed and counted only once. Let $i=(L_i,p_i)$ label an augmentation primitive on one atom, where $L_i=(l_i,m_i)$ is a spherical harmonic and $p_i$ selects $u_l$, $\dot u_l$, or an additional radial solution used by a local orbital (LO). The magnetic quantum number $m_i$ is distinct from a band label. Write
+\begin{equation}
+ f_i(\bm r)=u_i(r)Y_{L_i}(\bm n),\qquad
+ \psi_n^a(\bm r)=\sum_i A^a_{in}f_i(\bm r),\quad
+ r=|\bm r-\bm\tau_a|,\quad \bm n=(\bm r-\bm\tau_a)/r .
+\end{equation}
+$A$ collects ALM, BLM, and CLM, including the coefficients making each actual LO out of its primitives. Complex harmonics are orthonormal with Condon--Shortley phases. All formulas retain the bra conjugation explicitly. Radial primes mean $\dd/\dd r$.
+
+A symmetric strain channel $\nu=(\alpha\beta)$ is defined by
+\begin{equation}
+ F(t)=\Id+tE^\nu,\quad E^\nu_{ij}=\tfrac12(\delta_{i\alpha}\delta_{j\beta}+\delta_{i\beta}\delta_{j\alpha}),\quad
+ J=\det F,\quad \gamma_\nu=\partial_\nu\ln J=\delta_{\alpha\beta}.
+\end{equation}
+For shear, both off-diagonal entries are $t/2$. Set them both to $t$ and the finite difference is twice the tensor component. For isotropic linear strain $F=(1+t)\Id$, $\partial_t\Gamma=\Omega\Tr\sigma$. The hydrostatic mean stress is $\bar\sigma=\Tr\sigma/3$, and thermodynamic pressure is $p=-\bar\sigma$.
+
+The elementary G1/G2 derivation freezes radial solutions, energy parameters, and local axes; $R_{\MT}$ is fixed as a physical radial parameter. It still differentiates the radial \emph{coordinate argument}. Additional moving-interface bookkeeping is needed when using this formula for a fixed-sphere finite difference. The test in Sec.~\ref{sec:combined} deliberately removes that interface issue, so that it tests the bulk matrix algebra unambiguously.
+
+We use \textbf{Rydberg units} for $H$, band energies, $\rho_E$, and the implementation equations below. In these units $H=-\nabla^2+V$ in NREL. The paper's Hartree kinetic derivative must be multiplied by two. An overlap has no energy unit. The independent bra-plus-ket factor of two in G2 is not an energy-unit conversion or an extra spin factor.
+
+\section{The functional derivative and what stationarity removes}
+In the central orthonormal band frame define $O=\Id$, $H=\mathcal E=\operatorname{diag}(\epsilon_n)$ and
+\begin{align}
+ G_k(z)&=[zO_k-H_k-U_k\Sigma_{\rm eff}(z)U_k^\dagger]^{-1},\qquad z=\ii\omega_j+\mu_{\rm chem},\\
+ \rho_k&=\big[T\sum_jG_k(z_j)\big]_{\rm reg},\qquad
+ \rho_{E,k}=\big[T\sum_jz_jG_k(z_j)\big]_{\rm reg}.
+\end{align}
+$T$ is temperature in energy units, $\omega_j=(2j+1)\pi T$, and reg denotes a convergent contour/tail prescription, including subtraction of the contact term for $\rho_E$. These definitions do not prescribe summing a divergent series. Generally $[\rho,H]\ne0$ and $\rho_E\ne\frac12\{H,\rho\}$.
+
+The relevant part of the stationary Klein-functional derivative is
+\begin{equation}\label{eq:master}
+ \boxed{D_\nu^{1p+P}=\sum_k w_k\Rea\Tr_b[\rho_k H'_{k\nu}-\rho_{E,k}O'_{k\nu}]
+       +2\sum_k w_k\Rea\Tr_c[C_k U'_{k\nu}].}
+\end{equation}
+Here $D_\nu=\Omega\sigma_\nu$, $H'$ and $O'$ are moving-basis matrix derivatives, and $b,c$ identify band and correlated-orbital traces. Electrostatic, XC, core, ionic, local-functional, and any explicit interaction-parameter derivatives must be assembled consistently in addition. Equation~\eqref{eq:master} is a part of the variation, not the total value of the functional. Stationarity removes implicit self-energy and Green-function response from the first derivative, including the associated vertex response. It does not remove explicit basis or projector derivatives.
+
+For the implemented orientation of the projector,
+\begin{equation}
+ U_k=P_kX,\quad X=S^{-1/2},\quad
+ U'_k=P'_kX+P_kX',\quad
+ C_k=\big[T\sum_j\Sigma_{\rm eff}(z_j)U_k^\dagger G_k(z_j)\big]_{\rm reg}.
+\end{equation}
+$P,U$ are band-by-orbital matrices, $C$ is orbital-by-band, $S$ is the summed and symmetry-rotated raw-projector orbital metric, and $\Sigma_{\rm eff}=\Sigma_{\rm imp}-V_{\rm DC}$. Window response is included in $P'$; fixed band \emph{indices} do not make the selected subspace constant.
+
+The representation used for the normalization derivative must be specified. For a smooth selected subspace $W$ represented by nonorthogonal columns with metric $O_W$, its invariant orbital metric is
+\begin{equation}
+ S=\sum_k w_k\,\mathrm{Sym}\big(P_{W,k}^\dagger O_{W,k}^{-1}P_{W,k}\big).
+\end{equation}
+Here $P_W$ contains the raw overlaps with those selected columns. At the central orthonormal reference, $O_W=\Id$, its derivative is
+\begin{equation}\label{eq:normmetric}
+ S'=\sum_k w_k\,\mathrm{Sym}\big(P_W'^\dagger P_W+P_W^\dagger P_W'
+                    -P_W^\dagger O_W'P_W\big).
+\end{equation}
+If the selected bands are kept continuously orthonormal, $O_W'=0$ in that frame and the compensating metric response is already in $P_W'$. In a fixed central moving-basis frame, the last term must be retained. Mixing these two descriptions either loses or double counts that term. The generalized-window/normalization tests specifically exercise this distinction.
+
+For positive $S$, if $S=V\operatorname{diag}(s_i)V^\dagger$, then
+\begin{equation}
+ (V^\dagger X'V)_{ij}=-\frac{(V^\dagger S'V)_{ij}}
+ {\sqrt{s_i}\sqrt{s_j}(\sqrt{s_i}+\sqrt{s_j})}.
+\end{equation}
+This normalization term remains separate from G1/G2. It is not omitted by describing $U$ as a projector.
+
+\subsection{Why the discarded part of Eq. (13) is not an isolated new pressure term}
+The first part of Eq. (13) contains the common $\Omega^{-1/2}$ normalization and coefficient response. Under the unitary affine pullback
+\begin{equation}
+ \widetilde\psi_t(\bm r)=\sqrt{J(t)}\,\psi_t(F(t)\bm r),
+\end{equation}
+the derivative of $\sqrt J$ cancels the $-\gamma_\nu\psi/2$ from the common normalization. This cancellation does not require a KS eigenstate. One must not retain the normalization derivative while silently dropping its measure partner.
+
+A pure change of basis frame is another distinct cancellation. If the basis changes by $Z$, then
+\begin{equation}
+ \delta H=Z^\dagger H+HZ,\quad\delta O=Z^\dagger+Z,\quad\delta U=Z^\dagger U .
+\end{equation}
+The regularized Dyson identity gives $\rho_E=H\rho+UC$ and its adjoint. Hence the one-particle variation from this frame change is exactly cancelled by $2\Rea\Tr(C\delta U)$. This is a covariance identity for the complete expression. It is not an instruction to remove a genuine change of the projector window or radial shape, and it does not use a pseudoinverse to reconstruct $C$.
+
+\section{Eq. (19) to G1, with the product rule kept intact}
+Under the affine pullback, the Hartree kinetic operator is
+\begin{equation}
+ \widehat T(t)=-\tfrac12\partial_i(F^{-1}F^{-T})_{ij}\partial_j,
+ \qquad \partial_\nu\widehat T=K_\nu\equiv
+ \tfrac12(\partial_\alpha\partial_\beta+\partial_\beta\partial_\alpha).
+\end{equation}
+Thus the paper's Eq. (19) is $\Omega^{-1}\sum_{kn}w_k f_{nk}\langle\psi_{nk}|K_\nu|\psi_{nk}\rangle$ in Hartree units. In the Rydberg convention of this note the explicit kinetic matrix is $T^\nu=2\langle\psi_m|K_\nu|\psi_n\rangle$.
+
+Introduce multiplication $N_\alpha f=n_\alpha f$ and the tangential derivative
+\begin{equation}
+ \mathcal D_\alpha=(\delta_{\alpha j}-n_\alpha n_j)\partial_{n_j},\quad
+ \partial_\alpha=n_\alpha\partial_r+r^{-1}\mathcal D_\alpha,\quad
+ \mathcal D_\beta n_\alpha=\delta_{\alpha\beta}-n_\alpha n_\beta.
+\end{equation}
+Apply these identities twice to an arbitrary primitive, without a band equation:
+\begin{align}\label{eq:hessian}
+ \partial_\beta\partial_\alpha(uY)={}&n_\beta n_\alpha u''Y
+ +\frac{u'}r\mathcal D_\beta(n_\alpha Y)\nonumber\\
+ &+\left(\frac{u'}r-\frac{u}{r^2}\right)n_\beta\mathcal D_\alpha Y
+ +\frac{u}{r^2}\mathcal D_\beta\mathcal D_\alpha Y .
+\end{align}
+These are the four MT rows of G1 before contraction. Symmetrize $\alpha,\beta$ and define angular matrices between $Y_i,Y_j$ from
+\begin{align}
+ A_1^\nu&=N_\alpha N_\beta,&
+ A_2^\nu&=\tfrac12(\mathcal D_\beta N_\alpha+\mathcal D_\alpha N_\beta),\\
+ A_3^\nu&=\tfrac12(N_\beta\mathcal D_\alpha+N_\alpha\mathcal D_\beta),&
+ A_4^\nu&=\tfrac12(\mathcal D_\beta\mathcal D_\alpha+\mathcal D_\alpha\mathcal D_\beta).
+\end{align}
+Composition in $\mathcal D N$ differentiates the product to its right. Define
+\begin{equation}
+ R^{(2)}_{ij}=\int_0^Rr^2u_i^*u_j''\dd r,\quad
+ R^{(1)}_{ij}=\int_0^Rr u_i^*u_j'\dd r,\quad
+ R^{(0)}_{ij}=\int_0^Ru_i^*u_j\dd r.
+\end{equation}
+All G1 radial derivatives here act on the \textbf{ket}. The primitive matrix is
+\begin{equation}\label{eq:g1primitive}
+ K^\nu_{ij}=R^{(2)}_{ij}(A_1)_{ij}+R^{(1)}_{ij}(A_2)_{ij}
+ +(R^{(1)}_{ij}-R^{(0)}_{ij})(A_3)_{ij}+R^{(0)}_{ij}(A_4)_{ij}.
+\end{equation}
+The indices on $A_q$ mean their angular parts only. Since
+$A_2=\delta_{\alpha\beta}\Id-A_1+A_3$, the actual F1--F4 source grouping is
+\begin{equation}\label{eq:g1code}
+ \boxed{K^\nu=R^{(2)}A_1+R^{(1)}(\delta_{\alpha\beta}\Id-A_1)
+ +(2R^{(1)}-R^{(0)})A_3+R^{(0)}A_4.}
+\end{equation}
+Products in this equation are elementwise radial-angular products. The two copies of $R^{(1)}$ have different origins in Eq.~\eqref{eq:hessian}. Removing one is incorrect, although its error has zero tensor trace. Likewise ordered LO bra--ket pairs already occur in the double sum and need no independent factor of two.
+
+\subsection{Recovering the printed Gaunt form}
+Let
+\begin{equation}
+ \mathcal G_{J,l_1,l_2}^{M,m_1,m_2}=\int Y_{JM}^*Y_{l_1m_1}Y_{l_2m_2}\dd\bm n,
+ \quad n_\alpha=\sum_t c_{\alpha t}Y_{1t},\quad
+ \mathcal D_\alpha Y_{lm}=\sum_{s=\pm1,t}d_\alpha^{st}(l,m)Y_{l+s,m+t}.
+\end{equation}
+The paper denotes $d_\alpha^{st}$ by $c_\alpha^{st}$; the change of letter avoids confusing multiplication with differentiation. Specifically $c_{x,-1}=-c_{x,1}=\sqrt{2\pi/3}$, $c_{y,\pm1}=\ii\sqrt{2\pi/3}$, and $c_{z,0}=\sqrt{4\pi/3}$; other entries vanish. The derivative expansion defines $d$ uniquely.
+
+For angular bra $(l',m')$ and ket $(l,m)$ the four rows are
+\begin{align}
+ (A_1)_{L'L}&=\tfrac12\sum_{tt'JM}(c_{\alpha t}c_{\beta t'}+c_{\beta t}c_{\alpha t'})
+ \mathcal G_{J,1,l}^{M,t,m}\mathcal G_{l',1,J}^{m',t',M},\\
+ (A_2)_{L'L}&=\tfrac12\sum_{tt'JM s'}\mathcal G_{J,1,l}^{M,t,m}
+ [c_{\alpha t}d_\beta^{s't'}(J,M)+c_{\beta t}d_\alpha^{s't'}(J,M)]
+ \delta_{l',J+s'}\delta_{m',M+t'},\\
+ (A_3)_{L'L}&=\tfrac12\sum_{stt'}[d_\alpha^{st}(l,m)c_{\beta t'}+d_\beta^{st}(l,m)c_{\alpha t'}]
+ \mathcal G_{l',1,l+s}^{m',t',m+t},\\
+ (A_4)_{L'L}&=\tfrac12\sum_{ss'tt'}[d_\alpha^{st}(l,m)d_\beta^{s't'}(l+s,m+t)
+ +d_\beta^{st}(l,m)d_\alpha^{s't'}(l+s,m+t)]\nonumber\\
+ &\hspace{25mm}\times\delta_{l',l+s+s'}\delta_{m',m+t+t'}.
+\end{align}
+Both second derivative coefficients in the last line are evaluated at the intermediate $(l+s,m+t)$. Invalid harmonic indices are zero. Intermediate $l+1$ channels must remain even for a retained radial channel at $l_{\max}$. Inserting these expressions into Eq.~\eqref{eq:g1primitive} reproduces the printed G1 rows.
+
+\subsection{Band matrices, interstitial, and surface}
+The off-diagonal MT matrix is $K^{a,\nu}_{mn}=\sum_{ij}A_{im}^*K^\nu_{ij}A_{jn}$. For interstitial plane-wave coefficients $c_{Gn}$, $q_G=k+G$, and
+\begin{equation}
+ \theta_{GG'}=\Omega^{-1}\int_Ie^{\ii(q_{G'}-q_G)\cdot r}\dd^3r,\qquad
+ (Q_\nu)_{GG'}=\delta_{GG'}q_{G\alpha}q_{G\beta},
+\end{equation}
+one gets $K_I^\nu=-c^\dagger\theta Q_\nu c$. Putting $Q$ on the bra gives the adjoint and the same real contraction with Hermitian $\rho$, but not the same unsymmetrized matrix.
+
+For a continuous augmented function the regular MT plus interstitial Hessian satisfies
+\begin{align}
+ K_{\rm reg}^\nu&=-Q_{\rm grad}^\nu+B_{\rm APW}^\nu,\\
+ B_{{\rm APW},mn}^\nu&=\sum_aR_a^2\int\dd\bm n\,n_\alpha n_\beta\psi_m^*(R_a)
+ [\partial_r\psi_n^{\MT}-\partial_r\psi_n^I]_{R_a}.
+\end{align}
+$Q_{\rm grad}$ is the symmetrized integral of bra and ket first Cartesian derivatives. The weak kinetic matrix is $K_{\rm reg}-B_{\rm APW}$. This derivative jump vanishes for exact differentiable LAPW matching, but generally not for APW+lo. It is distinct from an affine-to-fixed-$R_{\MT}$ shape term. A local MT strong matrix need not be Hermitian: do not discard its boundary when integrating by parts.
+
+The DMFT kinetic contribution is therefore the real trace of the appropriate full bilinear matrix with $\rho$, not just its KS diagonal. Diagonalizing $\rho=VdV^\dagger$ and using $\widetilde A=AV$ gives exactly the same contraction, even for complex $V$ and signed $d$. No eigenvalue equation for $\widetilde\psi_s$ is required.
+
+\section{Eq. (20) to the six complete G2 rows}
+The paper's Eq. (20) is a bra-plus-ket basis variation. For a DFT eigenstate it takes the form
+\begin{equation}\label{eq:20}
+ D_\nu^{G2,\rm DFT}=2\Rea\sum_n f_n\langle\eta_n^\nu|(H-\epsilon_n)|\psi_n\rangle_{\MT},
+\end{equation}
+where $\eta$ is the augmentation part of the derivative after the common normalization/measure cancellation. Its expansion, directly from Eq. (13), is
+\begin{align}\label{eq:eta}
+ \eta_n^\nu={}&\sum_i D_{in}^\nu u_iY_i
+ +\sum_i A_{in}\left[r u_i' n_\alpha n_\beta Y_i
+                       +u_i\mathcal A_\nu Y_i\right],\\
+ \mathcal A_\nu&=\tfrac12(n_\alpha\mathcal D_\beta+n_\beta\mathcal D_\alpha),\qquad
+ D^\nu=s^\nu+\tfrac12\gamma_\nu A,\quad s^\nu=\partial_\nu A\ \text{(physical matching)}.
+\end{align}
+The second term comes from the radial coordinate argument and the third from the angular argument. Freezing $u_i(r)$ does not eliminate either.
+
+Before using a KS equation, introduce \emph{one-sided band matrices}
+\begin{equation}
+ (M_H^\nu)_{mn}=\langle\eta_m^\nu|H|\psi_n\rangle_{\MT},\qquad
+ (M_O^\nu)_{mn}=\langle\eta_m^\nu|\psi_n\rangle_{\MT}.
+\end{equation}
+The Hermitian derivative matrices are $B^\nu=M_H^\nu+M_H^{\nu\dagger}$ and
+$O_\eta^\nu=M_O^\nu+M_O^{\nu\dagger}$. The DMFT replacement for Eq.~\eqref{eq:20} is
+\begin{equation}\label{eq:dmftg2}
+ \boxed{D_\nu^{G2}=2\sum_k w_k\Rea\Tr\big(\rho_kM_{H,k}^\nu-\rho_{E,k}M_{O,k}^\nu\big).}
+\end{equation}
+It is not enough to symmetrize band labels in a formula that has already assigned a KS eigenvalue to a mixed state.
+
+\subsection{Primitive matrices and derivative placement}
+Split $H=H_{\rm sph}+V_\ns$. The NREL radial equation gives
+\begin{equation}
+ H_{\rm sph}u_j=E_j u_j,\qquad
+ H_{\rm sph}\dot u_j=E_j\dot u_j+u_j,
+ \quad \dot u_j=\partial u_j/\partial E_{\rm Ry}.
+\end{equation}
+Every additional radial solution has its own $E_j$. Define the primitive coefficient matrix $\mathsf L$ by these two relations: its diagonal is $E_j$ and its column for $\dot u_j$ has an extra 1 in the row of its $u_j$ partner. Thus $H_{\rm sph}\psi$ has coefficient vector $\mathsf L A$. This is a primitive radial equation, not a KS equation for a pseudo-band.
+
+Define six primitive integrals:
+\begin{align}
+ S^0_{ij}&=\int_0^Rr^2u_i^*u_j\dd r\int Y_i^*Y_j\dd\bm n,\\
+ S^r_{ij,\nu}&=\int_0^Rr^3u_i'^*u_j\dd r\int Y_i^* n_\alpha n_\beta Y_j\dd\bm n,\\
+ S^a_{ij,\nu}&=\int_0^Rr^2u_i^*u_j\dd r\int(\mathcal A_\nu Y_i)^*Y_j\dd\bm n,\\
+ V^0_{ij}&=\int_0^Rr^2u_i^*u_j\left[\int Y_i^*V_\ns(r,\bm n)Y_j\dd\bm n\right]\dd r,\\
+ V^r_{ij,\nu}&=\int_0^Rr^3u_i'^*u_j\left[\int Y_i^*n_\alpha n_\beta V_\ns(r,\bm n)Y_j\dd\bm n\right]\dd r,\\
+ V^a_{ij,\nu}&=\int_0^Rr^2u_i^*u_j\left[\int(\mathcal A_\nu Y_i)^*V_\ns(r,\bm n)Y_j\dd\bm n\right]\dd r.
+\end{align}
+The potential-dependent angular integral remains inside the radial integration. The radial and angular derivatives in $S^r,V^r,S^a,V^a$ act on the \textbf{bra}. In particular $S^r_{ij}$ generally differs from $S^r_{ji}$; replacing it by its transpose changes G2. Expanding $V_\ns=\sum_hv_h(r)Y_h(\bm n)$ gives the $V$ and $W$ radial tables and Gaunt integrals of Appendix G. Real or cubic harmonic conventions must be converted with their actual complex phases.
+
+Insert Eq.~\eqref{eq:eta} in $M_H$ to obtain exactly six rows:
+\begin{equation}\label{eq:six}
+ \boxed{\begin{aligned}
+ M_H^\nu={}&D^{\nu\dagger}S^0\mathsf L A
+          +A^\dagger S^r_\nu\mathsf L A
+          +A^\dagger S^a_\nu\mathsf L A\\
+          &+D^{\nu\dagger}V^0A
+          +A^\dagger V^r_\nu A
+          +A^\dagger V^a_\nu A,\\
+ M_O^\nu={}&D^{\nu\dagger}S^0 A
+          +A^\dagger S^r_\nu A
+          +A^\dagger S^a_\nu A .
+ \end{aligned}}
+\end{equation}
+The first three terms are spherical matching, radial, and angular rows; the last three are their nonspherical partners. No band-diagonal reduction has occurred. The top line, for example, is explicitly
+\begin{equation}
+ (M_{H,\rm match}^\nu)_{mn}=\sum_{ijq}(D_{im}^\nu)^*S^0_{ij}\mathsf L_{jq}A_{qn}.
+\end{equation}
+Its adjoint supplies the variation on the ket; no extra independent $1/2$ should be applied to this one-sided contraction.
+
+For diagonal $\rho_{mn}=f_n\delta_{mn}$ and $\rho_{E,mn}=f_n\epsilon_n\delta_{mn}$, replace $\mathsf L A_n$ in the first three rows by $(\mathsf L-\epsilon_n)A_n$, and Eq.~\eqref{eq:dmftg2} reduces to the six lines of printed G2. For DMFT, the two contractions remain separate.
+
+\subsection{Exact correspondence to the present implementation}
+The module \nolinkurl{stress_g2_matrices.f90} stores the six tables \texttt{s0}, \texttt{sr}, \texttt{sa}, \texttt{v0}, \texttt{vr}, and \texttt{va}. The arrays \texttt{energy} and \texttt{u\_partner} apply $\mathsf L$. \texttt{evaluate\_g2} forms all six terms in Eq.~\eqref{eq:six}. Its scalar test energy $e$ gives
+\begin{equation}
+ K_\nu(e;v)=v^\dagger(M_H^\nu-eM_O^\nu)v,\quad
+ K_\nu(0;v)-K_\nu(1\,\mathrm{Ry};v)=1\,\mathrm{Ry}\ v^\dagger M_O^\nu v.
+\end{equation}
+The numerical energy unit is Ry, so the numerical difference directly returns the overlap coefficient. This is an exact algebraic extraction of a linear coefficient, not a finite difference of an unknown kernel. The code diagonalizes $\rho$ and $\rho_E$ separately and rebuilds the corresponding pseudo-bands for each contraction. It must not reuse the first set of eigenvectors for the second.
+
+\section{Source audit and independent tests}
+The source paths below are relative to \nolinkurl{/Users/haule/projects/eDMFT_new/src/dmft2/}, unless WIEN is stated. The external WIEN sources are in \nolinkurl{/Users/haule/wien2k_24/SRC_lapw2/}.
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.39\linewidth}>{\raggedright\arraybackslash}p{0.54\linewidth}}
+\toprule
+Source or block & What was checked in this pass\\\midrule
+\texttt{stress\_kernels.f90}: G1; WIEN \texttt{val\_kinstrmt.F} & Product-rule grouping $2R^{(1)}-R^{(0)}$, ordered LO pairs, top-$l$ angular intermediates, arbitrary complex density.\\
+\texttt{stress\_integrals.f90}; WIEN \texttt{kin\_str\_integrals.F} & G1 positive-mesh derivative helper; convergence of cusp and fractional-power examples. This tests numerical radial differentiation, not strain response of the radial solution.\\
+\texttt{stress\_interstitial.f90}; WIEN interstitial routines & Actual Fourier step matrix and Hessian contraction versus an independent matrix, off-center sphere and complex signed density.\\
+\texttt{alm\_blm\_clm.f90}, \texttt{lomain.f90} & Full physical matching derivative by endpoint Bessel/harmonic evaluation; normalization, APW, LAPW, two LOs, rotations, bands below window, rectangular pseudo-band map.\\
+\texttt{stress\_g2\_matrices.f90} & Six local matrices and six contractions; derivative on bra; every LO's own energy; nonspherical channels not restricted to nonzero ordinary Gaunts.\\
+\texttt{cmp\_dmft\_stress.f90} & Separate $\rho$/$\rho_E$ passes, $K(0)-K(1)$, compact/full CLM leading dimensions, local-to-global tensor mapping, interstitial counted once.\\
+\texttt{stress\_APW\_surface}; WIEN counterpart & Complex bilinear boundary integral from independent angular quadrature; ket derivative evaluated at ket $l$.\\
+Normalization, window, and direct-$C$ regressions & Re-run existing functional finite differences, generalized $H/O$ window response, phase covariance, rank-deficient projector, and basis-connection cancellation.\\\bottomrule
+\end{longtable}
+The G1, interstitial, and APW direct tests exercise both the current WIEN and dmft2 routines. The six-row and combined tests exercise the current dmft2 complete G2 module; they are not an independent certification of every legacy WIEN G2 branch. The full material reruns exercise the default DFT TRACE and DMFT FULL choices as installed.
+
+\subsection{The new combined Hamiltonian/overlap test}\label{sec:combined}
+A row-by-row match to the same algebra can miss a shared error. The new test instead uses radial solutions of a single physical reference Hamiltonian,
+\begin{equation}
+ H_0=-\nabla^2+r^2,\quad
+ u_l''+\frac2r u_l'+\left(E-r^2-\frac{l(l+1)}{r^2}\right)u_l=0.
+\end{equation}
+The primitives are $u_l(E)$, $\partial_Eu_l(E)$, and $u_l(E+4),u_l(E+8)$ for $l=0,1,2$, with $E=2l+3$. Thus the primitive energy identities used by G2 actually hold. They did not need to hold for the older arbitrary-radial six-row test.
+
+Independent Gauss integration constructs overlap $S$, weak kinetic $T$, and Cartesian potential matrices $Q_{ab}$:
+\begin{align}
+ S_{ij}&=\langle f_i|f_j\rangle,\quad T_{ij}=\langle\nabla f_i|\nabla f_j\rangle,\quad
+ (Q_{ab})_{ij}=\langle f_i|x_a x_b|f_j\rangle,\\
+ V(\bm r)&=\bm r^TW\bm r=r^2+0.31r^2Y_{20},\quad
+ W=\Id+0.31\sqrt{5/(16\pi)}\operatorname{diag}(-1,-1,2).
+\end{align}
+Per $(l,m)$, two linear combinations of the four radial primitives are chosen to have both value and radial slope zero at $R=2.6$. They define compact $C^1$ functions and remove interface terms without assuming a KS eigenfunction. Four random complex bands are orthonormalized and rotated to diagonalize their central Hamiltonian. Matching-response coefficients $D^\nu$ are arbitrary complex combinations in the same compact subspace.
+
+Set $A_t=A+tD^\nu$ and use the pulled-back functions $\phi_t(r)=\sum_i(A_t)_{in}f_i(Fr)$. With the potential held fixed in the pulled-back coordinate, a change of integration variable gives the \emph{endpoint} matrices
+\begin{align}
+ O(t)&=J^{-1}A_t^\dagger S A_t,\\
+ H(t)&=J^{-1}A_t^\dagger\left[T+\sum_{ab}(F^{-T}WF^{-1})_{ab}Q_{ab}\right]A_t .
+\end{align}
+No G1/G2 derivative formula is used to construct these endpoints. Their derivative of $\Rea\Tr[\rho H(t)-\rho_E O(t)]$ is compared with the actual Fortran sum
+\begin{equation}
+ 2\Rea\Tr(\rho K_\nu)+2\Rea\Tr(\rho M_H^\nu-\rho_E M_O^\nu).
+\end{equation}
+All six strain components are tested, including noncommuting Hermitian $\rho,\rho_E$, a DFT diagonal case, and $D^\nu=0$ to isolate the cancellation of geometric terms. The latter is particularly useful: neither G1 nor G2 alone is the finite-difference answer.
+
+\subsection{Measured regression results}
+The absolute errors below are in the units of each synthetic fixture, not GPa. For the combined test the finite-difference step is $h=2\times10^{-5}$. The maximum is taken over all six tensor components. The $\sim10^{-7}$ combined error includes the production logarithmic-mesh radial quadrature; it is well below the $3\times10^{-5}$ test tolerance.
+\begin{center}\begin{tabular}{p{0.73\linewidth}r}\toprule
+Test & Maximum error\\\midrule
+G1, full complex density; WIEN and dmft2 & $4.438\times10^{-14}$\\
+G2, all six primitive contractions & $8.764\times10^{-8}$\\
+Combined H/O, noncommuting DMFT & $1.254\times10^{-7}$\\
+Combined H/O, diagonal DFT & $1.063\times10^{-7}$\\
+Combined H/O, geometric cancellation & $1.251\times10^{-7}$\\
+Matching, direct endpoints at $h=3\times10^{-6}$ & $2.258\times10^{-9}$\\
+APW boundary, complex density & $1.478\times10^{-12}$\\
+Interstitial, complex density & $4.441\times10^{-15}$\\
+\bottomrule\end{tabular}\end{center}
+The existing normalization, window, direct-$C$, and basis-covariance regressions also pass. The positive-mesh G1 derivative reproduces polynomials through degree three to roundoff-weighted accuracy; cusp and fractional-power tests converge with mesh refinement. A deliberately restored pre-audit G1 mode fails the Cartesian-polynomial test, so the suite is sensitive to the previously corrected factors and not just checking that two current routines agree.
+
+\subsection{Fresh SrVO3 and FeSe reruns}
+Installed binaries were rerun in isolated copies for both DFT and eDMFT. FeSe uses RELA and RKMAX 8; SrVO$_3$ uses NREL and RKMAX 7. The eDMFT vector data contain 66 bands at each of 140 $k$ points for FeSe, and 43 bands at each of 75 $k$ points for SrVO$_3$. The archived first-pass input provenance and endpoint references were reused unchanged.
+
+The table compares the \textbf{mean stress} $\bar\sigma=\Tr\sigma/3$ in GPa. Thus the difference is already divided by three relative to an isotropic linear-strain trace; do not divide the displayed difference by three again. The finite-difference values are the existing converged endpoint reference, not fresh endpoint reconvergence in this pass.
+\begin{center}\begin{tabular}{lrrr}\toprule
+Case & Analytic & Existing FD & Analytic $-$ FD\\\midrule
+DFT SrVO$_3$ & 8.516855 & 10.115115 & -1.598260\\
+DFT FeSe & 11.995096 & 12.138195 & -0.143099\\
+DMFT SrVO$_3$ & 5.223963 & 4.617396 & +0.606567\\
+DMFT FeSe & -0.488870 & -1.049104 & +0.560234\\
+\bottomrule\end{tabular}\end{center}
+The fresh total tensors exactly reproduce the first-pass results at the precision of the saved SCF component records. Valence charge files are byte-identical, and ordinary nonstress SCF2 records are unchanged in all four cases. DFT merge/mixer was also run on the isolated outputs and agrees with the component assembly to its printed precision. For eDMFT the total is assembled from the saved density, core, and valence stress records using the same convention.
+
+The code therefore remains reproducible after the first-pass corrections. The mismatch has not decreased in this pass, because the independent tests found no additional justified production correction. In particular the DMFT residuals remain about $0.607$ GPa in SrVO$_3$ and $0.560$ GPa in FeSe. Agreement of the synthetic NREL G1/G2 tests does not explain or remove those residuals.
+
+
+\section{What the second pass establishes, and what it leaves open}
+The current frozen-augmentation NREL bulk formulas have a consistent off-diagonal extension. The corrected G1 product rule survives direct differentiation. The G2 bra derivative, own-energy LO assignment, normalization convention, and independent $\rho_E$ contraction survive an independent full-$H/O$ test. There is no evidence from these checks for another missing bulk off-diagonal term in Eqs. (G1) or (G2).
+
+This conclusion is deliberately narrower than claiming a correct total material stress. The outstanding checks concern:
+\begin{enumerate}
+\item \textbf{Radial-solution response.} $\partial_\nu u_l$, $\partial_\nu\dot u_l$, changes of radial energy parameters and LO coefficients are different from $\dd u/\dd r$. The latter is tested here; the former is frozen in this derivation. A controlled radial-response calculation is needed before assigning the residual to it.
+\item \textbf{RELA consistency.} The combined test solves a NREL radial equation. It does not validate every scalar-relativistic metric, flux, small-component, or energy-derivative correction. The primitive identity $H_{\rm sph}\dot u=E\dot u+u$ must be checked in the actual RELA Hamiltonian and overlap representation, not inferred solely from an energy-dependent eliminated equation.
+\item \textbf{Interfaces and finite angular cutoffs.} The APW derivative-jump bilinear passes its own test. This does not prove the cancellation of all fixed-$R_{\MT}$ moving-domain terms, nor the differentiation of the actual nonspherical angular cutoff. The compact combined test cannot decide those issues by construction.
+\item \textbf{Normalized-projector radial/window response and endpoint convergence.} The small-matrix regressions pass, but material convergence, degeneracies at a window edge, fixed chemical potential, and the charge-relaxed frozen-self-energy reference still require their own controls.
+\end{enumerate}
+The next decisive full-basis test should differentiate the same discretized Hamiltonian and overlap used by lapw1/dftKS, with fixed basis size, in a common representation and with its interface and radial-response conventions recorded. Compare the \emph{combined} contraction, including the corresponding projector and potential terms, not an isolated large $H'$ or $O'$ contribution from inconsistent endpoint frames. No empirical scalar factor or term deletion is justified by the present tests.
+
+\section{Reproducibility and changes made in this pass}
+The accompanying directory \nolinkurl{g1_g2_second_pass_20261107/} contains the new independent tests, their numerical results and logs, source hashes, fresh material summaries, and executable hashes. Test programs compile unchanged production kernels in temporary fixtures with bounds checking. The reference implementations use independent Cartesian differentiation, direct angular/radial quadrature, or endpoint Bessel/harmonic evaluation.
+
+\textbf{Production changes in this pass: none.} The first-pass fixes are retained. This second pass adds a durable derivation and diagnostics; it does not relabel the previous corrections as new bugs or reinstall an unchanged executable. The material runs use isolated copies and leave the user's converged calculation directories untouched. The finite-difference reference is the existing converged endpoint data, not a newly reconverged triplet.
+
+\end{document}

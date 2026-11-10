@@ -1,0 +1,108 @@
+--- a/SRC_lapw1/seclr4.F
++++ b/SRC_lapw1/seclr4.F
+@@ -25,11 +25,8 @@
+                              time_backtransform
+ #endif
+       use lolog, only : nlo, loor, lapw, ilo
+-#ifdef ELPA
+-      use comi, only    : NVAA, NE, NBELW, NAT, NT, LNSMAX, NEMAX_IT
+-#else
+-      use comi, only    : NVAA, NE, NBELW, NAT, NT, LNSMAX
+-#endif  
++      use comi, only    : NVAA, NE, NBELW, NAT, NT, LNSMAX, &
++                          NEMAX_IT, FIXED_NBANDS
+       use coml, only    : SPRSWF, PRNTWF, WFTAPE, REL, ITER, NOHNS
+       use comr, only    : RKM, EL, EU, WEIGHT, divide
+ 
+@@ -208,6 +205,17 @@
+             EU1 = EIGVAL(2)
+             IL = 0
+             IU = 0
++            if(FIXED_NBANDS) then
++               if(NEMAX_IT.lt.1 .or. NEMAX_IT.gt.NVAA+NLO) then
++                  write(ERRMSG,'(A,I8,A,I8)') 'FIXED_NBANDS=',NEMAX_IT, &
++                       ' is incompatible with matrix size=',NVAA+NLO
++                  CALL OUTERR('SECLR4',ERRMSG)
++                  STOP 'invalid FIXED_NBANDS request'
++               endif
++               RANG='I'
++               IL=1
++               IU=NEMAX_IT
++            endif
+             ABSTOL = 0.0D+0
+       abstol=2.d0*PDLAMCH(ICTXTALL,'S')
+ !            ORFAC = 1.0D-3
+@@ -506,6 +514,18 @@
+       CALL START_TIMER(time_sep)
+       IL = 0
+       IU = 0
++      RANG='V'
++      if(FIXED_NBANDS) then
++         if(NEMAX_IT.lt.1 .or. NEMAX_IT.gt.NVAA+NLO) then
++            write(ERRMSG,'(A,I8,A,I8)') 'FIXED_NBANDS=',NEMAX_IT, &
++                 ' is incompatible with matrix size=',NVAA+NLO
++            CALL OUTERR('SECLR4',ERRMSG)
++            STOP 'invalid FIXED_NBANDS request'
++         endif
++         RANG='I'
++         IL=1
++         IU=NEMAX_IT
++      endif
+       ABSTOL = 0.0D+0
+ !      ORFAC = 1.0D-3
+ !abstol and orfac changed back PB 8.5.2014: Au-atom +lapwso_mpi problem
+@@ -672,11 +692,9 @@
+ #endif        
+         abstol=2.d0*PDLAMCH(ICTXTALL,'S')
+               JOBZ='V'
+-              RANG='V'
+               UPLO='L'
+         if(deschs(2).gt.0) then
+           EL1=-1.0D+70                                                          !!!
+-          RANG='V'
+ !!!       if(EU.ge.9.d9) RANG='A'                                               !!!
+ #ifdef old_scalapack
+ !_REAL       CALL PDSYEVX(JOBZ,RANG,UPLO,NVAA+NLO,H,1,1, &
+@@ -754,7 +772,7 @@
+       endif
+ 
+ #else
+-      if(EU.ge.9d9) then
++      if(EU.ge.9d9 .and. .not.FIXED_NBANDS) then
+         if(divide) then
+ !####################################################
+ !############### divide and conquer #################
+@@ -814,13 +832,13 @@
+ !########### standard algorithm (few EVs) ###########
+ !####################################################
+ 
+-!_REAL      CALL DSYXEV4('V','V','L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU, &  
++!_REAL      CALL DSYXEV4('V',RANG,'L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU, &  
+ !_REAL                  ABSTOL,NE,EIGVAL,Z,HSROWS,WORK,LWORK,IWORK,IFAIL, &
+ !_REAL                  BLOCK1,BLOCK2,0.d0,LCOLZ,NBELW,INFO)
+-!_REAL!      CALL DSYEVX2('V','V','L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU, &  
++!_REAL!      CALL DSYEVX2('V',RANG,'L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU, &  
+ !_REAL!                  ABSTOL,NE,EIGVAL,Z,HSROWS,WORK,LWORK,IWORK,IFAIL, &
+ !_REAL!                  BLOCK1,LCOLZ,NBELW,INFO)
+-!_COMPLEX      CALL ZHEEVX2('V','V','L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU,ABSTOL, & 
++!_COMPLEX      CALL ZHEEVX2('V',RANG,'L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU,ABSTOL, & 
+ !_COMPLEX                  NE,EIGVAL,Z,HSROWS,WORK,LWORK,RWORK,IWORK,IFAIL, &
+ !_COMPLEX                  BLOCKSIZE, LCOLZ, NBELW, INFO)
+ !     compare: Complex routines need additional parameter RWORK (after WORK)
+@@ -843,6 +861,16 @@
+          STOP 'SECLR4 - Error'
+       ENDIF
+ #endif
++      if(FIXED_NBANDS) then
++         if(NE.ne.NEMAX_IT) then
++            write(ERRMSG,'(A,I8,A,I8)') 'FIXED_NBANDS requested ', &
++                 NEMAX_IT,' eigenpairs but solver returned ',NE
++            CALL OUTERR('SECLR4',ERRMSG)
++            STOP 'FIXED_NBANDS count mismatch'
++         endif
++         if(MYID.eq.0) write(6,'(A,I8)') &
++              ':FIXED_NBANDS: exact number of lowest eigenpairs =',NE
++      endif
+       CALL STOP_TIMER(time_sep)
+ #ifdef Barrier
+       CALL BARRIER

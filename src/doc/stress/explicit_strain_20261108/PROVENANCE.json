@@ -1,0 +1,28 @@
+{
+  "SrVO3": {
+    "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central/SrVO3.struct": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central/SrVO3.clmsum": "8c8c41d0a8f8e52dd1d613d22f461b5b00d854d8ebe4a97f9d163815f782c236",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central/SrVO3.in0": "2bee8d34243532ddadcbad51c4e68489c49188b8ade049aa78a4740b3c49d8a0",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central/SrVO3.inm": "727743e55e3d46ec4ec34a9284e78ed772f3c635e5bc79b085bcf043dc49eabc",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central/SrVO3.vsp": "2e51e26fd9b834e3b43c66db9a97f7a3f2c4934f875c42b9a8d95379067881b4",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central/SrVO3.vns": "1cf06ee9267bedf59165d2eab02732c425cec262d2105a0ce16a5fbd6bceefe8",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/analytic_density.npy": "123268bf447a4d7ccc06f91aab8c3f0d06fe8bdecfe0b32fa6f60d1e21d8b0a3",
+    "/private/tmp/edmft_projector_functional_20261108/full_bz/SrVO3/covectors.npz": "2ee35d9c1f3d0309b70de7889284df998367f12c7700b9ca80c08ac3e1545518",
+    "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_closure_20261108/SrVO3_potential_core.npz": "b7a5f43ab9a3a0aeca24e89e0a6f6aff9ac04971529109433a04daa1a0ff1401"
+  },
+  "FeSe": {
+    "/private/tmp/edmft_screened_native_20261108/full_bz/FeSe/central/FeSe.struct": "7503825334944f3d0e646b10a60d22f4f1924768ddb27499700f64682e59be16",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/FeSe/central/FeSe.clmsum": "6b35498f5f4f8a2fbd69be9d8d252314608a6f52490c688f183b8c2aa13aa621",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/FeSe/central/FeSe.in0": "902acdd64d18552d3f7b7a0b1954b66409f94a49b125e0d4ea7e4e6f4c737f5e",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/FeSe/central/FeSe.inm": "c7ac0e7ffa5e03d684071b64bf2cc3bb1ad188d47478ff91a0abdfc19408de8f",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/FeSe/central/FeSe.vsp": "6a15019acab6fa21eb2a243f43584da8771a1f6a464a5b683d84e3e80b76d1ac",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/FeSe/central/FeSe.vns": "1b99ed73fd3edb1862ff1ca3c772f2eeb6bacc7a118bf30ba2e6da367f64c31f",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/FeSe/analytic_density.npy": "e9f366a4ea7384a79460ab095a5504f0e08a572752bcf76345ea35427d2b0a58",
+    "/private/tmp/edmft_projector_functional_20261108/full_bz/FeSe/covectors.npz": "cb22512bc65138bfb2c7a994f4b390c4b72a6e7263d45a5c75c144459dcb38de",
+    "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_closure_20261108/FeSe_potential_core.npz": "613505098be9f1765ab64d78d3c572f0727783217158a997d4f2f1b4687700fe"
+  },
+  "native": {
+    "/private/tmp/edmft_explicit_strain_20261108/native/SRC_lapw0/lapw0": "434b9dbb3f981196dfcfc03f6b40b98f1cce610289bb58dff01d19f7edbe7627",
+    "/private/tmp/edmft_explicit_strain_20261108/native/SRC_lapw0/readstruct.f": "895d9d383a157d0023a09f4a952ff9cf6832f29c280a3b5e9b4089e3e460baa9"
+  }
+}

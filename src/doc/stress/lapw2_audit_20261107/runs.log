@@ -1,0 +1,80 @@
+START FeSe_DFT_RELA_m001 lapw0_new
+START FeSe_DFT_RELA lapw0_new
+DONE FeSe_DFT_RELA lapw0_new 0.6s
+DONE FeSe_DFT_RELA_m001 lapw0_new 0.6s
+START FeSe_DFT_RELA lapw1_new
+START FeSe_DFT_RELA_m001 lapw1_new
+DONE FeSe_DFT_RELA lapw1_new 6.0s
+START FeSe_DFT_RELA lapw2_before
+DONE FeSe_DFT_RELA_m001 lapw1_new 6.0s
+START FeSe_DFT_RELA_m001 lapw2_corrected
+DONE FeSe_DFT_RELA lapw2_before 40.3s
+START FeSe_DFT_RELA lapw2_corrected
+DONE FeSe_DFT_RELA_m001 lapw2_corrected 40.6s
+START FeSe_DFT_RELA_m001 lcore_new
+DONE FeSe_DFT_RELA_m001 lcore_new 0.1s
+START FeSe_DFT_RELA_m001 merge_new
+DONE FeSe_DFT_RELA_m001 merge_new 0.0s
+START FeSe_DFT_RELA_m001 mixer_new
+DONE FeSe_DFT_RELA_m001 mixer_new 0.1s
+START FeSe_DFT_RELA_p001 lapw0_new
+DONE FeSe_DFT_RELA_p001 lapw0_new 0.5s
+START FeSe_DFT_RELA_p001 lapw1_new
+DONE FeSe_DFT_RELA_p001 lapw1_new 5.3s
+START FeSe_DFT_RELA_p001 lapw2_corrected
+DONE FeSe_DFT_RELA lapw2_corrected 40.3s
+START FeSe_DFT_RELA lcore_new
+DONE FeSe_DFT_RELA lcore_new 0.1s
+START FeSe_DFT_RELA merge_new
+DONE FeSe_DFT_RELA merge_new 0.0s
+START FeSe_DFT_RELA mixer_new
+DONE FeSe_DFT_RELA mixer_new 0.1s
+START FeSe_DFT_RELA lapw2_full
+DONE FeSe_DFT_RELA_p001 lapw2_corrected 40.2s
+START FeSe_DFT_RELA_p001 lcore_new
+DONE FeSe_DFT_RELA_p001 lcore_new 0.1s
+START FeSe_DFT_RELA_p001 merge_new
+DONE FeSe_DFT_RELA_p001 merge_new 0.0s
+START FeSe_DFT_RELA_p001 mixer_new
+DONE FeSe_DFT_RELA_p001 mixer_new 0.1s
+START SrVO3_DFT_center lapw0_new
+DONE SrVO3_DFT_center lapw0_new 0.4s
+START SrVO3_DFT_center lapw1_new
+DONE SrVO3_DFT_center lapw1_new 6.0s
+START SrVO3_DFT_center lapw2_before
+DONE FeSe_DFT_RELA lapw2_full 40.8s
+START SrVO3_DFT_m001 lapw0_new
+DONE SrVO3_DFT_center lapw2_before 28.4s
+START SrVO3_DFT_center lapw2_corrected
+DONE SrVO3_DFT_m001 lapw0_new 0.5s
+START SrVO3_DFT_m001 lapw1_new
+DONE SrVO3_DFT_m001 lapw1_new 6.1s
+START SrVO3_DFT_m001 lapw2_corrected
+DONE SrVO3_DFT_center lapw2_corrected 28.9s
+START SrVO3_DFT_center lcore_new
+DONE SrVO3_DFT_center lcore_new 0.1s
+START SrVO3_DFT_center merge_new
+DONE SrVO3_DFT_center merge_new 0.0s
+START SrVO3_DFT_center mixer_new
+DONE SrVO3_DFT_center mixer_new 0.1s
+START SrVO3_DFT_center lapw2_full
+DONE SrVO3_DFT_m001 lapw2_corrected 28.1s
+START SrVO3_DFT_m001 lcore_new
+DONE SrVO3_DFT_m001 lcore_new 0.1s
+START SrVO3_DFT_m001 merge_new
+DONE SrVO3_DFT_m001 merge_new 0.0s
+START SrVO3_DFT_m001 mixer_new
+DONE SrVO3_DFT_m001 mixer_new 0.1s
+START SrVO3_DFT_p001 lapw0_new
+DONE SrVO3_DFT_p001 lapw0_new 0.4s
+START SrVO3_DFT_p001 lapw1_new
+DONE SrVO3_DFT_p001 lapw1_new 6.1s
+START SrVO3_DFT_p001 lapw2_corrected
+DONE SrVO3_DFT_center lapw2_full 28.8s
+DONE SrVO3_DFT_p001 lapw2_corrected 28.1s
+START SrVO3_DFT_p001 lcore_new
+DONE SrVO3_DFT_p001 lcore_new 0.1s
+START SrVO3_DFT_p001 merge_new
+DONE SrVO3_DFT_p001 merge_new 0.0s
+START SrVO3_DFT_p001 mixer_new
+DONE SrVO3_DFT_p001 mixer_new 0.1s

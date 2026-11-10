@@ -1,0 +1,72 @@
+{
+  "SrVO3": {
+    "normal_seconds": 0.7527024999726564,
+    "identities": [
+      {
+        "k": 1,
+        "n": 703,
+        "nbands": 43,
+        "metric_error": 3.978114358937813e-14,
+        "H_error_Ry": 1.8651747009912532e-14,
+        "H_conjugated_error_Ry": 0.014426381512853113
+      },
+      {
+        "k": 2,
+        "n": 709,
+        "nbands": 43,
+        "metric_error": 4.6185277921522686e-14,
+        "H_error_Ry": 2.842171271511238e-14,
+        "H_conjugated_error_Ry": 0.15154897745297075
+      },
+      {
+        "k": 3,
+        "n": 701,
+        "nbands": 43,
+        "metric_error": 3.241853377334774e-14,
+        "H_error_Ry": 2.975401578236463e-14,
+        "H_conjugated_error_Ry": 0.22289666315001233
+      }
+    ],
+    "matrix1_seconds": 0.3494974169880152,
+    "matrix1_exact_match": true,
+    "matrix1_protected_outputs_unchanged": true,
+    "matrix4_seconds": 0.2600592088419944,
+    "matrix4_exact_match": true,
+    "matrix4_protected_outputs_unchanged": true
+  },
+  "FeSe": {
+    "normal_seconds": 0.2694903339724988,
+    "identities": [
+      {
+        "k": 1,
+        "n": 509,
+        "nbands": 66,
+        "metric_error": 9.2852031493478e-15,
+        "H_error_Ry": 2.7533531010703882e-14,
+        "H_conjugated_error_Ry": 2.7533531010703882e-14
+      },
+      {
+        "k": 2,
+        "n": 504,
+        "nbands": 66,
+        "metric_error": 2.708944180085382e-14,
+        "H_error_Ry": 4.632512456881888e-14,
+        "H_conjugated_error_Ry": 4.632512456881888e-14
+      },
+      {
+        "k": 3,
+        "n": 498,
+        "nbands": 66,
+        "metric_error": 3.164135620181696e-14,
+        "H_error_Ry": 1.9539925233402755e-14,
+        "H_conjugated_error_Ry": 1.9539925233402755e-14
+      }
+    ],
+    "matrix1_seconds": 0.20103124994784594,
+    "matrix1_exact_match": true,
+    "matrix1_protected_outputs_unchanged": true,
+    "matrix4_seconds": 0.18141304096207023,
+    "matrix4_exact_match": true,
+    "matrix4_protected_outputs_unchanged": true
+  }
+}

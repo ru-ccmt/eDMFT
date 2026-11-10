@@ -1,0 +1,27 @@
+{
+  "installed_at": "2026-11-09T02:16:52.571586-05:00",
+  "backup": "/private/tmp/edmft_core_functional_20261109/before_install_20261109_021652",
+  "destinations": [
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_functional_cancellation.py",
+    "/Users/haule/dbin/lapw_functional_cancellation.py",
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_xc_response.py",
+    "/Users/haule/dbin/lapw_xc_response.py",
+    "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_functional_cancellation.py",
+    "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_xc_energy.py",
+    "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt"
+  ],
+  "evidence": "/Users/haule/projects/eDMFT_new/src/doc/stress/core_functional_20261109",
+  "status": "installed and verified",
+  "verified_at": "2026-11-09T02:17:50.057041-05:00",
+  "verified_targets": 7,
+  "verified_documentation_files": 93,
+  "post_install_tests": {
+    "repository": 239,
+    "dbin": 239,
+    "skipped": 0,
+    "installed_imports_only": true
+  },
+  "stress_applied": false,
+  "phase": 4,
+  "remaining": "Electrostatic and explicit geometric functional terms, complete baseline subtraction, and total-stress validation."
+}

@@ -1,0 +1,40 @@
+{
+  "installed_at": "2026-11-08T23:20:29.844299-05:00",
+  "backup": "/private/tmp/edmft_projector_functional_20261108/before_install_20261108_232029",
+  "destinations": [
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_projector_functional.py",
+    "/Users/haule/dbin/lapw_projector_functional.py",
+    "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_projector_functional.py",
+    "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt"
+  ],
+  "evidence": "/Users/haule/projects/eDMFT_new/src/doc/stress/projector_functional_20261108",
+  "status": "installed and verified",
+  "verified_at": "2026-11-08T23:21:33.928197-05:00",
+  "post_install_checks": {
+    "repository": {
+      "passed": 194,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "verified_installed_imports": true,
+      "log": "post_install_repository.log"
+    },
+    "dbin": {
+      "passed": 194,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "verified_installed_imports": true,
+      "log": "post_install_dbin.log"
+    }
+  },
+  "installed_hashes_verified": 4,
+  "current_phase": 3,
+  "projector_only_readout_validated": true,
+  "next_step": "Point 3: explicit affine potential and complete functional/baseline contraction; then six analytic strain sources and production integration",
+  "limitations": [
+    "Broader geometry/spin support remains pending",
+    "MPI/streaming remains needed for large meshes",
+    "No new production stress or pressure agreement is claimed"
+  ]
+}

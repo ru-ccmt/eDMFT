@@ -1,0 +1,19 @@
+{
+  "case": "FeSe",
+  "setup_seconds": 1.4424777498934418,
+  "central_density_relative": 9.50357308954652e-13,
+  "normalization_offset_norm": 2.230173501632964e-15,
+  "coupled_transpose": 1.0280018115725491e-16,
+  "bands_transpose": 2.7845698904389594e-16,
+  "steps": [
+    {
+      "step": 0.0005,
+      "density_relative": 0.5446028489593596,
+      "density_maximum": 0.9605235733123652,
+      "H_relative": 7.489944272895068e-08,
+      "O_relative": 5.2557408560728846e-08,
+      "FD_norm": 10.607982175835453,
+      "analytic_norm": 11.949212495939687
+    }
+  ]
+}

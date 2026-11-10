@@ -1,0 +1,23 @@
+FeSe full_bz valence prepared 117.94199270801619
+FeSe screening prepared {"fixed_number": true, "target_charge": 120.0, "normalization_enabled": true, "normalization_alpha": 0.9999100015096025, "central_valence_relative_error": 9.584633755875703e-13, "central_core_relative_error": 1.0474876971864264e-13, "central_fixed_point_residual_norm": 0.6280062392181526, "kpoints": 140, "retained_bands": 66, "matrix_quadrature": "wien2k24", "stress_applied": false}
+FeSe forward 1 seconds 41.465645582880825
+FeSe forward 2 seconds 41.58596629090607
+FeSe forward 3 seconds 39.56161962496117
+FeSe forward 4 seconds 39.44305274984799
+FeSe forward 5 seconds 41.53400066704489
+FeSe forward 6 seconds 40.201837125001475
+FeSe forward 7 seconds 39.954533000011
+FeSe forward 8 seconds 40.38245829218067
+FeSe forward 9 seconds 41.032729082973674
+FeSe forward 10 seconds 40.09597370913252
+FeSe forward 11 seconds 39.573926124954596
+FeSe forward 12 seconds 38.84064275003038
+FeSe forward 13 seconds 40.32944304100238
+FeSe FORWARD SOLVED {"converged": true, "gmres_info": 0, "direction": "forward", "residual_norm": 8.694049807251814e-06, "threshold": 3.545601486437931e-05, "actions": 13, "inner_residual_history": [0.5971970565851573, 0.2940312466782278, 0.02604022980697213, 0.005482542895491565, 0.0013281071080615096, 0.0002009922359362569, 1.9506224341043307e-05, 5.0301144980578636e-06, 3.683751056682167e-07, 5.327859051333252e-08, 4.90413241714941e-09], "seconds": 524.4235767920036, "fixed_number": true, "target_charge": 120.0, "normalization_enabled": true, "normalization_alpha": 0.9999100015096025, "central_valence_relative_error": 9.584633755875703e-13, "central_core_relative_error": 1.0474876971864264e-13, "central_fixed_point_residual_norm": 0.6280062392181526, "kpoints": 140, "retained_bands": 66, "matrix_quadrature": "wien2k24", "stress_applied": false, "source_charge": 5.739053676734329e-11, "response_charge": 5.721556521714011e-11}
+FeSe verify_p_1e-05 native completed
+FeSe verify_m_1e-05 native completed
+FeSe NATIVE RESIDUAL 1e-05 {'norm': 1.8534037342965765e-05, 'relative_to_source': 1.0454664695882607e-08, 'jacobian_relative': 1.5501496426326102e-08}
+FeSe verify_p_5e-06 native completed
+FeSe verify_m_5e-06 native completed
+FeSe NATIVE RESIDUAL 5e-06 {'norm': 2.9123942852878016e-05, 'relative_to_source': 1.6428209974684565e-08, 'jacobian_relative': 2.534948370340808e-08}
+FeSe completed

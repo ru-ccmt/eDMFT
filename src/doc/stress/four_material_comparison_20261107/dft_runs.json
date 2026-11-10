@@ -1,0 +1,38 @@
+[
+  {
+    "case": "MnO",
+    "source": "/Users/haule/projects/materials/MnO/DFT_center",
+    "folder": "/private/tmp/edmft_four_material_table_20261107/DFT_runs/MnO_DFT_center",
+    "scope": "one complete DFT evaluation on saved density; not full reconvergence"
+  },
+  {
+    "case": "MnO",
+    "source": "/Users/haule/projects/materials/MnO/DFT_m_0.001",
+    "folder": "/private/tmp/edmft_four_material_table_20261107/DFT_runs/MnO_DFT_m_0.001",
+    "scope": "one complete DFT evaluation on saved density; not full reconvergence"
+  },
+  {
+    "case": "MnO",
+    "source": "/Users/haule/projects/materials/MnO/DFT_p_0.001",
+    "folder": "/private/tmp/edmft_four_material_table_20261107/DFT_runs/MnO_DFT_p_0.001",
+    "scope": "one complete DFT evaluation on saved density; not full reconvergence"
+  },
+  {
+    "case": "0_800_MnTe",
+    "source": "/Users/haule/projects/materials/MnTe/0_800_MnTe",
+    "folder": "/private/tmp/edmft_four_material_table_20261107/DFT_runs/0_800_MnTe_0_800_MnTe",
+    "scope": "one complete DFT evaluation on saved density; not full reconvergence"
+  },
+  {
+    "case": "0_800_MnTe",
+    "source": "/Users/haule/projects/materials/MnTe/MnTe_m_0.001",
+    "folder": "/private/tmp/edmft_four_material_table_20261107/DFT_runs/0_800_MnTe_MnTe_m_0.001",
+    "scope": "one complete DFT evaluation on saved density; not full reconvergence"
+  },
+  {
+    "case": "0_800_MnTe",
+    "source": "/Users/haule/projects/materials/MnTe/MnTe_p_0.001",
+    "folder": "/private/tmp/edmft_four_material_table_20261107/DFT_runs/0_800_MnTe_MnTe_p_0.001",
+    "scope": "one complete DFT evaluation on saved density; not full reconvergence"
+  }
+]

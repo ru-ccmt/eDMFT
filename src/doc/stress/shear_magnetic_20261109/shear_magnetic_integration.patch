@@ -1,0 +1,1205 @@
+--- /dev/null
++++ b/src/python/dmft2_spin.py
+@@ -0,0 +1,101 @@
++"""Shared chemical-potential sequencing for DMFT-only collinear magnetism.
++
++Native calls keep one unpolarized KS potential. The two spin densities are
++independent; only their total electron number is constrained. Temporary DEF
++and control files preserve the user's prepared inputs, including live edits.
++"""
++from contextlib import contextmanager
++from pathlib import Path
++import math
++import subprocess
++import tempfile
++from dmft2_step import entries, replace_filenames, execution_definition
++from lapw_response_policy import control_fields
++
++
++def chemical_potential(directory='.'):
++    mu = float((Path(directory)/'EF.dat').read_text().split()[0])
++    if not math.isfinite(mu):
++        raise ValueError('finite common chemical potential required in EF.dat')
++    return mu
++
++
++@contextmanager
++def measurement_definition(definition, *, mode, recompute, mu):
++    """Change only the three measurement fields in a disposable control copy."""
++    with execution_definition(definition) as native:
++        text = Path(native).read_text()
++        source = Path(entries(text)[2])
++        lines, i, words = control_fields(source)
++        words[:3] = [mode, format(mu, '.17g'), str(recompute)]
++        lines[i] = ' '.join(words)
++        with tempfile.TemporaryDirectory(prefix='.dmft2-spin-input-', dir='.') as tmp:
++            folder = Path(tmp)
++            control = folder/source.name
++            control.write_text('\n'.join(lines)+'\n')
++            df = folder/'dmft2.def'
++            df.write_text(replace_filenames(text, {2: control}))
++            yield str(df)
++
++
++def run_channels(definitions, policy, run, fermi, *, export=False, search_only=False):
++    """Invoke run(label, DEF) in the proper common-mu order.
++
++    Ordinary compensated magnets adjust mu in the first charge call. Ferro
++    states require BOTH eigenvalue files before fermif and both charge calls.
++    export=True reuses the established mu in every channel and skips searching.
++    That is a measurement choice, not a change of the response ensemble.
++    """
++    if len(definitions) != len(policy.channels):
++        raise ValueError('missing DMFT spin definition')
++    if not export and policy.magnetic and policy.ferro and policy.fixed_number:
++        for channel, definition in zip(policy.channels, definitions):
++            with measurement_definition(definition, mode='e', recompute=1,
++                                        mu=chemical_potential()) as df:
++                run('dmft2_eigen'+channel, df)
++        fermi([entries(Path(d).read_text())[15] for d in definitions])
++    if search_only and (not policy.fixed_number or policy.ferro):
++        return
++    for index, (channel, definition) in enumerate(zip(policy.channels, definitions)):
++        search = int(not export and index == 0 and policy.fixed_number and not policy.ferro)
++        with measurement_definition(definition, mode='c', recompute=search,
++                                    mu=chemical_potential()) as df:
++            run('dmft2'+channel, df)
++        if search_only:
++            return
++
++
++def run_fermif(executable, bands, output):
++    """Find one chemical potential from both spin spectra; fail before charge."""
++    if len(bands) != 2 or any(not Path(p).is_file() for p in bands):
++        raise ValueError('fermif requires both freshly computed band files')
++    command = [str(executable), *map(str, bands)]
++    print('FERMIF ..... running:', command, file=output, flush=True)
++    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
++                          text=True) as child:
++        for line in child.stdout:
++            print(line, end='', file=output, flush=True)
++        code = child.wait()
++    if code:
++        raise RuntimeError('fermif failed with status '+str(code))
++    chemical_potential()
++
++
++def average_charge(case, root, output):
++    """Native branch outputs contain a factor two; combineud takes their mean.
++
++    Keep the raw branches under the existing run_dmft backup names. This is
++    called only after BOTH charge calls, never once per spin or before fermif.
++    Core density and stress assembly remain shared downstream operations.
++    """
++    with subprocess.Popen([str(Path(root)/'combineud'), case], stdout=subprocess.PIPE,
++                          stderr=subprocess.STDOUT, text=True) as child:
++        for line in child.stdout:
++            print(line, end='', file=output, flush=True)
++        code = child.wait()
++    average = Path(case+'.clmval_aver')
++    if code or not average.is_file() or average.stat().st_size == 0:
++        raise RuntimeError('combineud did not produce the averaged valence charge')
++    Path(case+'.clmval').replace(case+'.clmval_up')
++    Path(case+'.clmvaldn').replace(case+'.clmval_dn')
++    average.replace(case+'.clmval')
+--- a/src/python/dmft2_step.py
++++ b/src/python/dmft2_step.py
+@@ -29,6 +29,7 @@
+ ALIASES = {"STRT": "STR", "STRFT": "STRF"}
+ SOLVER_KEYS = {
+     "backend",
++    "physical_policy",
+     "lapw0_worker",
+     "lapw1_worker",
+     "lcore_worker",
+@@ -60,6 +61,8 @@
+     ".indmfl",
+     ".indmfi",
+     ".indmf2",
++    ".indmfldn",
++    ".indmf2dn",
+     ".clmsum",
+     ".vsp",
+     ".vns",
+@@ -259,21 +262,18 @@
+     if solver.get("charge_integration", "native") not in {"native", "legacy_spline"}:
+         raise ValueError("charge_integration must be native or legacy_spline")
+     defs = req["files"]
+-    # Backend initially has one unpolarized density and a fixed-N solver.
+-    for suffix in [".inso", ".indmfldn", ".clmup", ".clmdn"]:
++    for suffix in [".inso", ".clmup", ".clmdn", ".incup", ".incdn"]:
+         p = Path(case + suffix)
+         if p.is_file() and p.stat().st_size:
+-            raise ValueError(
+-                "response currently supports nonmagnetic calculations without SOC only"
+-            )
++            raise ValueError("response requires no SOC and an unpolarized KS/core potential")
+     control = [
+         line.split("#", 1)[0].split()
+         for line in Path(defs[2]).read_text().splitlines()
+         if line.strip() and not line.lstrip().startswith("#")
+     ][0]
+-    if len(control) < 3 or control[0] != "c" or int(control[2]) != 1:
++    if len(control) < 3 or control[0] != "c" or int(control[2]) not in (0, 1):
+         raise ValueError(
+-            "response currently requires charge mode c and recomputeEF=1 (fixed N)"
++            "response requires charge mode c and recomputeEF=0 or 1"
+         )
+     if req["mode"] not in {"STR", "STRF", "STRT", "STRFT"}:
+         raise ValueError(
+@@ -286,8 +286,29 @@
+ 
+     s = Struct()
+     s.ReadStruct(case + ".struct")
+-    if s.lattyp.strip() != "P" or not np.allclose([s.alpha, s.beta, s.gamma], 90.0):
+-        raise ValueError("response currently supports primitive orthogonal cells only")
++    from lapw_lattice import NativeLattice
++    from lapw_response_policy import detect_policy
++    NativeLattice.from_structure(s)
++    policy = detect_policy(".", case, control=defs[2], override=solver.get("physical_policy"))
++    if backend == "native" and (policy.magnetic or not policy.fixed_number or s.lattyp.strip() != "P" or not np.allclose([s.alpha,s.beta,s.gamma],90)):
++        raise ValueError("legacy native backend requires nonmagnetic fixed-N primitive orthogonal inputs")
++    if policy.magnetic:
++        if Path(defs[7]).name != case+".indmfl":
++            raise ValueError("launch the primary dmft2 definition; response handles both spins")
++        companion = Path("dmft2dn.def")
++        if not companion.is_file():
++            raise ValueError("magnetic response requires prepared dmft2dn.def")
++        down = entries(companion.read_text())
++        for unit in [5,9,18,20,30,9919]:
++            if unit in defs and (unit not in down or Path(defs[unit]).resolve()!=Path(down[unit]).resolve()):
++                raise ValueError("spin branches must share native KS inputs at unit "+str(unit))
++        dh = Path(down[7]).read_text().splitlines()[0].split()
++        if len(dh)<4 or int(dh[2])!=1 or abs(int(dh[3]))!=5:
++            raise ValueError("second spin requires normalized projector 5 and fixed bands")
++        for name in ["combineud"]+(["fermif"] if policy.ferro and policy.fixed_number else []):
++            helper = Path(root)/name
++            if not helper.is_file() or not os.access(helper,os.X_OK):
++                raise ValueError("missing magnetic helper: "+str(helper))
+     header = Path(defs[7]).read_text().splitlines()[0].split()
+     if len(header) < 4 or int(header[2]) != 1 or abs(int(header[3])) != 5:
+         raise ValueError(
+@@ -353,9 +374,9 @@
+             raise ValueError("analytic stress publication requires STR in case.in0")
+         if solver.get("charge_integration", "native") != "native":
+             raise ValueError("analytic backend requires native charge integration")
+-        from lapw_total_stress import diagonal_invariant_strains
+-
+-        diagonal_invariant_strains(s)
++        from lapw_total_stress import invariant_strains
++
++        invariant_strains(s)
+         names = {
+             "lapw0_worker": "lapw0_response",
+             "lcore_worker": "lcore_response",
+@@ -374,6 +395,7 @@
+             solver[key] = str(path)
+     return solver | {
+         "backend": backend,
++        "physical_policy": policy.record(),
+         "wien_root": str(wi),
+         "dmft2": str(exe),
+         "mpi": launch,
+@@ -403,8 +425,8 @@
+     for p in sorted(Path(".").iterdir()):
+         if p.is_file() and (
+             (p.name.startswith(case + ".") and p.suffix in SNAPSHOT_SUFFIXES)
+-            or p.name in {"EF.dat", "projectorw.dat", "Eorb_imp.dat"}
+-            or re.fullmatch(r"sig\.inp\d*", p.name)
++            or p.name in {"EF.dat", "projectorw.dat", "Eorb_imp.dat", "params.dat"}
++            or re.fullmatch(r"sig\.inp\d*(?:dn)?", p.name)
+         ):
+             shutil.copy2(p, snapshot / p.name)
+             fingerprints[p.name] = sha256(snapshot / p.name)
+@@ -422,7 +444,7 @@
+     for name, source in [
+         ("dmft2.def", Path(req["definition"])),
+         ("lapw1.def", Path("lapw1.def")),
+-    ]:
++    ] + ([("dmft2dn.def", Path("dmft2dn.def"))] if solver["physical_policy"]["magnetic"] else []):
+         (snapshot / name).write_text(local_definition(source.read_text()))
+         fingerprints[name] = sha256(snapshot / name)
+     # Preserve identities of split and unsplit vector/energy inputs without
+@@ -447,6 +469,10 @@
+     scripts = {}
+     for module in [
+         "response_parallel",
++        "lapw_response_policy",
++        "dmft2_spin",
++        "lapw_magnetic_response",
++        "lapw_lattice",
+         "frozen_sigma_tangent",
+         "frozen_sigma_response",
+         "lapw_valence_state",
+@@ -489,6 +515,8 @@
+     if solver.get("backend", "native") == "analytic":
+         cfg = {
+             "case": case,
++            "physical_policy": solver["physical_policy"],
++            "fermif": str(Path(root)/"fermif"),
+             "reference": str(snapshot),
+             "workspace": str(work / "central"),
+             "wien_root": solver["wien_root"],
+@@ -499,6 +527,8 @@
+             "dmft2_definition": str(snapshot / "dmft2.def"),
+             **{k: solver[k] for k in ["lapw0_worker", "lapw1_worker", "lcore_worker"]},
+         }
++        if solver["physical_policy"]["magnetic"]:
++            cfg["dmft2dn_definition"] = str(snapshot/"dmft2dn.def")
+         atomic_json(work / "prepare.json", cfg)
+         commands = [
+             [
+@@ -553,6 +583,7 @@
+         if (
+             report.get("converged") is not True
+             or report.get("full_tensor_within_symmetry") is not True
++            or report.get("diagnostic_only", False)
+         ):
+             raise RuntimeError(
+                 "analytic response did not supply a complete supported tensor"
+@@ -562,7 +593,7 @@
+         parent = {
+             k: v
+             for k, v in fingerprints.items()
+-            if not k.startswith("parent/") and k not in {"lapw1.def", "dmft2.def"}
++            if not k.startswith("parent/") and k not in {"lapw1.def", "dmft2.def", "dmft2dn.def"}
+         }
+         return {
+             "backend": "analytic",
+@@ -667,8 +698,20 @@
+             preflight(case, req, root, mpi)
+         if tracking:
+             atomic_json(status_path, status)
+-        with execution_definition(definition) as native:
+-            run_core(root, mpi, native, output)
++        magnetic = due and Path(case+".indmfldn").is_file() and Path(case+".indmfldn").stat().st_size > 0
++        if magnetic:
++            from lapw_response_policy import detect_policy
++            from dmft2_spin import run_channels, run_fermif, average_charge
++            policy = detect_policy(".",case,control=req["files"][2],
++                                   override=req["config"].get("solver",{}).get("physical_policy"))
++            run_channels([definition,"dmft2dn.def"],policy,
++                lambda label,df: run_core(root,mpi,df,output),
++                lambda bands: run_fermif(Path(root)/"fermif",bands,output))
++            average_charge(case,root,output)
++            status["physical_policy"] = policy.record()
++        else:
++            with execution_definition(definition) as native:
++                run_core(root, mpi, native, output)
+         if due:
+             status["status"] = "running_response"
+             atomic_json(status_path, status)
+--- a/src/python/lapw_magnetic_response.py
++++ b/src/python/lapw_magnetic_response.py
+@@ -144,8 +144,8 @@
+           spherical=up.bands.spherical,spherical_selector=up.bands.spherical_selector,ns=up.bands.ns,ir=up.bands.ir),
+         spatial=SimpleNamespace(operator=spatial,coordinates=density_coordinates,
+           value=lambda:.5*(up.spatial.value()+down.spatial.value())),
+-        direct=SimpleNamespace(operator=direct),fingerprints=up.fingerprints,
+-        fingerprint_paths=up.fingerprint_paths,
++        direct=SimpleNamespace(operator=direct),fingerprints=up.fingerprints | down.fingerprints,
++        fingerprint_paths=up.fingerprint_paths | down.fingerprint_paths,
+         mixer_normalization_enabled=getattr(up, "mixer_normalization_enabled", None),
+         preparation_seconds=up.preparation_seconds+down.preparation_seconds,
+         matrix_quadrature=up.matrix_quadrature)
+--- /dev/null
++++ b/src/python/lapw_response_policy.py
+@@ -0,0 +1,109 @@
++"""Physical ensemble, magnetic channels and MIXER policy for native response.
++
++The flags describe different choices. INM controls charge normalization;
++recomputeEF controls the electronic number constraint; Ferro controls HOW a
++common chemical potential is found for inequivalent spin spectra. In a Ferro
++run the two charge calls use recomputeEF=0 after fermif, although the physical
++response is fixed N. Never infer its ensemble from that temporary zero alone.
++"""
++from dataclasses import asdict, dataclass
++from pathlib import Path
++import ast
++
++
++@dataclass(frozen=True)
++class ResponsePolicy:
++    magnetic: bool
++    ferro: bool
++    fixed_number: bool
++    normalization_enabled: bool
++
++    @property
++    def channels(self):
++        return ("", "dn") if self.magnetic else ("",)
++
++    def record(self):
++        return asdict(self)
++
++
++def control_fields(path):
++    lines = Path(path).read_text().splitlines()
++    for i, line in enumerate(lines):
++        words = line.split('#', 1)[0].split()
++        if words:
++            if len(words) < 3 or words[0] not in ('c', 'e', 'm'):
++                raise ValueError('invalid dmft2 charge/eigenvalue control: ' + str(path))
++            return lines, i, words
++    raise ValueError('empty dmft2 control: ' + str(path))
++
++
++def literal_parameters(path):
++    """Read the two simple policy assignments without executing params.dat.
++
++    run_dmft may supply already evaluated values for computed parameters.
++    Standalone callers must use literal Ferro/recomputeEF assignments, rather
++    than accidentally executing imports or impurity setup a second time.
++    """
++    path = Path(path)
++    if not path.is_file():
++        return {}
++    tree = ast.parse(path.read_text(), filename=str(path))
++    out = {}
++    for node in ast.walk(tree):
++        if isinstance(node, ast.Assign):
++            names = [t.id for t in node.targets if isinstance(t, ast.Name)]
++        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
++            names = [node.target.id]
++        else:
++            continue
++        for name in set(names) & {'Ferro', 'recomputeEF'}:
++            if node not in tree.body:
++                raise ValueError('computed policy requires an explicit override: ' + name)
++            try:
++                out[name] = ast.literal_eval(node.value)
++            except (ValueError, TypeError):
++                raise ValueError('computed policy requires an explicit override: ' + name) from None
++    return out
++
++
++def detect_policy(directory, case, *, control=None, override=None):
++    """Detect the second DMFT branch; it does not imply a spin-polarized KS map."""
++    directory = Path(directory)
++    nonempty = lambda suffix: (directory/(case+suffix)).is_file() and (directory/(case+suffix)).stat().st_size > 0
++    if any(nonempty(s) for s in ('.inso', '.clmup', '.clmdn', '.incup', '.incdn')):
++        raise NotImplementedError('response requires no SOC and one unpolarized KS/core potential')
++    magnetic = bool(nonempty('.indmfldn'))
++    _, _, words = control_fields(control or directory/(case+'.indmf2'))
++    mode = int(words[2])
++    if mode not in (0, 1):
++        raise NotImplementedError('response ensemble for gap-search recomputeEF=2 is not defined')
++    override = {} if override is None else dict(override)
++    if set(override) - {'magnetic', 'ferro', 'fixed_number', 'normalization_enabled'}:
++        raise ValueError('unknown physical response policy')
++    if any(not isinstance(value, bool) for value in override.values()):
++        raise ValueError('physical policy flags must be booleans')
++    params = {} if {'ferro', 'fixed_number'} <= set(override) else literal_parameters(directory/'params.dat')
++    ferro = override.get('ferro', params.get('Ferro', False))
++    if not isinstance(ferro, bool):
++        raise ValueError('Ferro must be True or False')
++    # Without Ferro, the live prepared primary input is authoritative. With
++    # Ferro, params carries the physical policy hidden by temporary m=0 calls.
++    physical_mode = params.get('recomputeEF', mode) if ferro else mode
++    if 'fixed_number' not in override and (type(physical_mode) is not int or physical_mode not in (0, 1)):
++        raise ValueError('physical recomputeEF must be 0 or 1 for response')
++    fixed = override.get('fixed_number', bool(physical_mode))
++    if not isinstance(fixed, bool):
++        raise ValueError('fixed_number must be a boolean')
++    if ferro and not magnetic:
++        raise ValueError('Ferro=True requires the second DMFT channel')
++    fields = (directory/(case+'.inm')).read_text().splitlines()[0].split()
++    if len(fields) < 3 or fields[2].upper() not in ('YES', 'NO'):
++        raise ValueError('explicit INM YES/NO normalization required')
++    if float(fields[1]) != 0:
++        raise NotImplementedError('charged-background INM policy requires a separate response')
++    normalize = fields[2].upper() == 'YES'
++    if 'magnetic' in override and override['magnetic'] != magnetic:
++        raise ValueError('recorded spin policy disagrees with case.indmfldn')
++    if 'normalization_enabled' in override and override['normalization_enabled'] != normalize:
++        raise ValueError('recorded charge normalization disagrees with case.inm')
++    return ResponsePolicy(magnetic, ferro, fixed, normalize)
+--- a/src/python/lapw_response_prepare.py
++++ b/src/python/lapw_response_prepare.py
+@@ -2,9 +2,9 @@
+ """Export one isolated central state for the analytic stress driver.
+ 
+ This is a single central LAPW0 -> LAPW1 -> DMFT2 -> LCORE pass, not a strained
+-SCF loop. DMFT2 first determines the central chemical potential, then its
+-fixed-mu export pass records that same state. The analytic derivative later
+-enforces fixed N. Parent files are copied, never linked or modified.
++SCF loop. The configured physical ensemble determines whether DMFT2/fermif first
++updates the common chemical potential. Fixed-mu exports then record both spin
++branches. Preparation metadata retains the original response ensemble. Parent files are copied, never linked or modified.
+ 
+ Workers are explicit configuration paths: lapw0_worker/lapw1_worker/lcore_worker
+ must support the native response exports; dmft2 is the response-enabled worker.
+@@ -15,10 +15,24 @@
+ pools and merges validated streams. Only LAPW0/LCORE remain replicated setup.
+ """
+ from pathlib import Path
++from contextlib import contextmanager
++from lapw_response_policy import detect_policy
++from dmft2_spin import run_channels, run_fermif
+ import argparse, json, os, re, shutil, subprocess, time, sys
+ from dmft2_step import local_definition, entries
+ from lapw_native_potential_export import prepare_native_potential_core
+ from lapw_potential_core_state import fingerprint_files
++
++
++@contextmanager
++def working_directory(path):
++    """Scoped native-file context, also available on Python 3.10."""
++    previous = Path.cwd()
++    try:
++        os.chdir(path)
++        yield
++    finally:
++        os.chdir(previous)
+ 
+ 
+ def prepare(config):
+@@ -34,7 +48,7 @@
+         "lapw1_definition",
+         "dmft2_definition",
+     }
+-    if set(config) - {"native_mpi", "lapw1_mpi"} != required:
++    if set(config) - {"native_mpi", "lapw1_mpi", "physical_policy", "dmft2dn_definition", "fermif"} != required:
+         raise ValueError("preparation config keys must be " + str(sorted(required)))
+     native_mpi = config.get("native_mpi", [])
+     if not isinstance(native_mpi, list) or any(
+@@ -51,6 +65,9 @@
+     work = Path(config["workspace"]).resolve()
+     if not re.fullmatch(r"[A-Za-z0-9_.+-]+", case):
+         raise ValueError("invalid case name")
++    policy = detect_policy(reference, case, override=config.get("physical_policy"))
++    if policy.magnetic and "dmft2dn_definition" not in config:
++        raise ValueError("two-spin preparation requires dmft2dn_definition")
+     work.mkdir(parents=True, exist_ok=False)
+     env = {
+         k: v
+@@ -78,22 +95,20 @@
+         "indmfl",
+         "indmfi",
+         "indmf2",
++        "indmfldn",
++        "indmf2dn",
+         "clmsum",
+     ]
+     names = (
+         [case + "." + s for s in suffixes]
+-        + ["EF.dat", "projectorw.dat", "Eorb_imp.dat"]
++        + ["EF.dat", "projectorw.dat", "Eorb_imp.dat", "params.dat"]
+         + [p.name for p in reference.glob("sig.inp*")]
+     )
+-    for suffix in ["inso", "indmfldn", "clmup", "clmdn"]:
+-        p = reference / (case + "." + suffix)
+-        if p.is_file() and p.stat().st_size:
+-            raise NotImplementedError("nonmagnetic, no-SOC preparation required")
+     files = {name: reference / name for name in names if (reference / name).is_file()}
+     before = fingerprint_files(files)
+     for name, path in files.items():
+         shutil.copy2(path, work / name)
+-    for label in ["lapw1", "dmft2"]:
++    for label in ["lapw1", "dmft2"] + (["dmft2dn"] if policy.magnetic else []):
+         (work / (label + ".def")).write_text(
+             local_definition(Path(config[label + "_definition"]).read_text())
+         )
+@@ -103,14 +118,6 @@
+             lines = p.read_text().splitlines()
+             lines[0] = re.sub(r"^\s*\S+", "TOT", lines[0], count=1)
+             p.write_text("\n".join(lines) + "\n")
+-    control = work / (case + ".indmf2")
+-    lines = control.read_text().splitlines()
+-    j = next(
+-        i for i, l in enumerate(lines) if l.strip() and not l.lstrip().startswith("#")
+-    )
+-    words = lines[j].split()
+-    if words[0] != "c" or int(words[2]) != 1:
+-        raise NotImplementedError("charge mode with recomputeEF=1 required")
+     times = []
+ 
+     def run(label, exe, args, extra=None, marker=None):
+@@ -163,28 +170,31 @@
+             {"WIEN_LAPW1_MATRIX_DUMP": str(work / "native")},
+             "LAPW1",
+         )
+-    run("dmft2_number", config["dmft2"], ["dmft2.def"], marker="DMFT2")
+-    words[1] = (work / "EF.dat").read_text().split()[0]
+-    words[2] = "0"
+-    lines[j] = " ".join(words)
+-    control.write_text("\n".join(lines) + "\n")
+-    run(
+-        "dmft2",
+-        config["dmft2"],
+-        ["dmft2.def"],
+-        {"EDMFT_RESPONSE_EXPORT": str(work / "response")},
+-        "DMFT2",
+-    )
++    definitions = [str(work/('dmft2'+channel+'.def')) for channel in policy.channels]
++    fermif = Path(config.get("fermif", Path(config["dmft2"]).parent/"fermif")).resolve()
++    def common_fermi(bands):
++        with (work/"fermif.log").open("w") as stream:
++            run_fermif(fermif, bands, stream)
++    with working_directory(work):
++        run_channels(definitions, policy,
++            lambda label, definition: run(label+"_number", config["dmft2"], [definition], marker="DMFT2"),
++            common_fermi, search_only=True)
++        def export(label, definition):
++            suffix = "_dn" if label.endswith("dn") else ""
++            run(label, config["dmft2"], [definition],
++                {"EDMFT_RESPONSE_EXPORT": str(work/("response"+suffix))}, "DMFT2")
++        run_channels(definitions, policy, export, common_fermi, export=True)
+     run("lcore", config["lcore_worker"], ["lcore.def"])
+     prepare_native_potential_core(work, case, work / "potential_core.npz")
+     if before != fingerprint_files(files):
+         raise RuntimeError("parent inputs changed during preparation")
+-    if not (work / "response.meta").is_file() or not list(
++    if any(not (work / ("response"+("_dn" if ch else "")+".meta")).is_file() for ch in policy.channels) or not list(
+         work.glob("native.ham.k*.bin")
+     ):
+         raise RuntimeError("workers did not export native response data")
+     report = dict(
+         case=case,
++        physical_policy=policy.record(),
+         parent_fingerprints=before,
+         config=config,
+         timings=times,
+--- a/src/python/lapw_strain_field.py
++++ b/src/python/lapw_strain_field.py
+@@ -1,9 +1,10 @@
+-"""Symmetry-preserving diagonal cell geometry of the native potential map.
++"""General symmetry-preserving strain of the native potential map.
+ 
+-Density transport is separately specified as the scalar hydrostatic convention.
+-This extension primarily matches the tiny anisotropy from rounded native cell
+-lengths, allowing exact source comparisons without mislabelling it as noise.
+-It does not supply general shear layouts or anisotropic density transport.
++All six symmetric Cartesian components are supported, including shear. The
++native star/equivalent-atom layout can be reused precisely when e commutes
++with its Cartesian point group. Symmetry-forbidden first stress derivatives
++are zero; symmetry-breaking response/elastic constants need expanded layouts.
++The density-coordinate transport is the independent scalar convention tr(e)/3.
+ """
+ 
+ from lapw_lattice import NativeLattice
+@@ -38,16 +39,16 @@
+ 
+ 
+ def diagonal_strain_potential(prepared, strain, *, transport_rate=None):
+-    """Analytic potential source for diagonal cell strain plus scalar transport.
++    """Analytic potential source for symmetric cell strain plus scalar transport.
+ 
+     q'=-e q, Omega'=tr(e)Omega. Let gamma_G=(q.e.q)/q^2. Differentiate the
+     Coulomb pseudocharge matrices, including YKAV angular motion, without
+     ratios to spherical harmonics or Bessel functions. XC gradients transform
+     as -e grad and Hessians as -e Hessian-Hessian e. RMT/radial grids stay fixed.
+-    A caller that supplies general diagonal e must deliberately choose its
++    A caller that supplies general symmetric e must deliberately choose its
+     density-coordinate convention; default trace(e)/3 matches native probes.
+     """
+-    e = checked(strain, (3, 3), "diagonal strain", real=True)
++    e = checked(strain, (3, 3), "symmetric strain", real=True)
+     if not np.allclose(e, e.T, atol=1e-14, rtol=0):
+         raise ValueError("symmetric cell strain required")
+     h, s = prepared.hartree, prepared.structure
+@@ -178,3 +179,6 @@
+         xc_geometry=vxc,
+         mask_derivative=mask,
+     )
++
++# Historical function name retained for existing importers.
++symmetric_strain_potential = diagonal_strain_potential
+--- a/src/python/lapw_total_stress.py
++++ b/src/python/lapw_total_stress.py
+@@ -1,14 +1,16 @@
+-"""Complete native frozen-Sigma stress for symmetry-enforced diagonal tensors.
++"""Complete native frozen-Sigma stress in the full crystal-invariant tensor space.
+ 
+ All functional terms are combined before contraction. One screened adjoint
+ serves every independent strain. This module consumes prepared central data;
+ it neither changes the calculation nor appends a partial correction to mixer.
+ 
+-Supported publication: symmetry-enforced diagonal, nonmagnetic/no-SOC,
+-fixed-N projector-5 scope of the native loaders, fixed RMT and local frames, successful ordinary
+-radial-energy searches with fixed IN1 reference EF. Symmetry must forbid every
+-off-diagonal stress component. General shear, magnetic and fixed-mu publication
+-require their own validation and are deliberately rejected here.
++The six Cartesian symmetric components are reduced only by the native charge
++symmetry. Triclinic cells retain all six; monoclinic cells retain their allowed
++shear. Non-invariant perturbations would need expanded density/star layouts,
++but their first derivatives vanish for a scalar with the imposed symmetry.
++The report explicitly identifies projection onto that imposed symmetry when
++the supplied self-energy is not invariant. RMT and local frames remain fixed.
++SOC and spin-dependent KS potentials are outside this implementation.
+ """
+ 
+ from dataclasses import dataclass
+@@ -28,14 +30,14 @@
+ from stress_response_adjoint import RY_BOHR3_TO_GPA
+ 
+ 
+-def diagonal_invariant_strains(structure):
+-    """A complete strain basis when point symmetry forces stress to be diagonal.
+-
+-    Determine the invariant subspace of *all six* symmetric tensor components
+-    first. Testing just diagonal strains would silently discard allowed shear
+-    stress in monoclinic/triclinic cases. The hydrostatic direction comes first;
+-    averaged zz, yy, xx directions complete its span without arbitrary signs.
+-    Fractional symmetry operations are converted to Cartesian coordinates.
++def invariant_strains(structure):
++    """Deterministic complete basis of crystal-invariant symmetric strains.
++
++    Project all six Cartesian directions with the point-group Reynolds map.
++    Keep hydrostatic strain first, then independent diagonal and shear images.
++    Never infer missing stress components from a hydrostatic measurement.
++    Fixed-point sources remain in the native symmetry-adapted coordinates:
++    every returned e obeys R e R^T=e. For P1/-1 this is all six components.
+     """
+     s = structure
+     from lapw_lattice import NativeLattice
+@@ -52,11 +54,14 @@
+     constraints = np.vstack(
+         [np.column_stack([(r @ e @ r.T - e).ravel() for e in basis]) for r in rotations]
+     )
++    # Identity/inversion in an oblique cell acquires roundoff from A R A^-1.
++    # Remove that absolute noise before a relative-rank SVD.
++    constraints[abs(constraints) < 1e-12] = 0
+     invariant = null_space(constraints, rcond=1e-10)
+-    if invariant.shape[1] == 0 or np.linalg.norm(invariant[3:]) > 1e-9:
+-        raise NotImplementedError("symmetry allows shear; expanded sources required")
++    if invariant.shape[1] == 0:
++        raise ValueError("point symmetry has no invariant hydrostatic direction")
+     directions = [np.eye(3)]
+-    for i in [2, 1, 0]:
++    for i in [2, 1, 0, 3, 4, 5]:
+         e = basis[i]
+         candidate = sum(r @ e @ r.T for r in rotations) / len(rotations)
+         columns = np.column_stack([v.ravel() for v in directions])
+@@ -67,8 +72,16 @@
+         if np.linalg.norm(residual) > 1e-9:
+             directions.append(candidate)
+     if len(directions) != invariant.shape[1]:
+-        raise ValueError("incomplete invariant diagonal strain basis")
++        raise ValueError("incomplete invariant symmetric strain basis")
+     return np.array(directions)
++
++
++def diagonal_invariant_strains(structure):
++    """Compatibility check for callers explicitly requesting a diagonal tensor."""
++    directions = invariant_strains(structure)
++    if any(np.linalg.norm(e - np.diag(np.diag(e))) > 1e-9 for e in directions):
++        raise NotImplementedError("symmetry allows shear; use invariant_strains")
++    return directions
+ 
+ 
+ def stress_from_contractions(strains, derivatives, volume):
+@@ -123,38 +136,37 @@
+         library,
+         fixed_point_tolerance=1e-3,
+         progress=None,
++        diagnostic=False,
+     ):
+-        if hasattr(state.valence, "branches"):
+-            raise NotImplementedError(
+-                "magnetic response is diagnostic until total-stress validation is complete"
+-            )
+-        if any(getattr(v.model, "diagnostic_only", False) for v in getattr(state.valence, "branches", [state.valence])):
++        branches = getattr(state.valence, "branches", [state.valence])
++        omitted = any(getattr(v.model, "diagnostic_only", False) for v in branches)
++        if omitted and not diagnostic:
+             raise NotImplementedError("window-omission diagnostic cannot publish total stress")
++        self.diagnostic_only = bool(diagnostic or omitted)
+         residual = state.metadata["central_fixed_point_residual_norm"]
+-        if not state.fixed_number:
+-            raise NotImplementedError("fixed-N total stress is validated here")
+         if not np.isfinite(fixed_point_tolerance) or fixed_point_tolerance <= 0:
+             raise ValueError("positive fixed-point tolerance required")
+         if residual > fixed_point_tolerance:
+             raise ValueError(f"central charge map is not converged: {residual:g}")
+-        self.strains = diagonal_invariant_strains(state.potential_core.structure)
++        self.strains = invariant_strains(state.potential_core.structure)
+         # Structural symmetry alone does not prove that a noisy frozen Sigma
+         # respects it. Its Hermitian real/imaginary parts must each be invariant
+         # under the actual orbital/cix map. Otherwise only the tensor projected
+         # onto the imposed charge symmetry is determined by these sources.
+-        meta = state.valence.model.meta
+         errors = []
+-        for sigma in [meta.sigma_inf] + [
+-            meta.sigma[..., n] for n in range(len(meta.omega))
+-        ]:
+-            dagger = sigma.swapaxes(0, 1).conj()
+-            for part in [(sigma + dagger) / 2, (sigma - dagger) / (2j)]:
+-                errors.append(
+-                    float(
+-                        np.linalg.norm(meta.sym(part) - part)
+-                        / max(np.linalg.norm(part), 1e-30)
++        for branch in branches:
++            meta = branch.model.meta
++            for sigma in [meta.sigma_inf] + [
++                meta.sigma[..., n] for n in range(len(meta.omega))
++            ]:
++                dagger = sigma.swapaxes(0, 1).conj()
++                for part in [(sigma + dagger) / 2, (sigma - dagger) / (2j)]:
++                    errors.append(
++                        float(
++                            np.linalg.norm(meta.sym(part) - part)
++                            / max(np.linalg.norm(part), 1e-30)
++                        )
+                     )
+-                )
+         self.sigma_symmetry_error = max(errors, default=0.0)
+         self.state, self.directory, self.case = state, directory, case
+         self.functional = PreparedKleinFunctional(state)
+@@ -268,9 +280,11 @@
+             contraction_seconds=time.perf_counter() - start,
+             stress_applied=False,
+             full_tensor_within_symmetry=True,
++            diagnostic_only=self.diagnostic_only,
++            stress_ready=not self.diagnostic_only,
+             sigma_symmetry_relative_error=self.sigma_symmetry_error,
+             tensor_is_symmetry_projection=self.sigma_symmetry_error > 1e-10,
+             unrestricted_tensor_validated=False,
+-            scope="nonmagnetic fixed-N primitive orthogonal; symmetry-enforced diagonal tensor",
++            scope="complete symmetric tensor within imposed native charge symmetry; shared unpolarized KS potential",
+         )
+         return sigma, lam, report
+--- a/src/python/lapw_total_stress_driver.py
++++ b/src/python/lapw_total_stress_driver.py
+@@ -13,6 +13,7 @@
+ executor after its native preparation pass.
+ """
+ from pathlib import Path
++from contextlib import ExitStack
+ from response_parallel import SERIAL, ResponseParallel, limit_blas_threads
+ import argparse
+ import hashlib
+@@ -45,6 +46,8 @@
+     basis_cache_mb=128.0,
+     full_sources=False,
+     save_geometry=False,
++    ensemble="auto",
++    diagnostic_gap_cutoff=None,
+ ):
+     """Prepare once, form invariant sources, solve one adjoint, save evidence."""
+     thread_policy = limit_blas_threads()
+@@ -57,10 +60,15 @@
+     library = Path(library or Path(__file__).with_name("liblapw_response.so")).resolve()
+     if not library.is_file():
+         raise ValueError("native radial library missing")
+-    for suffix in ["inso", "indmfldn", "clmup", "clmdn"]:
+-        p = snapshot / (case + "." + suffix)
+-        if p.is_file() and p.stat().st_size:
+-            raise NotImplementedError("nonmagnetic/no-SOC snapshot required")
++    from lapw_response_policy import detect_policy
++    from lapw_magnetic_response import combine_valence
++    provenance = snapshot / "preparation.json"
++    override = json.loads(provenance.read_text()).get("physical_policy", {}) if provenance.is_file() else {}
++    if ensemble not in ("auto", "fixed-n", "fixed-mu"):
++        raise ValueError("invalid electronic ensemble")
++    if ensemble != "auto":
++        override["fixed_number"] = ensemble == "fixed-n"
++    policy = detect_policy(snapshot, case, override=override)
+     files = {
+         name: snapshot / (case + "." + name)
+         for name in ["struct", "clmsum", "in0", "vsp", "inc"]
+@@ -72,9 +80,6 @@
+             lambda: prepare_native_potential_core(snapshot, case, potential_core)
+         )
+     pc = load_potential_core_state(potential_core, expected_fingerprints=expected)
+-    mixer = (snapshot / (case + ".inm")).read_text().splitlines()[0].split()
+-    if len(mixer) < 3 or float(mixer[1]) != 0 or mixer[2].upper() != "YES":
+-        raise NotImplementedError("neutral normalized native charge policy required")
+     import re
+ 
+     unit5 = re.search(
+@@ -86,20 +91,18 @@
+     core = Density(snapshot / (case + ".clmcor"), snapshot / (case + ".struct"))
+     target = float(np.dot(pc.structure.mult, pc.structure.Znuc))
+     timings = dict(prepare_potential_core_seconds=time.perf_counter() - start)
+-    with load_native_valence_state(
+-        snapshot,
+-        case,
+-        complex_vectors=complex_vectors,
+-        energy_policy="fixed",
+-        matrix_quadrature="wien2k24",
+-        library=library,
+-        parallel=parallel,
+-        cache_mb=cache_mb,
+-        basis_cache_mb=basis_cache_mb,
+-    ) as v:
++    with ExitStack() as stack:
++        branches = [stack.enter_context(load_native_valence_state(
++            snapshot, case, complex_vectors=complex_vectors, energy_policy="fixed",
++            matrix_quadrature="wien2k24", library=library, parallel=parallel,
++            cache_mb=cache_mb, basis_cache_mb=basis_cache_mb, spin_channel=channel,
++            diagnostic_gap_cutoff=diagnostic_gap_cutoff,
++        )) for channel in policy.channels]
++        v = combine_valence(*branches) if policy.magnetic else branches[0]
+         timings["prepare_valence_seconds"] = v.preparation_seconds
+         state = NativeScreenedState(
+-            v, pc, core, target_charge=target, fixed_number=True
++            v, pc, core, target_charge=target, fixed_number=policy.fixed_number,
++            normalization_enabled=policy.normalization_enabled,
+         )
+         t = time.perf_counter()
+         total = PreparedTotalStress(
+@@ -109,6 +112,7 @@
+             complex_vectors=complex_vectors,
+             library=library,
+             fixed_point_tolerance=fixed_point_tolerance,
++            diagnostic=diagnostic_gap_cutoff is not None,
+             progress=lambda i, x: progress(
+                 f"Prepared radial energy search {i+1}: atom {x['atom']+1}, l={x['l']}"
+             ),
+@@ -213,6 +217,7 @@
+         report.update(
+             converged=True,
+             case=case,
++            physical_policy=policy.record(),
+             snapshot=str(snapshot),
+             source_fingerprints=expected,
+             valence_fingerprints=v.fingerprints,
+@@ -228,7 +233,7 @@
+             kpoints=[int(r.kpoint) for r in v.records],
+             peak_rss_bytes=report["peak_rss_bytes"],
+             timings=report["timings"],
+-            electronic_cache=v.model.cache_info(),
++            electronic_cache=[b.model.cache_info() for b in branches],
+         )
+     )
+     report["parallel"] = dict(
+@@ -281,6 +286,10 @@
+         action="store_true",
+         help="diagnostic: retain local band-geometry arrays (large)",
+     )
++    p.add_argument("--ensemble", choices=["auto", "fixed-n", "fixed-mu"], default="auto",
++                   help="auto uses preparation provenance; override for legacy exports")
++    p.add_argument("--diagnostic-gap-cutoff", type=float,
++                   help="omit singular window pairs ONLY in a non-publishable diagnostic")
+     a = p.parse_args()
+     parallel = ResponseParallel.world() if a.mpi else SERIAL
+     run_prepared(
+@@ -296,6 +305,8 @@
+         basis_cache_mb=a.basis_cache_mb,
+         full_sources=a.full_sources,
+         save_geometry=a.save_geometry,
++        ensemble=a.ensemble,
++        diagnostic_gap_cutoff=a.diagnostic_gap_cutoff,
+     )
+ 
+ 
+--- a/src/python/run_dmft.py
++++ b/src/python/run_dmft.py
+@@ -260,7 +260,8 @@
+     before the last ordinary dmft2 call. The loop leaves final lapw0/lapw1
+     outputs ready; use those in one final pass with no impurity solve and no
+     regenerated inputs. A failed response raises before lcore or mixer.
+-    The current backend publishes potential tangents, not a corrected tensor.
++    The executor detects both DMFT channels, establishes their common mu,
++    averages charge once and computes one shared complete stress tensor.
+     """
+     if not dmft2_step.requested(case):
+         return False
+--- a/src/python/stress_response_publish.py
++++ b/src/python/stress_response_publish.py
+@@ -85,6 +85,7 @@
+     if (
+         report.get("converged") is not True
+         or report.get("full_tensor_within_symmetry") is not True
++        or report.get("diagnostic_only", False)
+     ):
+         raise ValueError("a complete supported tensor is required")
+     return replacement_rows(
+--- a/src/python/tests/test_analytic_stress_integration.py
++++ b/src/python/tests/test_analytic_stress_integration.py
+@@ -48,6 +48,7 @@
+                 "projectorw.dat": "projector",
+                 "lapw1.def": "5, 'sample.in1', 'old', 'formatted', 0\n",
+                 "sample.in1": "WFFIL\n",
++                "sample.inm": "MSR1 0.0 YES\n",
+             }.items():
+                 Path(name).write_text(text)
+             files = {
+@@ -76,10 +77,10 @@
+     def test_analytic_defaults_serial_but_preserves_production_mpi(self):
+         with fixture() as (root, bin, wi, req):
+             structure = SimpleNamespace(
+-                lattyp="P", alpha=90.0, beta=90.0, gamma=90.0, ReadStruct=lambda _: None
++                a=4., b=5., c=6., lattyp="P", alpha=90.0, beta=90.0, gamma=90.0, ReadStruct=lambda _: None
+             )
+             with patch("wstruct.Struct", return_value=structure), patch(
+-                "lapw_total_stress.diagonal_invariant_strains"
++                "lapw_total_stress.invariant_strains"
+             ):
+                 result = step.preflight("sample", req, bin, "mpirun -np 4")
+                 self.assertEqual(result["backend"], "analytic")
+@@ -94,6 +95,7 @@
+             before = {p: p.read_bytes() for p in root.iterdir() if p.is_file()}
+             solver = dict(
+                 backend="analytic",
++                physical_policy=dict(magnetic=False,ferro=False,fixed_number=True,normalization_enabled=True),
+                 wien_root=str(wi),
+                 dmft2=str(bin / "dmft2_response"),
+                 library=str(bin / "liblapw_response.so"),
+@@ -148,6 +150,7 @@
+         with fixture() as (root, bin, wi, req):
+             solver = dict(
+                 backend="analytic",
++                physical_policy=dict(magnetic=False,ferro=False,fixed_number=True,normalization_enabled=True),
+                 wien_root=str(wi),
+                 dmft2=str(bin / "dmft2_response"),
+                 library=str(bin / "liblapw_response.so"),
+@@ -171,6 +174,7 @@
+         with fixture() as (root, bin, wi, req):
+             solver = dict(
+                 backend="analytic",
++                physical_policy=dict(magnetic=False,ferro=False,fixed_number=True,normalization_enabled=True),
+                 wien_root=str(wi),
+                 dmft2=str(bin / "dmft2_response"),
+                 library=str(bin / "liblapw_response.so"),
+--- /dev/null
++++ b/src/python/tests/test_dmft2_spin.py
+@@ -0,0 +1,96 @@
++"""Magnetic detection, common-mu sequencing and preservation of live inputs."""
++from pathlib import Path
++from contextlib import contextmanager
++import io,os,tempfile,unittest
++from unittest.mock import patch
++from lapw_response_policy import detect_policy,control_fields
++from dmft2_spin import run_channels
++import dmft2_step as step
++
++
++@contextmanager
++def fixture(ferro=False, fixed=True, magnetic=True):
++    old=os.getcwd()
++    with tempfile.TemporaryDirectory() as tmp:
++        os.chdir(tmp)
++        try:
++            Path('sample.inm').write_text('MSR1 0.0 '+('YES' if fixed else 'NO')+'\n')
++            Path('params.dat').write_text(f'Ferro={ferro!r}\nrecomputeEF={int(fixed)}\n')
++            Path('sample.in2').write_text('STRFT\n')
++            Path('EF.dat').write_text('1.25\n')
++            for suffix in ['', 'dn'] if magnetic else ['']:
++                Path('sample.indmfl'+suffix).write_text('1 4 1 5\n')
++                Path('sample.indmf2'+suffix).write_text(f'# keep header\nc 1.25 {int(fixed and not ferro and not suffix)} 0.7 .T. 0.02\nkeep trailing controls\n')
++                Path('dmft2'+suffix+'.def').write_text(''.join(f"{u}, '{name}', 'old', 'formatted', 0\n" for u,name in [(2,'sample.indmf2'+suffix),(5,'sample.in2'),(7,'sample.indmfl'+suffix),(15,'sample.bnds'+suffix)]))
++            yield
++        finally:os.chdir(old)
++
++
++class SpinWorkflowTests(unittest.TestCase):
++    def test_detects_ferro_fixed_N_despite_temporary_zero(self):
++        with fixture(ferro=True):
++            p=detect_policy('.', 'sample')
++            self.assertTrue(p.magnetic and p.ferro and p.fixed_number)
++            self.assertEqual(p.channels,('', 'dn'))
++        with fixture(fixed=False):
++            p=detect_policy('.', 'sample')
++            self.assertFalse(p.fixed_number or p.normalization_enabled)
++        with fixture(magnetic=False):self.assertFalse(detect_policy('.','sample').magnetic)
++
++    def test_ordinary_pair_shares_first_mu_and_preserves_inputs(self):
++        with fixture():
++            old={p:p.read_bytes() for p in Path('.').glob('*') if p.name!='EF.dat'}
++            seen=[]
++            def run(label,df):
++                _,_,words=control_fields(step.entries(Path(df).read_text())[2]);seen.append((label,words[:3]))
++                if label=='dmft2':Path('EF.dat').write_text('1.47\n')
++            run_channels(['dmft2.def','dmft2dn.def'],detect_policy('.','sample'),run,lambda _:self.fail('unexpected fermif'))
++            self.assertEqual(seen,[('dmft2',['c','1.25','1']),('dmft2dn',['c','1.47','0'])])
++            for p,b in old.items():self.assertEqual(p.read_bytes(),b)
++            self.assertFalse(list(Path('.').glob('.dmft2-*-input-*')))
++
++    def test_ferro_spectra_then_common_mu_then_both_charges(self):
++        with fixture(ferro=True):
++            seen=[]
++            def run(label,df):
++                _,_,w=control_fields(step.entries(Path(df).read_text())[2]);seen.append((label,w[0],int(w[2]),float(w[1])))
++            def fermi(bands):
++                self.assertEqual(bands,['sample.bnds','sample.bndsdn']);seen.append('fermif');Path('EF.dat').write_text('1.61\n')
++            run_channels(['dmft2.def','dmft2dn.def'],detect_policy('.','sample'),run,fermi)
++            self.assertEqual([x[0] if isinstance(x,tuple) else x for x in seen],['dmft2_eigen','dmft2_eigendn','fermif','dmft2','dmft2dn'])
++            self.assertEqual(seen[-2][1:],('c',0,1.61));self.assertEqual(seen[-1][1:],('c',0,1.61))
++
++    def test_export_preserves_physical_ensemble_but_never_refits_mu(self):
++        with fixture(ferro=True):
++            p=detect_policy('.','sample');seen=[]
++            def run(label,df):seen.append(control_fields(step.entries(Path(df).read_text())[2])[2][:3])
++            run_channels(['dmft2.def','dmft2dn.def'],p,run,lambda _:self.fail('export refit'),export=True)
++            self.assertTrue(p.fixed_number);self.assertEqual(seen,[['c','1.25','0']]*2)
++
++    def test_executor_averages_once_before_shared_response(self):
++        with fixture():
++            events=[]
++            with patch.object(step,'preflight'),patch.object(step,'run_core',side_effect=lambda *a:events.append('core')),patch('dmft2_spin.average_charge',side_effect=lambda *a:events.append('average')),patch.object(step,'compute_response',side_effect=lambda *a:events.append('response') or {}):
++                step.execute('sample','/unused',phase='final',output=io.StringIO())
++            self.assertEqual(events,['core','core','average','response'])
++
++    def test_no_extra_charge_solve_during_native_search_phase(self):
++        for ferro,expected in [(False,['dmft2']),(True,['dmft2_eigen','dmft2_eigendn','fermif'])]:
++            with fixture(ferro=ferro):
++                seen=[]
++                run_channels(['dmft2.def','dmft2dn.def'],detect_policy('.','sample'),lambda label,df:seen.append(label),lambda _:seen.append('fermif'),search_only=True)
++                self.assertEqual(seen,expected)
++
++    def test_ferro_rejects_ambiguous_physical_ensemble(self):
++        with fixture(ferro=True):
++            for value in [2, '1', -1]:
++                Path('params.dat').write_text(f'Ferro=True\nrecomputeEF={value!r}\n')
++                with self.assertRaisesRegex(ValueError, 'physical recomputeEF'):
++                    detect_policy('.', 'sample')
++            with self.assertRaisesRegex(ValueError, 'booleans'):
++                detect_policy('.', 'sample', override={'ferro': True, 'fixed_number': 1})
++
++    def test_parameter_read_does_not_execute_file(self):
++        with fixture():
++            with Path('params.dat').open('a') as f:f.write("raise RuntimeError('must not execute')\n")
++            self.assertTrue(detect_policy('.','sample').fixed_number)
+--- a/src/python/tests/test_dmft2_step.py
++++ b/src/python/tests/test_dmft2_step.py
+@@ -216,15 +216,12 @@
+         self.assertEqual(found, [0])
+         self.assertEqual(passes, [0])
+ 
+-    def test_preflight_rejects_fixed_mu_and_magnetism_before_core(self):
++    def test_preflight_still_rejects_spin_polarized_KS(self):
+         with case_directory():
+-            req = step.request("sample")
+-            Path("sample.indmf2").write_text("c 1.25 0 1.0 .T. 0.02\n")
+-            with self.assertRaisesRegex(ValueError, "recomputeEF=1"):
+-                step.preflight("sample", req, "/unused", "")
+-            Path("sample.indmfldn").write_text("magnetic")
+-            with self.assertRaisesRegex(ValueError, "nonmagnetic"):
+-                step.preflight("sample", req, "/unused", "")
++            req=step.request("sample")
++            Path("sample.clmup").write_text("spin polarized KS")
++            with self.assertRaisesRegex(ValueError,"unpolarized KS"):
++                step.preflight("sample",req,"/unused","")
+ 
+     def test_charge_rule_is_checked_before_starting_response(self):
+         with case_directory():
+--- /dev/null
++++ b/src/python/tests/test_general_shear_response.py
+@@ -0,0 +1,62 @@
++"""Complete tensor bases and nonlinear oblique-cell shear endpoints."""
++from copy import deepcopy
++from pathlib import Path
++from unittest.mock import patch
++import tempfile, unittest
++import numpy as np
++from lapw_total_stress import invariant_strains, stress_from_contractions
++from lapw_lattice import NativeLattice
++from lapw_strain_field import symmetric_strain_potential
++from lapw_hydrostatic_potential import hydrostatic_explicit_potential
++from lapw_potential_core_state import save_potential_core_state
++from lapw_xc_response import InterstitialXCResponse
++from test_lapw_potential_core_state import inputs
++
++
++class GeneralShearTests(unittest.TestCase):
++    def test_triclinic_all_six_and_monoclinic_allowed_shear(self):
++        s=inputs()['structure'];s.alpha=81.;s.beta=98.;s.gamma=103.
++        s.timat=np.array([np.eye(3,dtype=int),-np.eye(3,dtype=int)])
++        e=invariant_strains(s)
++        self.assertEqual(len(e),6)
++        sigma=np.array([[.1,.21,-.13],[.21,-.2,.32],[-.13,.32,.7]])
++        volume=NativeLattice.from_structure(s).volume
++        d=volume*np.einsum('ij,aij->a',sigma,e)
++        np.testing.assert_allclose(stress_from_contractions(e,d,volume),sigma,atol=1e-14)
++        s.alpha=s.gamma=90.;s.beta=98.
++        s.timat=np.array([np.eye(3,dtype=int),np.diag([-1,1,-1])])
++        e=invariant_strains(s)
++        self.assertEqual(len(e),4)
++        self.assertTrue(any(abs(x[0,2])>.1 for x in e))
++        for x in e:
++            for rotation in NativeLattice.from_structure(s).cartesian_rotations(s.timat):
++                np.testing.assert_allclose(rotation@x@rotation.T,x,atol=1e-13)
++
++    def test_shear_potential_against_nonlinear_cell_reconstruction(self):
++        args=inputs();s=args['structure'];s.alpha=81.;s.beta=98.;s.gamma=103.
++        lattice=NativeLattice.from_structure(s)
++        d=args['density']
++        for g,z in [((1,0,0),.002+.001j),((-1,0,0),.002-.001j),
++                    ((1,1,1),.0003+.0002j),((-1,-1,-1),.0003-.0002j)]:d.pw[g]=z
++        # Keep the Cartesian orientation exactly F A. Reconstructing WIEN
++        # cell lengths/angles would add a rigid rotation to this independent
++        # finite-difference oracle; that is a separate coordinate conversion.
++        e=np.array([[.2,.3,-.2],[.3,-.1,.4],[-.2,.4,-.1]])
++        with tempfile.TemporaryDirectory() as directory:
++            def endpoint(t,functional):
++                cell=lattice.strained(e,t)
++                with patch.object(NativeLattice,'from_structure',return_value=cell):
++                    pc=save_potential_core_state(Path(directory)/'state.npz',**deepcopy(args))
++                    pc.xc.ir=InterstitialXCResponse(pc.hartree.reanalysis,
++                        np.array(list(d.pw.values())),cell.cell,functional=functional)
++                    value=hydrostatic_explicit_potential(pc)[1]['central_potential']
++                    return pc,value
++            for functional in ['LDA','PBE']:
++                pc,_=endpoint(0,functional)
++                actual,_=symmetric_strain_potential(pc,e,transport_rate=0)
++                errors=[]
++                for h in [1e-4,5e-5]:
++                    minus=endpoint(-h,functional)[1];plus=endpoint(h,functional)[1]
++                    errors.append(np.linalg.norm(actual-(plus-minus)/(2*h)))
++                self.assertLess(errors[-1],2e-7)
++                np.testing.assert_allclose(actual,(plus-minus)/(2*h),atol=4e-8,rtol=3e-6)
+--- a/src/python/tests/test_lapw_total_stress.py
++++ b/src/python/tests/test_lapw_total_stress.py
+@@ -21,10 +21,10 @@
+ 
+ 
+ class TensorTests(unittest.TestCase):
+-    def test_unvalidated_magnetic_total_cannot_be_published(self):
++    def test_unresolved_window_cannot_be_published(self):
+         from lapw_total_stress import PreparedTotalStress
+-        state = NS(valence=NS(branches=(NS(), NS())))
+-        with self.assertRaisesRegex(NotImplementedError, "magnetic response"):
++        state = NS(valence=NS(branches=(NS(model=NS(diagnostic_only=True)),)))
++        with self.assertRaisesRegex(NotImplementedError, "window-omission"):
+             PreparedTotalStress(state, ".", "case", complex_vectors=False,
+                                 library="unused")
+ 
+--- a/src/python/tests/test_stress_response_publish.py
++++ b/src/python/tests/test_stress_response_publish.py
+@@ -99,6 +99,23 @@
+             with self.assertRaisesRegex(ValueError, "report changed"):
+                 response_rows("sample", fixture(), directory=d)
+ 
++    def test_window_omission_report_cannot_reach_mixer(self):
++        # Even a converged diagnostic carrying a full tensor and a valid hash
++        # must not bypass the explicit window-regularity publication policy.
++        with tempfile.TemporaryDirectory() as folder:
++            d = Path(folder)
++            report = d / 'tensor.json'
++            report.write_text(json.dumps(dict(
++                converged=True, full_tensor_within_symmetry=True,
++                diagnostic_only=True, stress_Ry_Bohr3=np.eye(3).tolist())))
++            status = dict(backend='analytic', stress_ready=True,
++                status='complete', converged=True, reference_id='diagnostic',
++                report=str(report), parent_fingerprints={},
++                report_sha256=hashlib.sha256(report.read_bytes()).hexdigest())
++            (d / 'sample.stress_response.status.json').write_text(json.dumps(status))
++            with self.assertRaisesRegex(ValueError, 'complete supported tensor'):
++                response_rows('sample', fixture(), directory=d)
++
+     def test_no_tensor_for_ordinary_or_deferred_iteration(self):
+         with tempfile.TemporaryDirectory() as folder:
+             d = Path(folder)
+--- a/src/python/x_dmft.py
++++ b/src/python/x_dmft.py
+@@ -511,7 +511,17 @@
+         PrepareInFile(idmf+options.m_ext, mode, w2k.case, updn, 0, options.recomputeEF, options.mixEF, options.WL,Temperature,options.Q_ETOT)
+ 
+         if not options.def_only:
+-            #checkSigmas(cixs)
++            # A requested total response owns the two-spin measurement. Prepare
++            # and split the companion here, where ordinary input generation is
++            # already authorized. --execute-only deliberately never does this.
++            if (not options.m_ext and mode == 'c' and
++                os.path.isfile(w2k.case+'.indmfldn') and os.path.getsize(w2k.case+'.indmfldn') > 0 and
++                dmft2_step.request(w2k.case, 'dmft2.def', options.response_config, options.no_response)['enabled']):
++                down = indmffile.Indmfl(w2k.case, 'indmfldn')
++                down.read()
++                PrepareDefinitionFile_dmft2('2dn', mode, w2k.case, list(down.siginds.keys()), updn, dnup, so, para, w2k.SCRATCH, cmplx, 'dn')
++                PrepareInFile('2dn', mode, w2k.case, updn, 0, 0, options.mixEF, options.WL, Temperature, options.Q_ETOT)
++                subprocess.check_call([sys.executable, os.path.join(dmfe.ROOT,'ssplit.py'), '-n', str(options.nom), '-t', str(options.ntail), '-l', 'dn'])
+             runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft2', options.m_ext, response_config=options.response_config, no_response=options.no_response)
+             
+     elif args[0] == 'dmftu':

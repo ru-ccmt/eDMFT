@@ -1,0 +1,30 @@
+The Python/Fortran source patch is radial_quadrature_memory.patch.
+
+Build the optional response library from src/dmft2/atpar with `make response`.
+The clean staged build used gfortran -shared -fPIC -O2 -ffree-line-length-none
+outwin.f90 outwin_response.f90 lapw_radial_response.f90 lapw_radial_capi.f90
+-o liblapw_response.so. Dependent radial Hamiltonian/potential modules were
+also compiled against the updated module interfaces. The original C ABI is
+preserved; the policy-aware constructor is an additional entry point.
+
+Reproduction scripts record actual scratch paths and are not production
+wrappers. Full-mesh input/matrix/vector snapshots reside under
+/private/tmp/edmft_full_k_response_20261108/full_bz. The previous checkpoint's
+native archive preserves the smaller native inputs and endpoint densities.
+This checkpoint adds +/-0.125 Ry gauge input copies. Large native H/O/vector
+files are deliberately not duplicated into the source repository.
+
+The independent radial reference compiles the user's native WIEN2k OUTWINB
+and CHARGE with the small wrappers in reproduce/native. Their source hashes
+are recorded. WIEN2k source is not redistributed in this evidence bundle.
+The source paths in reproduction scripts can be adjusted for another host.
+
+Unit suite: run_all_tests.py with PYTHONDONTWRITEBYTECODE=1 and one BLAS/OpenMP
+thread. Set EDMFT_RADIAL_LIBRARY to the newly built shared library. Other
+native reference libraries are the same as the preceding full_k_response
+checkpoint (Hartree radial, periodic charge, mixer normalization). Set
+EDMFT_TEST_SOURCE=/Users/haule/dbin for the installed-helper dependency pass.
+Before installation, stage/ overrides only the proposed changed helpers.
+
+Point 3 has not started. Ordinary native executables, production stress and
+user material directories were not modified by these tests.

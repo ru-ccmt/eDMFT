@@ -1,0 +1,142 @@
+{
+  "SrVO3_DFT": {
+    "atoms": [
+      {
+        "atom": 1,
+        "stored_Ry": 4107.393291887905,
+        "log_regularized_Ry": 4107.393351099693,
+        "difference_Ry": 5.921178762946511e-05,
+        "quad_sensitivity_Ry": -2.1100277081131935e-10,
+        "core_charge_outside_MT": 4.760055078227312e-05,
+        "q_at_MT": 0.0002918004438881,
+        "tail_virial_Ry": 3.445887614361709e-05
+      },
+      {
+        "atom": 2,
+        "stored_Ry": 1142.841098764729,
+        "log_regularized_Ry": 1142.8411128978985,
+        "difference_Ry": 1.4133169543129043e-05,
+        "quad_sensitivity_Ry": 7.548806024715304e-11,
+        "core_charge_outside_MT": 6.008022009491803e-08,
+        "q_at_MT": 7.260804825219e-07,
+        "tail_virial_Ry": 6.613777259190101e-08
+      },
+      {
+        "atom": 3,
+        "stored_Ry": 76.67786400460719,
+        "log_regularized_Ry": 76.67786467020001,
+        "difference_Ry": 6.655928217469409e-07,
+        "quad_sensitivity_Ry": 8.15703060652595e-12,
+        "core_charge_outside_MT": 3.3332897913771753e-08,
+        "q_at_MT": 4.002322533302e-07,
+        "tail_virial_Ry": 1.65763651693851e-08
+      },
+      {
+        "atom": 4,
+        "stored_Ry": 153.3557577912298,
+        "log_regularized_Ry": 153.3557591224156,
+        "difference_Ry": 1.3311858140241384e-06,
+        "quad_sensitivity_Ry": 1.3585577107733116e-11,
+        "core_charge_outside_MT": 3.333243094270185e-08,
+        "q_at_MT": 4.002272030762e-07,
+        "tail_virial_Ry": 3.315449248475488e-08
+      }
+    ],
+    "mean_stress_difference_GPa": 0.0028959750745445466
+  },
+  "FeSe_DFT": {
+    "atoms": [
+      {
+        "atom": 1,
+        "stored_Ry": 3042.453925352864,
+        "log_regularized_Ry": 3042.4539654768196,
+        "difference_Ry": 4.012395538666169e-05,
+        "quad_sensitivity_Ry": -5.0240487325936556e-09,
+        "core_charge_outside_MT": 3.4784595915444433e-12,
+        "q_at_MT": 4.958072602836e-11,
+        "tail_virial_Ry": 3.637978807091713e-12
+      },
+      {
+        "atom": 2,
+        "stored_Ry": 6001.418477130782,
+        "log_regularized_Ry": 6001.418556973394,
+        "difference_Ry": 7.984261173987761e-05,
+        "quad_sensitivity_Ry": 1.9990693544968963e-09,
+        "core_charge_outside_MT": 0.00026122594115453914,
+        "q_at_MT": 0.001705554601222,
+        "tail_virial_Ry": 0.00044194137808517553
+      }
+    ],
+    "mean_stress_difference_GPa": 0.0033362858813008635
+  },
+  "SrVO3_DMFT": {
+    "atoms": [
+      {
+        "atom": 1,
+        "stored_Ry": 4107.380697104165,
+        "log_regularized_Ry": 4107.380756315827,
+        "difference_Ry": 5.921166211919626e-05,
+        "quad_sensitivity_Ry": -2.4283508537337184e-10,
+        "core_charge_outside_MT": 4.7700571582406284e-05,
+        "q_at_MT": 0.0002922889138935,
+        "tail_virial_Ry": 3.4274936297151726e-05
+      },
+      {
+        "atom": 2,
+        "stored_Ry": 1142.807526441535,
+        "log_regularized_Ry": 1142.8075405744662,
+        "difference_Ry": 1.4132931255517178e-05,
+        "quad_sensitivity_Ry": 8.753886504564434e-11,
+        "core_charge_outside_MT": 5.985213706435327e-08,
+        "q_at_MT": 7.23780672245e-07,
+        "tail_virial_Ry": 6.743539415765554e-08
+      },
+      {
+        "atom": 3,
+        "stored_Ry": 76.67596478927092,
+        "log_regularized_Ry": 76.67596545485407,
+        "difference_Ry": 6.655831441548798e-07,
+        "quad_sensitivity_Ry": 9.478640095039736e-12,
+        "core_charge_outside_MT": 3.3461764934130165e-08,
+        "q_at_MT": 4.016149256941e-07,
+        "tail_virial_Ry": 1.6318494999723043e-08
+      },
+      {
+        "atom": 4,
+        "stored_Ry": 153.3519560254119,
+        "log_regularized_Ry": 153.35195735657965,
+        "difference_Ry": 1.3311677378169406e-06,
+        "quad_sensitivity_Ry": 1.8474111129762605e-11,
+        "core_charge_outside_MT": 3.3461213619638425e-08,
+        "q_at_MT": 4.016089750434e-07,
+        "tail_virial_Ry": 3.2639064784234506e-08
+      }
+    ],
+    "mean_stress_difference_GPa": 0.0028959600241359857
+  },
+  "FeSe_DMFT": {
+    "atoms": [
+      {
+        "atom": 1,
+        "stored_Ry": 3042.361172091583,
+        "log_regularized_Ry": 3042.361212214639,
+        "difference_Ry": 4.012305635114899e-05,
+        "quad_sensitivity_Ry": -5.072251951787621e-09,
+        "core_charge_outside_MT": 3.4670235137897393e-12,
+        "q_at_MT": 4.943817999868e-11,
+        "tail_virial_Ry": 2.7284841053187847e-12
+      },
+      {
+        "atom": 2,
+        "stored_Ry": 6001.348719171172,
+        "log_regularized_Ry": 6001.348799013395,
+        "difference_Ry": 7.984222338563995e-05,
+        "quad_sensitivity_Ry": 1.7926140571944416e-09,
+        "core_charge_outside_MT": 0.0002631614790910097,
+        "q_at_MT": 0.001715806265733,
+        "tail_virial_Ry": 0.0004384638659757911
+      }
+    ],
+    "mean_stress_difference_GPa": 0.0033362500788239676
+  }
+}

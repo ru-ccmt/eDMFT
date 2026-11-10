@@ -1,0 +1,440 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,bm,booktabs,array,hyperref,xcolor,listings}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={Frozen-self-energy charge response and LAPW stress},pdfauthor={eDMFT implementation notes}}
+\setlength{\emergencystretch}{2em}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,columns=fullflexible,frame=single}
+\newcommand{\Tr}{\operatorname{Tr}}
+\newcommand{\Herm}{\operatorname{Herm}}
+\newcommand{\Sym}{\operatorname{Sym}}
+\newcommand{\dd}{\mathrm d}
+\newcommand{\ii}{\mathrm i}
+\title{Frozen-self-energy charge response\\and the projector contribution to LAPW stress}
+\author{Implementation and validation note for DFT+eDMFT}
+\date{8 November 2026}
+\begin{document}
+\maketitle
+
+\noindent\textbf{Purpose.} Obtain the strain derivative of the Kohn--Sham
+potential without two converged strained calculations and without an impurity
+solve. The immediate application is the chain-rule contribution from the
+potential-dependent, normalized, finite-band-window projector. This note
+distinguishes a tested complete charge-map derivative from the less accurate
+stored-band approximation. The correction remains opt-in.
+
+\section{What is differentiated, and what is kept fixed?}
+Let $\eta$ be hydrostatic linear strain, with deformation gradient
+$F_\eta=(1+\eta)I$, determinant $J_\eta=(1+\eta)^3$, and reference cell
+volume $\Omega$. Fractional nuclear positions, muffin-tin radii, local
+orbital axes, impurity self-energy on its supplied Matsubara mesh, and the
+double-counting contribution contained in that input are held fixed in
+the present tests. Band-window endpoints are fixed integer indices.
+
+Use material coordinates $\mathbf x$ in the central cell:
+\begin{equation}
+ q_\eta(\mathbf x)=J_\eta n_\eta(F_\eta\mathbf x),\qquad
+ v_\eta(\mathbf x)=V_{{\rm KS},\eta}(F_\eta\mathbf x).
+ \label{eq:pullback}
+\end{equation}
+Here $n$ is the physical total electron density, including core charge;
+$V_{\rm KS}$ is the local Kohn--Sham potential. A subscript 1 denotes
+$\partial_\eta|_0$. Equation~\eqref{eq:pullback} gives
+\begin{equation}
+ q_1=n_1+3n_0+\mathbf x\cdot\nabla n_0,\qquad
+ v_1=V_1+\mathbf x\cdot\nabla V_0.
+ \label{eq:advection}
+\end{equation}
+The derivative $V_1$ on the right is at fixed physical position; $v_1$
+is at fixed material position. Confusing the two loses the advection term.
+For general infinitesimal strain $E$, replace $3$ by $\Tr E$ and
+$\mathbf x\cdot\nabla$ by $(E\mathbf x)\cdot\nabla$.
+
+The first implementation constrains total particle number. A Mott-insulator
+calculation at fixed chemical potential is a different response problem;
+the complete WIEN driver does not silently substitute fixed $N$ for that
+ensemble. The analytic band-space action exposes both choices.
+
+\section{The linear screening equation}
+Write the linearized density-to-potential map in material coordinates as
+\begin{equation}
+ v_1=v_{\rm aff}+Kq_1.
+ \label{eq:potential}
+\end{equation}
+$v_{\rm aff}$ is the potential derivative when $q_\eta=q_0$: nuclei and
+cell are strained, while physical density is transported affinely.
+$K$ is the central Hartree plus exchange-correlation kernel. In the numerical
+implementation LAPW0 evaluates its action, including nonspherical,
+interstitial and GGA contributions; no explicit dense kernel is built.
+
+The frozen-self-energy electronic response satisfies
+\begin{equation}
+ q_1=b+\chi_{\rm fr}v_1,
+ \qquad
+ s=b+\chi_{\rm fr}v_{\rm aff},
+ \qquad
+ \boxed{(I-\chi_{\rm fr}K)q_1=s.}
+ \label{eq:screen}
+\end{equation}
+$b$ is the explicit geometrical response of the one-electron charge map,
+including basis and reconstruction changes, at fixed material potential.
+The source $s$ is obtained together, so its strongly cancelling pieces need
+not be evaluated separately. One screened approximation is $q_1\simeq s$,
+followed by $v_1\simeq v_{\rm aff}+Ks$. It is not sufficient in these tests.
+
+\subsection*{Why this is not a full interacting DMFT susceptibility}
+In a fixed central orthonormal representation,
+\begin{align}
+ G_k(z)&=[z+\mu-H_k-U_k\widetilde\Sigma(z)U_k^\dagger]^{-1},\\
+ \delta G_k&=G_k\left[\delta H_k-\delta\mu I
+  +\delta U_k\widetilde\Sigma U_k^\dagger
+  +U_k\widetilde\Sigma\delta U_k^\dagger\right]G_k.
+ \label{eq:dg}
+\end{align}
+$z=\ii\omega_n$, $\widetilde\Sigma$ is the local self-energy after the
+implemented double counting, and $U_k$ embeds local correlated orbitals.
+There is no $U_k\delta\widetilde\Sigma_{\rm imp}U_k^\dagger$ in this
+frozen-$\Sigma$ calculation. The physical DMFT susceptibility would require
+that term and the impurity vertex. The screening in Eq.~\eqref{eq:screen}
+uses the DFT kernel $K$, not an assumed Hubbard-$U$ RPA kernel.
+
+Computing $\delta G$ here supplies $q_1$ and hence $v_1$. It does not mean
+adding an independent $\delta G$ term to a stationary functional derivative.
+Stationarity at fixed projectors does not remove the explicit chain rule
+when the implemented projector itself depends on $V_{\rm KS}$.
+
+\section{Finite window and normalization must both respond}
+Let $\phi$ collect the untruncated localized trial orbitals, and let
+$\Pi_{W,k}$ project onto the chosen KS bands at each $k$. Then
+\begin{equation}
+ U_k=\Pi_{W,k}\phi_k X,\qquad
+ S=\Sym\sum_k w_k\phi_k^\dagger\Pi_{W,k}\phi_k,\qquad X=S^{-1/2}.
+ \label{eq:projector}
+\end{equation}
+The operation $\Sym$ is the actual orbital-symmetry and equivalent-site
+average used by the code. The $k$ weights $w_k$ are constant and sum to one.
+For several impurity blocks these expressions apply with the implemented
+block and site bookkeeping. Inactive orbital channels retain the code's
+identity normalization; they must not acquire an artificial derivative.
+
+For a perturbing potential matrix $D_k$ in the central KS basis, and
+indices $n\in W$, $a\notin W$,
+\begin{equation}
+ (\delta\Pi_{W,k})_{an}=\frac{(D_k)_{an}}{\epsilon_{kn}-\epsilon_{ka}},
+ \qquad
+ (\delta\Pi_{W,k})_{na}=(\delta\Pi_{W,k})_{an}^*.
+ \label{eq:pi}
+\end{equation}
+Within-$W$ and within-complement blocks vanish for this spectral-projector
+derivative. A window boundary through a degeneracy is rejected, not
+regularized. Smooth fixed-index selection still requires an isolated
+window subspace.
+
+In the frozen central LAPW basis,
+\begin{align}
+ \delta S&=\Sym\sum_k w_k\phi_k^\dagger\delta\Pi_{W,k}\phi_k,\\
+ \delta U_k&=\delta\Pi_{W,k}\phi_kX+\Pi_{W,k}\phi_k\delta X.
+ \label{eq:du}
+\end{align}
+If $S=V\operatorname{diag}(s_i)V^\dagger$, the exact Fr\'echet derivative is
+\begin{equation}
+ (V^\dagger\delta X V)_{ij}
+ =-\frac{(V^\dagger\delta S V)_{ij}}
+ {\sqrt{s_i}\sqrt{s_j}(\sqrt{s_i}+\sqrt{s_j})}.
+ \label{eq:dx}
+\end{equation}
+No projector pseudoinverse is needed: the exported $X$ is authoritative.
+The saved normalization can differ slightly from the newly summed $S$;
+directional endpoint tests anchor to the saved central $X$ consistently.
+
+The stored-band implementation uses only available complement bands in
+Eq.~\eqref{eq:pi}. It also holds central radial augmentation fixed.
+The complete charge-map derivative below includes the response missing
+from both restrictions, while keeping the same physical DMFT window.
+
+\section{Matsubara summation and particle-number constraint}
+For one spin component define
+$H_{\infty,k}=H_k+U_k\widetilde\Sigma_\infty U_k^\dagger-\mu I$,
+$G_{\infty,k}(z)=(z-H_{\infty,k})^{-1}$, and
+$f_T(x)=(e^{x/T}+1)^{-1}$. The implemented density prescription is
+\begin{equation}
+ \rho_k=g_s w_k\left[f_T(H_{\infty,k})+
+ 2T\sum_{n\in{\cal M}} a_n\Herm\{G_k(\ii\omega_n)-G_{\infty,k}(\ii\omega_n)\}\right].
+ \label{eq:rho}
+\end{equation}
+$g_s=2$ in the tested nonmagnetic calculation. $\mathcal M$ is the kept
+positive Matsubara mesh and $a_n$ are the actual production quadrature
+weights. The native export supplies them, $T$, $\mu$, and the effective
+self-energy matrices in Ry. The action differentiates Eq.~\eqref{eq:rho},
+including the static subtraction and exact Fermi-matrix derivative. It
+does not square a quadrature-weighted Green function: $a_n$ appears once
+after the two resolvents in Eq.~\eqref{eq:dg} are multiplied.
+
+In an eigenbasis of $H_\infty$, the static derivative is
+\begin{equation}
+ [L_f(H_\infty;\delta H_\infty)]_{ij}
+ =f_T[\varepsilon_i,\varepsilon_j](\delta H_\infty)_{ij},\quad
+ f_T[x,y]=\frac{f_T(x)-f_T(y)}{x-y},\quad f_T[x,x]=f_T'(x).
+\end{equation}
+Let $\delta\rho^{(0)}$ be the fixed-$\mu$ response and $\rho^{(\mu)}$
+the response to a unit increase in $\mu$. Fixed total particle number gives
+\begin{equation}
+ \delta\mu=-\frac{\sum_k\Tr\delta\rho_k^{(0)}}
+ {\sum_k\Tr\rho_k^{(\mu)}},\qquad
+ \delta\rho_k=\delta\rho_k^{(0)}+\delta\mu\,\rho_k^{(\mu)}.
+\end{equation}
+A nearly zero denominator requires an explicit ensemble decision. The
+analytic action refuses to divide by it. A uniform potential shift at
+fixed $N$ gives $\delta U=0$, $\delta\mu=\delta V$, and $\delta\rho=0$.
+
+\section{Complete directional derivative without an impurity solve}
+Define ${\cal F}_\eta[q]$ as \emph{one} frozen-$\Sigma$ charge evaluation,
+pulled back to the reference cell. Each evaluation consists of LAPW0,
+LAPW1, dmft2 with refreshed normalization and chemical potential, lcore,
+and the standard interstitial charge normalization. No mixer history or
+impurity solve is used. Then
+\begin{align}
+ s&\simeq\frac{{\cal F}_{+h}[q_0]-{\cal F}_{-h}[q_0]}{h_+-h_-},\\
+ A x&\equiv\chi_{\rm fr}Kx
+ \simeq\frac{{\cal F}_0[q_0+t x]-{\cal F}_0[q_0]}{t}.
+ \label{eq:jvp}
+\end{align}
+Actual rounded lattice strains $h_\pm$ are used. The central baseline is
+recomputed with the same program path and normalization as each action.
+This avoids dividing a small central mismatch by $t$.
+
+The second line is a numerical action of a linear-response operator at the
+central cell, not a converged strained calculation. It includes radial
+response and the complete LAPW eigenvector response implicitly: computing
+the occupied/window eigenvectors at the perturbed potential lets all basis
+states participate without writing every unoccupied band.
+
+Plain mixing can diverge. With residual $r_j=s+Aq_j-q_j$, the implementation
+uses Anderson history:
+\begin{equation}
+ \gamma=\arg\min_\gamma\|r_j-\Delta R\gamma\|_2,\qquad
+ q_{j+1}=q_j+\beta r_j-(\Delta Q+\beta\Delta R)\gamma.
+\end{equation}
+Here $\Delta Q$ and $\Delta R$ contain differences of recent iterates and
+residuals. Only this small history problem uses SVD. The returned iterate
+must have a measured residual below tolerance; otherwise the driver exits
+with a nonconvergence status. Tolerances refer to the stored density-vector
+norm, not to a universal physical norm; stress and step convergence are
+checked independently.
+
+\subsection*{LAPW-specific safeguards}
+\begin{itemize}
+\item The source and response runs use exactly the central integer G set,
+through the existing serial WIEN fixed-G reference markers. Fixed band
+count alone does not ensure a differentiable basis.
+\item Real versus complex LAPW1 is selected from its unit-5 definition,
+not from the mere presence of an \texttt{in1c} file. Empty optional files
+can exist in real-vector cases.
+\item The spherical \texttt{clmval} channel contains
+$\sqrt{4\pi}\,r^2 n$, whereas \texttt{clmsum}/\texttt{clmcor} contain
+$4\pi r^2 n$. Only the $l=m=0$ valence channel needs the extra
+$\sqrt{4\pi}$ factor before adding core density. Higher harmonics are
+unchanged.
+\item For radial density coefficients $c(r)=r^2n_{lm}(r)$, affine transport
+is $c_\lambda(r)=c_0(r/\lambda)/\lambda$; pullback is
+$\lambda c_\lambda(\lambda r)$. Fourier density star sums acquire
+$\lambda^{-3}$ and $\lambda^3$, respectively. Cubic interpolation on the
+logarithmic radial mesh is used. Boundary extrapolation is small but must
+be checked by halving $h$; density at $R_{\rm MT}$ is not assumed zero.
+\item The analytic signed density matrix is reconstructed through the
+existing dmft2 radial/angular/FFT machinery. All signed eigenmodes are
+retained. The input includes eigenvectors to reject a mismatched gauge,
+including rotations within degenerate subspaces. Energies printed during
+this reconstruction are not response energies.
+\end{itemize}
+
+\section{Projector stress contraction and its limits}
+Let $R_k^{W}$ and $R_k^{X}$ be the already implemented adjoint matrices for
+the window and normalization chain rules, defined operationally by
+\begin{equation}
+ \delta\Gamma_{\rm proj}^{V}
+ =\Re\sum_k\Tr[(R_k^{W}+R_k^{X})\,\delta v_k^{\rm op}].
+\end{equation}
+Here $\delta v_k^{\rm op}$ is the matrix of the \emph{material} local-potential
+derivative in the central KS representation. The exported adjoints already
+contain the code's spin, frequency, and $k$ weights; none is applied again.
+The correction to mean tensile stress is
+\begin{equation}
+ \boxed{\Delta\bar\sigma=
+ \frac{1}{3\Omega}\Re\sum_k\Tr[(R_k^{W}+R_k^{X})(v_{\rm aff}+Kq_1)_k^{\rm op}].}
+\end{equation}
+Multiply Ry/Bohr$^3$ by $14710.507641078$ for the GPa conversion used in
+these comparison archives. Compressive pressure has the opposite sign.
+The tabulated values are already hydrostatic means; do not divide by three
+again. For tetragonal FeSe this is the trace divided by three, not any
+individual diagonal component.
+
+The diagnostic contraction uses a frozen-central-basis LAPW1 matrix probe
+and a complete central dual basis, with separate MT advection and
+interstitial material-coordinate treatment. This probe is a reference
+integrator; it does not imply that the density response can freeze its
+radial basis. The general production replacement would evaluate those
+potential matrix elements directly.
+
+The driver writes predicted physical endpoint potentials using
+$n_\pm(\mathbf r)=J_\pm^{-1}[q_0\pm hq_1](F_\pm^{-1}\mathbf r)$ and two
+LAPW0 calls. Subtracting the raw \texttt{vns} arrays alone is not the
+material potential operator: sphere/interstitial and advection terms
+must still be treated consistently.
+
+\section{Validation results}
+All results below are mean tensile stresses in GPa, using saved
+frozen-$\Sigma$ finite-difference Klein references from the preceding audit.
+Those reference totals were not recomputed by an impurity solver during this
+work. Neither their densities nor potentials were inputs to the response
+solver; they were used only for independent validation.
+
+\begin{center}\small
+\begin{tabular}{lrrrr}\toprule
+Material & Previous analytic & Corrected & Numerical & Difference\\\midrule
+SrVO$_3$ & +5.676884 & +2.690161 & +2.933836 & -0.243675 \\
+FeSe & -0.116492 & -1.118667 & -1.049151 & -0.069516 \\
+\bottomrule\end{tabular}\end{center}
+
+\begin{center}\small
+\begin{tabular}{lrrrr}\toprule
+Material & Predicted correction & Relaxed reference & Difference & Actions\\\midrule
+SrVO$_3$ & -2.98672306 & -2.98675885 & +3.58e-05 & 9 \\
+FeSe & -1.00217579 & -1.00221547 & +3.97e-05 & 11 \\
+\bottomrule\end{tabular}\end{center}
+
+The final validation used a fixed integer G set, fixed band
+counts (43 in SrVO$_3$, 66 in FeSe), and fixed windows $[12,31]$ and
+$[21,44]$, respectively. The retained meshes have 75 and 140 k points.
+The source strain was $h=2.5\times10^{-4}$ and the central density-probe
+step $t=10^{-5}$. The screened-density residual norms were 0.01213 and
+0.00893. Their differences from the relaxed-reference material-density
+response were 0.01504 and 0.01352, versus reference norms 1062.99 and 997.37.
+
+Halving both steps to $h=1.25\times10^{-4}$, $t=5\times10^{-6}$ gives:
+\begin{center}\small
+\begin{tabular}{lrr}\toprule
+Material & Correction, half steps & Change\\\midrule
+SrVO$_3$ & -2.98672795 & -4.88e-06 \\
+FeSe & -1.00219128 & -1.55e-05 \\
+\bottomrule\end{tabular}\end{center}
+
+\subsection*{What exposed the incomplete approximation?}
+Insert the \emph{known} relaxed-reference density derivative into the
+right-hand side of Eq.~\eqref{eq:screen}; measure the residual against that
+reference. Using the corrected fixed-G source, the density-vector norms are:
+\begin{center}\small
+\begin{tabular}{lrr}\toprule
+Charge response used & SrVO$_3$ & FeSe\\\midrule
+Stored bands, frozen radial basis & 170.264 (43 bands) & 426.406 (66 bands)\\
+100 stored bands, frozen radial basis & 109.944 & ---\\
+200 stored bands, frozen radial basis & 89.013 & ---\\
+Complete LAPW response, frozen radial basis & 75.731 & ---\\
+Complete LAPW and radial response & 0.0174 & 0.0562\\\bottomrule
+\end{tabular}\end{center}
+The complete frozen-radial test freezes the basis in \emph{both} LAPW1 and
+dmft2 reconstruction. Freezing only LAPW1 would mix inconsistent radial and
+coefficient representations. The results establish that adding a modest
+number of complement bands alone does not fix the charge-response action.
+Radial-basis response is significant in SrVO$_3$.
+
+\subsection*{Checks passed}
+\begin{itemize}
+\item The exported-mesh Python density reproduces the production central
+band density to $3.3\times10^{-15}$ in SrVO$_3$ and $9\times10^{-16}$ in FeSe.
+\item Independent nonlinear spectral-projector endpoint differences verify
+Eq.~\eqref{eq:dg} and the normalization derivative with quadratic step
+convergence. A small standalone algebra fixture tests the same identity.
+\item Fixed-$N$ conservation and uniform-potential gauge tests pass.
+\item Signed density reconstruction retains negative modes; an intentionally
+changed eigenvector gauge is rejected with a failing process status.
+\item With optional hooks disabled, SrVO$_3$ charge output is identical to
+the prior result, and FeSe differs by at most $1.1\times10^{-18}$ in the
+stored density coefficients.
+\item LAPW0 applied to the measured reference density derivative reproduces
+the independently measured potential correction to approximately
+$2\times10^{-5}$ GPa (SrVO$_3$) and $5\times10^{-5}$ GPa (FeSe).
+\item Final fixed-G source and action runs preserve the G sets, band counts,
+k ordering and isolated window boundaries. Early preliminary runs that
+allowed G changes are superseded by these results.
+\end{itemize}
+
+The screening actions took about 169 seconds in SrVO$_3$ and 138 seconds in
+FeSe on this laptop, with four MPI ranks for dmft2 and serial LAPW1.
+Summed program times including source and central evaluations were about
+218 and 172 seconds, before the separate stress matrix probe. These are
+measured diagnostic costs, not a general scaling guarantee. There were no
+impurity solves and no pairs of converged strained charge calculations.
+
+\textbf{Remaining error.} The total-stress residuals of 0.244 and 0.070 GPa
+are not explained by the numerical accuracy of this potential-response
+calculation. That does not identify their source: residual analytic basis
+approximations, the complement convergence of the stress adjoint itself,
+and consistency of the functional finite-difference reference still need
+separate checks. Agreement of the new correction with its reference must
+not be reported as exact agreement of the complete stress.
+
+
+\section{Files and practical use}
+The reusable sources are in \texttt{src/python/}:
+\begin{itemize}
+\item \texttt{frozen\_sigma\_response.py}: analytic fixed-basis stored-band
+action, including projector/window/normalization and Matsubara derivatives.
+\item \texttt{frozen\_sigma\_screening.py}: matrix-free Anderson solver.
+\item \texttt{wien\_response\_density.py}: density conventions and transport.
+\item \path{wien_frozen_sigma_response.py}: complete WIEN charge-map
+action, source construction, screening and potential output.
+\item \path{frozen_sigma_projector_stress.py}: guarded hydrostatic contraction of the saved potential and projector-adjoint matrices.
+\end{itemize}
+Native hooks are in \texttt{src/dmft2/frozen\_response\_io.f90}, with optional
+calls from \texttt{l2main.f90}. They are disabled unless requested. A
+separate \texttt{dmft2\_response} executable is installed; the ordinary
+installed dmft2 is not replaced by an automatic stress correction.
+
+The complete driver takes a JSON configuration. Its workspace must be new.
+It copies inputs and never modifies the reference calculation. A template is
+included beside this note. Activate the usual environment, then run:
+\begin{lstlisting}
+source ~/activate
+~/dbin/wien_frozen_sigma_response.py response_config.json
+\end{lstlisting}
+The configuration names the reference case, workspace, WIEN root and executable,
+MPI launcher, and LAPW1/dmft2 definition files. Definitions must use relative
+case paths; the driver rewrites the distributed-vector suffix for the serial
+LAPW1 output. The initial complete driver supports nonmagnetic primitive
+orthogonal cells with fixed $N$ and projector 5. It does not claim magnetic,
+SOC, shear, or general-cell validation.
+
+For the analytic action, first replay a central TOT dmft2 charge calculation
+with recomputeEF=0 and the saved converged chemical potential:
+\begin{lstlisting}
+export EDMFT_RESPONSE_EXPORT=/absolute/work/central
+mpirun -n 4 ~/dbin/dmft2_response dmft2.def
+unset EDMFT_RESPONSE_EXPORT
+~/dbin/frozen_sigma_response.py --export /absolute/work/central \
+  --potential dV_band.npy --output /absolute/work/density_response
+export EDMFT_RESPONSE_DENSITY_PREFIX=/absolute/work/density_response
+mpirun -n 4 ~/dbin/dmft2_response dmft2.def
+unset EDMFT_RESPONSE_DENSITY_PREFIX
+\end{lstlisting}
+Run the last command in an isolated copy: its \texttt{clmval} is a signed
+response density and must not replace an ordinary converged density. The
+matrix input has shape $(N_k,N_b,N_b)$ and units Ry per strain, in exactly
+the exported central eigenvector gauge. $N_b$ includes all stored bands.
+
+\section{What remains open}
+The tested response can reproduce the potential-dependent projector
+correction obtained from the saved relaxed endpoints. It does not by itself
+prove that every remaining term in the stress functional is exact. The
+residual total-stress errors remain explicit in the table. Their audit
+should use the same ensemble, normalized projector, band/G sets, and
+frozen-$\Sigma$ Klein comparison including its impurity-functional linear
+correction. No values from MnO or magnetic MnTe are inferred from these
+nonmagnetic metallic tests.
+
+For speed, the next production step is an analytic radial response and a
+complete complement action replacing the numerical charge-map tangent.
+The stored-band implementation provides a useful building block and an
+independent check, but the measured radial error rules out promoting it
+unchanged. The present complete tangent is a validated, moderately priced
+reference route for deriving that faster implementation.
+\end{document}

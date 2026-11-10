@@ -1,0 +1,2 @@
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c lapw_radial_potential.f90 -o lapw_radial_potential.o
+ar  rcs libatpar.a outwin.o  outwin_response.o  lapw_radial_response.o  lapw_radial_hamiltonian.o  lapw_radial_potential.o  rint13.o  abc.o  diracout.o  dergl.o  inouh.o  inth.o atpar.o readPot.o

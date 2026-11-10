@@ -1,0 +1,1980 @@
+--- a/SRC_lapw0/finl_elect_str.F
++++ b/SRC_lapw0/finl_elect_str.F
+@@ -171,12 +171,13 @@
+      ctest=zero
+      
+      DO lm1 = 1, lmtot1             
+-        l0 = lmtot(1,lm1)
++        ! The lattice-harmonic sign is encoded in fc; Gaunt uses |l|.
++        l0 = abs(lmtot(1,lm1))
+         m0 = lmtot(2,lm1)
+         pone = (-1.0)**m0
+         
+         DO lm1p = 1, lmtot1
+-           l0p = lmtot(1,lm1p)
++           l0p = abs(lmtot(1,lm1p))
+            m0p = lmtot(2,lm1p)
+            
+            DO j = 1, imax
+@@ -228,7 +229,7 @@
+     ! WRITE(21,*) ':MADELUNG_STR  ==========Madelung Stress ========================='     
+      madelung_1 = zero
+      DO lm1 = 1, lmtot1        
+-        l0 = lmtot(1,lm1)
++        l0 = abs(lmtot(1,lm1))
+         m0 = lmtot(2,lm1)
+         pone = (-1)**m0
+           DO J = 1, imax
+@@ -279,7 +280,7 @@
+ !====potential involves in the Madelung potential===============    
+      madelung_3 = zero
+      DO lm1 = 1, lmtot1          
+-        l0   = lmtot(1,lm1)
++        l0   = abs(lmtot(1,lm1))
+         m0   = lmtot(2,lm1)        
+         pone = (-1)**m0
+         IF( NOTRI(l0,1,1) .lt. 0 ) CYCLE
+@@ -389,20 +390,22 @@
+ !    WRITE(21,*)   
+ !*************************************************************************************   
+    
++   ! col_pot_1 is REAL*8 already. REAL(real8) without KIND rounds to
++   ! default REAL before the large density/core/valence cancellation.
+    write(6,*) '===== Total STRESS DECOMPOSITION ======='
+    write(6,'("  i  j     coul_pot_sp      madelung     Coul_pot_int     exc_vxc       GGA_cont")')
+    index2 = 0
+    DO beta = 1, 3
+       DO alpha = 1, 3
+          index2 = index2 + 1
+-         tot_stress(alpha,beta) =  0.5*REAL(col_pot_1(index2))  + &
++         tot_stress(alpha,beta) =  0.5d0*col_pot_1(index2)  + &
+                                    madelung_final(index2)       + &
+                                    coulomb_str_int(index2)      + &
+                                    exc_vxc(index2)              - &
+                                    gga_fin_str(index2)                                        
+          if(stress_debug .and. myid.eq.0) then
+             write(21,81) alpha,beta, &
+-                         0.5d0*REAL(col_pot_1(index2))/vol, &
++                         0.5d0*col_pot_1(index2)/vol, &
+                          madelung_final(index2)/vol, &
+                          REAL(coulomb_str_int(index2))/vol, &
+                          exc_vxc(index2)/vol, &
+@@ -436,7 +439,7 @@
+      WRITE(21,*)
+    endif  
+ !    DO index2 = 1, 9
+-!       tot_stress(index2) =  0.5*REAL(col_pot_1(index2))   + &
++!       tot_stress(index2) =  0.5d0*col_pot_1(index2)   + &
+ !                             REAL(madelung_final(index2))  + &
+ !                             REAL(coulomb_str_int(index2)) + &
+ !                             REAL(exc_vxc(index2))         !- &
+--- /dev/null
++++ b/SRC_lapw0/gga_metric_tensor.f
+@@ -0,0 +1,29 @@
++! Metric derivative of a spin-resolved GGA energy density.
++! With f in Ry/Bohr^3, define a_s=df/d|grad n_s|^2 and
++! a_ud=df/d(grad n_up.grad n_dn).  The explicit gradient metric term
++! in physical stress is -Q_ab/Omega, where
++! Q_ab=2 a_up g_up,a g_up,b+2 a_dn g_dn,a g_dn,b
++!      +a_ud(g_up,a g_dn,b+g_dn,a g_up,b).
++! VXCLM2 returns sig=(2/JSPIN)*df_Ha/dsigma, so a=JSPIN*sig.
++! In the unpolarized interface sig_up is instead df_Ry/d|grad n|^2.
++! No occupations, density response, or extra density factor enter Q.
++subroutine gga_metric_tensor(jspin,grad_up,grad_dn,sig_up,sig_dn,sig_ud,q)
++  implicit none
++  integer,intent(in) :: jspin
++  real(8),intent(in) :: grad_up(3),grad_dn(3),sig_up,sig_dn,sig_ud
++  real(8),intent(out) :: q(3,3)
++  real(8) :: grad_total(3)
++  integer :: a,b
++  grad_total=grad_up+grad_dn
++  do b=1,3
++    do a=1,3
++      if(jspin==1)then
++        q(a,b)=2.d0*sig_up*grad_total(a)*grad_total(b)
++      else
++        q(a,b)=2.d0*dble(jspin)*(sig_up*grad_up(a)*grad_up(b) &
++                              +sig_dn*grad_dn(a)*grad_dn(b)) &
++              +dble(jspin)*sig_ud*(grad_up(a)*grad_dn(b)+grad_dn(a)*grad_up(b))
++      endif
++    enddo
++  enddo
++end subroutine gga_metric_tensor
+--- a/SRC_lapw0/lapw0.F
++++ b/SRC_lapw0/lapw0.F
+@@ -20,7 +20,7 @@
+       use norm_kub,   only: c_kub, init_c_kub
+       USE PW_mult,    only: DECOUL_POT_PW,CFFT_STR,SGGP,CFFT8,SGGP_GGA, &          !CKAMAL
+                             CFFT_STR_GGA,META_FFT
+-      use gga_str_kb,  only: gga_int !, sigma_str
++      use gga_str_kb,  only: gga_int, gga_mt_metric, gga_metric_full !, sigma_str
+       use str_switch,  only: SW_STRESS, SW_TOT_STR
+       use stress_time
+       use, intrinsic :: ISO_C_BINDING, only: C_INT
+@@ -1100,6 +1100,9 @@
+       
+       allocate( SGGP_GGA(nkk,1:9) )
+       allocate( gga_int(1:nkk,1:9) )       !contains gga correction term
++      ! Keep the former harmonic-diagonal GGA contraction available only
++      ! for regression diagnostics. FULL evaluates the derived metric term.
++      call init_gga_metric(nat)
+       gga_int        = zeroc
+       SGGP_GGA       = zero
+       
+@@ -2403,6 +2406,13 @@
+  2835 continue
+ 
+       if (.not.coul) goto 888
++
++      ! The alternate .xcpot1q path does not supply gradient stress data.
++      ! Do not emit an apparently valid GGA tensor with its MT term absent.
++      if(SW_STRESS.eq.'YES'.and.GGA_SWITCH.and.xcpot1qq)then
++         call outerr('LAPW0','GGA stress requires standard XCPOT1; remove .xcpot1q')
++         goto 999
++      endif
+ 
+ !
+ ! Exchange-correlation inside the spheres
+--- a/SRC_lapw0/modules.F
++++ b/SRC_lapw0/modules.F
+@@ -294,4 +294,8 @@
+ !  real*8                  :: sig_str_u, sig_str_d, sig_str_ud  
+   real*8                  :: GGA_INTER(1:9,1:2) 
+   real*8                  :: gga_fin_str(1:9)
++! Full angular-grid integral of the gradient metric tensor, per atom type.
++! Allocated only for a stress calculation; XCPOT1 writes disjoint atom slots.
++  real(8),allocatable     :: gga_mt_metric(:,:)
++  logical                :: gga_metric_full=.true.
+ end module gga_str_kb
+--- a/SRC_lapw0/pwxad5.f
++++ b/SRC_lapw0/pwxad5.f
+@@ -367,6 +367,7 @@
+                         gga_int_dn_31, gga_int_dn_32, gga_int_dn_33 )
+ !This subroutine contains the interstitial part of the gga correction  --- KAMAL JUN 2021
+ !    use gga_str_kb, only: sig_str_u,sig_str_d
++    use gga_str_kb, only: gga_metric_full
+     IMPLICIT none
+     real*8,intent(in)    :: GXU,GYU,GZU,GXD,GYD,GZD,GX,GY,GZ,du0,dd0,sig_str_u,sig_str_d,sig_str_ud
+     integer,intent(in)   :: JSPIN
+@@ -378,10 +379,44 @@
+                             gga_int_dn_21, gga_int_dn_22, gga_int_dn_23 , &
+                             gga_int_dn_31, gga_int_dn_32, gga_int_dn_33
+     real*8               :: grad_rho(3,2)
++    real(8) :: metric_q(3,3),density_total
++
+     integer              :: alpha,beta,index1
+     
+     grad_rho(1,1) = GXU; grad_rho(2,1) = GYU; grad_rho(3,1) = GZU
+     grad_rho(1,2) = GXD; grad_rho(2,2) = GYD; grad_rho(3,2) = GZD
++    if(gga_metric_full)then
++      call gga_metric_tensor(jspin,grad_rho(:,1),grad_rho(:,2),sig_str_u,sig_str_d,sig_str_ud,metric_q)
++      ! XCPOT3 multiplies these buffers by 2*n_spin before the FFT.
++      ! Give both spin slots Q/(2*n_total), so the downstream sum is Q
++      ! including the mixed-spin derivative; do not multiply Q by n again.
++      density_total=du0+dd0
++      if(density_total>1.d-30)then
++        metric_q=metric_q/(2.d0*density_total)
++      else
++        metric_q=0.d0
++      endif
++      gga_int_up_11=metric_q(1,1)
++      gga_int_up_12=metric_q(1,2)
++      gga_int_up_13=metric_q(1,3)
++      gga_int_up_21=metric_q(2,1)
++      gga_int_up_22=metric_q(2,2)
++      gga_int_up_23=metric_q(2,3)
++      gga_int_up_31=metric_q(3,1)
++      gga_int_up_32=metric_q(3,2)
++      gga_int_up_33=metric_q(3,3)
++      gga_int_dn_11=metric_q(1,1)
++      gga_int_dn_12=metric_q(1,2)
++      gga_int_dn_13=metric_q(1,3)
++      gga_int_dn_21=metric_q(2,1)
++      gga_int_dn_22=metric_q(2,2)
++      gga_int_dn_23=metric_q(2,3)
++      gga_int_dn_31=metric_q(3,1)
++      gga_int_dn_32=metric_q(3,2)
++      gga_int_dn_33=metric_q(3,3)
++      return
++    endif
++
+     
+ !     index1 = 0
+ !     DO alpha = 1, 3
+--- a/SRC_lapw0/stress_gga.F
++++ b/SRC_lapw0/stress_gga.F
+@@ -2,7 +2,7 @@
+     use densit  ,   only: clmsp, clm    !clmsp(j,lm1,jatom,ispin)
+     use parallel,   only: nstart, nstop, myid
+     use struct  ,   only: mult,jri,r0,dx,rmt,iatnr,nat
+-    use gga_str_kb, only: gga_fin_str   ! , sigma_str
++    use gga_str_kb, only: gga_fin_str, gga_mt_metric, gga_metric_full   ! , sigma_str
+     use work      , only: exc,vxc
+     implicit none
+    include 'param.inc'
+@@ -74,6 +74,30 @@
+     DO jatom = 1, nstart(myid)-1
+        index_a = index_a + mult(jatom)
+     ENDDO
++    if(gga_metric_full.and.allocated(gga_mt_metric))then
++       ! Q was integrated on exactly the angular grid where VXCLM2 samples
++       ! the energy density. Products of different harmonics and tangential
++       ! density gradients are thus retained, without an intermediate
++       ! projection/truncation of the nonlinear derivative df/dsigma.
++       do jatom=nstart(myid),nstop(myid)
++          do mu=1,mult(jatom)
++             index_a=index_a+1
++             buf_str4=gga_mt_metric(:,jatom)
++             call symmetry_stress_rotij(index_a,jatom,buf_str4)
++             gga_fin_str=gga_fin_str+buf_str4
++          enddo
++       enddo
++#ifdef Parallel
++       gga_fin_str1=gga_fin_str
++       call mpi_reduce(gga_fin_str1,gga_fin_str,9,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,ierr)
++#endif
++       if(myid.eq.0)then
++          write(6,'(a,9es24.15)') ':GGA_METRIC_MT_RY:',gga_fin_str
++          write(6,'(a,9es24.15)') ':GGA_METRIC_INT_RY:',real(gga_str_int,8)
++          gga_fin_str=gga_fin_str+real(gga_str_int,8)
++       endif
++       return
++    endif
+     DO 29 jatom = nstart(myid), nstop(myid)
+     DO 29 mu    = 1, mult(jatom)
+           index_a = index_a + 1
+@@ -318,3 +342,16 @@
+      
+ return
+ END
++
++subroutine init_gga_metric(natom)
++  use gga_str_kb, only: gga_mt_metric,gga_metric_full
++  implicit none
++  integer,intent(in) :: natom
++  character(32) :: mode
++  integer :: status
++  if(allocated(gga_mt_metric))deallocate(gga_mt_metric)
++  allocate(gga_mt_metric(9,natom));gga_mt_metric=0.d0
++  mode=''
++  call get_environment_variable('WIEN_STRESS_GGA_MODE',mode,status=status)
++  gga_metric_full=trim(mode)/='LEGACY'
++end subroutine init_gga_metric
+--- a/SRC_lapw0/suml.f
++++ b/SRC_lapw0/suml.f
+@@ -6,18 +6,22 @@
+ !
+       COMPLEX*16 YL,IMAG,IMAG1                                          
+       REAL*8  MINU                                                      
+-      DIMENSION YL(*),LM(2,NCOM+3)                                     
++      !DIMENSION YL(*),LM(2,NCOM+3)
++      DIMENSION YL((lmax2X+1)*(lmax2X+1)),LM(2,NCOM+3)
+       DATA IMAG /(0.d0,1.0D0)/                                           
+ !                                                                       
+       ILM=LMMAX                                                         
+       IMAG1=(1.D0,0.d0)                                                   
+-      LL=IABS(LM(1,ILM))                                                
+-      MM=LM(2,ILM)                                                      
+-      MINU=1.                                                           
+-      IF(LM(1,ILM).LT.0) THEN                                           
+-      IMAG1=-IMAG                                                       
+-      MINU=-1.D0                                                        
+-      END IF                                                            
++      LL = LM(1,ILM)
++      MM = LM(2,ILM)
++      !LL=IABS(LM(1,ILM))                                                
++      !MM=LM(2,ILM)                                                      
++      MINU=1.
++      IF(LL.LT.0) THEN
++         IMAG1=-IMAG
++         MINU=-1.D0
++         LL = -LL
++      END IF
+       IF(MOD(MM,2).EQ.1) THEN                                           
+       IMAG1=-IMAG1                                                      
+       MINU=-MINU                                                        
+--- a/SRC_lapw0/xcpot1.f
++++ b/SRC_lapw0/xcpot1.f
+@@ -10,6 +10,7 @@
+       use TestCases,only : Lebedev, LEECE
+ !      use gga_str_kb, only: sig_str_u,sig_str_d, sig_str_ud  !,sigma_str    !for the stress tensor
+       use str_switch, only : SW_STRESS, STRESS
++      use gga_str_kb, only: gga_mt_metric,gga_metric_full
+ !                                                                       
+ !     XCPOT1 CALCULATES THE EXCHANGE-CORRELATION POTENTIAL INSIDE       
+ !     THE SPHERES.                                                      
+@@ -24,33 +25,38 @@
+       INCLUDE 'param.inc'
+ 
+ !     arguments
+-      integer        :: luse2, iprint, jatom, imfield
+-      integer        :: LM(2,NCOM+3,NAT),LMMAX(NAT)
+-      real*8         :: bextene
+-      real*8         :: sigmaj(2)
+-      logical        :: lr2v
+-      real*8         :: sigma_str(1:nrad,1:lmmaxx,nstart(myid):nstop(myid),1:3)
++      integer, intent(in) :: luse2, iprint, jatom, imfield, jspin
++      integer, intent(in) :: LM(2,NCOM+3,NAT),LMMAX(NAT)
++      real*8, intent(in)  :: bextene
++      logical, intent(in) :: lr2v
++      character*5, intent(in):: switch1
++      real*8, intent(out) :: sigmaj(2)
++      real*8, intent(out) :: sigma_str(1:nrad,1:lmmaxx,nstart(myid):nstop(myid),1:3)
+ 
+ !     local
+       LOGICAL        :: robfit, spin, nospin
+       real*8         :: YY(NCOM,nspd),YYB(nspd,NCOM),ROTA1(3)
+       REAL*8            bbu(NCOM),bbbu(NCOM),bbd(NCOM), bbbd(NCOM), &
+            vtau_bu(ncom),vtau_bd(ncom),vlapl_bu(ncom),vlapl_bd(ncom)
+-      COMPLEX*16     :: YL((lmax2X+1)*(lmax2X+1)),&
+-           dyt((lmax2X+1)*(lmax2X+1)),dyt2((lmax2X+1)*(lmax2X+1)), &
+-           dyp((lmax2X+1)*(lmax2X+1)),dyp2((lmax2X+1)*(lmax2X+1)), &
+-           dytp((lmax2X+1)*(lmax2X+1))
+-      real*8 :: spt(3,nspd),weight(nspd), &
+-           vxcsu(nspd),vxcsd(nspd), &
+-           vxu(nspd),vxd(nspd),exu(nspd),exd(nspd), &
+-           vtau_rad_up(nspd),vtau_rad_dn(nspd), &
+-           vlapl_rad_up(nspd),vlapl_rad_dn(nspd),&
+-           dcsp(ncom,nrad,2),ddcsp(ncom,nrad,2), &
+-           dydt(ncom,nspd),dydt2(ncom,nspd), &
+-           dydp(ncom,nspd),dydp2(ncom,nspd),dydtp(ncom,nspd), &
+-           qrhou(ncom),qrhod(ncom), &
+-           qsin(nspd),qcos(nspd)
+-      
++      COMPLEX*16, allocatable :: YL(:), dyt(:),dyt2(:), dyp(:),dyp2(:), dytp(:)
++      !COMPLEX*16     :: YL((lmax2X+1)*(lmax2X+1)),&
++      !     dyt((lmax2X+1)*(lmax2X+1)),dyt2((lmax2X+1)*(lmax2X+1)), &
++      !     dyp((lmax2X+1)*(lmax2X+1)),dyp2((lmax2X+1)*(lmax2X+1)), &
++      !     dytp((lmax2X+1)*(lmax2X+1))
++      !real*8 :: spt(3,nspd),weight(nspd), &
++      !     vxcsu(nspd),vxcsd(nspd), &
++      !     vxu(nspd),vxd(nspd),exu(nspd),exd(nspd), &
++      !     vtau_rad_up(nspd),vtau_rad_dn(nspd), &
++      !     vlapl_rad_up(nspd),vlapl_rad_dn(nspd),&
++      !     dcsp(ncom,nrad,2),ddcsp(ncom,nrad,2), &
++      !     dydt(ncom,nspd),dydt2(ncom,nspd), &
++      !     dydp(ncom,nspd),dydp2(ncom,nspd),dydtp(ncom,nspd), &
++      !     qrhou(ncom),qrhod(ncom), &
++      !     qsin(nspd),qcos(nspd)
++      real*8, allocatable :: spt(:,:),weight(:),vxcsu(:),vxcsd(:),vxu(:),vxd(:),exu(:),exd(:)
++      real*8, allocatable :: vtau_rad_up(:),vtau_rad_dn(:),vlapl_rad_up(:),vlapl_rad_dn(:)
++      real*8, allocatable :: dcsp(:,:,:),ddcsp(:,:,:),dydt(:,:),dydt2(:,:),dydp(:,:),dydp2(:,:)
++      real*8, allocatable :: dydtp(:,:),qrhou(:),qrhod(:),qsin(:),qcos(:)
+ !     derivatives of kinetic energy density
+       real*8   ::  dtau_dr(ncom,nrad,2),d2tau_dr2(ncom,nrad,2), &
+            dtau_dt_u, dtau_dt_d, dtau_dt_t, d2tau_dt2_u , d2tau_dt2_d, &
+@@ -67,7 +73,7 @@
+            dtau_u_drho_d, dtau_d_drho_u, dtau_d_drho_d, d2tau_dr2_u, &
+            d2tau_dr2_d, d2tau_dr2_t, sig_str_u,sig_str_d,sig_str_ud
+ 
+-      integer  ::  quadtest,iatj,l,ll,jspin,iatest,ncomx,j,index,llmm,luse,&
++      integer  ::  quadtest,iatj,l,ll,iatest,ncomx,j,index,llmm,luse,&
+            npt1,lm1,ind,init,ir,k,irsigmaup,irsigmadn
+       real*8   :: dmaxup,dmaxdn,sigmamaxup,sigmamaxdn, &
+            sum0,rp,rpp,ft,fu,fd,tautot,tauup,taudn,vxuold,vxdold,vxtold, &
+@@ -100,7 +106,6 @@
+        real*8 du_h(nspd), dd_h(nspd), tmpup(nspd), tmpdn(nspd)
+        logical UseLM(ncom), UseInterp, UseLDA, there, EECE_SWITCH
+        character*6 EECE_Show
+-       character*5 switch1
+        real*4,allocatable :: rwork(:)
+        real*8,allocatable :: tmp(:,:)
+        integer,allocatable:: itmp(:)
+@@ -109,13 +114,24 @@
+        
+ !******* for the stress tensor
+        REAL*8 :: gxyzu1(nspd),gxyzd1(nspd),gxyzud1(nspd)
+-
+-                        
+-!
+-
++       real(8),allocatable :: metric_radial(:,:)
++       real(8) :: er_st(3),et_st(3),ep_st(3),gu_st(3),gd_st(3),q_st(3,3)
++       real(8) :: cp_st,sp_st,xy_st,metric_integral
++       integer :: aa_st,bb_st,ii_st
++!
+ !       STRESS = .false.
+ !       IF(SW_STRESS .eq. 'YES') STRESS = .true.
++
++       allocate(YL((lmax2X+1)*(lmax2X+1)),dyt((lmax2X+1)*(lmax2X+1)),dyt2((lmax2X+1)*(lmax2X+1)))
++       allocate(dyp((lmax2X+1)*(lmax2X+1)),dyp2((lmax2X+1)*(lmax2X+1)), dytp((lmax2X+1)*(lmax2X+1)))
++       allocate(spt(3,nspd),weight(nspd),vxcsu(nspd),vxcsd(nspd),vxu(nspd),vxd(nspd),exu(nspd),exd(nspd))
++       allocate(vtau_rad_up(nspd),vtau_rad_dn(nspd),vlapl_rad_up(nspd),vlapl_rad_dn(nspd),dcsp(ncom,nrad,2))
++       allocate(ddcsp(ncom,nrad,2),dydt(ncom,nspd),dydt2(ncom,nspd),dydp(ncom,nspd),dydp2(ncom,nspd))
++       allocate(dydtp(ncom,nspd),qrhou(ncom),qrhod(ncom),qsin(nspd),qcos(nspd))
+        
++       if(STRESS.and.GGA_SWITCH.and.gga_metric_full)then
++          allocate(metric_radial(nrad,9));metric_radial=0.d0
++       endif
+        UseInterp= .false.
+        UseLDA   = .false.
+        EECE_SWITCH=.false.
+@@ -290,12 +306,12 @@
+       endif
+ !-----------
+ !     Note, we don't need LUSE later to be big
++      
+       LUSE=0
+       do LM1=1,LLMM
+         luse = max( iabs(LM(1,LM1,JATOM)), luse)
+       enddo
+       LUse=LUse+2
+-
+       Sum0 = 0.D0
+       do 1 ind=1,npt1
+          rota1(1)=spt(1,ind)
+@@ -338,6 +354,7 @@
+          ENDIF
+ !                                                                       
+   1   CONTINUE
++      
+ !                                                                       
+ !========================================================
+ !         derivatives dCLM/dR and ddCLM/ddR
+@@ -422,7 +439,8 @@
+ !$omp& vtauc_up,vtauc_dn,vlaplc_up,vlaplc_dn, &
+ !$omp& vtau_rad_up,vtau_rad_dn,vlapl_rad_up,vlapl_rad_dn, &
+ !$omp& vtau_ua,vtau_da,vlapl_ua,vlapl_da, gxyzu1, gxyzd1, gxyzud1, &
+-!$omp& sig_str_u,sig_str_d,sig_str_ud) &
++!$omp& sig_str_u,sig_str_d,sig_str_ud,er_st,et_st,ep_st,gu_st,gd_st, &
++!$omp& q_st,cp_st,sp_st,xy_st,aa_st,bb_st,ii_st) &
+ !$omp& lastprivate(vxcsu,vxcsd,bbu,bbd, &
+ !$omp& vtau_bu,vtau_bd,vlapl_bu,vlapl_bd) &
+ !$omp& copyin(xc1,xc2,xc3,xc4,xcconst) &
+@@ -713,6 +731,28 @@
+         !vtauc_dn = 0.0d0
+ !        
+ !                 
++         if(STRESS.and.GGA_SWITCH.and.gga_metric_full)then
++           ! GRANS returns components along (e_r,e_theta,e_phi), not the
++           ! fixed Cartesian axes. Rotate before taking outer products.
++           er_st=spt(:,k)
++           xy_st=sqrt(er_st(1)**2+er_st(2)**2)
++           cp_st=1.d0;sp_st=0.d0
++           if(xy_st>1.d-14)then
++             cp_st=er_st(1)/xy_st;sp_st=er_st(2)/xy_st
++           endif
++           et_st=[er_st(3)*cp_st,er_st(3)*sp_st,-xy_st]
++           ep_st=[-sp_st,cp_st,0.d0]
++           gu_st=gxu*er_st+gyu*et_st+gzu*ep_st
++           gd_st=gxd*er_st+gyd*et_st+gzd*ep_st
++           call gga_metric_tensor(jspin,gu_st,gd_st,sig_str_u,sig_str_d,sig_str_ud,q_st)
++           ii_st=0
++           do aa_st=1,3
++             do bb_st=1,3
++               ii_st=ii_st+1
++               metric_radial(ir,ii_st)=metric_radial(ir,ii_st)+weight(k)*rp*rp*q_st(aa_st,bb_st)
++             enddo
++           enddo
++         endif
+          IF(STRESS) THEN
+            gxyzu1(k) = sig_str_u
+            IF(spin) then
+@@ -1150,6 +1190,24 @@
+              F8.5)                                                      
+  1540 FORMAT(3X,'INDEX',6X,'V-XC',7X,'FIT',5X,'DIFFERENCE')             
+  1550 FORMAT(I8,2F10.5,F15.5)                                           
++
++
++      if(allocated(metric_radial))then
++         ! The radial integrand already includes r^2 and the angular
++         ! quadrature weights. Charge performs integral dr, not r^2 dr.
++         do ii_st=1,9
++           call charge(r,log(r(2)/r(1)),metric_radial(:,ii_st),1,jri(jatom),metric_integral)
++           gga_mt_metric(ii_st,jatom)=metric_integral
++         enddo
++         deallocate(metric_radial)
++      endif
++      deallocate(spt,weight,vxcsu,vxcsd,vxu,vxd,exu,exd)
++      deallocate(vtau_rad_up,vtau_rad_dn,vlapl_rad_up,vlapl_rad_dn,dcsp)
++      deallocate(ddcsp,dydt,dydt2,dydp,dydp2)
++      deallocate(dydtp,qrhou,qrhod,qsin,qcos)
++      deallocate(YL,dyt,dyt2)
++      deallocate(dyp,dyp2,dytp)
++      
+       RETURN                                                            
+       END
+                                                                
+--- a/SRC_lapw1/atpar.F
++++ b/SRC_lapw1/atpar.F
+@@ -1,4 +1,6 @@
+       SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,efermi)
++      use atspdt, only: basis_restore_spherical,basis_restore_high_l, &
++           basis_restore_lmin
+ !
+       use reallocate, only: doreallocate
+       use loabc, only : ALO, BLO, CLO, ELO, PLO, DPLO, PELO, DPELO, PEILO, &
+@@ -76,7 +78,13 @@
+       character*512 ::   basis_vsp_file
+       integer       ::   basis_vsp_status,basis_vsp_ios,basis_vsp_unit
+       logical       ::   basis_vsp_enabled,basis_vsp_exists
++      character(len=16) :: basis_restore_env
++      integer :: basis_restore_status
+       real*8, allocatable :: VRB(:,:)
++      real*8 :: basis_vr_solve(NRAD)
++      character(len=16) :: basis_low_l_env
++      integer :: basis_low_l_status
++      logical :: basis_low_l_only
+       real*8, parameter ::    PI = 4.D0*DATAN(1.D0)
+ !fb
+ !     variables for [yu91]-force formalism
+@@ -106,6 +114,10 @@
+ !fe
+       NGAU=2350
+       LMMIN = 1
++      basis_low_l_env=''
++      call get_environment_variable('WIEN_LAPW1_BASIS_LOW_L_ONLY', &
++           basis_low_l_env,status=basis_low_l_status)
++      basis_low_l_only=(basis_low_l_status.eq.0.and.trim(basis_low_l_env).eq.'1')
+       nloat=nloat_new
+       mgga_gaunts = -1
+       g2_diag_env=''
+@@ -180,6 +192,25 @@
+            basis_vsp_file,status=basis_vsp_status)
+       basis_vsp_enabled=(basis_vsp_status.eq.0 .and. &
+            len_trim(basis_vsp_file).gt.0)
++      ! This is active only inside the optional alternate-basis probe.
++      ! Disabling high-l restoration reproduces the OLD, incomplete probe
++      ! solely for comparisons; it is never a valid fixed-H reference.
++      basis_restore_high_l=basis_vsp_enabled.and..not.basis_low_l_only
++      basis_restore_lmin=LNSMAX+1
++      basis_restore_env=''
++      call get_environment_variable('WIEN_LAPW1_BASIS_RESTORE_HIGH_L', &
++           basis_restore_env,status=basis_restore_status)
++      if (basis_restore_status.eq.0) then
++         select case(trim(basis_restore_env))
++         case('','1')
++         case('0')
++            basis_restore_high_l=.false.
++         case default
++            error stop 'WIEN_LAPW1_BASIS_RESTORE_HIGH_L must be 0 or 1'
++         end select
++      else if (basis_restore_status.eq.-1) then
++         error stop 'WIEN_LAPW1_BASIS_RESTORE_HIGH_L value too long'
++      endif
+       basis_vsp_ios=0
+       basis_vsp_unit=98
+       if (basis_vsp_enabled.and.myid.eq.0) then
+@@ -484,13 +515,20 @@
+ 1500        CONTINUE
+             L = J - 1
+             FL = L
++            basis_vr_solve(:)=VRB(:,JATOM)
++            ! Diagnostic: the alternate-basis L=0 operator restoration is
++            ! currently in HNS, whose orbital legs end at LNSMAX.  Freeze
++            ! all higher-l basis functions to remove the uncovered leg.
++            ! This is a restricted response, not an all-l correction.
++            if (basis_low_l_only.and.L.gt.LNSMAX) &
++                 basis_vr_solve(:)=VR(:,JATOM)
+             EI = E(J,JATOM)/2.D0
+ !
+ !        calculate energy-derivative by finite difference
+ !        DELE is the up and downward energy-shift in Hartrees
+ !
+             E1 = EI - DELE
+-            CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
++            CALL OUTWINB(REL,basis_vr_solve,RNeT,DX,JRI,E1,FL,UVB,DUVB, &
+                  NODEL,ZZ(JATOM))
+             CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+             TRX = 1.0D+0/SQRT(OVLP)
+@@ -502,7 +540,7 @@
+             DUVB = TRX*DUVB
+ 
+             E1 = EI + DELE
+-            CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
++            CALL OUTWINB(REL,basis_vr_solve,RNeT,DX,JRI,E1,FL,UVE,DUVE, &
+                  NODEU,ZZ(JATOM))
+             CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+             TRX = 1.0D+0/SQRT(OVLP)
+@@ -515,7 +553,7 @@
+ !     
+ !     calculate function at EI
+ !
+-            CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
++            CALL OUTWINB(REL,basis_vr_solve,RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
+                  ,ZZ(JATOM))
+             CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+             TRX = 1.0D+0/SQRT(OVLP)
+@@ -541,6 +579,20 @@
+             PE(J,JATOM) = UVE + TRY*P(J,JATOM)
+             DPE(J,JATOM) = DUVE + TRY*DP(J,JATOM)
+             CALL RINT13(CFEIN1,CFEIN2,AE,BE,AE,BE,PEI(J,JATOM),JATOM)
++            if (basis_restore_high_l.and.L.gt.LNSMAX) then
++               ! VR is r*V in Hartree.  HAMILT is in Ry, so DeltaV is
++               ! 2*(VR-VRB)/r.  Do not multiply by sqrt(4*pi): HAMILT
++               ! already sums the normalized Y_lm products analytically.
++               ! Use the same normalized large/small components and RINT13
++               ! metric as HNS, including the scalar-relativistic factor.
++               AW(1:JRI)=A(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               BW(1:JRI)=B(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               AEW(1:JRI)=AE(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               BEW(1:JRI)=BE(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               call RINT13(CFEIN1,CFEIN2,AW,BW,A,B,basis_restore_spherical(1,J,JATOM),JATOM)
++               call RINT13(CFEIN1,CFEIN2,AEW,BEW,AE,BE,basis_restore_spherical(2,J,JATOM),JATOM)
++               call RINT13(CFEIN1,CFEIN2,AW,BW,AE,BE,basis_restore_spherical(3,J,JATOM),JATOM)
++            endif
+             IF (J .LE. NSLMAX) THEN
+                A1(1:JRI,J) = A(1:JRI)
+                B1(1:JRI,J) = B(1:JRI)
+@@ -567,6 +619,15 @@
+                  NODEU
+  150     CONTINUE
+ !     
++!     The high-l path below covers plane-wave augmentation.  Existing
++!     HNS restoration includes all LOs in the tested LNSMAX>=LOMAX setup.
++!     Refuse an uncovered high-l LO rather than report an incomplete probe.
++         if (basis_vsp_enabled) then
++            do l=LNSMAX+1,LOMAX
++               if (ilo(l,JATOM).gt.0) &
++                    error stop 'alternate-basis probe needs LNSMAX to include every LO'
++            enddo
++         endif
+ !     and now for local orbitals
+ !     
+          IF(myid.eq.0) write(6,6021)
+--- a/SRC_lapw1/calkpt.F
++++ b/SRC_lapw1/calkpt.F
+@@ -126,6 +126,9 @@
+ !
+ !        Locals
+ !
++      integer, save :: dump_kpoint=0
++      character(len=1024) :: matrix_prefix
++      integer :: matrix_status, matrix_length
+       logical            nmat_only
+       INTEGER            NU, NLDAU, LLDAU, i, j
+       DOUBLE PRECISION   TSEC1, TSEC2
+@@ -212,6 +215,24 @@
+       endif
+ 
+       CALL STOP_TIMER(time_horb)
++
++! Default-off assembled-matrix diagnostic.  Unlike inversion of a complete
++! eigensystem, this exports the matrices before Cholesky/diagonalization.
++! Intended only for isolated response probes; no ordinary path is changed.
++      dump_kpoint=dump_kpoint+1
++      matrix_prefix=''
++      call get_environment_variable('WIEN_LAPW1_MATRIX_DUMP',matrix_prefix, &
++           length=matrix_length,status=matrix_status)
++      if (matrix_status.eq.-1) error stop 'WIEN_LAPW1_MATRIX_DUMP too long'
++      if (matrix_status.eq.0.and.matrix_length.gt.0) then
++#ifdef Parallel
++         error stop 'WIEN_LAPW1_MATRIX_DUMP requires serial LAPW1'
++#else
++         call DumpAssembledMatrices(trim(matrix_prefix),dump_kpoint, &
++              (/SX1,SY1,SZ1/),KZZ,HS,HSDIAG,HSROWS,nlo)
++#endif
++      endif
++
+ 
+ #ifdef Parallel
+       call start_timer(time_sync)
+@@ -265,3 +286,99 @@
+ !        End of 'CALKPT'
+ !
+       END
++
++SUBROUTINE DumpAssembledMatrices(prefix,kpoint,kfrac,kzz, &
++     mixed,hdiag,nbasis,nlo)
++  USE, INTRINSIC :: ISO_FORTRAN_ENV, ONLY: INT32, REAL64
++  IMPLICIT NONE
++  CHARACTER(len=*), INTENT(in) :: prefix
++  INTEGER, INTENT(in) :: kpoint,nbasis,nlo
++  REAL*8, INTENT(in) :: kfrac(3)
++  INTEGER, INTENT(in) :: kzz(3,nbasis)
++!_REAL REAL*8, INTENT(in) :: mixed(nbasis,nbasis),hdiag(nbasis)
++!_COMPLEX COMPLEX*16, INTENT(in) :: mixed(nbasis,nbasis),hdiag(nbasis)
++
++  CHARACTER(len=8), PARAMETER :: overlapMagic='EDMFTOV1'
++  CHARACTER(len=8), PARAMETER :: hamiltonianMagic='EDMFTHV1'
++  CHARACTER(len=1200) :: filename
++  INTEGER :: unit,ios,i,j
++  INTEGER(INT32) :: marker,header(8)
++  INTEGER(INT32), ALLOCATABLE :: labels(:,:)
++  COMPLEX(REAL64), ALLOCATABLE :: column(:)
++
++  marker=INT(Z'01020304',INT32)
++  header=(/ INT(1,INT32),INT(kpoint,INT32),INT(0,INT32), &
++       INT(nbasis,INT32),INT(nlo,INT32),INT(2,INT32), &
++       INT(1,INT32),INT(1,INT32) /)
++  WRITE(filename,'(A,".k",I8.8,".bin")') trim(prefix),kpoint
++
++  OPEN(NEWUNIT=unit,FILE=trim(filename),ACCESS='STREAM', &
++       FORM='UNFORMATTED',STATUS='REPLACE',ACTION='WRITE',IOSTAT=ios)
++  if (ios.ne.0) then
++     WRITE(6,'(A,1X,A,1X,A,I0)') ':WIEN_MATRIX_DUMP_ERROR:', &
++          trim(filename),'open iostat=',ios
++     STOP 'cannot open generalized-overlap dump'
++  endif
++
++  allocate(labels(3,nbasis),column(nbasis))
++  labels=INT(kzz(:,1:nbasis),INT32)
++  WRITE(unit,IOSTAT=ios) overlapMagic
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) marker
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) header
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) REAL(kfrac,REAL64)
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) labels
++  do j=1,nbasis
++     if (ios.ne.0) exit
++     do i=1,j
++!_REAL         column(i)=CMPLX(mixed(i,j),0.0_REAL64,KIND=REAL64)
++!_REAL         if (i.eq.j) column(i)=CMPLX(hdiag(j),0.0_REAL64,KIND=REAL64)
++!_COMPLEX         ! TAPEWF writes CONJG(Z) in the complex executable.  Express the
++!_COMPLEX         ! metric in that same coefficient convention: if A=CONJG(Z), then
++!_COMPLEX         ! A^+ CONJG(O) A = CONJG(Z^+ O Z) = I.  Without this conjugation a
++!_COMPLEX         ! diagnostic normalization check fails even though LAPW1 itself is
++!_COMPLEX         ! correct.
++!_COMPLEX         column(i)=CMPLX(DBLE(mixed(i,j)),-AIMAG(mixed(i,j)), &
++!_COMPLEX              KIND=REAL64)
++!_COMPLEX         if (i.eq.j) column(i)=conjg(hdiag(j))
++     enddo
++     WRITE(unit,IOSTAT=ios) column(1:j)
++  enddo
++  CLOSE(unit)
++
++  if (ios.ne.0) then
++     WRITE(6,'(A,1X,A,1X,A,I0)') ':WIEN_MATRIX_DUMP_ERROR:', &
++          trim(filename),'write iostat=',ios
++     STOP 'cannot write generalized-overlap dump'
++  endif
++
++  ! The complementary file contains the Hamiltonian in the identical
++  ! case.vector coefficient convention.  At this point MIXED holds the lower triangle and diagonal of H;
++  ! HDIAG holds the diagonal of O.  Pack an upper Hermitian
++  ! triangle so the Python reader can treat H and O uniformly.
++  WRITE(filename,'(A,".ham.k",I8.8,".bin")') trim(prefix),kpoint
++  OPEN(NEWUNIT=unit,FILE=trim(filename),ACCESS='STREAM', &
++       FORM='UNFORMATTED',STATUS='REPLACE',ACTION='WRITE',IOSTAT=ios)
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) hamiltonianMagic
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) marker
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) header
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) REAL(kfrac,REAL64)
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) labels
++  do j=1,nbasis
++     if (ios.ne.0) exit
++     do i=1,j-1
++!_REAL         column(i)=CMPLX(mixed(j,i),0.0_REAL64,KIND=REAL64)
++!_COMPLEX         column(i)=CMPLX(DBLE(mixed(j,i)),-AIMAG(mixed(j,i)), &
++!_COMPLEX              KIND=REAL64)
++     enddo
++!_REAL      column(j)=CMPLX(mixed(j,j),0.0_REAL64,KIND=REAL64)
++!_COMPLEX      column(j)=CMPLX(DBLE(mixed(j,j)),-AIMAG(mixed(j,j)),KIND=REAL64)
++     WRITE(unit,IOSTAT=ios) column(1:j)
++  enddo
++  CLOSE(unit)
++  deallocate(labels,column)
++  if (ios.ne.0) then
++     WRITE(6,'(A,1X,A,1X,A,I0)') ':WIEN_MATRIX_DUMP_ERROR:', &
++          trim(filename),'write iostat=',ios
++     STOP 'cannot write generalized-Hamiltonian dump'
++  endif
++END SUBROUTINE DumpAssembledMatrices
+--- a/SRC_lapw1/hamilt.F
++++ b/SRC_lapw1/hamilt.F
+@@ -21,6 +21,8 @@
+       use rotmat, only: ROTIJ, ROTLOC
+       use struk, only : NDF,multmax
+       use coml, only   : mgga
++      use atspdt, only: basis_restore_spherical,basis_restore_high_l, &
++           basis_restore_lmin
+       use albl
+       use stdmath
+       IMPLICIT NONE
+@@ -663,7 +665,22 @@
+                              TMP3*(ATMP1*AL_r(J,L)+Btmp1*BL_r(J,L))
+                      end do
+                   endif
+-                  
++
++                  if (basis_restore_high_l.and.L.ge.basis_restore_lmin) then
++                     ! Complete the fixed-operator probe above the HNS
++                     ! orbital cutoff.  Spherical DeltaV is diagonal in
++                     ! (l,m); the sum over m supplies P_l and (2l+1).
++                     ! Both mixed terms are required.  BL is zero for APW,
++                     ! so the same expression also covers that channel.
++                     ! No overlap, surface or ordinary stress term changes.
++                     do J=1,j_end(ihelp)
++                        TMP1(J)=TMP1(J)+DLL1*P(J,L,ihelp)*( &
++                             basis_restore_spherical(1,L+1,JNEQ)*AL_c(L,ihelp)*AL_r(J,L) &
++                            +basis_restore_spherical(2,L+1,JNEQ)*BL_c(L,ihelp)*BL_r(J,L) &
++                            +basis_restore_spherical(3,L+1,JNEQ)*( &
++                                 AL_c(L,ihelp)*BL_r(J,L)+BL_c(L,ihelp)*AL_r(J,L)))
++                     enddo
++                  endif
+                enddo
+ !$omp simd
+                DO J = 1, j_end(ihelp)
+--- a/SRC_lapw1/inilpw.f
++++ b/SRC_lapw1/inilpw.f
+@@ -9,7 +9,7 @@
+       use atspdt, only  : INS, NL, E
+       use char, only    : LATTIC, NAME, init_char
+       use comc, only    : IPGR, KNAME, init_comc
+-      use comi, only    : NT, LNSMAX, NAT,nemax_it,NSLMAX
++      use comi, only    : NT, LNSMAX, NAT,nemax_it,NSLMAX,fixed_nbands
+       use coml, only    : SPRSWF, PRNTWF, WFTAPE, REL, ITER, NOHNS, mgga, &
+            mgga_central_correction
+       use comr, only    : RKM, EL, EU, WEIGHT, init_comr,sproj_limit,eshift_iter,readHinv,divide
+@@ -149,7 +149,7 @@
+ !        Local Scalars
+ !
+       INTEGER            KINDEX, ITAPE, IUNIT, INDEX, JATOM, J
+-      INTEGER            I, I1, I2, NT1, IA, M, IRECL,ios,isize
++      INTEGER            I, I1, I2, NT1, IA, M, IRECL,ios,isize,code
+       INTEGER            ISX, ISY, ISZ, IDV, JAT, L, M1, K
+       DOUBLE PRECISION   E1N, E2N, eorb_ind, test1, test2, efermi
+       DOUBLE PRECISION, allocatable :: ZZ(:)
+@@ -163,7 +163,7 @@
+       LOGICAL            RUNORB,nmat_only,there
+       LOGICAL            FORCE,newform,Hinv_open
+       INTEGER            NK1
+-      character          line*80 
++      character          line*80, keyword_line*80
+ 
+ !
+ !        External Subroutines
+@@ -468,6 +468,21 @@
+ !
+ !      READ (5,5090,err=71) ITAPE,e1n,e2n
+       read(5,'(a)')line
++!     Keep the fourth numerical field's legacy meaning unless the user
++!     explicitly requests index-based selection with a trailing keyword:
++!       K-VECTORS FROM UNIT:4 -10.0 2.0 66 FIXED_NBANDS
++!     Convert a copy to upper case so the keyword is case-insensitive.
++      keyword_line=line
++      do i=1,len(keyword_line)
++         code=iachar(keyword_line(i:i))
++         if(code.ge.iachar('a').and.code.le.iachar('z')) &
++              keyword_line(i:i)=achar(code-iachar('a')+iachar('A'))
++      enddo
++      fixed_nbands=.false.
++      do i=1,len(keyword_line)-len('FIXED_NBANDS')+1
++         if(keyword_line(i:i+len('FIXED_NBANDS')-1).eq.'FIXED_NBANDS') &
++              fixed_nbands=.true.
++      enddo
+       nemax_it=99999999
+       read(line(21:),*,IOSTAT=ios) ITAPE,e1n,e2n,nemax_it
+       if (ios.ne.0) then
+--- a/SRC_lapw1/modules.F
++++ b/SRC_lapw1/modules.F
+@@ -1135,6 +1135,14 @@
+ !                         VNS3(l,L,l') ...
+ !                            ... integral(u_{l'}_dot*V_{L}*u_{l} dr)
+ 
++        ! Alternate-basis diagnostics must keep the physical operator fixed.
++        ! The L=0 correction routed through HNS covers only l<=LNSMAX.
++        ! Store the three remaining spherical radial integrals separately;
++        ! HAMILT adds them using its existing Legendre/addition-theorem path.
++        ! Channels are uu, udot-udot, u-udot, in Ry (no Y00 factor).
++        logical :: basis_restore_high_l=.false.
++        integer :: basis_restore_lmin=0
++        real*8, allocatable :: basis_restore_spherical(:,:,:)
+         INTEGER                       :: INS, NL, NGAU
+         INTEGER, allocatable          :: LMMAX(:), LQIND(:), LM(:,:,:)
+         DOUBLE PRECISION, allocatable :: DP(:,:), DPE(:,:), E(:,:), P(:,:), PE(:,:), PEI(:,:)
+@@ -1171,6 +1179,9 @@
+         SUBROUTINE init_atspdt(NATO, LMMX, LMAX, NSLMAX)
+           IMPLICIT NONE
+           integer NATO, LMMX, LMAX, NSLMAX
++          allocate(basis_restore_spherical(3,LMAX,NATO))
++          basis_restore_spherical=0.d0
++          basis_restore_high_l=.false.
+           allocate( LMMAX(NATO) )
+           allocate( LQIND(NATO) )
+           allocate( LM(2,0:LMMX,NATO) )
+@@ -1519,6 +1530,10 @@
+ !      COMMON  /COMI/     NVAA, NE, NBELW, NAT, NT, LNSMAX
+ !      SAVE    /COMI/
+         INTEGER :: NVAA, NE, NBELW, NAT, NT, LNSMAX,nemax_it
++!       Explicit opt-in for selecting a fixed number of lowest bands.
++!       This must remain separate from nemax_it so input files without the
++!       FIXED_NBANDS keyword retain WIEN2k's historical behavior.
++        LOGICAL :: fixed_nbands
+         INTEGER :: NSLMAX
+       end module comi
+ 
+--- a/SRC_lapw1/seclr4.F
++++ b/SRC_lapw1/seclr4.F
+@@ -25,11 +25,8 @@
+                              time_backtransform
+ #endif
+       use lolog, only : nlo, loor, lapw, ilo
+-#ifdef ELPA
+-      use comi, only    : NVAA, NE, NBELW, NAT, NT, LNSMAX, NEMAX_IT
+-#else
+-      use comi, only    : NVAA, NE, NBELW, NAT, NT, LNSMAX
+-#endif  
++      use comi, only    : NVAA, NE, NBELW, NAT, NT, LNSMAX, &
++                          NEMAX_IT, FIXED_NBANDS
+       use coml, only    : SPRSWF, PRNTWF, WFTAPE, REL, ITER, NOHNS
+       use comr, only    : RKM, EL, EU, WEIGHT, divide
+ 
+@@ -208,6 +205,17 @@
+             EU1 = EIGVAL(2)
+             IL = 0
+             IU = 0
++            if(FIXED_NBANDS) then
++               if(NEMAX_IT.lt.1 .or. NEMAX_IT.gt.NVAA+NLO) then
++                  write(ERRMSG,'(A,I8,A,I8)') 'FIXED_NBANDS=',NEMAX_IT, &
++                       ' is incompatible with matrix size=',NVAA+NLO
++                  CALL OUTERR('SECLR4',ERRMSG)
++                  STOP 'invalid FIXED_NBANDS request'
++               endif
++               RANG='I'
++               IL=1
++               IU=NEMAX_IT
++            endif
+             ABSTOL = 0.0D+0
+       abstol=2.d0*PDLAMCH(ICTXTALL,'S')
+ !            ORFAC = 1.0D-3
+@@ -506,6 +514,18 @@
+       CALL START_TIMER(time_sep)
+       IL = 0
+       IU = 0
++      RANG='V'
++      if(FIXED_NBANDS) then
++         if(NEMAX_IT.lt.1 .or. NEMAX_IT.gt.NVAA+NLO) then
++            write(ERRMSG,'(A,I8,A,I8)') 'FIXED_NBANDS=',NEMAX_IT, &
++                 ' is incompatible with matrix size=',NVAA+NLO
++            CALL OUTERR('SECLR4',ERRMSG)
++            STOP 'invalid FIXED_NBANDS request'
++         endif
++         RANG='I'
++         IL=1
++         IU=NEMAX_IT
++      endif
+       ABSTOL = 0.0D+0
+ !      ORFAC = 1.0D-3
+ !abstol and orfac changed back PB 8.5.2014: Au-atom +lapwso_mpi problem
+@@ -672,11 +692,9 @@
+ #endif        
+         abstol=2.d0*PDLAMCH(ICTXTALL,'S')
+               JOBZ='V'
+-              RANG='V'
+               UPLO='L'
+         if(deschs(2).gt.0) then
+           EL1=-1.0D+70                                                          !!!
+-          RANG='V'
+ !!!       if(EU.ge.9.d9) RANG='A'                                               !!!
+ #ifdef old_scalapack
+ !_REAL       CALL PDSYEVX(JOBZ,RANG,UPLO,NVAA+NLO,H,1,1, &
+@@ -754,7 +772,7 @@
+       endif
+ 
+ #else
+-      if(EU.ge.9d9) then
++      if(EU.ge.9d9 .and. .not.FIXED_NBANDS) then
+         if(divide) then
+ !####################################################
+ !############### divide and conquer #################
+@@ -814,13 +832,13 @@
+ !########### standard algorithm (few EVs) ###########
+ !####################################################
+ 
+-!_REAL      CALL DSYXEV4('V','V','L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU, &  
++!_REAL      CALL DSYXEV4('V',RANG,'L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU, &  
+ !_REAL                  ABSTOL,NE,EIGVAL,Z,HSROWS,WORK,LWORK,IWORK,IFAIL, &
+ !_REAL                  BLOCK1,BLOCK2,0.d0,LCOLZ,NBELW,INFO)
+-!_REAL!      CALL DSYEVX2('V','V','L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU, &  
++!_REAL!      CALL DSYEVX2('V',RANG,'L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU, &  
+ !_REAL!                  ABSTOL,NE,EIGVAL,Z,HSROWS,WORK,LWORK,IWORK,IFAIL, &
+ !_REAL!                  BLOCK1,LCOLZ,NBELW,INFO)
+-!_COMPLEX      CALL ZHEEVX2('V','V','L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU,ABSTOL, & 
++!_COMPLEX      CALL ZHEEVX2('V',RANG,'L',NVAA+NLO,HS,HSROWS,EL1,EU1,IL,IU,ABSTOL, & 
+ !_COMPLEX                  NE,EIGVAL,Z,HSROWS,WORK,LWORK,RWORK,IWORK,IFAIL, &
+ !_COMPLEX                  BLOCKSIZE, LCOLZ, NBELW, INFO)
+ !     compare: Complex routines need additional parameter RWORK (after WORK)
+@@ -843,6 +861,16 @@
+          STOP 'SECLR4 - Error'
+       ENDIF
+ #endif
++      if(FIXED_NBANDS) then
++         if(NE.ne.NEMAX_IT) then
++            write(ERRMSG,'(A,I8,A,I8)') 'FIXED_NBANDS requested ', &
++                 NEMAX_IT,' eigenpairs but solver returned ',NE
++            CALL OUTERR('SECLR4',ERRMSG)
++            STOP 'FIXED_NBANDS count mismatch'
++         endif
++         if(MYID.eq.0) write(6,'(A,I8)') &
++              ':FIXED_NBANDS: exact number of lowest eigenpairs =',NE
++      endif
+       CALL STOP_TIMER(time_sep)
+ #ifdef Barrier
+       CALL BARRIER
+--- a/SRC_lapw1/seclr5.F
++++ b/SRC_lapw1/seclr5.F
+@@ -11,7 +11,8 @@
+                            ICTXTALL,LDHS,LCOLHS,LCOLZ,BLOCKSIZE,NPCOL,NPROW,ICTXT,&
+                            barrier, NBELW_PARA                                        !!!
+       use lolog, only : nlo, loor, lapw, ilo
+-      use comi, only    : NV => NVAA, NE, NBLW => NBELW, NAT,nemax_it
++      use comi, only    : NV => NVAA, NE, NBLW => NBELW, NAT,nemax_it, &
++                          fixed_nbands
+       use coml, only    : SPRSWF, ITER
+       use comr, only    : RKM, EL                                                     !!!
+       use struk, only    : mult
+@@ -170,6 +171,17 @@
+       CALL MPI_BCAST(NEOLD, 1, MPI_INTEGER, 0,  &
+                      MPI_COMM_WORLD, ierr)
+ #endif
++
++      if(fixed_nbands .and. nemax_it.gt.NV+NLO) then
++         write(6,*) 'FIXED_NBANDS exceeds the current matrix dimension:', &
++              nemax_it,NV+NLO
++         stop 'invalid FIXED_NBANDS request'
++      endif
++      if(fixed_nbands .and. NEOLD.lt.nemax_it) then
++         if(MYID.eq.0) write(6,*) &
++              'Old vector has too few bands for FIXED_NBANDS; using full diagonalization.'
++         goto 999
++      endif
+ 
+       ALLOCATE(ZI(MAX(NVOLD, NV+NLO)))
+ #ifdef Parallel
+@@ -293,6 +305,11 @@
+ !</HH>-------------------------------------------------------------------
+ 
+       NE = NEOLD
++      if(fixed_nbands) then
++         if(NE.ne.nemax_it) stop 'FIXED_NBANDS iterative count mismatch'
++         if(MYID.eq.0) write(6,'(A,I8)') &
++              ':FIXED_NBANDS: exact number of lowest eigenpairs =',NE
++      endif
+ !
+ !     Check for EV below EL (modified lines marked with ' !!! ')    
+ !  
+--- a/SRC_lapw2/atpar.F
++++ b/SRC_lapw2/atpar.F
+@@ -516,6 +516,30 @@
+                     radp1(m,l),radp2(m,l),radpe1(m,l),radpe2(m,l)
+             enddo
+          enddo
++         ! The bare local-orbital radial solution and the ABC coefficients
++         ! are required to reconstruct the response of the *complete* LO
++         ! basis function
++         !
++         !   L_j(r)=A_j u_l(r)+B_j udot_l(r)+C_j u_LO,j(r).
++         !
++         ! Dumping only u_LO would violate the zero-value/zero-slope
++         ! boundary constraints when center and strained structures are
++         ! differenced.  These records are still diagnostic-only and do not
++         ! alter any LAPW2 result.
++         do l=0,min(lomax,lmax2n)
++            do jlo=1,ilo(l)
++               write(radial_dump_unit, &
++                    '(a,4(1x,i0),4(1x,es24.16))') ':RADIAL_LO_COEFF', &
++                    jatom,l,jlo,merge(1,0,lapw(l)), &
++                    alo(l,jlo),blo(l,jlo),clo(l,jlo),elo(l,jlo)
++               do m=1,jri(jatom)
++                  write(radial_dump_unit, &
++                       '(a,4(1x,i0),5(1x,es24.16))') ':RADIAL_LO_FD', &
++                       jatom,l,jlo,m,rnet(m),a1lo(m,jlo,l), &
++                       b1lo(m,jlo,l),ap1lo(m,jlo,l),bp1lo(m,jlo,l)
++               enddo
++            enddo
++         enddo
+          close(radial_dump_unit)
+       endif
+       
+--- a/SRC_lapw2/kin_str_integrals.F
++++ b/SRC_lapw2/kin_str_integrals.F
+@@ -34,7 +34,6 @@
+                           UCL(nrad),UCS(nrad),UCLP(nrad),UCSP(nrad),   &
+                           UAB(nrad),UBA(nrad), &
+                           UAA(nrad), r1(nrad)                                                     
+-   logical             :: IsEven                       
+    real*8              :: CIN,CINP,g0,TC, VALUE(nrad)                          
+    
+    
+@@ -55,24 +54,22 @@
+           UBS(i) = rade2(i,lp)/r1(i)           
+        ENDDO       
+              
+-!        IsEven = .false.
+-!        IF(2*(lp/2) .eq. lp) IsEven = .true.
+-       call dergl(imax,r1,UAL,UAA,IsEven,g0)   !in new dergl last logic is absent              
+-       call dergl(imax,r1,UAS,UAB,IsEven,g0)       
+-       
+-       call dergl(imax,r1,UAA,UAL,IsEven,g0)
+-       call dergl(imax,r1,UAB,UAS,IsEven,g0)
++       call g1_radial_derivative(imax,r1,UAL,UAA)   !in new dergl last logic is absent              
++       call g1_radial_derivative(imax,r1,UAS,UAB)       
++       
++       call g1_radial_derivative(imax,r1,UAA,UAL)
++       call g1_radial_derivative(imax,r1,UAB,UAS)
+        
+        DO i = 1, imax
+           uppl2(i,lp) = UAL(i)*r1(i)
+           upps2(i,lp) = UAS(i)*r1(i)
+        ENDDO       
+        
+-       call dergl(imax,r1,UBL,UAA,IsEven,g0)
+-       call dergl(imax,r1,UBS,UAB,IsEven,g0)
+-       
+-       call dergl(imax,r1,UAA,UBL,IsEven,g0)
+-       call dergl(imax,r1,UAB,UBS,IsEven,g0)
++       call g1_radial_derivative(imax,r1,UBL,UAA)
++       call g1_radial_derivative(imax,r1,UBS,UAB)
++       
++       call g1_radial_derivative(imax,r1,UAA,UBL)
++       call g1_radial_derivative(imax,r1,UAB,UBS)
+        
+        DO i = 1, imax
+           udppl2(i,lp) = UBL(i)*r1(i)
+@@ -101,13 +98,11 @@
+              UBLP(i) = rade1(i,l)/r1(i) 
+              UBSP(i) = rade2(i,l)/r1(i)              
+           ENDDO        
+-!           IsEven = .false.
+-!           IF(2*(lp/2) .eq. lp) IsEven = .true.
+-          call dergl(imax,r1,UAL,dul,IsEven,g0)
+-          call dergl(imax,r1,UAS,dus,IsEven,g0)
+-             
+-          call dergl(imax,r1,UBL,dudl,IsEven,g0)
+-          call dergl(imax,r1,UBS,duds,IsEven,g0)
++          call g1_radial_derivative(imax,r1,UAL,dul)
++          call g1_radial_derivative(imax,r1,UAS,dus)
++             
++          call g1_radial_derivative(imax,r1,UBL,dudl)
++          call g1_radial_derivative(imax,r1,UBS,duds)
+           
+           CALL RINT13(rel,rrad1(1,l),rrad2(1,l),dul(1),dus(1),  TC2S00(l,lp), jatom)   !integrand contains just product of two functions: r*u_llmd*du_llmdp; d derivative
+           CALL RINT13(rel,rrad1(1,l),rrad2(1,l),dudl(1),duds(1),TC2S01(l,lp), jatom)
+@@ -130,11 +125,11 @@
+                    UCL(i) = a1lo(i,jlop,lp)/r1(i)                         !large comp of LO fun ul(e2)
+                    UCS(i) = b1lo(i,jlop,lp)/r1(i)                         !small comp of LO fun us(e2)
+                 ENDDO
+-                call dergl(imax,r1,UCL,dulol,.true.,g0)         !first derivative of  ul(r,e2)
+-                call dergl(imax,r1,UCS,dulos,.true.,g0)         !first derivative of  uS(r,e2)
+-                
+-                call dergl(imax,r1,dulol,ddulol,.true.,g0)      !2nd derivative of  ul(r,e2)
+-                call dergl(imax,r1,dulos,ddulos,.true.,g0)      !2nd derivative of  us(r,e2)  
++                call g1_radial_derivative(imax,r1,UCL,dulol)         !first derivative of  ul(r,e2)
++                call g1_radial_derivative(imax,r1,UCS,dulos)         !first derivative of  uS(r,e2)
++                
++                call g1_radial_derivative(imax,r1,dulol,ddulol)      !2nd derivative of  ul(r,e2)
++                call g1_radial_derivative(imax,r1,dulos,ddulos)      !2nd derivative of  us(r,e2)  
+              
+                 DO i = 1, imax
+                    ddulol(i) = r1(i)*ddulol(i)
+@@ -171,11 +166,11 @@
+                 UBL(i) = rade1(i,lp)/r1(i) 
+                 UBS(i) = rade2(i,lp)/r1(i) 
+             ENDDO                  
+-            call dergl(imax,r1,UAL,dul,.true.,g0)
+-            call dergl(imax,r1,UAS,dus,.true.,g0)
+-             
+-            call dergl(imax,r1,UBL,dudl,.true.,g0)
+-            call dergl(imax,r1,UBS,duds,.true.,g0)
++            call g1_radial_derivative(imax,r1,UAL,dul)
++            call g1_radial_derivative(imax,r1,UAS,dus)
++             
++            call g1_radial_derivative(imax,r1,UBL,dudl)
++            call g1_radial_derivative(imax,r1,UBS,duds)
+             
+             CALL RINT13(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),uppl2(1,lp),upps2(1,lp),  juddu_20(jlo,l,lp),jatom)     !integral u times double radia derivative
+             CALL RINT13(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),udppl2(1,lp),udpps2(1,lp),juddu_21(jlo,l,lp),jatom)
+@@ -209,11 +204,11 @@
+              UCL(i) = a1lo(i,jlop,lp)/r1(i)                         !large comp of LO fun ul(e2)
+              UCS(i) = b1lo(i,jlop,lp)/r1(i)                         !small comp of LO fun us(e2)
+           ENDDO
+-          call dergl(imax,r1,UCL,dulol,.true.,g0)         !first derivative of  ul(r,e2)
+-          call dergl(imax,r1,UCS,dulos,.true.,g0)         !first derivative of  uS(r,e2)
+-                
+-          call dergl(imax,r1,dulol,ddulol,.true.,g0)      !2nd derivative of  ul(r,e2)
+-          call dergl(imax,r1,dulos,ddulos,.true.,g0)      !2nd derivative of  us(r,e2)  
++          call g1_radial_derivative(imax,r1,UCL,dulol)         !first derivative of  ul(r,e2)
++          call g1_radial_derivative(imax,r1,UCS,dulos)         !first derivative of  uS(r,e2)
++                
++          call g1_radial_derivative(imax,r1,dulol,ddulol)      !2nd derivative of  ul(r,e2)
++          call g1_radial_derivative(imax,r1,dulos,ddulos)      !2nd derivative of  us(r,e2)  
+              
+           DO i = 1, imax
+              ddulol(i) = r1(i)*ddulol(i)
+@@ -253,3 +248,23 @@
+     
+ return
+ end subroutine kin_str_integrals
++
++subroutine g1_radial_derivative(n,r,f,df)
++  ! Stress-only derivative on the physical positive-r mesh.
++  ! The old G1 path passed an UNINITIALIZED IsEven to DERGL, which
++  ! actually uses the flag to mirror f across r=0. Even a specified
++  ! parity is not generally valid for Coulomb-cusp/RELA radial functions,
++  ! or for both a radial function and its derivative. No extrapolated
++  ! negative-radius samples are needed: SPLINE already supplies a
++  ! one-sided endpoint condition from positive-mesh divided differences.
++  ! Keep the existing cubic interpolation and twice-differentiated
++  ! strategy; this repair does NOT add physical radial response to strain.
++  ! Generic DERGL and non-stress density/force routines are untouched.
++  implicit none
++  integer,intent(in) :: n
++  real*8,intent(in) :: r(n),f(n)
++  real*8,intent(out) :: df(n)
++  real*8 :: c(n),d(n)
++  if(n.lt.4) stop 'G1 radial derivative requires at least four points'
++  call spline(n,r,f,df,c,d)
++end subroutine g1_radial_derivative
+--- a/SRC_lapw2/val_corr_stress.F
++++ b/SRC_lapw2/val_corr_stress.F
+@@ -670,7 +670,11 @@
+                                            !     buf_sph_val1_buf3(alpha,beta,num) = buf_sph_val1_buf3(alpha,beta,num) + & 
+                                                  gaunt1*gaunt2*conjg(c_am(alpha,t))*conjg(c_am(beta,u))*&
+                                                  conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
+-                                                 (elo(lp,jlop)-e(num))*jr3upu_22(jlo,jlop,l,lp)
++                                                 ! G2 differentiates the BRA radial function.  The integral
++                                                 ! table stores <i|r d_r|j>, so transpose BOTH
++                                                 ! LO and angular indices, while retaining the
++                                                 ! KET linearization energy elo(lp,jlop).
++                                                 (elo(lp,jlop)-e(num))*jr3upu_22(jlop,jlo,lp,l)
+                                               ENDIF
+                                            ENDDO                                           
+                                         ENDIF
+@@ -803,7 +807,9 @@
+        ! ATPAR/FORFHS writes all (m,m') replicas of one radial channel
+        ! consecutively, so comparison with the preceding record is sufficient
+        ! and avoids an O(ihmx**2) search at every k point.
+-       IF (ih.GT.1 .AND. lpv(ih-1).EQ.l .AND. lv(ih-1).EQ.lp .AND. &
++       ! Fortran .AND. need not short circuit: guard ih-1 separately.
++       IF (ih.GT.1) THEN
++       IF (lpv(ih-1).EQ.l .AND. lv(ih-1).EQ.lp .AND. &
+            llv(ih-1).EQ.llv(ih) .AND. mmv(ih-1).EQ.mmv(ih)) THEN
+           channel_diff = ABS(vpuu(ih-1)-vpuu(ih))+ &
+                          ABS(vpdd(ih-1)-vpdd(ih))+ &
+@@ -818,6 +824,7 @@
+                           ABS(wpud(ih))+ABS(wpdu(ih))
+           duplicate_radial_channel = &
+                channel_diff.LE.1.d-12*(1.d0+channel_scale)
++       ENDIF
+        ENDIF
+        IF (duplicate_radial_channel) CYCLE
+ 
+@@ -855,9 +862,14 @@
+                                IF (ABS(gaunt_couple).LT.1.d-30) CYCLE
+                                DO alpha = 1,3
+                                   DO beta = 1,3
++                                     ! This Gaunt ordering expands n_alpha*n_beta
++                                     ! on the KET side of <Y_bra|...|Y_ket>.
++                                     ! Conjugating c_am here reverses xy/yz signs.
++                                     ! The spherical block uses another ordering
++                                     ! and must NOT be changed in the same way.
+                                      radial_factor = &
+-                                          conjg(c_am(alpha,t))* &
+-                                          conjg(c_am(beta,u))*gaunt1* &
++                                          c_am(alpha,t)* &
++                                          c_am(beta,u)*gaunt1* &
+                                           gaunt_pot*gaunt_couple
+                                      radial_geom(alpha,beta) = &
+                                           radial_geom(alpha,beta)+radial_factor
+@@ -1037,7 +1049,9 @@
+        l  = lpv(ih)
+        lp = lv(ih)
+        duplicate_radial_channel = .FALSE.
+-       IF (ih.GT.1 .AND. lpv(ih-1).EQ.l .AND. lv(ih-1).EQ.lp .AND. &
++       ! Fortran .AND. need not short circuit: guard ih-1 separately.
++       IF (ih.GT.1) THEN
++       IF (lpv(ih-1).EQ.l .AND. lv(ih-1).EQ.lp .AND. &
+            llv(ih-1).EQ.llv(ih) .AND. mmv(ih-1).EQ.mmv(ih)) THEN
+           channel_diff = ABS(vpuu(ih-1)-vpuu(ih))+ &
+                          ABS(vpdd(ih-1)-vpdd(ih))+ &
+@@ -1053,6 +1067,7 @@
+           duplicate_radial_channel = &
+                channel_diff.LE.1.d-12*(1.d0+channel_scale)
+        ENDIF
++       ENDIF
+        IF (duplicate_radial_channel) CYCLE
+ 
+        DO mbra = -l,l
+@@ -1062,7 +1077,11 @@
+              index2 = lp*(lp+1)+mket+1
+              angular_geom = zeroc
+              DO v = -1,1,2
+-                IF (l+v.LT.0 .OR. l+v.GT.lmax2n) CYCLE
++                ! grad_Omega Y_l contains l+1 even for l=lmax2n.
++                ! This is an intermediate angular harmonic, not an extra
++                ! radial basis channel.  Cutting it spoils the exact zero
++                ! trace n dot grad_Omega=0, including in TRACE mode.
++                IF (l+v.LT.0) CYCLE
+                 DO t = -1,1
+                    IF (mbra+t.LT.-(l+v) .OR. &
+                        mbra+t.GT. (l+v)) CYCLE
+--- a/SRC_lapw2/val_kinstrmt.F
++++ b/SRC_lapw2/val_kinstrmt.F
+@@ -31,7 +31,7 @@
+     REAL*8,  external          :: GAUNT
+     real*8                     :: gaunt1,gaunt2,gaunt3,RMT2
+     REAL*8, PARAMETER          :: ohalf = 1.D0/2.D0    
+-    real*8                     :: g1_deriv_scale
++    real*8                     :: g1_deriv_scale, g1_lo_scale
+     integer                    :: g1_legacy_status
+     character(len=32)          :: g1_legacy_env
+     complex*16                 :: c_am(3,-1:1), ca_st_lm(3,-1:1,-1:1), &
+@@ -50,20 +50,29 @@
+     lmax = lmax2n        !at least lmax = 7 is needed
+ !=====================                                      
+ 
+-    ! Eq. (G1) has one overall factor 1/2 in front of all four
+-    ! muffin-tin terms.  In the historical F3 implementation the
+-    ! first-radial-derivative piece duplicated its angular factor and
+-    ! therefore lost this 1/2, whereas the accompanying -u/r**2 piece kept
+-    ! it.  Restoring the common 1/2 removes the full traceless discrepancy
+-    ! in the exact fixed-G FeSe finite-difference test.  The legacy switch is
+-    ! retained only to reproduce and diagnose historical WIEN2k results.
+-    g1_deriv_scale = 0.5d0
++    ! G1 product rule (audit 2026-11-07): F2 differentiates n_alpha only.
++    ! The derivative of Y in D_beta(n_alpha*Y) belongs in F3 as well as
++    ! the separate n_beta*D_alpha(Y) row. Thus F3 is
++    !       (2*R1-R0) * (n_alpha*D_beta+n_beta*D_alpha)/2,
++    ! R1=int r*u_bra*u'_ket dr, R0=int u_bra*u_ket dr.
++    ! Halving the R1 coefficient was an incorrect earlier correction.
++    ! In particular psi=r*Y_10 is proportional to z and has ZERO Hessian;
++    ! the halved coefficient gives a spurious, traceless tensor instead.
++    ! LO--LO products have no extra multiplicity: the ordered pair sum
++    ! already contains every primitive pair, just as for u and udot.
++    ! PREAUDIT explicitly reproduces the two old angular defects for
++    ! diagnostics only; the physical/default scales are both one.
++    g1_deriv_scale = 1.d0
++    g1_lo_scale = 1.d0
+     g1_legacy_env = ''
+-    call get_environment_variable('WIEN_STRESS_G1_LEGACY',g1_legacy_env, &
++    call get_environment_variable('WIEN_STRESS_G1_PREAUDIT',g1_legacy_env, &
+                                   status=g1_legacy_status)
+     if(g1_legacy_status.eq.0 .and. len_trim(g1_legacy_env).gt.0 .and. &
+-       trim(g1_legacy_env).ne.'0') g1_deriv_scale = 1.d0
+-                                  
++       trim(g1_legacy_env).ne.'0') then
++       g1_deriv_scale = 0.5d0
++       g1_lo_scale = 2.d0
++    endif
++
+     DO l = 0, lmax
+        FF(0,l)   = P(l)
+        FF(1,l)   = PE(l)
+@@ -288,10 +297,10 @@
+                                   IF(.NOT.loor(jlo,l)) CYCLE
+                                   DO jlop = 1,ilo(lp)
+                                      IF(.NOT.loor(jlop,lp)) CYCLE
+-                                     radial_buf1 = radial_buf1 + 2.d0* &
++                                     radial_buf1 = radial_buf1 + g1_lo_scale* &
+                                           conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
+                                           judu_22(jlo,jlop,l,lp)
+-                                     radial_buf2 = radial_buf2 + 2.d0* &
++                                     radial_buf2 = radial_buf2 + g1_lo_scale* &
+                                           conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
+                                           juu_22(jlo,jlop,l,lp)
+                                   ENDDO
+--- a/SRC_lapw2/val_rela_kinstrmt.F
++++ b/SRC_lapw2/val_rela_kinstrmt.F
+@@ -1,3 +1,285 @@
++module rela_operator_cache
++ implicit none
++ integer, allocatable, save :: basis_lm(:),basis_ch(:),pair_p(:),pair_q(:)
++ integer*8, allocatable, save :: input_key(:)
++ complex*16, allocatable, save :: operators(:,:,:)
++ real*8, allocatable, save :: overlap(:)
++ integer, save :: nbasis=0,npairs=0,builds=0,hits=0
++contains
++subroutine apply_cached_rela(nemin,nemax,jatom,alm,blm,clm, &
++    rmesh,dx,lf,ldf,sf,sdf,qd,qu,dvry,nmap,outmap,hmap,dmap, &
++    nmap2,outmap2,hmap2,old_scale,surf_scale,en_scale,nat_scale,mass_scale, &
++    band_energy,buf_corr,buf_sr,buf_old,buf_surf)
++ use lo, only: ilo,loor
++ use TestCases, only: SimpInt,ConOpt
++ implicit none
++ integer,intent(in)::nemin,nemax,jatom,nmap(:),outmap(:,:),nmap2(:),outmap2(:,:)
++ complex*16,intent(in)::alm(:,:),blm(:,:),clm(:,:,:),hmap(:,:,:),dmap(:,:,:),hmap2(:,:,:)
++ real*8,intent(in)::rmesh(:),dx,lf(:,0:,:),ldf(:,0:,:),sf(:,0:,:),sdf(:,0:,:), &
++    qd(:,0:,:),qu(:,0:,:),dvry(:),old_scale,surf_scale,en_scale,nat_scale,mass_scale,band_energy(:)
++ complex*16,intent(out)::buf_corr(:,:,:),buf_sr(:,:,:),buf_old(:,:,:),buf_surf(:,:,:)
++ real*8,allocatable::key_real(:)
++ integer*8,allocatable::new_key(:)
++ complex*16,allocatable::coeff(:)
++ complex*16::sums(9,5),product,norm_value
++ integer::num,p,q,k,a,b,t,u,log_unit
++ logical::refresh
++ character(len=32)::cache_env
++ integer::cache_status
++ real*8::t0,t1,t2
++ key_real=[dble(jatom),dble(size(rmesh)),dble(size(lf,2)),dble(size(lf,3)),dx,merge(1.d0,0.d0,SimpInt),merge(1.d0,0.d0,ConOpt),old_scale,surf_scale,en_scale,nat_scale,mass_scale, &
++    dble(ilo),reshape(merge(1.d0,0.d0,loor),[size(loor)]), &
++    rmesh,dvry,reshape(lf,[size(lf)]),reshape(ldf,[size(ldf)]), &
++    reshape(sf,[size(sf)]),reshape(sdf,[size(sdf)]), &
++    reshape(qd,[size(qd)]),reshape(qu,[size(qu)])]
++ new_key=transfer(key_real,[0_8],size(key_real))
++ refresh=.true.
++ if(allocated(input_key)) then
++    if(size(input_key).eq.size(new_key)) refresh=any(input_key.ne.new_key)
++ endif
++ call cpu_time(t0)
++ if(refresh) then
++    call build_operators(rmesh,dx,lf,ldf,sf,sdf,qd,qu,dvry, &
++       nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2,old_scale,surf_scale,en_scale,nat_scale,mass_scale)
++    input_key=new_key
++    builds=builds+1
++ else
++    hits=hits+1
++ endif
++ call cpu_time(t1)
++ buf_corr=(0.d0,0.d0);buf_sr=(0.d0,0.d0);buf_old=(0.d0,0.d0);buf_surf=(0.d0,0.d0)
++!$omp parallel default(shared) private(num,coeff,p,q,k,a,b,t,u,product,sums,norm_value)
++ allocate(coeff(nbasis))
++!$omp do schedule(dynamic,1)
++ do num=nemin,nemax
++    do p=1,nbasis
++       if(basis_ch(p).eq.1) then
++          coeff(p)=alm(basis_lm(p),num)
++       else if(basis_ch(p).eq.2) then
++          coeff(p)=blm(basis_lm(p),num)
++       else
++          coeff(p)=clm(basis_lm(p),num,basis_ch(p)-2)
++       endif
++    enddo
++    sums=(0.d0,0.d0);norm_value=(0.d0,0.d0)
++    do k=1,npairs
++       p=pair_p(k);q=pair_q(k)
++       product=conjg(coeff(p))*coeff(q)
++       do u=1,4
++          do t=1,9
++             sums(t,u)=sums(t,u)+product*operators(t,u,k)
++          enddo
++       enddo
++       if(nat_scale.ne.0.d0) then
++          do t=1,9
++             sums(t,5)=sums(t,5)+product*operators(t,5,k)
++          enddo
++       endif
++       if(en_scale.ne.0.d0) norm_value=norm_value+product*overlap(k)
++    enddo
++    do b=1,3
++       do a=1,3
++          t=a+3*(b-1)
++          buf_sr(a,b,num)=sums(t,1)
++          buf_old(a,b,num)=sums(t,2)
++          buf_surf(a,b,num)=sums(t,3)
++          buf_corr(a,b,num)=sums(t,1)-sums(t,2)
++          if(nat_scale.ne.0.d0) buf_corr(a,b,num)=buf_corr(a,b,num)+nat_scale*band_energy(num)*sums(t,5)
++          if(mass_scale.ne.0.d0) buf_corr(a,b,num)=buf_corr(a,b,num)-0.5d0*mass_scale*real(sums(t,4))
++       enddo
++    enddo
++    if(en_scale.ne.0.d0) then
++       do a=1,3
++          buf_surf(a,a,num)=buf_surf(a,a,num)-en_scale*band_energy(num)*real(norm_value)/3.d0
++       enddo
++    endif
++ enddo
++!$omp end do
++ deallocate(coeff)
++!$omp end parallel
++ call cpu_time(t2)
++ cache_env=''
++ call get_environment_variable('WIEN_STRESS_RELA_CACHE_DIAG',cache_env,status=cache_status)
++ if(cache_status.eq.0.and.len_trim(cache_env).gt.0.and.trim(cache_env).ne.'0') then
++ open(newunit=log_unit,file='operator-cache.log',status='unknown',position='append')
++ write(log_unit,*) jatom,refresh,nbasis,npairs,builds,hits,t1-t0,t2-t1
++ close(log_unit)
++ endif
++end subroutine
++
++subroutine build_operators(r,dx,lf,ldf,sf,sdf,qd,qu,dvry, &
++    nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2,old_scale,surf_scale,en_scale,nat_scale,mass_scale)
++ use lo, only: ilo,loor
++ implicit none
++ integer,intent(in)::nmap(:),outmap(:,:),nmap2(:),outmap2(:,:)
++ complex*16,intent(in)::hmap(:,:,:),dmap(:,:,:),hmap2(:,:,:)
++ real*8,intent(in)::r(:),dx,lf(:,0:,:),ldf(:,0:,:),sf(:,0:,:),sdf(:,0:,:), &
++    qd(:,0:,:),qu(:,0:,:),dvry(:),old_scale,surf_scale,en_scale,nat_scale,mass_scale
++ real*8,allocatable::gv(:,:,:),fv(:,:,:),sv(:,:,:),small(:,:),rad(:,:,:,:,:),rs(:,:,:),fun(:)
++ integer,allocatable::rl(:),rc(:),lookup(:,:),br(:),first(:),last(:)
++ complex*16,allocatable::angular(:,:,:,:),moment(:,:,:,:,:)
++ complex*16::aa(3,3,2,2),mm(3,3,2,2),op(9,5),ang
++ real*8::c2inv,me,rsq,rr,ev
++ integer::nr,lmax,nin,nout,nout2,nchan,nlc,l,m,lm,ch,z,p,q,ip,iq,lp,lq, &
++          i,j,a,b,v,k,w,out,output,t,iu,iv,maxpairs
++ nr=size(r);lmax=ubound(lf,2);nchan=size(lf,3)
++ nin=size(nmap);nout=size(nmap2);nout2=(lmax+3)**2
++ c2inv=1.d0/(137.0359895d0**2);me=0.25d0*c2inv
++ allocate(lookup(0:lmax,nchan));lookup=0
++ nlc=0
++ do l=0,lmax
++    do ch=1,nchan
++       if(ch.gt.2) then
++          if(ch-2.gt.ilo(l)) cycle
++          if(.not.loor(ch-2,l)) cycle
++       endif
++       nlc=nlc+1;lookup(l,ch)=nlc
++    enddo
++ enddo
++ allocate(rl(nlc),rc(nlc),gv(nr,2,nlc),fv(nr,2,nlc),sv(nr,2,nlc),small(nr,nlc))
++ do l=0,lmax
++    do ch=1,nchan
++       z=lookup(l,ch);if(z.eq.0) cycle
++       rl(z)=l;rc(z)=ch
++       gv(:,1,z)=ldf(:,l,ch);gv(:,2,z)=lf(:,l,ch)/r
++       fv(:,1,z)=qd(:,l,ch);fv(:,2,z)=qu(:,l,ch)
++       sv(:,1,z)=sdf(:,l,ch);sv(:,2,z)=sf(:,l,ch)/r
++       small(:,z)=sf(:,l,ch)
++    enddo
++ enddo
++ allocate(rad(2,2,nlc,nlc,5),rs(nlc,nlc,2),fun(nr));rad=0.d0;rs=0.d0
++ do q=1,nlc
++    do p=1,nlc
++       do j=1,2
++          do i=1,2
++             fun=r*r*gv(:,i,p)*gv(:,j,q)
++             call charge(r,dx,fun,1,nr,rad(i,j,p,q,1))
++             fun=r*r*gv(:,i,p)*fv(:,j,q)
++             call charge(r,dx,fun,1,nr,rad(i,j,p,q,2))
++             fun=r*r*sv(:,i,p)*sv(:,j,q)
++             call charge(r,dx,fun,1,nr,rad(i,j,p,q,3))
++             if(nat_scale.ne.0.d0) then
++                fun=r*r*fv(:,i,p)*fv(:,j,q)
++                call charge(r,dx,fun,1,nr,rad(i,j,p,q,4))
++             endif
++             if(mass_scale.ne.0.d0) then
++                fun=r*r*r*dvry*fv(:,i,p)*fv(:,j,q)
++                call charge(r,dx,fun,1,nr,rad(i,j,p,q,5))
++             endif
++          enddo
++       enddo
++       if(mass_scale.ne.0.d0) then
++          fun=r*r*r*dvry*small(:,p)*small(:,q)
++          call charge(r,dx,fun,1,nr,rs(p,q,1))
++       endif
++       if(en_scale.ne.0.d0) then
++          fun=r*r*c2inv*small(:,p)*small(:,q)
++          call charge(r,dx,fun,1,nr,rs(p,q,2))
++       endif
++    enddo
++ enddo
++ allocate(angular(nout,3,2,nin),moment(nout2,3,3,2,nin))
++ angular=(0.d0,0.d0);moment=(0.d0,0.d0)
++ do lm=1,nin
++    do k=1,nmap(lm)
++       out=outmap(k,lm)
++       angular(out,:,1,lm)=hmap(:,k,lm)
++       angular(out,:,2,lm)=dmap(:,k,lm)
++    enddo
++ enddo
++ if(mass_scale.ne.0.d0) then
++    do lm=1,nin
++       do i=1,2
++          do v=1,3
++             do out=1,nout
++                do k=1,nmap2(out)
++                   output=outmap2(k,out)
++                   do a=1,3
++                      moment(output,a,v,i,lm)=moment(output,a,v,i,lm)+ &
++                          hmap2(a,k,out)*angular(out,v,i,lm)
++                   enddo
++                enddo
++             enddo
++          enddo
++       enddo
++    enddo
++ endif
++ nbasis=0
++ do l=0,lmax
++    nbasis=nbasis+(2*l+1)*count(lookup(l,:).ne.0)
++ enddo
++ if(allocated(basis_lm)) deallocate(basis_lm,basis_ch,pair_p,pair_q,operators,overlap)
++ allocate(basis_lm(nbasis),basis_ch(nbasis),br(nbasis),first(nin),last(nin))
++ p=0
++ do lm=1,nin
++    l=int(sqrt(dble(lm-1)));first(lm)=p+1
++    do ch=1,nchan
++       if(lookup(l,ch).eq.0) cycle
++       p=p+1;basis_lm(p)=lm;basis_ch(p)=ch;br(p)=lookup(l,ch)
++    enddo
++    last(lm)=p
++ enddo
++ maxpairs=nbasis*nbasis
++ allocate(pair_p(maxpairs),pair_q(maxpairs),operators(9,5,maxpairs),overlap(maxpairs))
++ npairs=0;rsq=r(nr)*r(nr)
++ do iq=1,nin
++    do ip=1,nin
++       aa=(0.d0,0.d0);mm=(0.d0,0.d0)
++       do j=1,2
++          do i=1,2
++             do b=1,3
++                do a=1,3
++                   aa(a,b,i,j)=0.5d0*sum(conjg(angular(:,a,i,ip))*angular(:,b,j,iq)+ &
++                                                conjg(angular(:,b,i,ip))*angular(:,a,j,iq))
++                   if(mass_scale.ne.0.d0) then
++                      do v=1,3
++                         mm(a,b,i,j)=mm(a,b,i,j)+0.5d0*sum( &
++                            conjg(moment(:,a,v,i,ip))*moment(:,b,v,j,iq)+ &
++                            conjg(moment(:,b,v,i,ip))*moment(:,a,v,j,iq))
++                      enddo
++                   endif
++                enddo
++             enddo
++          enddo
++       enddo
++       if(all(aa.eq.(0.d0,0.d0)).and.all(mm.eq.(0.d0,0.d0)).and.ip.ne.iq) cycle
++       do q=first(iq),last(iq)
++          do p=first(ip),last(ip)
++             lp=br(p);lq=br(q);op=(0.d0,0.d0)
++             do b=1,3
++                do a=1,3
++                   t=a+3*(b-1)
++                   do j=1,2
++                      do i=1,2
++                         ang=aa(a,b,i,j)
++                         op(t,1)=op(t,1)+0.5d0*ang*(rad(i,j,lp,lq,2)+rad(j,i,lq,lp,2))
++                         op(t,2)=op(t,2)+ang*(rad(i,j,lp,lq,1)+old_scale*c2inv*rad(i,j,lp,lq,3))
++                         if(nat_scale.ne.0.d0) op(t,5)=op(t,5)+me*ang*rad(i,j,lp,lq,4)
++                         if(mass_scale.ne.0.d0) op(t,4)=op(t,4)+me*mm(a,b,i,j)*rad(i,j,lp,lq,5)
++                      enddo
++                   enddo
++                   if(mass_scale.ne.0.d0) op(t,4)=op(t,4)-c2inv*aa(a,b,1,1)*rs(lp,lq,1)
++                   op(t,3)=rsq*aa(a,b,1,1)*lf(nr,rl(lp),rc(lp))* &
++                              (qd(nr,rl(lq),rc(lq))-ldf(nr,rl(lq),rc(lq)))
++                   if(surf_scale.ne.0.d0) then
++                      do j=1,2
++                         op(t,3)=op(t,3)+surf_scale*rsq*c2inv*small(nr,lp)*aa(a,b,1,j)*sv(nr,j,lq)
++                      enddo
++                   endif
++                enddo
++             enddo
++             ev=0.d0
++             if(en_scale.ne.0.d0.and.ip.eq.iq) ev=rs(lp,lq,2)
++             if(all(op.eq.(0.d0,0.d0)).and.ev.eq.0.d0) cycle
++             npairs=npairs+1;pair_p(npairs)=p;pair_q(npairs)=q
++             operators(:,:,npairs)=op;overlap(npairs)=ev
++          enddo
++       enddo
++    enddo
++ enddo
++end subroutine
++end module rela_operator_cache
++
+ subroutine val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
+                              buf_corr,buf_sr,buf_old,buf_surf)
+    ! Scalar-relativistic correction to the valence kinetic stress inside
+@@ -63,6 +345,7 @@
+    ! dcoef stores c^a_st.  Once both gradients are expressed in an
+    ! orthonormal Y_LM basis, the angular integral is just a dot product.
+ 
++   use rela_operator_cache, only: apply_cached_rela
+    use param
+    use com, only: rel
+    use struk, only: r0,dx,jri
+@@ -470,286 +753,10 @@
+                                       max_flux_err,max_flux_boundary_err
+    endif
+ 
+-   ! Band loop.  For each radial point, form the large-component gradient,
+-   ! its scalar-relativistic flux q, and the old small-component gradient in
+-   ! the common Y_LM output basis.  Orthogonality then performs the complete
+-   ! angular integral without an angular mesh.
+-   ! Every band writes a distinct NUM slice of BUF_SR/BUF_OLD/BUF_CORR and
+-   ! BUF_SURF.  It is therefore an ideal OpenMP dimension, unlike the angular
+-   ! channels of the nonrelativistic G1 contraction, whose work is strongly
+-   ! imbalanced.  All arrays below are scratch storage for one band and must
+-   ! be private.  Allocating them once per thread (outside OMP DO) avoids both
+-   ! races and the much larger cost of allocating them at every radial point.
+-   ! The shared radial functions/maps above are read-only in this region.
+-!$omp parallel default(shared) &
+-!$omp& private(num,ir,l,m,lm,lmout,imap,jlo,ich,alpha,beta,v,zval, &
+-!$omp&         sum_re,sum_im,small_norm,fvec,dfvec,svec,dsvec,qdvec,quvec, &
+-!$omp&         grad,aux,sgrad,npsi,ndflux,nsval,naux,integ_sr,integ_old, &
+-!$omp&         integ_nat,funct_re,funct_im,massv_tensor,tmp)
+-   allocate(fvec(nin),dfvec(nin),svec(nin),dsvec(nin))
+-   allocate(qdvec(nin),quvec(nin))
+-   allocate(grad(3,nout),aux(3,nout),sgrad(3,nout))
+-   allocate(npsi(3,nout),ndflux(3,nout))
+-   allocate(nsval(3,nout),naux(3,3,nout2))
+-   allocate(integ_sr(3,3,imax),integ_old(3,3,imax),integ_nat(3,3,imax))
+-   allocate(funct_re(imax),funct_im(imax),massv_tensor(3,3,imax),tmp(imax))
+-!$omp do schedule(dynamic,1)
+-   do num=nemin,nemax
+-      integ_sr=(0.d0,0.d0)
+-      integ_old=(0.d0,0.d0)
+-      integ_nat=(0.d0,0.d0)
+-      tmp=0.d0
+-      massv_tensor=0.d0
+-      do ir=1,imax
+-         fvec=(0.d0,0.d0); dfvec=(0.d0,0.d0)
+-         svec=(0.d0,0.d0); dsvec=(0.d0,0.d0)
+-         qdvec=(0.d0,0.d0); quvec=(0.d0,0.d0)
+-         do l=0,lmax
+-            do m=-l,l
+-               lm=l*(l+1)+m+1
+-               fvec(lm)=alm(lm,num)*lf(ir,l,1)+ &
+-                        blm(lm,num)*lf(ir,l,2)
+-               dfvec(lm)=alm(lm,num)*ldf(ir,l,1)+ &
+-                         blm(lm,num)*ldf(ir,l,2)
+-               svec(lm)=alm(lm,num)*sf(ir,l,1)+ &
+-                        blm(lm,num)*sf(ir,l,2)
+-               dsvec(lm)=alm(lm,num)*sdf(ir,l,1)+ &
+-                         blm(lm,num)*sdf(ir,l,2)
+-               qdvec(lm)=alm(lm,num)*qd(ir,l,1)+ &
+-                         blm(lm,num)*qd(ir,l,2)
+-               quvec(lm)=alm(lm,num)*qu(ir,l,1)+ &
+-                         blm(lm,num)*qu(ir,l,2)
+-               do jlo=1,ilo(l)
+-                  if(.not.loor(jlo,l)) cycle
+-                  ich=2+jlo
+-                  fvec(lm)=fvec(lm)+clm(lm,num,jlo)*lf(ir,l,ich)
+-                  dfvec(lm)=dfvec(lm)+clm(lm,num,jlo)*ldf(ir,l,ich)
+-                  svec(lm)=svec(lm)+clm(lm,num,jlo)*sf(ir,l,ich)
+-                  dsvec(lm)=dsvec(lm)+clm(lm,num,jlo)*sdf(ir,l,ich)
+-                  qdvec(lm)=qdvec(lm)+clm(lm,num,jlo)*qd(ir,l,ich)
+-                  quvec(lm)=quvec(lm)+clm(lm,num,jlo)*qu(ir,l,ich)
+-               enddo
+-            enddo
+-         enddo
+-
+-         grad=(0.d0,0.d0); aux=(0.d0,0.d0); sgrad=(0.d0,0.d0)
+-         do alpha=1,3
+-            do lm=1,nin
+-               do imap=1,nmap(lm)
+-                  lmout=outmap(imap,lm)
+-                  grad(alpha,lmout)=grad(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*dfvec(lm)+ &
+-                       dmap(alpha,imap,lm)*fvec(lm)/rmesh(ir)
+-                  aux(alpha,lmout)=aux(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*qdvec(lm)+ &
+-                       dmap(alpha,imap,lm)*quvec(lm)
+-                  sgrad(alpha,lmout)=sgrad(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*dsvec(lm)+ &
+-                       dmap(alpha,imap,lm)*svec(lm)/rmesh(ir)
+-               enddo
+-            enddo
+-         enddo
+-
+-         do alpha=1,3
+-            do beta=1,3
+-               zval=(0.d0,0.d0)
+-               do lmout=1,nout
+-                  ! Q_SR: Hermitian and strain-symmetrized large/flux
+-                  ! bilinear.  Q_old: the plain large gradient plus the
+-                  ! 1/c^2-weighted stored small-component gradient.
+-                  zval=zval+0.25d0*( &
+-                       conjg(grad(alpha,lmout))*aux(beta,lmout)+ &
+-                       conjg(aux(alpha,lmout))*grad(beta,lmout)+ &
+-                       conjg(grad(beta,lmout))*aux(alpha,lmout)+ &
+-                       conjg(aux(beta,lmout))*grad(alpha,lmout))
+-               enddo
+-               integ_sr(alpha,beta,ir)=rmesh(ir)*rmesh(ir)*zval
+-
+-               zval=(0.d0,0.d0)
+-               do lmout=1,nout
+-                  zval=zval+0.5d0*( &
+-                       conjg(grad(alpha,lmout))*grad(beta,lmout)+ &
+-                       conjg(grad(beta,lmout))*grad(alpha,lmout)+ &
+-                       old_small_scale*c2inv* &
+-                       conjg(sgrad(alpha,lmout))*sgrad(beta,lmout)+ &
+-                       old_small_scale*c2inv* &
+-                       conjg(sgrad(beta,lmout))*sgrad(alpha,lmout))
+-               enddo
+-               integ_old(alpha,beta,ir)=rmesh(ir)*rmesh(ir)*zval
+-
+-               zval=(0.d0,0.d0)
+-               do lmout=1,nout
+-                  zval=zval+0.5d0*me*( &
+-                       conjg(aux(alpha,lmout))*aux(beta,lmout)+ &
+-                       conjg(aux(beta,lmout))*aux(alpha,lmout))
+-               enddo
+-               integ_nat(alpha,beta,ir)=rmesh(ir)*rmesh(ir)*zval
+-            enddo
+-         enddo
+-
+-         ! Stored scalar-relativistic small-component norm for this band.
+-         ! SVEC is B(r)/r in WIEN2k's convention and RINT13 weights B^2 by
+-         ! 1/c^2, hence r^2/c^2 times the angular norm is the radial density.
+-         do lm=1,nin
+-            tmp(ir)=tmp(ir)+rmesh(ir)*rmesh(ir)*c2inv*abs(svec(lm))**2
+-         enddo
+-
+-         nsval=(0.d0,0.d0)
+-         naux=(0.d0,0.d0)
+-         do alpha=1,3
+-            do lm=1,nin
+-               do imap=1,nmap(lm)
+-                  lmout=outmap(imap,lm)
+-                  nsval(alpha,lmout)=nsval(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*svec(lm)
+-               enddo
+-            enddo
+-            do beta=1,3
+-               do lm=1,nout
+-                  do imap=1,nmap2(lm)
+-                     lmout=outmap2(imap,lm)
+-                     naux(alpha,beta,lmout)=naux(alpha,beta,lmout)+ &
+-                          hmap2(alpha,imap,lm)*aux(beta,lm)
+-                  enddo
+-               enddo
+-            enddo
+-         enddo
+-         do alpha=1,3
+-            do beta=1,3
+-               zval=(0.d0,0.d0)
+-               do v=1,3
+-                  do lmout=1,nout2
+-                     zval=zval+0.5d0*me*( &
+-                          conjg(naux(alpha,v,lmout))*naux(beta,v,lmout)+ &
+-                          conjg(naux(beta,v,lmout))*naux(alpha,v,lmout))
+-                  enddo
+-               enddo
+-               do lmout=1,nout
+-                  zval=zval-0.5d0*c2inv*( &
+-                       conjg(nsval(alpha,lmout))*nsval(beta,lmout)+ &
+-                       conjg(nsval(beta,lmout))*nsval(alpha,lmout))
+-               enddo
+-               massv_tensor(alpha,beta,ir)=rmesh(ir)*rmesh(ir)* &
+-                    rmesh(ir)*dvry(ir)*real(zval)
+-            enddo
+-         enddo
+-      enddo
+-
+-      do alpha=1,3
+-         do beta=1,3
+-               funct_re=real(integ_sr(alpha,beta,:))
+-               funct_im=aimag(integ_sr(alpha,beta,:))
+-               call charge(rmesh,dx(jatom),funct_re,1,imax,sum_re)
+-               call charge(rmesh,dx(jatom),funct_im,1,imax,sum_im)
+-               buf_sr(alpha,beta,num)=dcmplx(sum_re,sum_im)
+-
+-               funct_re=real(integ_old(alpha,beta,:))
+-               funct_im=aimag(integ_old(alpha,beta,:))
+-               call charge(rmesh,dx(jatom),funct_re,1,imax,sum_re)
+-               call charge(rmesh,dx(jatom),funct_im,1,imax,sum_im)
+-               buf_old(alpha,beta,num)=dcmplx(sum_re,sum_im)
+-               buf_corr(alpha,beta,num)=buf_sr(alpha,beta,num)- &
+-                                         buf_old(alpha,beta,num)
+-
+-               if(ennat_scale.ne.0.d0) then
+-                  funct_re=real(integ_nat(alpha,beta,:))
+-                  funct_im=aimag(integ_nat(alpha,beta,:))
+-                  call charge(rmesh,dx(jatom),funct_re,1,imax,sum_re)
+-                  call charge(rmesh,dx(jatom),funct_im,1,imax,sum_im)
+-                  buf_corr(alpha,beta,num)=buf_corr(alpha,beta,num)+ &
+-                       ennat_scale*band_energy(num)*dcmplx(sum_re,sum_im)
+-               endif
+-         enddo
+-      enddo
+-
+-      ! Correct the APW surface flux.  At this point FVEC, DFVEC and QDVEC
+-      ! still contain the values at the outermost radial point.  HMAP is the
+-      ! exact spherical-harmonic representation of n_alpha*Y_lm.  Thus NPSI
+-      ! represents n_alpha*psi and NDFLUX represents
+-      ! n_alpha*(A*d_r(psi)-d_r(psi)).  The factor R_MT^2 is the surface
+-      ! measure.  Symmetrizing alpha,beta makes the tensor Hermitian before
+-      ! the real occupation sum is taken in l2main.
+-      npsi=(0.d0,0.d0)
+-      ndflux=(0.d0,0.d0)
+-      do alpha=1,3
+-         do lm=1,nin
+-            do imap=1,nmap(lm)
+-               lmout=outmap(imap,lm)
+-               npsi(alpha,lmout)=npsi(alpha,lmout)+ &
+-                    hmap(alpha,imap,lm)*fvec(lm)
+-               ndflux(alpha,lmout)=ndflux(alpha,lmout)+ &
+-                    hmap(alpha,imap,lm)*(qdvec(lm)-dfvec(lm))
+-            enddo
+-         enddo
+-      enddo
+-      do alpha=1,3
+-         do beta=1,3
+-            zval=(0.d0,0.d0)
+-            do lmout=1,nout
+-               zval=zval+0.5d0*( &
+-                    conjg(npsi(alpha,lmout))*ndflux(beta,lmout)+ &
+-                    conjg(npsi(beta,lmout))*ndflux(alpha,lmout))
+-            enddo
+-            buf_surf(alpha,beta,num)=rmesh(imax)*rmesh(imax)*zval
+-
+-         enddo
+-      enddo
+-
+-      if(small_surf_scale.ne.0.d0) then
+-         ! SMALL COMPONENT: unlike the large component it has no APW
+-         ! continuation outside the sphere.  Rebuild NPSI from SVEC so it
+-         ! represents n_alpha*s and contract it with the complete small-
+-         ! component gradient already held in SGRAD.
+-         npsi=(0.d0,0.d0)
+-         do alpha=1,3
+-            do lm=1,nin
+-               do imap=1,nmap(lm)
+-                  lmout=outmap(imap,lm)
+-                  npsi(alpha,lmout)=npsi(alpha,lmout)+ &
+-                       hmap(alpha,imap,lm)*svec(lm)
+-               enddo
+-            enddo
+-         enddo
+-         do alpha=1,3
+-            do beta=1,3
+-               zval=(0.d0,0.d0)
+-               do lmout=1,nout
+-                  zval=zval+0.5d0*c2inv*( &
+-                       conjg(npsi(alpha,lmout))*sgrad(beta,lmout)+ &
+-                       conjg(npsi(beta,lmout))*sgrad(alpha,lmout))
+-               enddo
+-               buf_surf(alpha,beta,num)=buf_surf(alpha,beta,num)+ &
+-                    small_surf_scale*rmesh(imax)*rmesh(imax)*zval
+-            enddo
+-         enddo
+-      endif
+-
+-
+-      if(ensmall_scale.ne.0.d0) then
+-         call charge(rmesh,dx(jatom),tmp,1,imax,small_norm)
+-         do alpha=1,3
+-            buf_surf(alpha,alpha,num)=buf_surf(alpha,alpha,num)- &
+-                 ensmall_scale*band_energy(num)*small_norm/3.d0
+-         enddo
+-      endif
+-
+-      if(massv_scale.ne.0.d0) then
+-         do alpha=1,3
+-            do beta=1,3
+-               funct_re=massv_tensor(alpha,beta,:)
+-               call charge(rmesh,dx(jatom),funct_re,1,imax,sum_re)
+-               buf_corr(alpha,beta,num)=buf_corr(alpha,beta,num)- &
+-                    0.5d0*massv_scale*sum_re
+-            enddo
+-         enddo
+-      endif
+-   enddo
+-!$omp end do
+-   deallocate(fvec,dfvec,svec,dsvec,qdvec,quvec)
+-   deallocate(grad,aux,sgrad,npsi,ndflux,nsval,naux)
+-   deallocate(integ_sr,integ_old,integ_nat,funct_re,funct_im, &
+-              massv_tensor,tmp)
+-!$omp end parallel
++   call apply_cached_rela(nemin,nemax,jatom,alm,blm,clm, &
++      rmesh,dx(jatom),lf,ldf,sf,sdf,qd,qu,dvry,nmap,outmap,hmap,dmap, &
++      nmap2,outmap2,hmap2,old_small_scale,small_surf_scale,ensmall_scale, &
++      ennat_scale,massv_scale,band_energy,buf_corr,buf_sr,buf_old,buf_surf)
+ 
+    deallocate(nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2, &
+               rmesh,vry,dvry)
+--- a/SRC_lcore/core_corr_stress.f
++++ b/SRC_lcore/core_corr_stress.f
+@@ -260,7 +260,11 @@
+       cor_corr_ns1_buf = 0.0
+       buf_sum  = (0.0d0, 0.d0)
+       DO lm1p = 1, lmtot1
+-         ll_p = lmtot(1,lm1p)
++         ! The sign of a WIEN lattice-harmonic l labels the sine/cosine
++         ! combination, not angular momentum.  multfc_core has already
++         ! encoded that sign in the complex coefficients.  Gaunt triangle
++         ! rules and C_FACTOR require the physical, nonnegative l.
++         ll_p = abs(lmtot(1,lm1p))
+          mm_p = lmtot(2,lm1p)                                                       
+          
+          !if we use commented line then replace counter by nrp
+@@ -324,7 +328,11 @@
+       !second part of non-spherical core contribution
+       cor_corr_ns2_buf = 0.0
+       DO lm1p = 1, lmtot1
+-         ll_p = lmtot(1,lm1p)
++         ! The sign of a WIEN lattice-harmonic l labels the sine/cosine
++         ! combination, not angular momentum.  multfc_core has already
++         ! encoded that sign in the complex coefficients.  Gaunt triangle
++         ! rules and C_FACTOR require the physical, nonnegative l.
++         ll_p = abs(lmtot(1,lm1p))
+          mm_p = lmtot(2,lm1p)
+          
+          DO ri = 1, counter

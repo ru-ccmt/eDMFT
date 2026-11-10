@@ -1,0 +1,28 @@
+no user mixer or charge output was overwritten. Existing IEEE invalid/zero
+flags at MPI shutdown occur with both before and corrected executables; no
+nonfinite checked stress/SCF output was found. These flags are not claimed fixed.
+
+Installation:
+  Sources and binaries backed up as *.before_g1_audit_20261107.
+  lapw2/lapw2c installed in /Users/haule/wien2k_24/.
+  dmft2 installed in /Users/haule/dbin/.
+  Build used source ~/activate; Homebrew compiler/MPI paths were explicitly
+  selected because conda mpif90 refers to an unavailable compiler.
+  WIEN_STRESS_G1_PREAUDIT=1 is DEFAULT OFF and reproduces only the two old
+  angular defects while keeping the defined radial helper. It is a diagnostic,
+  not a recommended production mode. The older G1_LEGACY selector is superseded.
+
+Portable patches are lapw2-g1-audit-20261107.patch and dmft2-g1-audit-20261107.patch.
+They record ONLY these changes, on top of the pre-existing work. The previous
+G2 lapw2 patch is in ../lapw2_audit_20261107/lapw2-g2-audit.patch. These audit
+patches must accompany an older cumulative WIEN patch distribution; this task
+does not claim to have regenerated that entire distribution.
+
+What remains:
+  The hydrostatic DMFT residual is essentially unchanged. No empirical term
+  was fitted to make it disappear. The corrected anisotropy still needs its
+  own controlled component-strain finite differences of the full functional.
+  Next: a consistent RKMAX series (first DFT, then DMFT), with fixed G sets
+  within each triplet, then an analytic radial-response audit if the residual
+  persists. Increasing RKMAX is a hypothesis to test, not an established cause.
+  No additional standalone M_Sigma term or pseudo-inverse change was introduced.

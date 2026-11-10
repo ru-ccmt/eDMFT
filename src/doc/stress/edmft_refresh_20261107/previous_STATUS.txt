@@ -1,0 +1,140 @@
+Stress comparison baseline — 7 November 2026
+
+All stresses below are mean normal stress in GPa: trace(sigma)/3.
+Numerical mean = [F(+epsilon)-F(-epsilon)]/(6*epsilon*Omega0), epsilon=0.001.
+Difference = analytic minus numerical. Do not divide differences by three again.
+Conventional compressive pressure has the opposite sign.
+For eDMFT, F denotes the frozen-self-energy Klein-functional comparison.
+
+Material Method RKMAX Mode Analytic Numerical Difference Status
+SrVO3 DFT    7 NREL    8.5169   10.1151  -1.5983 Earlier converged audit
+SrVO3 DFT    8 NREL    8.6275    8.4035  +0.2240 After remaining-terms fixes, matched bases
+SrVO3 eDMFT  7 NREL    5.2240    4.6174  +0.6066 Earlier comparison retained
+SrVO3 eDMFT  8 NREL    5.5454    2.9332  +2.6122 Reconverged; mismatch unresolved
+FeSe  DFT    8 RELA   12.2448   12.1389  +0.1059 After remaining-terms fixes, matched bases
+FeSe  eDMFT  8 RELA   -0.4889   -1.0491  +0.5602 Unresolved
+MnO   DFT    7 RELA   35.0851   34.0171  +1.0680 Matched bases, RKMAX8 pending
+MnO   eDMFT  7 RELA  -16.4060  -72.3474 +55.9415 Questionable numerical reference
+MnTe  DFT    7 RELA   15.8843   17.1994  -1.3151 Provisional earlier comparison
+MnTe  DFT    8 RELA   17.0000   17.7822  -0.7821 After remaining-terms fixes, matched bases
+MnTe  eDMFT  7 RELA   -5.7011   -0.6672  -5.0338 Magnetic assembly checked; reference limitations
+
+The older rows include the audited stress corrections, not the pre-repair code.
+Keep older cutoff results when extending this record. A new result should record
+its method, cutoff, strain, energy convention, convergence/basis checks, and source
+outputs. Do not treat a changed setup as an isolated RKMAX test without checking it.
+
+Latest validated DFT triplets
+SrVO3: /Users/haule/projects/materials/SrVO3/DFT_{m001,center,p001}
+75 k points, 43 bands per k, identical LAPW G sets and 1648 charge PW representatives.
+Endpoint energies: -8592.40883374 and -8592.40752198 Ry; Omega0=382.70904 Bohr^3.
+Numerical mean 8.4035411516 GPa. Final central mean after remaining-terms fixes 8.62750 GPa.
+NREL/LDA, tetrahedron. Same stale Eorb_imp.dat constant at all geometries cancels
+in the derivative. Final charge residuals <=5e-7.
+MnTe: /Users/haule/projects/materials/MnTe/{MnTe_m_0.001,0_800_MnTe,MnTe_p_0.001}
+100 k points, 64 bands per k, identical LAPW G sets and 1900 charge PW representatives.
+Endpoint energies: -31822.00697387 and -31822.00208137 Ry; Omega0=674.56301 Bohr^3.
+Numerical mean 17.7821790917 GPa. Analytic mean after remaining-terms fixes 17.0000326995 GPa.
+Nonmagnetic RELA/PBE; TEMPS=0.005 Ry includes full entropy. Charge residuals <=4e-7.
+An isotropic test validates only the trace, not individual normal or shear components.
+
+Reference limitations
+MnO eDMFT: fixed chemical potential; endpoint valence charges 20.992718, 21.008041;
+projector window [6,16] cuts a degenerate multiplet. The apparent 55.94 GPa mismatch
+is not an established analytic-stress error. Dense-mesh control differs from the
+user's earlier approximately -15.97 GPa calculation.
+MnTe DFT RKMAX7: basis and band counts differed, charge convergence was weaker.
+Its listed numerical value uses full Mermin entropy but remains provisional.
+MnTe eDMFT: both full-cell magnetic mappings were averaged; density/core included
+once. Window [21,51] degeneracies and endpoint convergence remain limitations.
+No new impurity convergence is implied by any eDMFT row.
+
+Recent audit findings
+G2 repairs: LO radial-index transpose; nonspherical angular conjugation;
+missing highest intermediate angular channel; safe Fortran bounds checking.
+G1 repairs: restore 2*R1-R0 product-rule coefficient; remove extra LO--LO factors;
+replace undefined parity flag in G1 radial differentiation with defined spline rule.
+Angular repairs can change anisotropy without changing trace. This is distinct from
+physical radial response to strain. Recent stress-only repairs preserved ordinary
+charge/SCF/force outputs on fixed inputs. Second-pass audit found no additional bug.
+Independent combined G1+G2 vs H/O derivative test with noncommuting complex density
+passed (~1.25e-7 fixture units), matching derivatives (~2.3e-9), surface quadrature
+(~1.5e-12), interstitial and normalization/window/direct-C regression checks passed.
+Combined test is a simplified NREL frozen-radial compact-support model, not proof of
+all RELA, radial-response, finite-RMT interface, or angular-truncation terms.
+
+Runtime fixes/checks
+SrVO3 stale mixer history (576 vs fresh 821 internal PW components) was restarted.
+MnTe expanded-cell GMAX changed to 11.988 to avoid an extra charge reciprocal shell.
+TEMPS replaces TEMP for full free-energy derivative comparisons.
+run_dft.py zero energy difference fix installed in ~/dbin and repository src/python:
+zero remains zero; charge and insufficient-history requirements remain enforced.
+
+Evidence
+/Users/haule/projects/eDMFT_new/src/doc/stress/g1_audit_20261107/REPORT.txt
+/Users/haule/projects/eDMFT_new/src/doc/stress/g1_g2_second_pass_20261107/REPORT.txt
+/Users/haule/projects/eDMFT_new/src/doc/stress/four_material_comparison_20261107/SUMMARY.txt
+/Users/haule/projects/eDMFT_new/src/doc/stress/lapw2_audit_20261107/REPORT.txt
+/Users/haule/projects/eDMFT_new/src/doc/stress/edmft_stress_G1_G2_second_pass_20261107.pdf
+The new RKMAX8 DFT rows supersede the corresponding old DFT rows in earlier reports;
+the old results remain useful and are retained above.
+
+Latest SrVO3 eDMFT RKMAX8 result checked 7 November after 14:24 local.
+All three jobs stopped; charge residuals minus/center/plus = 8e-7/5e-7/8e-7.
+Same 75 k points, 43 bands, per-k basis dimensions 690..713, 1648 charge PW
+representatives, frozen sigma and impurity inputs. No projector-window edge
+degeneracy. Endpoint functional drift only a few 1e-9 Ry in recent iterations.
+Kplus-Kminus = 0.0004578539992508013 Ry. Postprocessor isotropic derivative is
+8.7994586625 GPa (trace); numerical mean = 2.9331528875 GPa.
+Central total mean = 5.54540 GPa; discrepancy +2.6122471 GPa remains unexplained.
+Increasing cutoff did not resolve the eDMFT mismatch. Do not assume this change
+isolates RKMAX: the new runs also refreshed charge/projector and use the repaired
+zero-energy convergence check. Current vector G arrays were not re-read because
+normal run_dmft cleanup removes them; current energy metadata and charge G arrays
+were checked. Full report and input/output hashes:
+/Users/haule/projects/eDMFT_new/src/doc/stress/SrVO3_RK8_edmft_check_20261107/REPORT.txt
+/Users/haule/projects/eDMFT_new/src/doc/stress/SrVO3_RK8_edmft_check_20261107/results.json
+
+run_dmft.py zero-energy change fix is also installed in repository and ~/dbin;
+equal energies remain zero while charge and history requirements are retained.
+
+
+REMAINING-TERMS AUDIT FOLLOW-UP, 2026-11-07
+Installed LAPW0/lcore signed-harmonic, full-GGA, and precision corrections.
+The earlier table remains a historical record, not silently recalculated using
+new density terms. Full report, derivation, LaTeX/PDF and structured test results:
+  remaining_terms_audit_20261107/REPORT.txt
+  remaining_terms_audit_20261107/remaining_terms_audit.pdf
+
+Fixed-density mean shifts: SrVO3 DFT +0.000505, eDMFT +0.002347 GPa;
+FeSe DFT +0.249143, eDMFT +0.235899 GPa on the current snapshots. Current FeSe
+snapshots differ from archived accepted comparison inputs; do not add these
+shifts blindly to older total-stress rows.
+
+SrVO3 RK8 fixed-charge replay (window [12,31]), after new density assembly:
+43/100/200/400/680 stored bands -> 5.54761/6.19884/6.05295/6.05645/6.07193 GPa.
+EF, SUM, VSUM and SOlapm unchanged to numerical/printed precision across tests.
+Finite-difference reference remains 2.93315 GPa. Extra bands do not fix mismatch.
+
+Core and electrostatic analytic fixtures pass. Combined Coulomb trace identity
+residual <=0.00148 GPa. Native PBE metric derivative passes. Whole-functional
+GGA scaling still has ~0.37-0.38 GPa residual; this is unresolved, as is the
+principal SrVO3 eDMFT mismatch. No dmft2 or reference-directory change this pass.
+Portable source supplement under wien2k_patches/wien2k24_stress_20261102/
+supplements/remaining_terms_20261107/; older cumulative installer not rewritten.
+
+
+DFT POST-CORRECTION COMPARISON, 7 November 2026
+Latest RKMAX8 DFT rows at the top are updated. Fresh central dftKS/WIEN lapw2
+runs match both endpoint bases and give mixer charge residuals 0,0,2e-7 for
+SrVO3,FeSe,MnTe. Before -> after analytic means at identical central charge:
+SrVO3 8.626998866 -> 8.627504334; FeSe 11.995632452 -> 12.244775946;
+MnTe 16.927841424 -> 17.000032700 GPa. Numerical means are 8.403541158,
+12.138890192,17.782179095 GPa respectively. Current FeSe endpoint reference
+differs by 0.000695 GPa from the archived 12.138195 reference.
+The eDMFT rows remain the earlier comparisons; see response-complement controls
+above for the later SrVO3 test. DFT corrections modestly improve FeSe and MnTe;
+SrVO3 is essentially unchanged. Remaining DFT errors +0.2240,+0.1059,-0.7821 GPa.
+Report and raw records: dft_after_remaining_terms_20261107/REPORT.txt.
+SrVO3 source central vector is partial (12/75 k points); full vectors were
+regenerated in scratch. Source references were preserved, not overwritten.

@@ -1,0 +1,10 @@
+{
+  "values": {
+    "minus": -27.52630169,
+    "plus": -27.526301052,
+    "zero": -27.526301428
+  },
+  "half_step_GPa": 0.008174446574632965,
+  "half_fixed_weights_GPa": 0.008170312201238202,
+  "zero_max_energy_error_Ry": 0.0
+}

@@ -1,0 +1,158 @@
+{
+  "FeSe": {
+    "directories": [
+      "/private/tmp/lapw2_stress_audit_20261107/runs/FeSe_DFT_RELA_m001",
+      "/private/tmp/lapw2_stress_audit_20261107/runs/FeSe_DFT_RELA",
+      "/private/tmp/lapw2_stress_audit_20261107/runs/FeSe_DFT_RELA_p001"
+    ],
+    "basis_consistency": {
+      "k": true,
+      "weight": true,
+      "basis": true,
+      "bands": true,
+      "pw_hash": true
+    },
+    "nk": 140,
+    "bands": [
+      66
+    ],
+    "basis_min": 492,
+    "basis_max": 516,
+    "volume": [
+      527.37728,
+      528.96251,
+      530.55091
+    ],
+    "energy_before": [
+      -14811.71733719,
+      -14811.7160405,
+      -14811.71471824
+    ],
+    "energy_after": [
+      -14812.19189644,
+      -14812.19059978,
+      -14812.18927758
+    ],
+    "energy_change_ry": [
+      -0.4745592499984923,
+      -0.4745592800009035,
+      -0.474559340000269
+    ],
+    "DIS": [
+      "CHARGE DISTANCE      (  0.0000185 for atom    2 spin 1)      0.0000104",
+      "CHARGE DISTANCE      (  0.0000185 for atom    2 spin 1)      0.0000104",
+      "CHARGE DISTANCE      (  0.0000185 for atom    2 spin 1)      0.0000104"
+    ],
+    "numerical_mean_gpa": 12.138473031522675,
+    "numerical_volume_slope_gpa": 12.139027855776893,
+    "analytic": {
+      "before": {
+        "diagonal": [
+          12.196226451515775,
+          12.196226451515775,
+          11.585603389462344
+        ],
+        "mean": 11.9926854308313,
+        "difference_from_fd": -0.14578760069137608
+      },
+      "corrected_trace": {
+        "diagonal": [
+          11.836781499901795,
+          11.836781499901795,
+          12.304493292693568
+        ],
+        "mean": 11.992685430832386,
+        "difference_from_fd": -0.14578760069028895
+      },
+      "corrected_full": {
+        "diagonal": [
+          13.260133467238305,
+          13.260133467238305,
+          9.457789358020552
+        ],
+        "mean": 11.992685430832386,
+        "difference_from_fd": -0.14578760069028895
+      }
+    },
+    "clmval_identical": true,
+    "full_clmval_identical": true
+  },
+  "SrVO3": {
+    "directories": [
+      "/private/tmp/lapw2_stress_audit_20261107/runs/SrVO3_DFT_m001",
+      "/private/tmp/lapw2_stress_audit_20261107/runs/SrVO3_DFT_center",
+      "/private/tmp/lapw2_stress_audit_20261107/runs/SrVO3_DFT_p001"
+    ],
+    "basis_consistency": {
+      "k": true,
+      "weight": true,
+      "basis": true,
+      "bands": true,
+      "pw_hash": true
+    },
+    "nk": 75,
+    "bands": [
+      43
+    ],
+    "basis_min": 473,
+    "basis_max": 491,
+    "volume": [
+      381.56212,
+      382.70904,
+      383.85827
+    ],
+    "energy_before": [
+      -8592.39831161,
+      -8592.39754527,
+      -8592.39673269
+    ],
+    "energy_after": [
+      -8592.21438405,
+      -8592.2136177,
+      -8592.21280511
+    ],
+    "energy_change_ry": [
+      0.18392756000139343,
+      0.18392757000037818,
+      0.18392757999936293
+    ],
+    "DIS": [
+      "CHARGE DISTANCE      (  0.0000015 for atom    1 spin 1)      0.0000014",
+      "CHARGE DISTANCE      (  0.0000016 for atom    1 spin 1)      0.0000013",
+      "CHARGE DISTANCE      (  0.0000015 for atom    1 spin 1)      0.0000013"
+    ],
+    "numerical_mean_gpa": 10.115179037289867,
+    "numerical_volume_slope_gpa": 10.115638243466613,
+    "analytic": {
+      "before": {
+        "diagonal": [
+          8.512083459918243,
+          8.512083459918243,
+          8.519729397948716
+        ],
+        "mean": 8.514632105928401,
+        "difference_from_fd": -1.6005469313614658
+      },
+      "corrected_trace": {
+        "diagonal": [
+          8.512083459918243,
+          8.512083459918243,
+          8.519729397948716
+        ],
+        "mean": 8.514632105928401,
+        "difference_from_fd": -1.6005469313614658
+      },
+      "corrected_full": {
+        "diagonal": [
+          8.508433898481314,
+          8.508433898481314,
+          8.527028535531128
+        ],
+        "mean": 8.514632110831252,
+        "difference_from_fd": -1.6005469264586143
+      }
+    },
+    "clmval_identical": true,
+    "full_clmval_identical": true
+  }
+}

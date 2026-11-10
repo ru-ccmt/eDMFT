@@ -1,0 +1,12 @@
+/opt/homebrew/bin/gfortran -fPIC -O2 -c outwin.f90 -o outwin.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c outwin_response.f90 -o outwin_response.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c rint13.f90 -o rint13.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c abc.f90 -o abc.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c diracout.f90 -o diracout.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c dergl.f90 -o dergl.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c inouh.f90 -o inouh.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c inth.f90 -o inth.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c atpar.f90 -o atpar.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c readPot.f90 -o readPot.o
+/opt/homebrew/bin/gfortran -fPIC -O2 -c lapw_radial_response.f90 -o lapw_radial_response.o
+ar  rcs libatpar.a outwin.o  outwin_response.o  lapw_radial_response.o  rint13.o  abc.o  diracout.o  dergl.o  inouh.o  inth.o atpar.o readPot.o

@@ -1,0 +1,18 @@
+{
+  "LDA/1e-08": {
+    "samples": 1000,
+    "bitwise_identical": true
+  },
+  "LDA/1e-09": {
+    "samples": 1000,
+    "bitwise_identical": true
+  },
+  "PBE/1e-08": {
+    "samples": 1000,
+    "bitwise_identical": true
+  },
+  "PBE/1e-09": {
+    "samples": 1000,
+    "bitwise_identical": true
+  }
+}

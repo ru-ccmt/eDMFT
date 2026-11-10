@@ -1,6 +1,7 @@
 subroutine read_def_file(deffn, nloat, nohns, iter, readHinv, force, runorb, nmat_only, dokorig, writeham, ERRMSG, info)
   !        open all files listed in 'lapw1.def'
   use param, only   : filename_V_sph, filename_V_vns, filename_vector, filename_energy
+  use response_run, only: response_matrices_only
   use mpi, only : Qprint, FilenameMPI2, FilenameMPI, vector_para, myrank, master, cpuID, nprocs
   IMPLICIT NONE
   CHARACTER*(*), intent(in) :: deffn
@@ -42,6 +43,11 @@ subroutine read_def_file(deffn, nloat, nohns, iter, readHinv, force, runorb, nma
      
      if (iunit.eq.10) filename_vector=FNAME  ! vector file
      if (iunit.eq.11) filename_energy=FNAME  ! energy file
+     ! Never open ordinary eigenvector/energy outputs in matrix-only mode.
+     ! Suppress NSH and auxiliary vector output too: they belong to the
+     ! production eigensystem and must not be replaced by a response probe.
+     if (response_matrices_only .and. &
+          (iunit.eq.10.or.iunit.eq.11.or.iunit.eq.71.or.iunit.eq.55)) cycle
 
      if ((vector_para .or. FNAME(lngth-1:lngth).EQ.'_x') .and. (iunit.eq.10 .or. iunit.eq.11)) then
         ! It is enugh that one of the two files has '_x' and we will try vector_para.

@@ -1,0 +1,65 @@
+diff --git a/SRC_lapw1/atpar.F b/SRC_lapw1/atpar.F
+--- a/SRC_lapw1/atpar.F
++++ b/SRC_lapw1/atpar.F
+@@ -77,6 +77,10 @@
+       integer       ::   basis_vsp_status,basis_vsp_ios,basis_vsp_unit
+       logical       ::   basis_vsp_enabled,basis_vsp_exists
+       real*8, allocatable :: VRB(:,:)
++      real*8 :: basis_vr_solve(NRAD)
++      character(len=16) :: basis_low_l_env
++      integer :: basis_low_l_status
++      logical :: basis_low_l_only
+       real*8, parameter ::    PI = 4.D0*DATAN(1.D0)
+ !fb
+ !     variables for [yu91]-force formalism
+@@ -106,6 +110,10 @@
+ !fe
+       NGAU=2350
+       LMMIN = 1
++      basis_low_l_env=''
++      call get_environment_variable('WIEN_LAPW1_BASIS_LOW_L_ONLY', &
++           basis_low_l_env,status=basis_low_l_status)
++      basis_low_l_only=(basis_low_l_status.eq.0.and.trim(basis_low_l_env).eq.'1')
+       nloat=nloat_new
+       mgga_gaunts = -1
+       g2_diag_env=''
+@@ -484,13 +492,20 @@
+ 1500        CONTINUE
+             L = J - 1
+             FL = L
++            basis_vr_solve(:)=VRB(:,JATOM)
++            ! Diagnostic: the alternate-basis L=0 operator restoration is
++            ! currently in HNS, whose orbital legs end at LNSMAX.  Freeze
++            ! all higher-l basis functions to remove the uncovered leg.
++            ! This is a restricted response, not an all-l correction.
++            if (basis_low_l_only.and.L.gt.LNSMAX) &
++                 basis_vr_solve(:)=VR(:,JATOM)
+             EI = E(J,JATOM)/2.D0
+ !
+ !        calculate energy-derivative by finite difference
+ !        DELE is the up and downward energy-shift in Hartrees
+ !
+             E1 = EI - DELE
+-            CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
++            CALL OUTWINB(REL,basis_vr_solve,RNeT,DX,JRI,E1,FL,UVB,DUVB, &
+                  NODEL,ZZ(JATOM))
+             CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+             TRX = 1.0D+0/SQRT(OVLP)
+@@ -502,7 +517,7 @@
+             DUVB = TRX*DUVB
+ 
+             E1 = EI + DELE
+-            CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
++            CALL OUTWINB(REL,basis_vr_solve,RNeT,DX,JRI,E1,FL,UVE,DUVE, &
+                  NODEU,ZZ(JATOM))
+             CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+             TRX = 1.0D+0/SQRT(OVLP)
+@@ -515,7 +530,7 @@
+ !     
+ !     calculate function at EI
+ !
+-            CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
++            CALL OUTWINB(REL,basis_vr_solve,RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
+                  ,ZZ(JATOM))
+             CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+             TRX = 1.0D+0/SQRT(OVLP)

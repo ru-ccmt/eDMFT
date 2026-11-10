@@ -1,0 +1,25 @@
+  2, '0_800_MnTe.indmf1' , 'old'     , 'formatted'  , 0   
+  4, '0_800_MnTe.inso'   , 'unknown' , 'formatted'  , 0   
+  5, '0_800_MnTe.indmfl' , 'old'     , 'formatted'  , 0   
+  6, '0_800_MnTe.outputdmf1', 'unknown' , 'formatted'  , 0   
+  7, '0_800_MnTe.in1c'   , 'unknown' , 'formatted'  , 0   
+  8, '0_800_MnTe.scf2'   , 'unknown' , 'formatted'  , 0   
+  9, './0_800_MnTe.vector', 'old'     , 'unformatted', 9000
+ 10, './0_800_MnTe.vectordn', 'unknown' , 'unformatted', 9000
+ 14, '0_800_MnTe.klist'  , 'old'     , 'formatted'  , 0   
+ 18, '0_800_MnTe.vsp'    , 'old'     , 'formatted'  , 0   
+ 19, '0_800_MnTe.vspdn'  , 'unknown' , 'formatted'  , 0   
+ 20, '0_800_MnTe.struct' , 'old'     , 'formatted'  , 0   
+ 21, '0_800_MnTe.scfdmft1', 'unknown' , 'formatted'  , 0   
+ 22, '0_800_MnTe.rotlm'  , 'unknown' , 'formatted'  , 0   
+500, '0_800_MnTe.cdos'   , 'unknown' , 'formatted'  , 0   
+ 59, '0_800_MnTe.energydn', 'unknown' , 'formatted'  , 0   
+ 60, '0_800_MnTe.energy' , 'old'     , 'formatted'  , 0   
+ 81, 'sig.inp1'          , 'old'     , 'formatted'  , 0   
+181, '0_800_MnTe.gc1'    , 'unknown' , 'formatted'  , 0   
+281, '0_800_MnTe.dlt1'   , 'unknown' , 'formatted'  , 0   
+381, '0_800_MnTe.Eimp1'  , 'unknown' , 'formatted'  , 0   
+ 82, 'sig.inp2'          , 'old'     , 'formatted'  , 0   
+182, '0_800_MnTe.gc2'    , 'unknown' , 'formatted'  , 0   
+282, '0_800_MnTe.dlt2'   , 'unknown' , 'formatted'  , 0   
+382, '0_800_MnTe.Eimp2'  , 'unknown' , 'formatted'  , 0   

@@ -1,0 +1,166 @@
+NATIVE RADIAL HARTREE RESPONSE: FIRST PART OF ROADMAP STEP 2
+8 November 2026
+
+RESULT
+
+lapw_hartree_radial.py supplies a prepared radial Coulomb integration and its
+exact discrete transpose, together with the muffin-tin Dirichlet Hartree map.
+It matches the CoulEM branch of LAPW0. CoulEM is the native default; the NCEM
+alternative is deliberately not supplied by this adapter.
+
+Seven new tests pass. Compiled native CoulInt/Spline controls agree near double
+precision for smooth fields on realistic meshes. For the actual induced-density
+harmonics of FeSe and SrVO3, the maximum radial-potential differences are
+5.94e-11 and 1.47e-11 relative, respectively. Transpose errors are below 3.6e-17.
+The complete source test suite contains 115 tests, with both native reference
+libraries explicitly supplied. Installation/test records are saved separately.
+
+This is a component of the Hartree operator, not the full periodic Hartree/XC
+map. The boundary values must still come from the periodic multipole/Fourier
+solution. XC, core response and complete screened-response validation remain.
+No production dmft2/dftKS/WIEN2k executable is replaced in this checkpoint.
+
+1. WHY FOLLOW THE DISCRETE ALGORITHM
+
+The desired derivative is of the implemented native map. Replacing its radial
+integral by a different spline or continuum quadrature would give a different
+Jacobian and spoil cancellation with other discrete terms. CoulInt is linear
+at fixed geometry, but its spline uses endpoint conditions from four-point
+differences, not SciPy's default not-a-knot conditions.
+
+Let r_i=r_0 exp(i d), with d the logarithmic spacing, i=0,...,N-1. To integrate
+F(r) with dr, the native routine forms f_i=r_i F_i and a cubic spline in
+x_i=(i+1)d:
+
+  spline_i(x)=f_i+b_i(x-x_i)+c_i(x-x_i)^2+d_i(x-x_i)^3.
+
+Write t_i=c_i/3 and h_i=x_(i+1)-x_i. The interior spline system is
+
+  h_(i-1) t_(i-1)+2(h_(i-1)+h_i)t_i+h_i t_(i+1)
+      = (f_(i+1)-f_i)/h_i-(f_i-f_(i-1))/h_(i-1).          (1)
+
+The first/last diagonal entries are -h_0 and -h_(N-2); their RHS uses the
+native four-point endpoint differences. The prepared operation constructs this
+tridiagonal system once, factors it with pivoting, and reuses the same factors
+for forward and transposed solves. It neither constructs a dense radial
+Jacobian nor probes one coordinate at a time.
+
+Native CoulInt returns the cumulative integral
+
+  I_i=d [T_i - d(b_i-b_0)/12 + d^3(d_i-d_0)/120],         (2)
+
+where T_i is the trapezoid prefix sum of f, with half weights at its endpoints.
+I_0=0. As in the native CoulEM branch, this adds no separate origin term.
+
+The outer integral J_i=I_(N-1)-I_i is evaluated directly as a suffix sum with
+the corresponding spline endpoint differences. This is algebraically the same
+discrete integral, while avoiding subtraction of two large prefixes for high-l
+radial kernels. Its transpose reverses that same suffix evaluation. The small
+native/adapter differences for actual high-l fields include this change of
+floating-point evaluation order; bitwise identity is not asserted.
+
+The reverse follows the transpose of prefix/suffix sums, endpoint differences,
+spline coefficient construction and the tridiagonal solve. It is the Euclidean
+transpose in the explicit field coordinates, not a presumed symmetric Green
+matrix under an unspecified continuum integration weight.
+
+2. MUFFIN-TIN DIRICHLET POTENTIAL AND UNITS
+
+For angular momentum l, define
+
+  a_l(r)=r^l,
+  b_l(r)=[1-(r/R)^(2l+1)]/r^(l+1),
+  c_L(r)=r^2 delta rho_L(r).                              (3)
+
+R is the fixed muffin-tin radius. In Density.vector() the spherical coefficient
+has the CLMSUM convention c_00=4 pi r^2 delta rho_spherical. Higher real-harmonic
+coefficients are c_L=r^2 delta rho_L without that extra spherical factor.
+
+Define the discrete bulk radial map
+
+  v_bulk,l(r)=b_l(r) I[a_l c_L](r)+a_l(r) J[b_l c_L](r).  (4)
+
+For l>0, the native vns output in Ry is
+
+  delta V_L(r)=8 pi/(2l+1) v_bulk,l(r)+(r/R)^l v_boundary,L. (5)
+
+For l=0, the native vsp output is r times the scalar spherical potential:
+
+  delta[r V_spherical](r)=2 r v_bulk,0(r)+r v_boundary,0. (6)
+
+The spherical factor 2 follows from both native sqrt(4 pi) conventions: the
+input CLMSUM coefficient and conversion from V_00 to scalar V_spherical.
+It is checked against an independent uniform-density Poisson solution.
+
+Boundary input is explicit and mandatory in the API. Setting it to zero is a
+Dirichlet control, not a substitute for the missing periodic boundary solve.
+The native ionic term has zero derivative in this fixed-geometry density map.
+Charged-background and strain-geometry sources are not included here.
+
+For a potential covector y, set z=scale*y, with scale=2r in (6), or
+8 pi/(2l+1) in (5). The density and boundary covectors are
+
+  c_bar=a_l I^T[b_l z]+b_l J^T[a_l z],
+  boundary_bar=sum_r boundary_profile(r) y(r),             (7)
+
+where boundary_profile is r for l=0 and (r/R)^l otherwise. Equation (7)
+includes the explicit boundary leg needed for the later periodic adjoint.
+
+3. VALIDATION AND COST
+
+The reference library is compiled in scratch from the user's unmodified
+  wien2k_24/SRC_lapw0/coulint.f
+  wien2k_24/SRC_Globals/spline.f
+and a small radial Dirichlet reference wrapper. The new production module is
+Python/NumPy/SciPy and does not require distributing those native source files.
+
+Tests cover cubic-in-log integration, prefix/suffix transposes and batching,
+boundary/normalization units, continuum multipole convergence, input validation,
+compiled CoulInt controls, and compiled radial Dirichlet controls. The continuum
+test is separate from the native-discrete match: agreement with the native code
+does not make a finite radial grid exact. Extremely coarse logarithmic grids
+and high l can be poorly conditioned; material tests use actual native meshes.
+
+Material inputs are the analytic fixed-N combined-potential density derivatives
+from the adjacent charge-response checkpoint. All native density harmonics are
+tested, using the actual FeSe RELA and SrVO3 NREL radial grids:
+
+                              FeSe                 SrVO3
+  inequivalent MT harmonics   18                   46
+  maximum native error        5.94323e-11           1.47405e-11
+  maximum transpose error     3.52273e-17           2.74237e-17
+  all-MT forward time          0.00143 s             0.00350 s
+  all-MT reverse time          0.00153 s             0.00422 s
+
+Times are medians of seven warm single-thread calls. The spline factorization
+is shared once per atom/grid. Each forward/reverse is O(Nrad) per harmonic;
+there is no repeated nonlinear LAPW0 run, iterative radial solve or dense
+radial matrix inversion. These timings exclude periodic Hartree, XC, core,
+electronic response, MPI, screened iterations and stress-functional contraction.
+
+4. NEXT PHYSICAL WORK
+
+We are in roadmap step 2, not at complete step 3. Complete the periodic Hartree
+operation: density multipoles, pseudocharge, PW Poisson solution, sphere-boundary
+values and interstitial reanalysis, with matching transposes. Reuse the radial
+map above for the interior potential. Preserve the distinct potential-star and
+density-star conventions already tested in the general-input checkpoint.
+
+Then connect the actual native GGA-XC derivative and core-density response.
+Validate the full unmixed charge-map Jacobian before using it in the screened
+forward/adjoint solver. The generic solver is already available; the full
+physical Jacobian is not. General material loading, full gauge/energy-policy
+checks, six physical strain sources and final tensor publication remain.
+
+REPRODUCIBILITY
+
+Native reference build used:
+  /opt/homebrew/bin/gfortran -dynamiclib -fPIC -O2 -ffree-form
+  -ffree-line-length-none <coulint.f> <spline.f> <reference.f90>
+  -framework Accelerate -o libhartree_reference.dylib
+
+Set EDMFT_HARTREE_REFERENCE_LIBRARY to that library for the two optional native
+tests. Also set EDMFT_RADIAL_LIBRARY to the existing liblapw_response.so for
+the prior native radial tests. Test logs specify both paths. Source snapshots,
+native-reference wrapper, material driver, JSON results and installation hashes
+are retained with this checkpoint. The large material fixtures remain in scratch.

@@ -1,0 +1,19 @@
+{
+  "case": "SrVO3",
+  "setup_seconds": 3.9707751250825822,
+  "central_density_relative": 1.6262533137035286e-12,
+  "normalization_offset_norm": 0.2016239655189638,
+  "coupled_transpose": 3.1798128743572165e-16,
+  "bands_transpose": 2.0461556532832273e-15,
+  "steps": [
+    {
+      "step": 0.0005,
+      "density_relative": 0.03014204720044942,
+      "density_maximum": 0.1865134739877765,
+      "H_relative": 8.596177535458523e-08,
+      "O_relative": 9.267881837014953e-08,
+      "FD_norm": 25.61587299193921,
+      "analytic_norm": 25.637101761606367
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+--- /dev/null
++++ b/SRC_lapw0/gga_metric_tensor.f
+@@ -0,0 +1,29 @@
++! Metric derivative of a spin-resolved GGA energy density.
++! With f in Ry/Bohr^3, define a_s=df/d|grad n_s|^2 and
++! a_ud=df/d(grad n_up.grad n_dn).  The explicit gradient metric term
++! in physical stress is -Q_ab/Omega, where
++! Q_ab=2 a_up g_up,a g_up,b+2 a_dn g_dn,a g_dn,b
++!      +a_ud(g_up,a g_dn,b+g_dn,a g_up,b).
++! VXCLM2 returns sig=(2/JSPIN)*df_Ha/dsigma, so a=JSPIN*sig.
++! In the unpolarized interface sig_up is instead df_Ry/d|grad n|^2.
++! No occupations, density response, or extra density factor enter Q.
++subroutine gga_metric_tensor(jspin,grad_up,grad_dn,sig_up,sig_dn,sig_ud,q)
++  implicit none
++  integer,intent(in) :: jspin
++  real(8),intent(in) :: grad_up(3),grad_dn(3),sig_up,sig_dn,sig_ud
++  real(8),intent(out) :: q(3,3)
++  real(8) :: grad_total(3)
++  integer :: a,b
++  grad_total=grad_up+grad_dn
++  do b=1,3
++    do a=1,3
++      if(jspin==1)then
++        q(a,b)=2.d0*sig_up*grad_total(a)*grad_total(b)
++      else
++        q(a,b)=2.d0*dble(jspin)*(sig_up*grad_up(a)*grad_up(b) &
++                              +sig_dn*grad_dn(a)*grad_dn(b)) &
++              +dble(jspin)*sig_ud*(grad_up(a)*grad_dn(b)+grad_dn(a)*grad_up(b))
++      endif
++    enddo
++  enddo
++end subroutine gga_metric_tensor

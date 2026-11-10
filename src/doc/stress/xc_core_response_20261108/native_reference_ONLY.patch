@@ -1,0 +1,89 @@
+--- a/SRC_lcore/resld.f
++++ b/SRC_lcore/resld.f
+@@ -218,6 +218,12 @@
+       DDQ_DR(I)=0.d0
+       DP(I)=0.d0                                                          
+  371  DQ(I)=0.d0                                                          
+- 398  NSTOP=0                                                           
++ 398  continue
++      open(996,file='core_native.bin',access='stream',form='unformatted',position='append')
++      write(996) nqn,nql,nk,np,imax,imat,nuc
++      write(996) de,z,dvc,dfl
++      write(996) dr(1:np),dv(1:np),dp(1:np),dq(1:np)
++      close(996)
++      NSTOP=0                                                           
+  399  RETURN                                                            
+       END                                                               
+--- a/SRC_lapw0/xcpot1.F
++++ b/SRC_lapw0/xcpot1.F
+@@ -409,6 +409,9 @@
+       enddo
+       
+ !
++      call response_xc_geometry(jatom,nrad,ncom,nspd,jri(jatom),lmmax(jatom),npt1,&
++          r,yy,weight,qsin,qcos,dydt,dydt2,dydp,dydp2,dydtp,lm(:,:,jatom),GGA_SWITCH)
++!
+ !     LOOP OVER ALL RADIAL MESH POINTS                                  
+ !
+       init=1
+@@ -712,6 +715,11 @@
+            stop "not yet implemented"
+         end if
+      
++        if(GGA_SWITCH)then
++          write(985) ir,k,ft,2*gmagu,2*g2u,gdggt
++        else
++          write(985) ir,k,ft,0.d0,0.d0,0.d0
++        endif
+         CALL VXCLM2(FU,GXU,GYU,GZU,GMAGU,G2U,GGXU,GGYU,GGZU,&
+              FD,GXD,GYD,GZD,GMAGD,G2D,GGXD,GGYD,GGZD,&
+              VXCU,VXCD,excu,excd,&
+@@ -720,6 +728,7 @@
+              VXUOLD,VXDOLD,VXUNONLOC,VXDNONLOC,&
+              GGX,GGY,GGZ,GDGGT,gdggu,gdggd,tauup,taudn,&
+              ir,CutMuffin,JSPIN,JATOM,sig_str_u,sig_str_d,sig_str_ud)
++        write(985) vxcu
+ !     if(ir.ge.780.and. k.lt.3) then
+ !          write(6,*)'xcpot1',sig_str_u,sig_str_d,sig_str_ud       
+ !          write(6,*)FU,GXU,GYU,GZU,GMAGU,G2U,GGXU,GGYU,GGZU
+@@ -1211,3 +1220,22 @@
+       RETURN                                                            
+       END
+                                                                
++
++subroutine response_xc_geometry(a,nr,nc,na,n,lmmax,ng,r,yy,w,ss,cc,dt,dtt,dp,dpp,dtp,lm,gga)
++implicit none
++integer a,nr,nc,na,n,lmmax,ng,lm(2,nc+3)
++real*8 r(nr),yy(nc,na),w(na),ss(na),cc(na),dt(nc,na),dtt(nc,na),dp(nc,na),dpp(nc,na),dtp(nc,na)
++logical gga
++character(80) fname
++write(fname,'("xc_geometry_",i4.4,".bin")')a
++open(984,file=trim(fname),access='stream',form='unformatted',status='replace')
++write(984) n,lmmax,ng
++write(984) lm(:,1:lmmax),r(1:n),yy(1:lmmax,1:ng),w(1:ng)
++if(gga)then
++write(984) ss(1:ng),cc(1:ng),dt(1:lmmax,1:ng),dtt(1:lmmax,1:ng),dp(1:lmmax,1:ng),dpp(1:lmmax,1:ng),dtp(1:lmmax,1:ng)
++endif
++close(984)
++close(985)
++write(fname,'("xc_points_",i4.4,".bin")')a
++open(985,file=trim(fname),access='stream',form='unformatted',status='replace')
++end subroutine
+--- a/SRC_lapw0/lapw0.F
++++ b/SRC_lapw0/lapw0.F
+@@ -2725,6 +2725,15 @@
+           STOP 'EXCH OK'
+       endif
+ 
++      open(986,file='xc_native.bin',access='stream',form='unformatted',status='replace')
++      write(986) nat,nkk,iff1,iff2,iff3,vol
++      write(986) kzz(:,1:nkk)
++      do jatom=1,nat
++        write(986) jri(jatom),lmmax(jatom),lm(:,1:lmmax(jatom),jatom)
++        write(986) vxc(1:jri(jatom),1:lmmax(jatom),jatom,1)
++      enddo
++      write(986) fft(:,:,:,1)
++      close(986)
+       CALL CPUTIM(TIME4)
+       CALL wallTIM(TIME4w)
+ 

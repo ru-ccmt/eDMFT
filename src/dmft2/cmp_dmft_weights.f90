@@ -1,7 +1,13 @@
 ! @Copyright 2007 Kristjan Haule
 ! 
 
-SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, dNds, Edimp0, AEweight, nedim, STrans, sigma, s_oo, wkp, omega, vnorm1, DM_EF, Temperature, wgamma, gamma, csize, nbands, DM_nemin, DM_nemax, maxsize, ncix, nomega, npomega, nume, matsubara, lgTrans, lg_deg, ntcix, nipc, ikp, maxdim2, iorbital, iSx, norbitals)
+SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
+     DMFTU, dNds, Edimp0, AEweight, nedim, STrans, sigma, s_oo, wkp, &
+     omega, vnorm1, DM_EF, Temperature, wgamma, gamma, csize, nbands, &
+     DM_nemin, DM_nemax, maxsize, ncix, nomega, npomega, nume, &
+     matsubara, lgTrans, lg_deg, ntcix, nipc, ikp, maxdim2, iorbital, &
+     iSx, norbitals, projectorGradientDirect, cix_orb, cixdim, nindo, &
+     Sigind)
   USE defs,  ONLY: pi, IMAG
   USE xa,    ONLY: E
   USE muzero,ONLY: nomq, iomq, jomq, womq, abom, n0_om, matsum_weight
@@ -20,8 +26,12 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
   INTEGER, intent(in)    :: csize(ncix), nbands, DM_nemin, DM_nemax, maxsize, ncix, nomega, npomega, nume, lg_deg(ntcix)
   INTEGER, intent(in)    :: iorbital(natom,lmaxp+1), iSx(maxdim2, norbitals)
   INTEGER, intent(in)    :: ntcix, nipc, nedim, ikp, maxdim2, norbitals
+  INTEGER, intent(in)    :: cix_orb(norbitals), cixdim(ncix), &
+       nindo(norbitals), Sigind(maxdim,maxdim,ncix)
   LOGICAL, intent(in)    :: matsubara
   COMPLEX*16, intent(in) :: DMFTU(nbands,maxdim2,norbitals,nipc)
+  COMPLEX*16, intent(out) :: &
+       projectorGradientDirect(nbands,maxdim2,norbitals)
   ! functions
   Interface
      real*8 FUNCTION ferm(x)
@@ -63,6 +73,10 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
   COMPLEX*16, allocatable :: Wsum(:,:), WEsum(:,:), w0inf(:), Identity(:,:)
   COMPLEX*16, allocatable :: WSigPair(:,:), SigDirect(:,:), SigScratch(:,:), &
        SigmaTail1(:,:)
+  COMPLEX*16, allocatable :: CPair(:,:,:), CStatic(:,:,:), &
+       Uactive(:,:,:), SigmaLocal(:,:,:), SigmaInfLocal(:,:,:), &
+       SigmaTail1Local(:,:,:), CdiagUdagG(:,:), &
+       CdiagUdagGminus(:,:), CdiagProduct(:,:), CdiagProductMinus(:,:)
   COMPLEX*16, allocatable :: Eij(:,:), zek(:), zar(:,:), zal(:,:), tmp(:,:), Sigmaij(:,:), Sigma_inf(:,:), Gij(:,:), tmp2(:,:)
   REAL*8,     allocatable :: zek_inf(:)
   COMPLEX*16, allocatable :: zw1(:), w1(:,:), zar_inf(:,:), zal_inf(:,:), w2(:,:), w3(:,:), Dni(:)
@@ -71,8 +85,9 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
   COMPLEX*16 :: cc, gtc, cek, omn, w0, wo, bg, sginf, sginf_!, cc0, cc1, cc2
   REAL*8  :: fer, tlogGD, tlogG, tlogG0, tdens, ek_inf, beta, csm, wkpt, &
        C0, sginf2, second_order_correction, fermi, matsuWeight, tailMoment2!, diff
-  INTEGER :: i, iom, num, num0, it, nomq_max, icix, j, ip, start_nipc
-  LOGICAL :: Qforce, stressMomentDiagnostic
+  INTEGER :: i, iom, num, num0, it, nomq_max, icix, j, ip, iq, iorb, &
+       ind, nloc, start_nipc
+  LOGICAL :: Qforce, stressMomentDiagnostic, computeDirectC
   CHARACTER(len=64) :: diagnosticEnvironment
   INTEGER :: diagnosticStatus
   REAL*8 :: directNorm, directResidual, directScale
@@ -84,6 +99,8 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
   
   Qforce=.false.
   if (nedim.eq.nbands) Qforce=.true.
+  projectorGradientDirect=czero
+  AEweight=czero
 
   diagnosticEnvironment=''
   CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_PROJECTOR_DIAG', &
@@ -91,6 +108,12 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
   stressMomentDiagnostic=Qforce .and. diagnosticStatus.eq.0 .and. &
        len_trim(diagnosticEnvironment).gt.0 .and. &
        trim(diagnosticEnvironment).ne.'0'
+
+  ! Accumulate C=Sum Sigma_local U^dagger G for every derivative run.
+  ! U*C=rhoE-epsilon*rho does not determine ker(U) components of C;
+  ! reconstructing C with a pseudoinverse can therefore lose a real force.
+  ! Density-only runs still skip these rectangular matrix products.
+  computeDirectC=Qforce .and. matsubara
 
   if (Qforce) then
      allocate( WEsum(nedim,nedim) ) ! Unfortunately we need this for $OMP command to work.
@@ -132,6 +155,47 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
      ! otherwise two formally equivalent Matsubara completions would use
      ! different estimates of Sigma_1.
      Sigmaij=SigmaTail1
+
+     if (computeDirectC) then
+        allocate(CPair(maxdim,nbands,ncix), &
+             CStatic(maxdim,nbands,ncix), &
+             Uactive(nbands,maxdim,ncix), &
+             SigmaLocal(maxdim,maxdim,ncix), &
+             SigmaInfLocal(maxdim,maxdim,ncix), &
+             SigmaTail1Local(maxdim,maxdim,ncix), &
+             CdiagUdagG(maxdim,nbands), &
+             CdiagUdagGminus(maxdim,nbands), &
+             CdiagProduct(maxdim,nbands), &
+             CdiagProductMinus(maxdim,nbands))
+        CPair=czero
+        Uactive=czero
+
+        ! Assemble the same aggregate local-to-band projector which is
+        ! implicit in CompressSigmaTransformation1.  Several orbital records
+        ! may belong to one impurity block, hence the addition rather than an
+        ! assignment.  This also makes Uactive*Sigma*Uactive^+ reproduce the
+        ! embedded self-energy used to construct G.
+        do iorb=1,norbitals
+           icix=cix_orb(iorb)
+           if (icix.le.0) cycle
+           do ind=1,nindo(iorb)
+              ip=iSx(ind,iorb)
+              Uactive(:,ip,icix)=Uactive(:,ip,icix)+ &
+                   DMFTU(:,ind,iorb,1)
+           enddo
+        enddo
+        CALL BuildLocalSigmaMatrix(SigmaInfLocal,s_oo,Sigind,cixdim, &
+             maxdim,maxsize,ncix)
+        CALL BuildLocalSigmaMatrix(SigmaTail1Local,sigma_winf,Sigind, &
+             cixdim,maxdim,maxsize,ncix)
+        do icix=1,ncix
+           nloc=cixdim(icix)
+           SigmaTail1Local(1:nloc,1:nloc,icix)=0.5d0*( &
+                SigmaTail1Local(1:nloc,1:nloc,icix)+ &
+                conjg(transpose( &
+                SigmaTail1Local(1:nloc,1:nloc,icix))))
+        enddo
+     endif
 
      ! Exact positive-frequency sum from the beginning of the sparse tail:
      !   sum_{m=j0}^inf 1/w_m^2,  w_m=(2m-1)pi/beta.
@@ -226,6 +290,13 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
            SigScratch=matmul(conjg(transpose(Sigmaij)), &
                 conjg(transpose(Gij)))
            WSigPair=WSigPair+SigDirect+SigScratch
+        endif
+        if (computeDirectC) then
+           CALL BuildLocalSigmaMatrix(SigmaLocal,sigma(:,:,iom), &
+                Sigind,cixdim,maxdim,maxsize,ncix)
+           CALL AccumulateDirectProjectorPair(CPair,Gij,Uactive, &
+                SigmaLocal,cixdim,nbands,maxdim,ncix,CdiagUdagG, &
+                CdiagUdagGminus,CdiagProduct,CdiagProductMinus)
         endif
         
         CALL eigvals(Eij, zek, nbands) ! eigenvalues only
@@ -381,6 +452,26 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
                 matsum_weight(iom)*SigmaTail1/(omn*omn)
            WSigPair=WSigPair+SigDirect+SigScratch
         endif
+        if (computeDirectC) then
+           CALL BuildLocalSigmaMatrix(SigmaLocal,sigma(:,:,iom), &
+                Sigind,cixdim,maxdim,maxsize,ncix)
+           CALL AccumulateDirectProjectorPair(CPair,Gij,Uactive, &
+                SigmaLocal,cixdim,nbands,maxdim,ncix,CdiagUdagG, &
+                CdiagUdagGminus,CdiagProduct,CdiagProductMinus)
+
+           ! Gij already contains matsum_weight at a sparse node.  Remove
+           ! the paired Sigma_1 U^+/(iw)^2 asymptote from that same weighted
+           ! integrand; its exact discrete tail is restored below.
+           do icix=1,ncix
+              nloc=cixdim(icix)
+              CALL zgemm('N','C',nloc,nbands,nloc,cone, &
+                   SigmaTail1Local(1,1,icix),maxdim, &
+                   Uactive(1,1,icix),nbands,czero,CdiagProduct,maxdim)
+              CPair(1:nloc,:,icix)=CPair(1:nloc,:,icix)- &
+                   2.d0*matsum_weight(iom)* &
+                   CdiagProduct(1:nloc,:)/(omn*omn)
+           enddo
+        endif
         
         ! Evaluating G_local
         do j=1,nbands
@@ -451,6 +542,42 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
         SigScratch=matmul(conjg(transpose(Sigma_inf)), &
              conjg(transpose(Wferm)))
         SigDirect=(0.5d0*wkp)*(WSigPair+SigDirect+SigScratch)
+     endif
+
+     if (computeDirectC) then
+        ! Complete precisely the same Matsubara construction as the
+        ! band-space Sigma*G diagnostic, but before multiplying by U.  The
+        ! result is the rectangular C conjugate to an explicit dU.
+        CStatic=czero
+        CALL AccumulateDirectProjectorPair(CStatic,Winf,Uactive, &
+             SigmaInfLocal,cixdim,nbands,maxdim,ncix,CdiagUdagG, &
+             CdiagUdagGminus,CdiagProduct,CdiagProductMinus)
+        CPair=CPair-CStatic
+        do icix=1,ncix
+           nloc=cixdim(icix)
+           CALL zgemm('N','C',nloc,nbands,nloc,cone, &
+                SigmaTail1Local(1,1,icix),maxdim, &
+                Uactive(1,1,icix),nbands,czero,CdiagProduct,maxdim)
+           CPair(1:nloc,:,icix)=CPair(1:nloc,:,icix)- &
+                2.d0*tailMoment2*CdiagProduct(1:nloc,:)
+        enddo
+        CPair=CPair*(2.d0/beta)
+        CStatic=czero
+        CALL AccumulateDirectProjectorPair(CStatic,Wferm,Uactive, &
+             SigmaInfLocal,cixdim,nbands,maxdim,ncix,CdiagUdagG, &
+             CdiagUdagGminus,CdiagProduct,CdiagProductMinus)
+        CPair=(0.5d0*wkp)*(CPair+CStatic)
+
+        ! Restore the external storage convention used by the existing
+        ! Moore--Penrose C: band index first, orbital row second.
+        do iorb=1,norbitals
+           icix=cix_orb(iorb)
+           if (icix.le.0) cycle
+           do ind=1,nindo(iorb)
+              ip=iSx(ind,iorb)
+              projectorGradientDirect(:,ind,iorb)=CPair(ip,:,icix)
+           enddo
+        enddo
      endif
      
      tmp(:,:) = (Wsum(:,:) - Winf(:,:))*(2/beta) + Wferm(:,:)
@@ -537,18 +664,38 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
      deallocate( tmp2 )
      deallocate( Sigma_inf )
      deallocate( SigmaTail1 )
+     if (computeDirectC) deallocate(CPair,CStatic,Uactive,SigmaLocal, &
+          SigmaInfLocal,SigmaTail1Local,CdiagUdagG,CdiagUdagGminus, &
+          CdiagProduct,CdiagProductMinus)
 
      CALL GetLocalNds(dNds, Aweight, lgTrans, vnorm1, lg_deg, nbands, ntcix, nipc)     
   endif
 
   if (.not. matsubara) then
      Gdloc=0.0
+     if (Qforce) then
+        ! Real-axis counterpart: integrate the retarded/advanced difference
+        ! of Sigma U^dagger G with the same log-bin weights used for rho.
+        ! No projector pseudoinverse is needed on this branch either.
+        allocate(Uactive(nbands,maxdim,ncix))
+        Uactive=czero
+        do iorb=1,norbitals
+           icix=cix_orb(iorb)
+           if(icix.le.0) cycle
+           do ind=1,nindo(iorb)
+              Uactive(:,iSx(ind,iorb),icix)= &
+                   Uactive(:,iSx(ind,iorb),icix)+DMFTU(:,ind,iorb,1)
+           enddo
+        enddo
+        AEweight=czero
+     endif
      Aweight(:,:)=0
      logG=0
      logGD=0
      logG0=0
-     !$OMP PARALLEL DO PRIVATE(Eij,zek,zal,zar,zw1,tmp,w1,w2,w3, i,fer,num,cc,gtc,tlogG,tlogG0,tlogGD,tdens)&
-     !$OMP SHARED(gloc) SCHEDULE(STATIC,CHUNK) REDUCTION(+:Aweight,dens,logG,logG0,logGD)
+     !$OMP PARALLEL DO PRIVATE(Eij,zek,zal,zar,zw1,tmp,w1,w2,w3, i,fer,num,cc,gtc,tlogG,tlogG0,tlogGD,tdens, &
+     !$OMP& SigmaLocal,CPair,CdiagUdagG,CdiagUdagGminus,CdiagProduct,CdiagProductMinus,iorb,icix,ind,ip)&
+     !$OMP SHARED(gloc) SCHEDULE(STATIC,CHUNK) REDUCTION(+:Aweight,AEweight,projectorGradientDirect,dens,logG,logG0,logGD)
      do iom=1,npomega
         allocate(Eij(nbands,nbands),zek(nbands),zar(nbands,nbands),zal(nbands,nbands),tmp(nbands,nbands),zw1(nbands),w1(nbands,nbands),w2(nbands,nbands),w3(nbands,nbands))
         ! Total hamiltonian (H+Sigma) in Kohn-Sham basis
@@ -578,6 +725,35 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
         w3 = conjg(w2)
         w2 = -(w1-w3)/(2*pi*IMAG)
         Aweight(:,:) = Aweight(:,:) + w2(:,:)
+        if (Qforce) then
+           allocate(SigmaLocal(maxdim,maxdim,ncix),CPair(maxdim,nbands,ncix), &
+                CdiagUdagG(maxdim,nbands),CdiagUdagGminus(maxdim,nbands), &
+                CdiagProduct(maxdim,nbands),CdiagProductMinus(maxdim,nbands))
+           CALL BuildLocalSigmaMatrix(SigmaLocal,sigma(:,:,iom),Sigind, &
+                cixdim,maxdim,maxsize,ncix)
+           CPair=czero
+           CALL AccumulateDirectProjectorSpectral(CPair,w1,Uactive,SigmaLocal, &
+                cixdim,nbands,maxdim,ncix,CdiagUdagG,CdiagUdagGminus, &
+                CdiagProduct,CdiagProductMinus)
+           do iorb=1,norbitals
+              icix=cix_orb(iorb)
+              if(icix.le.0) cycle
+              do ind=1,nindo(iorb)
+                 ip=iSx(ind,iorb)
+                 projectorGradientDirect(:,ind,iorb)= &
+                      projectorGradientDirect(:,ind,iorb)+CPair(ip,:,icix)
+              enddo
+           enddo
+           ! zG-I = (epsilon+Sigma)G.  Apply the same piecewise-constant
+           ! Hamiltonian as the log-bin integral, then its advanced partner.
+           do num=1,nbands
+              tmp(:,num)=zar(:,num)*zw1(num)*zek(num)
+           enddo
+           w2=matmul(tmp,zal)
+           AEweight=AEweight-(w2-conjg(transpose(w2)))/(2*pi*IMAG)
+           deallocate(SigmaLocal,CPair,CdiagUdagG,CdiagUdagGminus,CdiagProduct,CdiagProductMinus)
+        endif
+
         
         gtc=0
         do i=1,nbands
@@ -595,11 +771,108 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, d
         deallocate( Eij, zek, zar, zal, tmp, zw1, w1, w2, w3)
      enddo
      !$OMP END PARALLEL DO
+     if(Qforce) deallocate(Uactive)
   endif
   if (stressMomentDiagnostic) deallocate(WSigPair,SigDirect,SigScratch)
   deallocate(Wsum, WEsum, w0inf) 
 
 END SUBROUTINE cmp_dmft_weights2
+
+
+! Expand the compact impurity self-energy labels into one dense local matrix
+! for every correlated block.  Keeping this operation in local space is much
+! cheaper than reconstructing the band-space embedded self-energy and is the
+! purpose of accumulating the direct functional gradient C.
+SUBROUTINE BuildLocalSigmaMatrix(localSigma,compactSigma,Sigind,cixdim, &
+     maxdim,maxsize,ncix)
+  IMPLICIT NONE
+  INTEGER,intent(in) :: maxdim,maxsize,ncix,cixdim(ncix)
+  INTEGER,intent(in) :: Sigind(maxdim,maxdim,ncix)
+  COMPLEX*16,intent(in) :: compactSigma(maxsize,ncix)
+  COMPLEX*16,intent(out) :: localSigma(maxdim,maxdim,ncix)
+  INTEGER :: icix,ip,iq,it
+
+  localSigma=0.d0
+  do icix=1,ncix
+     do iq=1,cixdim(icix)
+        do ip=1,cixdim(icix)
+           it=Sigind(ip,iq,icix)
+           if (it.gt.0) localSigma(ip,iq,icix)=compactSigma(it,icix)
+        enddo
+     enddo
+  enddo
+END SUBROUTINE BuildLocalSigmaMatrix
+
+
+! Add the positive and negative Matsubara partners of
+!
+!   C(iw) = Sigma_local(iw) U^+ G(iw)
+!
+! to CPair.  Notice that the negative partner is
+! Sigma_local^+ U^+ G^+, not C(iw)^+: C is rectangular, and reversing the
+! product order would not reproduce U*C=Sigma_embedded*G.
+SUBROUTINE AccumulateDirectProjectorPair(CPair,G,Uactive,localSigma, &
+     cixdim,nbands,maxdim,ncix,UdagG,UdagGminus,product,productMinus)
+  IMPLICIT NONE
+  INTEGER,intent(in) :: nbands,maxdim,ncix,cixdim(ncix)
+  COMPLEX*16,intent(in) :: G(nbands,nbands), &
+       Uactive(nbands,maxdim,ncix),localSigma(maxdim,maxdim,ncix)
+  COMPLEX*16,intent(inout) :: CPair(maxdim,nbands,ncix)
+  COMPLEX*16,intent(inout) :: UdagG(maxdim,nbands), &
+       UdagGminus(maxdim,nbands),product(maxdim,nbands), &
+       productMinus(maxdim,nbands)
+  INTEGER :: icix,nloc
+  COMPLEX*16,parameter :: cone=(1.d0,0.d0),czero=(0.d0,0.d0)
+
+  do icix=1,ncix
+     nloc=cixdim(icix)
+     if (nloc.le.0) cycle
+     CALL zgemm('C','N',nloc,nbands,nbands,cone, &
+          Uactive(1,1,icix),nbands,G,nbands,czero,UdagG,maxdim)
+     CALL zgemm('N','N',nloc,nbands,nloc,cone, &
+          localSigma(1,1,icix),maxdim,UdagG,maxdim,czero,product,maxdim)
+
+     CALL zgemm('C','C',nloc,nbands,nbands,cone, &
+          Uactive(1,1,icix),nbands,G,nbands,czero,UdagGminus,maxdim)
+     CALL zgemm('C','N',nloc,nbands,nloc,cone, &
+          localSigma(1,1,icix),maxdim,UdagGminus,maxdim,czero, &
+          productMinus,maxdim)
+     CPair(1:nloc,:,icix)=CPair(1:nloc,:,icix)+ &
+          product(1:nloc,:)+productMinus(1:nloc,:)
+  enddo
+END SUBROUTINE AccumulateDirectProjectorPair
+
+! Retarded/advanced contour pair, using the already integrated weighted G.
+SUBROUTINE AccumulateDirectProjectorSpectral(CPair,G,Uactive,localSigma, &
+     cixdim,nbands,maxdim,ncix,UdagG,UdagGminus,product,productMinus)
+  IMPLICIT NONE
+  INTEGER,intent(in) :: nbands,maxdim,ncix,cixdim(ncix)
+  COMPLEX*16,intent(in) :: G(nbands,nbands), &
+       Uactive(nbands,maxdim,ncix),localSigma(maxdim,maxdim,ncix)
+  COMPLEX*16,intent(inout) :: CPair(maxdim,nbands,ncix)
+  COMPLEX*16,intent(inout) :: UdagG(maxdim,nbands), &
+       UdagGminus(maxdim,nbands),product(maxdim,nbands), &
+       productMinus(maxdim,nbands)
+  INTEGER :: icix,nloc
+  COMPLEX*16,parameter :: cone=(1.d0,0.d0),czero=(0.d0,0.d0)
+
+  do icix=1,ncix
+     nloc=cixdim(icix)
+     if (nloc.le.0) cycle
+     CALL zgemm('C','N',nloc,nbands,nbands,cone, &
+          Uactive(1,1,icix),nbands,G,nbands,czero,UdagG,maxdim)
+     CALL zgemm('N','N',nloc,nbands,nloc,cone, &
+          localSigma(1,1,icix),maxdim,UdagG,maxdim,czero,product,maxdim)
+
+     CALL zgemm('C','C',nloc,nbands,nbands,cone, &
+          Uactive(1,1,icix),nbands,G,nbands,czero,UdagGminus,maxdim)
+     CALL zgemm('C','N',nloc,nbands,nloc,cone, &
+          localSigma(1,1,icix),maxdim,UdagGminus,maxdim,czero, &
+          productMinus,maxdim)
+     CPair(1:nloc,:,icix)=CPair(1:nloc,:,icix)+ &
+          -(product(1:nloc,:)-productMinus(1:nloc,:))/cmplx(0.d0,2.d0*acos(-1.d0),8)
+  enddo
+END SUBROUTINE AccumulateDirectProjectorSpectral
 
 
 ! Determine the leading dynamic self-energy moment used by the Matsubara

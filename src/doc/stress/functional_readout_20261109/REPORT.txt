@@ -1,0 +1,373 @@
+REGULARIZED LATTICE STRAIN READOUT: FIRST PART OF POINT 4
+9 November 2026
+
+STATUS
+
+The preceding analytic hydrostatic charge-source checkpoint was installed in
+eDMFT_new and dbin and verified with 215 tests in both locations. The functional-readout checkpoint is installed in eDMFT_new and dbin after explicit user approval.
+Post-install validation: 225/225 tests passed in each location, zero skips;
+all checked helpers and tests imported from installed paths. It changes
+neither production stress nor any material calculation. This checkpoint tests
+the regularized lattice scalar and its projector/direct decomposition. It does
+not claim that the total Klein-functional derivative or stress is complete.
+
+WHAT IS NOW CONNECTED
+
+For a strain parameter eta_nu, the installed charge engine supplies
+
+  (I-J) q_nu = s_nu,
+  V'_nu = v_explicit,nu + K q_nu,
+  b_nu = b_geometry,nu + B V'_nu.
+
+q is the density response in the central material coordinates. s is the
+complete explicit normalized charge-map source, including spatial geometry,
+core, radial changes and both native normalization/transport operations.
+K is the prepared Hartree/XC density-to-potential operation. B maps a native
+potential to joint H/O/raw-projector perturbations. b_geometry contains the
+remaining explicit matrix/overlap/projector strain at fixed potential files.
+J, K and B need not be symmetric; their tested transposes are used explicitly.
+
+The new helper requires BOTH explicit band geometry and explicit potential.
+Omitting either is an error. It supplies the following selected scalar readout:
+
+  D_nu = g_b^T b_geometry,nu + g_V^T v_explicit,nu + c^T q_nu,
+  g_V = B^T g_b,        c = K^T g_V.
+
+One adjoint for this scalar gives
+
+  (I-J)^T lambda = c,
+  D_nu = g_b^T b_geometry,nu + g_V^T v_explicit,nu + lambda^T s_nu.
+
+The same lambda serves all strain directions for ONE scalar functional. The
+projector and lattice readouts are different observables and generally need
+different adjoints. Their two solves here are diagnostics, not a requirement
+for a future complete functional: its combined gradient needs one adjoint.
+Six-column synthetic tests pass; six physical general strain sources are NOT
+supplied by this checkpoint. The material tests use hydrostatic strain only.
+
+THE SCALAR THAT IS DIFFERENTIATED
+
+Let epsilon_k be the diagonal central KS energies, mu the central chemical
+potential, U_k the normalized window projector, and Sigma_n the effective
+local self-energy including the chosen double-counting subtraction. Define
+
+  h_k = epsilon_k - mu I,
+  h_inf,k = h_k + U_k Sigma_inf U_k^dagger,
+  A_n,k = i omega_n I - h_k - U_k Sigma_n U_k^dagger.
+
+The regularized lattice grand-potential scalar used in the tests is
+
+  L = 2 sum_k w_k [ -T Tr log(1 + exp(-h_inf,k/T))
+      + 2T sum_n W_n Re{log det(i omega_n I-h_inf,k)-log det A_n,k} ].
+
+T and all energies are in Ry; W_n are the EXPORTED compressed Matsubara
+quadrature weights. The first factor 2 is nonmagnetic spin degeneracy; the
+second factor 2 combines positive and negative frequencies. rho and all
+functional covectors already contain these weights and w_k. They must not
+be inserted again. Every test uses the same exported quadrature and static
+subtraction; this is not an independent assessment of the omitted tail error.
+
+L includes the noninteracting valence contribution. It is NOT the complete
+Klein functional: Hartree/XC double counting, ionic energy, core, and the
+consistent impurity/DC tangent bookkeeping remain to be assembled. In a
+frozen-local-Sigma check, changing U still changes its lattice embedding.
+
+JOINT DERIVATIVE, INCLUDING THE NORMALIZED PROJECTOR
+
+In the central orthonormal KS gauge, a generalized-basis perturbation gives
+
+  h_eff' = H' - (O' epsilon + epsilon O')/2,
+  phi_eff' = phi' - O' phi/2,
+  U = Pi_W phi X,
+  U' = Pi_W' phi X + Pi_W phi_eff' X + Pi_W phi X'.
+
+The Pi_W and X derivatives are evaluated by the installed common electronic
+response, with the actual overlap symmetrization and normalization. X' contains
+both raw-overlap and window-motion contributions. The empty complementary
+finite LAPW space contributes through the retained/complement shifted solves;
+it is not dropped merely because it is outside the correlated band window.
+
+The scalar derivative is
+
+  L' = Re Tr(rho h_eff') + Re Tr(g_U^dagger U').
+
+The second term, after the full window/normalization/metric pullback, is the
+previously validated projector covector g_projector. The new direct covector
+is especially simple in joint RR/QR/raw coordinates:
+
+  g_direct,H_RR = rho,
+  g_direct,O_RR = -(rho epsilon + epsilon rho)/2,
+  g_direct,phi_R = g_direct,H_QR = g_direct,O_QR = 0,
+  g_lattice = g_projector + g_direct.
+
+R denotes retained KS states; Q completes the finite native LAPW space.
+The direct Q blocks vanish under the prepared thermally empty/gapped Q policy.
+The projector Q blocks need not vanish. Hermitian cross blocks use the real
+pairing 2 Re Tr(g_QR^dagger b_QR). The installed packed coordinates include
+this factor isometrically; the raw-projector complex pairing has no factor 2.
+
+WHY NO ADDITIONAL ISOLATED M_SIGMA O' IS INSERTED
+
+The production covariant formulation uses rho_E and contains the familiar
+combination Re Tr(rho H' - rho_E O'). It can be rewritten in the symmetric
+orthonormal gauge above. In that gauge the direct overlap weight is
+{rho,epsilon}/2, while the self-energy-related metric dependence is carried
+by the derivative of U. Appending another isolated self-energy overlap moment
+to this complete orthonormal-gauge expression would generally count that
+dependence twice. The two arrangements must be compared as complete sums.
+
+This is a bookkeeping requirement, not a claim that a particular production
+term is erroneous or should be deleted. Reconciliation with the actual
+Fortran rho_E, Matsubara tail and projector baseline remains an explicit task.
+
+A strong test is a pure infinitesimal change of basis S=I+eta A:
+
+  H' = A^dagger epsilon + epsilon A,
+  O' = A^dagger + A,
+  phi' = A^dagger phi.
+
+L'=0 for this coordinate change. The direct and projector contributions are
+individually nonzero and cancel in the new tests. This also explains why
+testing or adding an isolated overlap or projector term can be misleading.
+
+NATIVE FINITE-DIFFERENCE CHECK AND CHEMICAL-POTENTIAL POLICY
+
+The nonlinear oracle reads native eigenvalues and normalized projectors from
+the independently run strained snapshots. It evaluates the same scalar using
+an independent orbital-space determinant identity and checked LU factors.
+Its invariance under KS band rotations avoids phase matching. No derivative
+matrix is used to construct this oracle. Band count, window, k weights,
+self-energy, temperature and quadrature are checked against the center.
+
+At strictly fixed mu, SrVO3 has appreciable finite-step curvature from its
+occupations. This caused an initially poor two-step extrapolation. The saved
+native endpoint runs already supplied independently solved fixed-N values of
+mu. They permit a smoother, equally valid first-derivative comparison:
+
+  F_eta = L_eta(mu_eta) + (mu_eta - mu_0) N_0,
+  dF/deta|_0 = partial_eta L|_(mu_0),
+
+because partial_mu L=-N_0 at the central state. Here N_0 is the reference
+VALENCE band number for this scalar, not the integer total charge including
+core, and not the post-normalized total spatial density. The shifted constant
+mu_0 N_0 is immaterial. Sigma(i omega_n) remains fixed in the supplied local
+convention, as in the reference response. Both fixed-mu and fixed-N paths have
+the same first derivative; their finite-step errors differ. Raw grand
+potentials at different mu must NOT be compared without the Legendre term.
+
+Two strain sizes were used on all tested meshes, with a third available on
+the three-k fixtures. Results and Richardson limits are recorded below and
+in scalar_refinement.json. The remaining smallest-step differences include
+native input rounding and subtraction of large scalar values.
+
+FORWARD/ADJOINT ERROR ACCOUNTING
+
+For approximate q and lambda let r_f=s-(I-J)q and r_a=c-(I-J)^T lambda.
+The difference between the two induced contractions is exactly
+
+  c^T q - lambda^T s = r_a^T q - lambda^T r_f.
+
+The reported absolute bound is ||r_a|| ||q|| + ||lambda|| ||r_f||. A small
+GMRES callback residual alone is insufficient: the final true residual is
+recomputed. Explicit geometry and potential terms are identical on both
+sides. All readout values are in Ry per strain parameter; no isolated value
+in this report is converted into a pressure correction.
+
+NEXT REQUIRED RECONCILIATION
+
+1. The fixed-basis PHYSICAL-potential map P has now been implemented in
+   lapw_physical_potential.py using the same discrete H assembly. It has a
+   tested transpose and scalar contraction, with three-k material checks in
+   SrVO3 and FeSe. Its scalar covector is P^T rho. In the
+   ideal stationary rearrangement the ordinary physical-potential derivative
+   cancels the corresponding density/potential term outside L. The remaining
+   valence potential gradient is B^T g_lattice - P^T rho. This residual can
+   contain both radial Pulay and normalized-projector response.
+
+   Implemented code route: PreparedSphericalBand.action(...,
+   difference_dot=delta(r V)) with all radial/matching tangents set to zero
+   supplies the spherical fixed-basis physical variation; its pullback returns
+   difference_bar. NativePotentialBands supplies explicit nonspherical and
+   interstitial actions/pullbacks. NativeScreenedState.potential_selector
+   supplies the common potential-file coordinate conversion. Independent
+   spherical-integral, paired, nonlinear scalar and constant-potential tests
+   pass. The constant-potential matrix equals identity in RR and zero in QR,
+   and its density contraction reproduces the central valence particle number.
+
+   We also record the potential-dependent MATRIX remainder
+     g_remainder,V = B^T g_lattice - P^T rho
+                  = g_projector,V + g_radial_basis,V.
+   Its separation is now exact for these prepared maps. It has NOT yet been
+   identified with the complete correction to the actual spatial Klein
+   functional or the existing analytic stress. In particular this subtraction
+   alone supplies neither core nor explicit geometry terms outside L.
+
+2. Reconcile that matrix-potential contraction with the actual spatial density,
+   core, Hartree/XC and charge normalization used in the Klein implementation.
+   WIEN24 H/O uses CHARGE radial quadrature; dmft2's ATPARN/projector/density
+   path uses its historical RINT13 quadrature. They are separate maps in the
+   response engine. Do not silently replace one contraction by the other.
+   The archived centers have nonzero charge fixed-point residuals, especially
+   the deliberately small three-k fixtures. Stationarity cannot be assumed
+   to remove their residual terms numerically.
+
+   ADDITIONAL PAIRING AUDIT: the interstitial matrix and raw spatial-density
+   contractions agree near roundoff. Their MT contractions initially differ.
+   A controlled calculation at FIXED central coefficients separates two causes:
+   the native nonspherical Hamiltonian uses LNSMAX=4, whereas the spatial
+   density uses wavefunction channels through l=8; the radial banks also differ.
+   Raising only the DIAGNOSTIC potential contraction to l<=8 removes nearly
+   all of the nonspherical discrepancy. Using l<=8 AND the density's ATPARN
+   radial bank makes that contraction agree with the spatial integral near
+   roundoff. This identifies a concrete finite-cutoff cancellation issue, not
+   a missing impurity vertex. It does not establish the pressure error caused
+   by that issue, and no LNSMAX input, Hamiltonian or material run was changed.
+
+   The prospective functional cancellation therefore needs explicit handling
+   of this native angular truncation as well as radial quadrature. We must not
+   silently identify P^T rho with an integral of the higher-l native density.
+   Detailed numbers are in spatial_pairing.json and angular_cutoff.json. A
+   physical comparison after raising LNSMAX and reconverging remains a future
+   test; these same-coefficient diagnostics cannot replace it.
+
+   The analogous spherical check compares Hamiltonian channels through l=10
+   with density channels through l=8. Restricting the diagnostic contraction
+   to l<=8 reduces that smaller residual too. The remaining FeSe spherical
+   pairing error after using the density bank is recorded, not declared zero.
+   Thus the proposed final gradient must include a separately verified
+   matrix-minus-spatial pairing term in addition to projector and radial
+   response, or use consistently converged cutoffs. The present calculation
+   does not yet assemble the core/input-density/normalization counterparts.
+
+3. Match the existing Fortran stress decomposition, including its sign,
+   Rydberg factors, rho_E/self-energy moment and window/normalization pieces.
+   Subtract only the terms actually present, once. Keep the radial correction
+   separately selectable as requested. Then form ONE combined correction
+   gradient, compute its adjoint once, and validate the complete frozen-Sigma
+   Klein-tangent finite difference on consistent converged centers.
+
+4. Extend from tested hydrostatic/rounded diagonal sources to all physical
+   strain components and supported symmetry/site/harmonic layouts. After
+   those checks replace the reference backend in the shared dmft2 executor,
+   retaining final-only run_dmft scheduling and isolated response files.
+
+WHAT THIS CHECKPOINT DOES NOT ESTABLISH
+
+No total stress improvement or final pressure agreement is claimed. Magnetic
+MnTe, fixed-mu insulating MnO, general cells, SOC, moving local axes/RMT/radial
+energies, general shear sources and production MPI/streaming remain outside
+this checkpoint. The material checks are local tangent tests at saved states,
+not new fully converged physical eDMFT calculations. No force code changed.
+
+PERFORMANCE FOLLOW-UP
+
+A cProfile measurement of one prepared three-k FeSe J^T action takes 1.824 s
+with profiling enabled. NativePotentialBands.pullback accounts for 1.255 s
+(about 69%), and its spherical pullbacks for 1.071 s. Repeated rectangular
+right_multiply_columns and array validation are significant within that cost.
+The cached Matsubara response is not the main cost in this particular profile.
+Full-mesh FeSe transpose actions measured separately take about 47-50 s.
+The small-mesh profile identifies routines to investigate, not a quantitative
+full-mesh speedup prediction. FeSe_transpose_profile.txt contains the evidence.
+
+After the functional is reconciled, optimize/reuse the repeated spherical
+RR/QR contractions, move redundant validation to the prepared-map boundary
+where safe, and parallelize the independent k/site reductions. Preserve all
+paired, gauge and native scalar checks. The final combined correction should
+require ONE adjoint for all six strains; the two adjoints per case here test
+two separate diagnostic observables. No production acceleration is claimed.
+
+NUMERICAL RESULTS
+
+225 tests pass using repository dependencies and installed dbin dependencies.
+Ten new tests cover nonlinear scalar derivatives, direct/projector
+separation, pure-basis covariance, zero-Sigma DFT, particle-number/gauge,
+six-source forward/adjoint algebra, fixed-basis physical-potential integrals/transpose/scalar, and rejected missing inputs. Zero skips.
+
+Case/mesh       lattice explicit   Legendre extrap error   relative error
+SrVO3 /three_k    -364.354987675            2.393818e-08     6.570017e-11
+FeSe  /three_k   -1238.261380942           -4.799290e-08     3.875829e-11
+SrVO3 /full_bz    -322.537503045            5.275922e-09     1.635755e-11
+FeSe  /full_bz   -1249.737235569           -9.799078e-08     7.840911e-11
+
+All values above are Ry per hydrostatic parameter; not total stress.
+
+Fixed-basis physical-potential material checks (3 k):
+  SrVO3: extrapolated scalar error -2.697242e-11 Ry; transpose relative error 5.923040e-14; constant-potential RR-I norm 2.693305e-13, QR norm 8.925483e-12.
+  Its induced-potential matrix decomposition in Ry: {'lattice': 254.70978168620854, 'ordinary_physical': 254.71974451131345, 'radial_basis': 0.34858041936672707, 'projector': -0.35854324447163266, 'matrix_remainder': -0.00996282510490468}. This remainder is not a total stress correction.
+  Raw spatial-pairing audit: {'matrix_Ry': 254.71974451131345, 'spatial_Ry': 254.7264011369951, 'difference_Ry': -0.006656625681650067, 'MT_difference_Ry': -0.006656625682708049, 'IR_difference_Ry': 1.057959616248172e-12}; band-minus-spatial valence number 2.227704e-05.
+  Nonspherical same-coefficient cutoff/bank experiment:
+    matrix_l4: norm difference 3.291309e-03; induced difference -6.662762e-03 Ry.
+    matrix_l8: norm difference 7.673715e-09; induced difference -2.034647e-08 Ry.
+    density_l4: norm difference 3.291307e-03; induced difference -6.662753e-03 Ry.
+    density_l8: norm difference 3.637831e-14; induced difference -3.730414e-15 Ry.
+  Spherical same-coefficient cutoff/bank experiment:
+    matrix_l10: norm difference 2.224560e-06; induced difference 6.136261e-06 Ry.
+    matrix_l8: norm difference 3.633559e-09; induced difference 1.194056e-08 Ry.
+    density_l8: norm difference 3.337308e-12; induced difference 3.473123e-12 Ry.
+  FeSe: extrapolated scalar error -9.669954e-11 Ry; transpose relative error 2.624965e-14; constant-potential RR-I norm 6.820348e-13, QR norm 6.136094e-12.
+  Its induced-potential matrix decomposition in Ry: {'lattice': 1124.7094196085359, 'ordinary_physical': 1129.7498111858577, 'radial_basis': 10.83317102824826, 'projector': -15.873562605569997, 'matrix_remainder': -5.040391577321738}. This remainder is not a total stress correction.
+  Raw spatial-pairing audit: {'matrix_Ry': 1129.7498111858577, 'spatial_Ry': 1129.7648312502013, 'difference_Ry': -0.01502006434318626, 'MT_difference_Ry': -0.015020064338849634, 'IR_difference_Ry': -4.3366285026921524e-12}; band-minus-spatial valence number 2.259824e-05.
+  Nonspherical same-coefficient cutoff/bank experiment:
+    matrix_l4: norm difference 4.885412e-03; induced difference -1.503210e-02 Ry.
+    matrix_l8: norm difference 1.326494e-08; induced difference -4.071322e-08 Ry.
+    density_l4: norm difference 4.885409e-03; induced difference -1.503208e-02 Ry.
+    density_l8: norm difference 8.173136e-14; induced difference 1.429137e-13 Ry.
+  Spherical same-coefficient cutoff/bank experiment:
+    matrix_l10: norm difference 2.563413e-06; induced difference 1.203700e-05 Ry.
+    matrix_l8: norm difference 2.236266e-08; induced difference -9.077376e-07 Ry.
+    density_l8: norm difference 6.327367e-09; induced difference 8.049170e-07 Ry.
+
+Independent fixed-geometry potential-direction lattice derivatives (3 k):
+  SrVO3: analytic -1.09077695871 Ry; extrapolated error 1.246241e-08 Ry, relative 1.142526e-08.
+  FeSe: analytic -7.89011969751 Ry; extrapolated error -6.804828e-08 Ry, relative 8.624493e-09.
+
+Case/mesh       component     forward-adjoint error     residual bound
+SrVO3 /three_k projector              3.786935e-08       1.389519e-06
+SrVO3 /three_k lattice                7.888240e-06       1.760838e-03
+FeSe  /three_k projector              1.666282e-07       2.593370e-04
+FeSe  /three_k lattice                2.096830e-05       1.520204e-02
+SrVO3 /full_bz projector              4.582892e-08       4.391497e-06
+SrVO3 /full_bz lattice                2.732185e-06       3.133006e-03
+FeSe  /full_bz projector              1.343520e-07       1.483429e-04
+FeSe  /full_bz lattice                7.446424e-06       1.003550e-02
+
+Separated contractions in Ry (these are NOT independently additive stresses):
+
+SrVO3/three_k; central charge fixed-point residual norm 18.58727:
+  projector : geometry -0.0837139826, explicit potential  0.4585860903, induced -0.3585432445, sum  0.0163288632
+  direct    : geometry -6.2191771855, explicit potential -358.5106825972, induced  255.0683249307, sum -109.6615348520
+  lattice   : geometry -6.3028911681, explicit potential -358.0520965069, induced  254.7097816862, sum -109.6452059888
+  Valence preparation 6.47 s; gradient preparation 0.03 s.
+  projector adjoint: 2 actions, 2.29 s, true residual 2.492647e-10 (threshold 4.852258e-10).
+  lattice adjoint: 15 actions, 17.93 s, true residual 1.261606e-07 (threshold 5.803318e-07).
+  Smaller-pair extrapolated scalar error: 1.238157e-07 Ry (3.398216e-10 relative).
+
+FeSe/three_k; central charge fixed-point residual norm 2.5520948:
+  projector : geometry -0.4512518483, explicit potential  18.2578368851, induced -15.8735626056, sum  1.9330224312
+  direct    : geometry  2.8588468740, explicit potential -1258.9268128529, induced  1140.5829822141, sum -115.4849837647
+  lattice   : geometry  2.4075950257, explicit potential -1240.6689759677, induced  1124.7094196085, sum -113.5519613335
+  Valence preparation 3.61 s; gradient preparation 0.02 s.
+  projector adjoint: 2 actions, 2.35 s, true residual 2.279602e-08 (threshold 7.479078e-08).
+  lattice adjoint: 15 actions, 19.21 s, true residual 9.950897e-07 (threshold 1.942872e-06).
+  Smaller-pair extrapolated scalar error: 5.597747e-07 Ry (4.520650e-10 relative).
+
+SrVO3/full_bz; central charge fixed-point residual norm 0.03984598:
+  projector : geometry -0.1177223506, explicit potential  0.6357997492, induced -0.4972473508, sum  0.0208300478
+  direct    : geometry -1.9117317743, explicit potential -321.1438486697, induced  221.7948451728, sum -101.2607352711
+  lattice   : geometry -2.0294541248, explicit potential -320.5080489205, induced  221.2975978220, sum -101.2399052233
+  Valence preparation 126.51 s; gradient preparation 0.73 s.
+  projector adjoint: 14 actions, 307.24 s, true residual 8.751392e-10 (threshold 1.323799e-09).
+  lattice adjoint: 15 actions, 330.08 s, true residual 8.991275e-08 (threshold 4.868934e-07).
+
+FeSe/full_bz; central charge fixed-point residual norm 0.62800624:
+  projector : geometry -0.3872255872, explicit potential  15.2711788944, induced -13.1928648965, sum  1.6910884107
+  direct    : geometry  2.4452346895, explicit potential -1267.0664235656, induced  1139.6832667951, sum -124.9379220809
+  lattice   : geometry  2.0580091024, explicit potential -1251.7952446712, induced  1126.4904018987, sum -123.2468336702
+  Valence preparation 118.25 s; gradient preparation 1.41 s.
+  projector adjoint: 15 actions, 712.82 s, true residual 1.148158e-08 (threshold 6.297515e-08).
+  lattice adjoint: 15 actions, 721.46 s, true residual 5.792124e-07 (threshold 2.007940e-06).
+
+Preparation/solve times are serial adapter diagnostics on this machine, not
+production timing promises. Saved analytic q and sources were reused; their
+preparation costs are in the previous checkpoint. No native process was rerun.

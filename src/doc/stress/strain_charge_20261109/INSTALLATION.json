@@ -1,0 +1,43 @@
+{
+  "installed_at": "2026-11-09T00:45:24.002768-05:00",
+  "backup": "/private/tmp/edmft_strain_charge_20261109/before_install_20261109_004523",
+  "destinations": [
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_strain_charge.py",
+    "/Users/haule/dbin/lapw_strain_charge.py",
+    "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_strain_charge.py",
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_strain_field.py",
+    "/Users/haule/dbin/lapw_strain_field.py",
+    "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_strain_field.py",
+    "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt"
+  ],
+  "evidence": "/Users/haule/projects/eDMFT_new/src/doc/stress/strain_charge_20261109",
+  "status": "installed and verified",
+  "verified_at": "2026-11-09T00:46:13.586965-05:00",
+  "post_install_checks": {
+    "repository": {
+      "passed": 215,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "verified_installed_imports": true,
+      "log": "post_install_repository.log"
+    },
+    "dbin": {
+      "passed": 215,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "verified_installed_imports": true,
+      "log": "post_install_dbin.log"
+    }
+  },
+  "installed_hashes_verified": 7,
+  "current_phase": 3,
+  "analytic_hydrostatic_charge_source_validated": true,
+  "next_step": "Hydrostatic point 3 validated; next complete functional/baseline contraction, six strain layouts and production integration",
+  "limitations": [
+    "Broader geometry/spin support remains pending",
+    "MPI/streaming remains needed for large meshes",
+    "No new production stress or pressure agreement is claimed"
+  ]
+}

@@ -1,0 +1,4 @@
+nargs= 1
+argi=dmft2.def
+ OpeningFeSe.outputdmf2                                                                                                                                                                     
+STOP  DMFT2 END

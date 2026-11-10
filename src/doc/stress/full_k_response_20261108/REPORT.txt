@@ -1,0 +1,171 @@
+PHASE 2: REUSABLE FULL-K VALENCE PREPARATION AND CHARGE-MAP VALIDATION
+8 November 2026
+
+STATUS: installed in eDMFT_new and dbin after explicit user approval.
+Post-install validation: 179/179 tests passed in each location, zero skips;
+all seven helpers and both new tests imported from installed paths.
+Point 3 (physical screened response) has NOT been started in this checkpoint.
+No pressure/stress accuracy or production response publication is claimed.
+
+RESULTS: COMPLETE UNMIXED CHARGE-MAP DERIVATIVE
+
+Material   Nk  Nret  finite LAPW size   ensemble   error(h=.001)   error(h=.0005)
+Errors below are relative Euclidean norms after native output normalization.
+h is an input-density direction amplitude, NOT strain.
+FeSe      140    66  492-- 516          fixed_mu  9.66476019e-07  2.53211068e-07
+FeSe      140    66  492-- 516          fixed_N   9.20560204e-08  8.75300930e-08
+SrVO3      75    43  690-- 713          fixed_mu  1.66782032e-06  5.24439465e-07
+SrVO3      75    43  690-- 713          fixed_N   7.69912907e-08  3.17134685e-07
+
+Both ensembles include the same fixed-target native MIXER normalization.
+The inner fixed-mu electronic map still permits a raw particle-number change;
+it is not reinterpreted as a fixed-N electronic response.
+SrVO3 fixed-N errors reach a finite-difference/noise floor at the smaller h;
+they are not monotonically quadratic. Endpoint chemical potentials were
+solved from the nonlinear N(mu) constraint, not taken from analytic dmu.
+
+The saved first-k potential/core archive is valid here because the central
+structure, radial energies, input density, potential and core data are the
+same; only the k sampling used in the native valence update is changed.
+Native endpoint LAPW1 and dmft2 calculations were rerun on the actual full
+case.klist (140 FeSe points, 75 SrVO3 points) in isolated scratch folders.
+Core endpoints reuse the independently validated native LCORE data for the
+identical potential perturbations. No impurity solve or material SCF run
+was performed, and no user material directory was changed.
+
+CONSERVATION, TRANSPOSES AND PERFORMANCE
+
+FeSe: central density relative error 9.584652686e-13
+  Complete normalized-map transpose error 4.406744566e-14
+  Fixed-N metric-corrected band derivative -1.563194019e-13 electrons per direction amplitude
+  Normalized spatial charge derivative -2.442489917e-15 electrons per direction amplitude
+  Valence preparation 140.340 s; complete forward action 38.596 s
+  Peak process RSS 17.463 GB (macOS ru_maxrss)
+  Stored Wronskian kernels 3.274 GB; full square representation would need 24.969 GB
+  Minimum retained/complement gap 1.400782060e-03 Ry
+
+SrVO3: central density relative error 8.185530272e-10
+  Complete normalized-map transpose error 7.290830427e-16
+  Fixed-N metric-corrected band derivative 3.552713679e-15 electrons per direction amplitude
+  Normalized spatial charge derivative -2.775829961e-17 electrons per direction amplitude
+  Valence preparation 142.925 s; complete forward action 16.227 s
+  Peak process RSS 13.945 GB (macOS ru_maxrss)
+  Stored Wronskian kernels 1.981 GB; full square representation would need 32.150 GB
+  Minimum retained/complement gap 5.118584673e-06 Ry
+
+Timings are single-process checks on this host, not an end-to-end stress
+speedup. Preparation still stores sizable dense complements and geometry.
+The portable full-k path now works but needs streaming/MPI and further
+profiling before it is suitable for large production meshes. The formerly
+unused full QQ response matrices and FFTs of every Q wavefunction are gone.
+
+GAUGE CHECK: SMALL RESIDUAL REMAINS, NOT DECLARED EXACT
+
+A physical +1 Ry gauge change shifts V, all valence linearization/LO energies,
+mu, and the core reference shift together. It is not a fixed-energy-policy
+potential probe. Radial and raw-projector derivatives vanish near roundoff.
+FeSe: dmu=1.00000000117 Ry per +1 Ry potential shift; spatial density norm=1.016926833e-06
+  H'_RR-I norm=2.913512192e-06; H'_QR norm=1.275402447e-05
+  Three-k diagnostic: exact IR-mask discrepancy=8.423282954e-14;
+  adding an independently integrated high-l candidate leaves 3.637229384e-05, worse than the original 1.883018633e-06.
+SrVO3: dmu=1.00000000253 Ry per +1 Ry potential shift; spatial density norm=1.600063232e-06
+  H'_RR-I norm=9.597403332e-07; H'_QR norm=8.011664553e-06
+  Three-k diagnostic: exact IR-mask discrepancy=1.697328106e-12;
+  adding an independently integrated high-l candidate leaves 4.350368127e-04, worse than the original 1.604830441e-06.
+The high-l guess is therefore rejected. No such term was added to the code.
+The small remaining gauge discrepancy still needs a native constant-shift
+endpoint/assembly audit. No source correction or pressure inference is made
+from it. The charge-map native finite-difference checks above independently
+test the implemented fixed-energy update, not this separate gauge policy.
+
+EQUATIONS AND WHY THE COMPACT REPRESENTATION IS SUFFICIENT
+
+R contains all retained KS states, including the full DMFT window W and all
+appreciably occupied states. Q completes the finite LAPW space. Its size
+may depend on k. The existing complement solver checks that Q is empty,
+separated from R, and consistent with native H/O and the retained vectors.
+The density and its derivative have no QQ block under those checked bounds:
+  rho0 = [[rho_RR, 0], [0, 0]],
+  d rho = [[d rho_RR, d rho_QR^dagger], [d rho_QR, 0]].
+The same RR/QR blocks suffice for H/O input. The physical real pairing is
+  <Y,dH> = Re Tr(Y_RR^dagger dH_RR) + 2 Re Tr(Y_QR^dagger dH_QR).
+The factor two includes the RQ partner; it is not a spin or k weight.
+No such factor is applied to the raw orbital overlaps.
+
+The unchanged electronic map uses
+  H_Q T - T epsilon_R = -(dH_QR - dO_QR epsilon_R),
+  d phi_R,eff = d phi_R + T^dagger phi_Q,
+  d rho_QR = T rho_RR.
+There is ONE electronic model for all k points. Global overlap symmetry,
+X derivatives and the fixed-N chemical-potential response are shared, never
+computed independently for each k point. Native spin/k weights are applied
+once by E and are not reapplied by the spatial or potential adapters.
+
+For MT matching matrices Z_R,Z_Q, the fixed-basis density coefficient is
+  dD = Z_R d rho_RR Z_R^dagger
+       + Z_Q d rho_QR Z_R^dagger + Hermitian conjugate of this cross term.
+The k/site sum is performed before the radial/angular contraction.
+For the interstitial, transform only Nr columns:
+  d n(r) = Re sum_j [FFT(C_R d rho_RR + 2 C_Q d rho_QR)]_j
+                         [FFT(C_R)]_j^* / Omega.
+Native Fourier-star conventions are then applied. Direct moving-basis
+density D uses only the retained central density. Radial contexts are
+shared per atom/l, not prepared again per k point.
+
+The complete one-step unmixed charge derivative tested here is
+  J = N [R E B + D + C] K_Hxc.
+N is evaluated at raw TOTAL OUTPUT density, including core. The physical
+screened equation (I-J) q_A=b_A is the next point, and was not solved here.
+
+SOFTWARE AND VALIDATION
+
+New helpers:
+  lapw_compact_blocks.py: exact RR/QR pairings and matrix products.
+  lapw_compact_response.py: ragged spherical-input and spatial adapters.
+  lapw_native_snapshot.py: standalone endian-checked native H/O reader.
+  lapw_valence_state.py: reusable native-snapshot preparation and lifecycle.
+Updated helpers:
+  lapw_spherical_response.py: rectangular Wronskian and H/O response.
+  lapw_nonspherical_response.py: both radial legs with rectangular output.
+  lapw_potential_response.py: common native input with ragged RR/QR output.
+The old full-square interfaces remain available and pass the existing tests.
+No new Fortran/native executable or production switch is part of this patch.
+
+179 tests pass with both repository and dbin dependency paths, zero skips.
+Ten new tests cover complex dense/compact identities, native triangular
+assembly, ragged physical spatial reconstruction, native radial potential
+adapters and their reverses, stale normalization/fingerprints, missing input
+policies, cleanup on failure, and little/big-endian matrix input.
+The standalone reader matches all 430 full-mesh native H/O matrices exactly.
+Three-k FeSe/SrVO3 complete charge actions with dbin dependencies reproduce
+the repository-dependency results bit for bit.
+
+The endpoint number-root helper was accelerated by caching eigenvalues of
+H_W+U_W Sigma(iw) U_W^dagger. It remains a nonlinear independent reference;
+no analytic response dmu is used. Its trace agrees with dense inverse sums
+within 2.85e-14 electrons on the three-k controls. Two FeSe full-mesh roots
+were obtained with the original dense reference and retained; the remaining
+roots use the validated scalar-resolvent trace. No production mu code changed.
+
+SCOPE AND NEXT WORK
+
+Native snapshot support is currently nonmagnetic, no SOC, primitive
+orthogonal cells, normalized projector 5, fixed radial energies/RMT/axes,
+ordinary l<=3 LOs and native density channels l<=8. A common retained band
+count is required, but total LAPW dimensions are allowed to vary with k.
+Outside-MT projector tails, shifted/multisite impurity orbitals and higher-l
+LOs are explicitly rejected by this adapter. Native data exports remain an
+explicit prerequisite, not an automatic addition to ordinary dmft2.
+
+Complete the remaining gauge/representation controls and reduce preparation
+memory or distribute k points before large production meshes. The full-k
+Jacobian can now be supplied to point 3: compare the physical screened
+charge/potential response with the isolated native reference. Six geometric
+strain sources, the final stress gradient/adjoint and tensor publication
+remain later work. Do not infer new analytic-versus-numeric GPa agreement.
+The deferred force audit remains AFTER strain validation.
+
+Evidence: *_multik.json, full_bz/*_multik.json, test logs, dbin_material.json,
+native input/density archive and reproduction scripts. Large matrix/vector
+snapshots remain under the scratch directory; their hashes are in the JSON
+reports. They are not duplicated into the source repository.

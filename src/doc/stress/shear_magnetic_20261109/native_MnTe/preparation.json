@@ -1,0 +1,142 @@
+{
+  "case": "0_800_MnTe",
+  "physical_policy": {
+    "magnetic": true,
+    "ferro": false,
+    "fixed_number": true,
+    "normalization_enabled": true
+  },
+  "parent_fingerprints": {
+    "0_800_MnTe.clmsum": "f2a12520e5fa2426ec6bb0325167da4a58aea72e7af0ca858946fe53c81357f7",
+    "0_800_MnTe.in0": "7b3bf0a332c727254d4a108b48b3dc5cee76142c6d39cb2d61ee72fe651b58cc",
+    "0_800_MnTe.in1": "a5d990773eefa4a36311172d9cb4472f35980e421c129ccab179f2813320b00a",
+    "0_800_MnTe.in2": "f3058fb8ba35668a8ecf706d6f598799ec2d674c58b6382abdd2976e070cb9dd",
+    "0_800_MnTe.inc": "8493e9f213cb722639562a722d8c6b31051a6fa0ee683f1a262753596bfe3dbf",
+    "0_800_MnTe.indmf2": "93e744b7e92be66b8e119fcd04d55b58f28f83c135c63192555b18946cf530ad",
+    "0_800_MnTe.indmf2dn": "400e54d36c3cbca4e9a1c5f68d985c7996335e11af7f58c8e69d3602a3703327",
+    "0_800_MnTe.indmfi": "b97e2ab8a7c2bc51be67976a2430624186f3ab5552adb029bc142b3af61d99a9",
+    "0_800_MnTe.indmfl": "3a43dcf4c1b30ca889e8e8278ae44bff5daf0060ea473913ae461eabf36cb9be",
+    "0_800_MnTe.indmfldn": "c145ffb4eb2ae9f8e957b0311bdf2fcd0a8e684be1b6495d676cbfbcb60cf631",
+    "0_800_MnTe.inm": "546e999ffa036eb7b075d37477b134946fe2f677aacc7622a1c4132d18259b72",
+    "0_800_MnTe.kgen": "534ebb188e5f094c5a59506927c22f80814d6273f08ce8c76644c52872560f95",
+    "0_800_MnTe.klist": "1ae6d388007ce2099f6830992c27bacd7f9c2e63f11f2b6d13c4f75681377751",
+    "0_800_MnTe.rotlm": "6407ed5dceaa317d6377a533eec98e106e226eb66260a5f9cbe5a446d937867a",
+    "0_800_MnTe.struct": "8dae93934c08eaa490a4c33a2fd87631a08bf5bf3edb6c1851dd33b2cb757e20",
+    "EF.dat": "6b0684e544e9a88237900123f9e7118ed5915a11000949c8c7baf3e1b7a22f30",
+    "Eorb_imp.dat": "f455366707d3fc7ab23b48cf01e9bf603896f88eb81962a69aecaadc360ff9fe",
+    "params.dat": "1f6918cb9ebcfa7d94fe17ad250675d5233f48580d6ada071b3aeb2b551fbb27",
+    "projectorw.dat": "ae004ade1340716be2ffe5a2a3b3e5765eaf02f8addd930dc320d16b21608128",
+    "sig.inp": "9af8b22fdd197a07e53a2f5fe438a66963d47665fb5d1b6ba24933e6b06e673a",
+    "sig.inp.0": "9af8b22fdd197a07e53a2f5fe438a66963d47665fb5d1b6ba24933e6b06e673a",
+    "sig.inp.10.1": "cd387ce4d172c2416d202e8dcb86706526e7b90cc1f05b311f308a16c7fcdcd7",
+    "sig.inp.11.1": "7591c1b2fcd161db1c46ba0b52f3d37a0dcc0b39c639733556e84057fb27d04e",
+    "sig.inp.12.1": "ee3c4e606fda9b358334ab49e5a7034dcff081c8d3f4a7e50c6e9920ee3c952e",
+    "sig.inp.13.1": "bbe6871e4ee30ac21f34effb732cdd8326c17663457f6a1df735919a312d0994",
+    "sig.inp.14.1": "7ca7bc904c3b89d44a7f8d9f7c7e76599d5deb7f4e883b9256d5aec089f31a6e",
+    "sig.inp.15.1": "c248d0fd1074bdb903717e4051282b433d8f4ed1cd8fbb39e3c08140a6bea32d",
+    "sig.inp.16.1": "4f982610fdaf54478aba918e65a89000f429e9d4b49bd161f118e23220b84b4f",
+    "sig.inp.17.1": "c0f1236fff2651a10f410b23c8914dbbc259629b2efc3408f6206b215d6611d7",
+    "sig.inp.18.1": "aa94adc289ecb12d53dc213e6573729a1dea2e1409e9e8352649b7f34167a4c4",
+    "sig.inp.19.1": "0741708be3eac3c5c7d27b8a69655db23dcf9afb2d57c657e41f06b834e9e840",
+    "sig.inp.2.1": "2def8d0388e93dfeb2d0593ce775d0a41a691c888c38abe45aa318411630bdd4",
+    "sig.inp.20.1": "9ba14855786cb2d01025efc66052f200e54311d85346fc344f1ea5024d5fd2b8",
+    "sig.inp.21.1": "8d1847d2eafe46fca033542bf8d72621f41168a4809fb41360274a1213a40035",
+    "sig.inp.22.1": "90fcd1eacb6d1bab847b100134c770a64a4877c0ba7df318ff60332c073f0864",
+    "sig.inp.23.1": "acafe6acba40f0152b40ed226da8fa85bafcaf9421d5b73d9fa636a3461b705a",
+    "sig.inp.24.1": "205be8388c966650c3ba30e1867dbfe38ca9736f042a0f9fad3c0c049ac40127",
+    "sig.inp.25.1": "bb10229d5d35dff8e884ea57ebb34ac962425bf59e43a52b018e9d7466fffabc",
+    "sig.inp.26.1": "ca1e901972d4328a66f49742d04ed5044697506738bcc5b676369268d244fe16",
+    "sig.inp.27.1": "bf678789ba6b1acd13deef5b7b3f8dcd35bd93dbf6c8652a5480250f0a606567",
+    "sig.inp.28.1": "2a115a97ab5379e9dfdbc2350e28983f9bed8b2fb7fd333f1f9ed05d104f09d8",
+    "sig.inp.29.1": "e93736b8126847f24d1a3aaa7fa3e2765ada769f7433a82256a9044dc07b6775",
+    "sig.inp.3.1": "17dc361d744166b8c3e0cad28d1b33c91ad18dcc2484bf6e5fec71ce25567078",
+    "sig.inp.30.1": "1eff8d42abc87aa197dcdb1773d8e96e37eb6a87011829afc3826cfcd6a84a46",
+    "sig.inp.31.1": "28a3d3c357e8eb31d2fcd99199ad7a77c457246385bdc8a2e55367f288566355",
+    "sig.inp.32.1": "40c87f5dda4fe6e148ddba83e54d28f75ec7656cf0b2b90bf59f72461bc97a71",
+    "sig.inp.33.1": "caaedc721ea382d1b95d2b23770ad0733f3f145eab1bcc1263c0d31e7730c10f",
+    "sig.inp.34.1": "8b9d9479a408901f773e8d4cd7fcdfa406d798286d6d604b5a81640e3118582f",
+    "sig.inp.35.1": "88aec36ed392f50699e0607b7426be934e26622a937cb7616c1cecb8ae9171bf",
+    "sig.inp.36.1": "0bbd2dae28bd9e0d8e76a69d37151a86685a6e555e6e119a2144b11460b13f42",
+    "sig.inp.37.1": "5743a06df3e8002533f90d22eda3b24c78dc7ae343ad601d8deab8ad84e62999",
+    "sig.inp.38.1": "a7f0981c9ea41f09facb51c0aa99d320a91d225c9c759d48cbb412873b828157",
+    "sig.inp.39.1": "eb12eebf70b34270ce9fcb7f7024a6a6d4037ba1f0e3bba1ed9a44552bd9fda6",
+    "sig.inp.4.1": "b414e673d14ba51cc0006fed4e614557746881834e07ae0ee2917560e46b2e3c",
+    "sig.inp.40.1": "1f5dff1d813013ce5ec9020ef85654524ee76f6fb29d7c06c6aac6d00baf4fc2",
+    "sig.inp.41.1": "b3eaee1a69825c3c2715d1f95efeae42c604e215a3817dcb3a70d6eea208c196",
+    "sig.inp.42.1": "b74ea03ccd56331146b631f2ff8febc47f89a4dd9cf55514eb7e75e83da5f9a3",
+    "sig.inp.43.1": "393a5931b24e2f0cf28ddd790217b3b0dad0447a9441c98248cf56a23eee3be5",
+    "sig.inp.44.1": "fa3e5bce49df1534839149386958941927416e639087459db763738ed300ee9c",
+    "sig.inp.45.1": "c6a64920324d30dc84a2bf900c7b714165a916adb90cc7333ca152f94e498fc1",
+    "sig.inp.46.1": "1c71f28f338a076fd3e85d058450bb65c79b5e94a9c442738323d7d0d19413f6",
+    "sig.inp.47.1": "c6562d0a56f66ecda6a8aa299464531cf84d4f1beb3ab4912b81067e4c60ee0c",
+    "sig.inp.48.1": "fde993a35d3680def05f818ae61170f3ffdffcbbd5439ba0cd3e034dbc02e0dc",
+    "sig.inp.49.1": "888964bdf112c72e0c73a996981b9b5bc993b70fc9d310947bb8e6b82625213c",
+    "sig.inp.5.1": "af7ee805a1b0c5db347b57c00a6422ea000de04f0971fee4709df5109cfc6556",
+    "sig.inp.50.1": "9af8b22fdd197a07e53a2f5fe438a66963d47665fb5d1b6ba24933e6b06e673a",
+    "sig.inp.6.1": "d8c0b11ef1a92fc28e671691fd99729eac7f21a0871cae6e274f2c4e76eddedb",
+    "sig.inp.7.1": "3999eec62ba8bf34b5f666a0a762c5995ac8fb7fd990dcac610c8bc8668069d5",
+    "sig.inp.8.1": "7f95d0ad8ab5142819dd9621ef9861186cd7f7fa0cf478aa51ffc84635eb46b9",
+    "sig.inp.9.1": "435436a2d47bd1b96f18a64f1f3214d40d4261127bfb68c8b7bbc8704e27aa34",
+    "sig.inp1": "2e34d7d33839bf29dbde79a752aec3ffe42eca589496c477f2af6aa14ebfbd3d",
+    "sig.inp1dn": "a5fe747b7f421f16751a646fa4e057bde3e98ea1bcb3a4bba872b089eb6c282f",
+    "sig.inp2": "a5fe747b7f421f16751a646fa4e057bde3e98ea1bcb3a4bba872b089eb6c282f",
+    "sig.inp2dn": "2e34d7d33839bf29dbde79a752aec3ffe42eca589496c477f2af6aa14ebfbd3d",
+    "sig.inp_6": "6c0a819c44471afdfe9bc08e4ba07e50cba05cc0302e9033b86c9736737c16a9",
+    "sig.inp_8": "78e64eedc4b5a3d4c2c010f59cd2b0b4443b09b06453780f95e3313bdda3d498",
+    "sig.inpx": "8b06d5f00aa8d27e2d60eb24b8ab9745d2b8cb112e73b045e43074f3854d59e3"
+  },
+  "config": {
+    "case": "0_800_MnTe",
+    "reference": "/Users/haule/projects/materials/MnTe/dmft",
+    "workspace": "/private/tmp/edmft_shear_magnetic_20261109/native_MnTe",
+    "wien_root": "/Users/haule/wien2k_24",
+    "lapw0_worker": "/Users/haule/dbin/lapw0_response",
+    "lapw1_worker": "/Users/haule/dbin/lapw1_response",
+    "lcore_worker": "/Users/haule/dbin/lcore_response",
+    "dmft2": "/Users/haule/dbin/dmft2_response",
+    "lapw1_definition": "/Users/haule/projects/materials/MnTe/dmft/lapw1.def",
+    "dmft2_definition": "/Users/haule/projects/materials/MnTe/dmft/dmft2.def",
+    "dmft2dn_definition": "/Users/haule/projects/materials/MnTe/dmft/dmft2dn.def",
+    "native_mpi": [
+      "/opt/homebrew/bin/mpirun",
+      "-np",
+      "4"
+    ]
+  },
+  "timings": [
+    {
+      "program": "lapw0_definition",
+      "seconds": 0.07763025001622736
+    },
+    {
+      "program": "lcore_definition",
+      "seconds": 0.04622966609895229
+    },
+    {
+      "program": "lapw0",
+      "seconds": 0.8486203330103308
+    },
+    {
+      "program": "lapw1",
+      "seconds": 2.171965332934633
+    },
+    {
+      "program": "dmft2_number",
+      "seconds": 6.891477416967973
+    },
+    {
+      "program": "dmft2",
+      "seconds": 4.560589834116399
+    },
+    {
+      "program": "dmft2dn",
+      "seconds": 4.540855667088181
+    },
+    {
+      "program": "lcore",
+      "seconds": 0.03246745793148875
+    }
+  ],
+  "scope": "one central snapshot, no strained SCF loop",
+  "stress_applied": false
+}

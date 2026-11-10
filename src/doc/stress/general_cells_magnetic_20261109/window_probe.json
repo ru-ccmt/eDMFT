@@ -1,0 +1,414 @@
+{
+  "MnO": {
+    "material": "MnO",
+    "spin": "up_or_nonmagnetic",
+    "volume_bohr3": 148.11716074988342,
+    "clusters": [
+      {
+        "k_index": 1,
+        "bands": [
+          16,
+          17,
+          18
+        ],
+        "weight": 0.0005787037037037037,
+        "raw_weight": 0.33145559162800947,
+        "normalized_weight": 0.3523178757930201,
+        "h_block_norm": 8.235523877070811,
+        "h_block_anisotropy": 7.349236667389365e-13
+      },
+      {
+        "k_index": 2,
+        "bands": [
+          16,
+          17
+        ],
+        "weight": 0.004629629629629629,
+        "raw_weight": 0.19024723637656066,
+        "normalized_weight": 0.20221597912377548,
+        "h_block_norm": 6.836902774580056,
+        "h_block_anisotropy": 1.670388967652106e-12
+      },
+      {
+        "k_index": 3,
+        "bands": [
+          16,
+          17
+        ],
+        "weight": 0.004629629629629629,
+        "raw_weight": 0.12493906986848385,
+        "normalized_weight": 0.13275905903412932,
+        "h_block_norm": 1614.7322688480403,
+        "h_block_anisotropy": 3.9629508029040156e-11
+      },
+      {
+        "k_index": 4,
+        "bands": [
+          16,
+          17
+        ],
+        "weight": 0.004629629629629629,
+        "raw_weight": 0.0784687532084383,
+        "normalized_weight": 0.08333977153121731,
+        "h_block_norm": 1775.3382827859243,
+        "h_block_anisotropy": 1.549144165941128e-10
+      },
+      {
+        "k_index": 5,
+        "bands": [
+          16,
+          17
+        ],
+        "weight": 0.004629629629629629,
+        "raw_weight": 0.04218392964515722,
+        "normalized_weight": 0.044786334436821305,
+        "h_block_norm": 1269.8236146327297,
+        "h_block_anisotropy": 7.444269695975804e-11
+      },
+      {
+        "k_index": 6,
+        "bands": [
+          16,
+          17
+        ],
+        "weight": 0.004629629629629629,
+        "raw_weight": 0.012397808723196516,
+        "normalized_weight": 0.013159960023261188,
+        "h_block_norm": 105.05716220570918,
+        "h_block_anisotropy": 9.757061780707942e-13
+      },
+      {
+        "k_index": 7,
+        "bands": [
+          16,
+          17
+        ],
+        "weight": 0.0023148148148148147,
+        "raw_weight": 2.0062554806170163e-29,
+        "normalized_weight": 2.1315968124155687e-29,
+        "h_block_norm": 173.24834213149592,
+        "h_block_anisotropy": 82.2417653841047
+      },
+      {
+        "k_index": 8,
+        "bands": [
+          16,
+          17
+        ],
+        "weight": 0.003472222222222222,
+        "raw_weight": 0.16716844269461195,
+        "normalized_weight": 0.17769026113124664,
+        "h_block_norm": 6.892532986790648,
+        "h_block_anisotropy": 3.0870189955410696e-13
+      }
+    ],
+    "threshold_sweep": [
+      {
+        "cutoff_Ry": 1e-12,
+        "omitted_pairs": 9,
+        "projector_window_mean_GPa": 34.089943702259674
+      },
+      {
+        "cutoff_Ry": 1e-10,
+        "omitted_pairs": 9,
+        "projector_window_mean_GPa": 34.089943702259674
+      },
+      {
+        "cutoff_Ry": 1e-08,
+        "omitted_pairs": 9,
+        "projector_window_mean_GPa": 34.089943702259674
+      },
+      {
+        "cutoff_Ry": 1e-06,
+        "omitted_pairs": 9,
+        "projector_window_mean_GPa": 34.089943702259674
+      },
+      {
+        "cutoff_Ry": 0.0001,
+        "omitted_pairs": 9,
+        "projector_window_mean_GPa": 34.089943702259674
+      },
+      {
+        "cutoff_Ry": 0.001,
+        "omitted_pairs": 9,
+        "projector_window_mean_GPa": 34.089943702259674
+      }
+    ],
+    "omit_all_window_motion_at_affected_k_GPa": 26.06194632953396,
+    "extra_change_omitting_affected_k_GPa": -8.027997372725714,
+    "rotation_probes": [
+      {
+        "seed": 20261109,
+        "projector_change_norm": 0.5821098900207851,
+        "lattice_scalar_change_Ry": 1.919752179446732e-08,
+        "apparent_mean_GPa_at_eta001": 0.0006355448385532987
+      },
+      {
+        "seed": 20261110,
+        "projector_change_norm": 0.8460952517171809,
+        "lattice_scalar_change_Ry": 2.2354647200018007e-07,
+        "apparent_mean_GPa_at_eta001": 0.007400632642983079
+      },
+      {
+        "seed": 20261111,
+        "projector_change_norm": 0.7197264602774736,
+        "lattice_scalar_change_Ry": 1.0073631528939586e-07,
+        "apparent_mean_GPa_at_eta001": 0.003334932806561751
+      }
+    ],
+    "raw_retained_electrons": 21.00017311994678,
+    "compressibility_per_Ry": 6.1637938524912865,
+    "seconds": 2.4685414999257773,
+    "scope": "window+normalization chain only, contracted against finite-difference H/O from relaxed endpoint potentials; not total stress"
+  },
+  "MnTe": {
+    "material": "MnTe",
+    "spin": "up_or_nonmagnetic",
+    "volume_bohr3": 674.5630071858831,
+    "clusters": [
+      {
+        "k_index": 4,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.0011574074074074073,
+        "raw_weight": 0.07377072520645123,
+        "normalized_weight": 0.0767740156724986,
+        "h_block_norm": 24.233428817523553,
+        "h_block_anisotropy": 14.318690370439619
+      },
+      {
+        "k_index": 97,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.0023148148148148147,
+        "raw_weight": 0.04786424637573436,
+        "normalized_weight": 0.049481623324311025,
+        "h_block_norm": 4.8737938273418155,
+        "h_block_anisotropy": 4.3535045993171827e-13
+      },
+      {
+        "k_index": 98,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.004629629629629629,
+        "raw_weight": 0.03409673961513497,
+        "normalized_weight": 0.035278049321149904,
+        "h_block_norm": 4.929120783892096,
+        "h_block_anisotropy": 0.044787197248485
+      },
+      {
+        "k_index": 99,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.004629629629629629,
+        "raw_weight": 0.020932054582486297,
+        "normalized_weight": 0.02171494925436568,
+        "h_block_norm": 4.688852779920207,
+        "h_block_anisotropy": 0.535909636738507
+      },
+      {
+        "k_index": 100,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.0023148148148148147,
+        "raw_weight": 0.03924365065739414,
+        "normalized_weight": 0.041008994920718946,
+        "h_block_norm": 6.160627255215436,
+        "h_block_anisotropy": 7.4476716507544e-05
+      }
+    ],
+    "threshold_sweep": [
+      {
+        "cutoff_Ry": 1e-12,
+        "omitted_pairs": 5,
+        "projector_window_mean_GPa": -20.49129274465548
+      },
+      {
+        "cutoff_Ry": 1e-10,
+        "omitted_pairs": 5,
+        "projector_window_mean_GPa": -20.49129274465548
+      },
+      {
+        "cutoff_Ry": 1e-08,
+        "omitted_pairs": 5,
+        "projector_window_mean_GPa": -20.49129274465548
+      },
+      {
+        "cutoff_Ry": 1e-06,
+        "omitted_pairs": 6,
+        "projector_window_mean_GPa": -20.491292744655443
+      },
+      {
+        "cutoff_Ry": 0.0001,
+        "omitted_pairs": 24,
+        "projector_window_mean_GPa": -20.49304513587007
+      },
+      {
+        "cutoff_Ry": 0.001,
+        "omitted_pairs": 26,
+        "projector_window_mean_GPa": -20.493045135869203
+      }
+    ],
+    "omit_all_window_motion_at_affected_k_GPa": -20.48807917302487,
+    "extra_change_omitting_affected_k_GPa": 0.0032135716306065376,
+    "rotation_probes": [
+      {
+        "seed": 20261109,
+        "projector_change_norm": 0.3795724242586426,
+        "lattice_scalar_change_Ry": -8.400832030019956e-09,
+        "apparent_mean_GPa_at_eta001": -6.106694381031948e-05
+      },
+      {
+        "seed": 20261110,
+        "projector_change_norm": 0.3933895411732727,
+        "lattice_scalar_change_Ry": 6.3953677909012185e-09,
+        "apparent_mean_GPa_at_eta001": 4.6488914923866655e-05
+      },
+      {
+        "seed": 20261111,
+        "projector_change_norm": 0.32082728194447263,
+        "lattice_scalar_change_Ry": 6.692630449833814e-09,
+        "apparent_mean_GPa_at_eta001": 4.8649763042847536e-05
+      }
+    ],
+    "raw_retained_electrons": 61.99999997566349,
+    "compressibility_per_Ry": 19.300221460380506,
+    "seconds": 24.330506999976933,
+    "scope": "window+normalization chain only, contracted against finite-difference H/O from relaxed endpoint potentials; not total stress"
+  },
+  "MnTe_dn": {
+    "material": "MnTe",
+    "spin": "_dn",
+    "volume_bohr3": 674.5630071858831,
+    "clusters": [
+      {
+        "k_index": 4,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.0011574074074074073,
+        "raw_weight": 0.07377072520645123,
+        "normalized_weight": 0.0767740156724986,
+        "h_block_norm": 24.233428817523553,
+        "h_block_anisotropy": 14.318690370439619
+      },
+      {
+        "k_index": 97,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.0023148148148148147,
+        "raw_weight": 0.04786424637573436,
+        "normalized_weight": 0.049481623324311025,
+        "h_block_norm": 4.8737938273418155,
+        "h_block_anisotropy": 4.3535045993171827e-13
+      },
+      {
+        "k_index": 98,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.004629629629629629,
+        "raw_weight": 0.03409673961513497,
+        "normalized_weight": 0.035278049321149904,
+        "h_block_norm": 4.929120783892096,
+        "h_block_anisotropy": 0.044787197248485
+      },
+      {
+        "k_index": 99,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.004629629629629629,
+        "raw_weight": 0.020932054582486297,
+        "normalized_weight": 0.02171494925436568,
+        "h_block_norm": 4.688852779920207,
+        "h_block_anisotropy": 0.535909636738507
+      },
+      {
+        "k_index": 100,
+        "bands": [
+          51,
+          52
+        ],
+        "weight": 0.0023148148148148147,
+        "raw_weight": 0.03924365065739414,
+        "normalized_weight": 0.041008994920718946,
+        "h_block_norm": 6.160627255215436,
+        "h_block_anisotropy": 7.4476716507544e-05
+      }
+    ],
+    "threshold_sweep": [
+      {
+        "cutoff_Ry": 1e-12,
+        "omitted_pairs": 5,
+        "projector_window_mean_GPa": -20.427019933177828
+      },
+      {
+        "cutoff_Ry": 1e-10,
+        "omitted_pairs": 5,
+        "projector_window_mean_GPa": -20.427019933177828
+      },
+      {
+        "cutoff_Ry": 1e-08,
+        "omitted_pairs": 5,
+        "projector_window_mean_GPa": -20.427019933177828
+      },
+      {
+        "cutoff_Ry": 1e-06,
+        "omitted_pairs": 6,
+        "projector_window_mean_GPa": -20.42701993317786
+      },
+      {
+        "cutoff_Ry": 0.0001,
+        "omitted_pairs": 24,
+        "projector_window_mean_GPa": -20.425266044197773
+      },
+      {
+        "cutoff_Ry": 0.001,
+        "omitted_pairs": 26,
+        "projector_window_mean_GPa": -20.4252660441969
+      }
+    ],
+    "omit_all_window_motion_at_affected_k_GPa": -20.424656170732526,
+    "extra_change_omitting_affected_k_GPa": 0.002363762445302342,
+    "rotation_probes": [
+      {
+        "seed": 20261109,
+        "projector_change_norm": 0.3795724242586426,
+        "lattice_scalar_change_Ry": -2.4107578155962983e-08,
+        "apparent_mean_GPa_at_eta001": -0.00017524170408268235
+      },
+      {
+        "seed": 20261110,
+        "projector_change_norm": 0.3933895411732727,
+        "lattice_scalar_change_Ry": -2.169784352190618e-08,
+        "apparent_mean_GPa_at_eta001": -0.00015772497133884506
+      },
+      {
+        "seed": 20261111,
+        "projector_change_norm": 0.32082728194447263,
+        "lattice_scalar_change_Ry": -1.3940166354586836e-08,
+        "apparent_mean_GPa_at_eta001": -0.00010133321942874725
+      }
+    ],
+    "raw_retained_electrons": 62.000013756088954,
+    "compressibility_per_Ry": 19.30412554841772,
+    "seconds": 25.620175207965076,
+    "scope": "window+normalization chain only, contracted against finite-difference H/O from relaxed endpoint potentials; not total stress"
+  }
+}

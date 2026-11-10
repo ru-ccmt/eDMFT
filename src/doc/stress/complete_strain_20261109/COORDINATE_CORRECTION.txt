@@ -1,0 +1,62 @@
+THE LAST FESE ERROR: AN EXTRA NORMALIZATION IN MATERIAL COORDINATES
+
+The native physical density n_eta is normalized using the integration measure
+I_eta of the strained cell. With the chosen density transport T_eta, introduce
+material coordinates r_eta=T_eta^(-1)n_eta. The fixed-point equation is
+
+  r_eta = T_eta^(-1) F_eta(T_eta r_eta),
+
+where F_eta includes native interstitial-only normalization in the strained
+cell. Differentiating at eta=0 gives
+
+  (I-J) q = s_phys,
+  s_phys = N F_exp + g_norm - tau(n_output).
+
+N is the derivative of native normalization at the UNNORMALIZED output,
+g_norm is its explicit change of the cell integration measure, and tau is the
+derivative of T_eta. The output, not the input, belongs in inverse transport.
+
+Crucially, fixed physical particle number does NOT require I_0 q=0. Rather,
+
+  I_0 (q + tau(n_0)) + I'_eta n_0 = 0.
+
+The earlier source normalized a second time after inverse transport, forcing
+I_0 q=0 in central coordinates. It had been tested against a native reference
+which also applied that second projection, so those tests correctly verified
+the wrong coordinate map. A normalized-coordinate formulation could be used,
+but would require a corresponding normalized INPUT pushforward and scalar
+readout. We had not supplied those matching partners.
+
+The corrected physical source omits this second projection. It preserves the
+native physical normalization itself. Because J and the complete scalar
+covector c are unchanged, the same adjoint lambda solves (I-J)^T lambda=c.
+The change in stress derivative is exactly lambda^T delta_s.
+
+For native interstitial-only normalization, let p be the normalized output
+with its MT entries set to zero and Q_IR=I_IR n_output. Then
+
+  delta_s = (p/Q_IR) [-I'_eta n_output - I_0 tau(n_output)].
+
+This expression is used to audit and recontract already completed runs. The
+production source instead computes the physical derivative directly. There
+is no empirical pressure adjustment. All partners follow from the native
+coordinate transformation and charge-integration rule.
+
+Measured hydrostatic corrections:
+  FeSe refined: delta D = -0.001266932321 Ry
+                 delta mean stress = -0.011744510688 GPa
+  SrVO3:        delta D = -0.000047772075 Ry
+                 delta mean stress = -0.000612085070 GPa
+
+For FeSe the correction changes -1.036848135 to -1.048592646 GPa; independently
+relaxed +/-0.0005 gives -1.048711378 GPa. Contracting the complete functional
+with the ACTUAL relaxed physical density tangent gives -1.048603087 GPa.
+Thus the corrected analytic density response and that native tangent differ
+by only 0.00001044 GPa in the total readout.
+
+Independent axial native source tests still agree to about 1e-6 relative.
+The new regression test differentiates strained-cell native normalization
+followed by inverse transport WITHOUT a second normalization, and checks the
+full changing-measure charge conservation identity above. The old projected
+map is available only as normalize_coordinates=True for reproducing historical
+diagnostics. New total stress uses the physical default.

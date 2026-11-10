@@ -1,0 +1,32 @@
+[
+  {
+    "case": "SrVO3",
+    "mode": "STRF",
+    "solver": {
+      "lapw0_worker": "/Users/haule/dbin/lapw0_response",
+      "lcore_worker": "/Users/haule/dbin/lcore_response",
+      "lapw1_worker": "/Users/haule/dbin/lapw1c_response",
+      "library": "/Users/haule/dbin/liblapw_response.so",
+      "backend": "analytic",
+      "wien_root": "/Users/haule/wien2k_24",
+      "dmft2": "/Users/haule/dbin/dmft2_response",
+      "mpi": [],
+      "charge_integration": "native"
+    }
+  },
+  {
+    "case": "FeSe",
+    "mode": "STRF",
+    "solver": {
+      "lapw0_worker": "/Users/haule/dbin/lapw0_response",
+      "lcore_worker": "/Users/haule/dbin/lcore_response",
+      "lapw1_worker": "/Users/haule/dbin/lapw1_response",
+      "library": "/Users/haule/dbin/liblapw_response.so",
+      "backend": "analytic",
+      "wien_root": "/Users/haule/wien2k_24",
+      "dmft2": "/Users/haule/dbin/dmft2_response",
+      "mpi": [],
+      "charge_integration": "native"
+    }
+  }
+]

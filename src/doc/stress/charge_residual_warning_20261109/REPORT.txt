@@ -1,0 +1,51 @@
+CENTRAL CHARGE RESIDUAL: WARNING, NOT ABORT — 9 November 2026
+
+User-requested policy
+A finite central charge-map residual above the default 0.001 threshold now
+issues a warning and continues ordinary STRT/STRFT stress evaluation. There
+is no new input switch and no need to increase the threshold to 0.01.
+The existing --fixed-point-tolerance option now sets the warning threshold.
+
+The residual is the unweighted Euclidean norm of the normalized output charge
+minus the input charge in stored radial/PW coordinates. It is not WIEN2k DIS,
+not a particle-number error, and not a universal stress-error estimate. The
+report retains the residual, threshold, within_threshold boolean and warning.
+The readable journal distinguishes response-solver convergence from central
+charge convergence. The warning is emitted only on MPI rank zero and appears
+both during the calculation and in the final case.outputdmf2_response.
+
+This changes the reporting policy only. No density, self-energy, normalization,
+response operator, tensor, or convergence tolerance is numerically modified.
+Non-finite or negative residuals, invalid thresholds, inconsistent snapshots,
+failed native reconstruction and failed response solves remain errors.
+
+Validation
+55 targeted tests passed: finite-residual continuation, root-only logging,
+non-finite refusal, readable reports, SCF publication, spin sequencing,
+magnetic response, general shear and launcher integration.
+
+Full MnTe default run on the user's saved two-spin native snapshot:
+/Users/haule/projects/materials/MnTe/dmft/0_800_MnTe.response_runs/20261109T195715-2c52631238e8/central
+Central charge residual: 0.00503140542619553
+Warning threshold: 0.001; within threshold: False
+Mean tensile stress: -0.668175953622 GPa
+Compression-positive pressure: 0.668175953622 GPa
+Stress tensor (GPa): [[-0.8027793146819222, 0.0, 0.0], [0.0, -0.8027793146819222, 0.0], [0.0, 0.0, -0.3989692315033715]]
+Response driver time: 274.869 seconds on 12 MPI ranks.
+The default band-pair omission warning is also retained in both spin branches.
+The tensor is marked stress_ready=True and diagnostic_only=False.
+The source snapshot and parent material directory were not changed.
+
+Both magnetic branches use one common charge response and one adjoint. SCF
+assembly was checked on copies of the real two-spin component outputs; the
+central-charge warning remains visible and does not prevent publication.
+See publication_validation.json for the printed-row precision check.
+
+Scope
+Three runtime helpers changed: lapw_total_stress.py,
+lapw_total_stress_driver.py and stress_response_summary.py. Three test files
+accompany them. No native rebuild or WIEN2k bundle update is required.
+The full tensor remains projected onto the imposed native charge symmetry,
+as before; this patch makes no new unrestricted-symmetry validation claim.
+Installation and the follow-up rupc-01 repository transfer are recorded in
+DEPLOYMENT.json. Remote dbin installation is separate from source transfer.

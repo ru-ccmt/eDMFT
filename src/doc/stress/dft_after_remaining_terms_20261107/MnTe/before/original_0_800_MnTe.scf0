@@ -1,0 +1,120 @@
+ Euler-Maclaurian Coulomb
+ Consistent 3/8+Simpson combinations at start/end
+ New Mode for Coulomb Integral
+ Extension of core to zero
+ LDM version in phi
+ Fifth-order quadrature in outwin
+ Lebedev-Laikov Grid in lapw0
+
+
+            ---------
+:ITE214:214. ITERATION
+            ---------
+
+:NATO :    3 INDEPENDENT AND    4 TOTAL ATOMS IN UNITCELL
+       SUBSTANCE: MnTe                                                        
+
+       LATTICE                      = H   
+:LAT  : LATTICE CONSTANTS=  7.83764  7.83764 12.68006
+:VOL  : UNIT CELL VOLUME =     674.56301
+:POT  : POTENTIAL OPTION EX_PBE EC_PBE VX_PBE VC_PBE
+       MODE OF CALCULATION IS       = RELA
+       NON-SPINPOLARIZED CALCULATION
+:IFFT  : FFT-parameters:   60   60  100 Factor: 2.00
+
+
+   CONVERGENCE PARAMETER FOR PSEUDOCHARGE: NCON=  9
+   MAXIMAL VALUE OF RMT(JATOM)*ABSK(NKK) : RK  =29.98137
+
+
+:VKCOUL :  VK-COUL convergence: 0.359E-07
+ Lebedev grid of          350
+ :rho_min:   2.0000000000000000E-008   1.0000000000000001E-009
+:DBG_STR_INT_COUL_JAC:   1.774096175069817E+00 F
+
+:STRESS (Ry/Bohr^3)
+:STR_DENS001:       32.243982092333     -0.000000000000     -0.000000000000
+:STR_DENS002:       -0.000000000000     32.243982092333      0.000000000000
+:STR_DENS003:       -0.000000000000      0.000000000000     32.242168072483
+
+:VCOUL001 ATOMNUMBER=  1 Mn1     VCOUL-ZERO =  0.40507E+00
+:EFG001:                        EFG         =     1.56641   *10**21  V / m**2
+                               V20  TOT/SRF=     1.35655     0.00732
+                               V22  TOT/SRF=     0.00000     0.00000
+                               V22M TOT/SRF=     0.00000     0.00000
+                               V21  TOT/SRF=     0.00000     0.00000
+                               V21M TOT/SRF=     0.00000     0.00000
+
+             -0.78321    0.00000    0.00000       -0.78321    0.00000    0.00000
+              0.00000   -0.78321    0.00000        0.00000   -0.78321    0.00000
+              0.00000    0.00000    1.56641        0.00000    0.00000    1.56641
+
+         MAIN DIRECTIONS OF THE EFG   1.0000 -0.0000  0.0000
+                                      0.0000  1.0000  0.0000
+                                      0.0000  0.0000  1.0000
+:ANG001:  ANGLE WITH OLD X-AXIS =         0.0
+
+:ETA001:                         ASYMM. ETA =     0.00000
+
+
+:VCOUL002 ATOMNUMBER=  2 Mn2     VCOUL-ZERO =  0.40507E+00
+:EFG002:                        EFG         =     1.56640   *10**21  V / m**2
+                               V20  TOT/SRF=     1.35654     0.00732
+                               V22  TOT/SRF=     0.00000     0.00000
+                               V22M TOT/SRF=     0.00000     0.00000
+                               V21  TOT/SRF=     0.00000     0.00000
+                               V21M TOT/SRF=     0.00000     0.00000
+
+             -0.78320    0.00000    0.00000       -0.78320    0.00000    0.00000
+              0.00000   -0.78320    0.00000        0.00000   -0.78320    0.00000
+              0.00000    0.00000    1.56640        0.00000    0.00000    1.56640
+
+         MAIN DIRECTIONS OF THE EFG   1.0000 -0.0000  0.0000
+                                      0.0000  1.0000  0.0000
+                                      0.0000  0.0000  1.0000
+:ANG002:  ANGLE WITH OLD X-AXIS =         0.0
+
+:ETA002:                         ASYMM. ETA =     0.00000
+
+
+:VCOUL003 ATOMNUMBER=  3 Te      VCOUL-ZERO =  0.25171E+00
+:EFG003:                        EFG         =    -0.61697   *10**21  V / m**2
+                               V20  TOT/SRF=    -0.53431    -0.00447
+                               V22  TOT/SRF=     0.00000     0.00000
+                               V22M TOT/SRF=     0.00000     0.00000
+                               V21  TOT/SRF=     0.00000     0.00000
+                               V21M TOT/SRF=     0.00000     0.00000
+
+              0.30848    0.00000    0.00000        0.30848    0.00000    0.00000
+              0.00000    0.30848    0.00000        0.00000    0.30848    0.00000
+              0.00000    0.00000   -0.61697        0.00000    0.00000   -0.61697
+
+         MAIN DIRECTIONS OF THE EFG   1.0000 -0.0000 -0.0000
+                                      0.0000  1.0000 -0.0000
+                                      0.0000  0.0000  1.0000
+:ANG003:  ANGLE WITH OLD X-AXIS =         0.0
+
+:ETA003:                         ASYMM. ETA =    -0.00000
+
+
+     HELLMANN-FEYNMAN-FORCE IN mRy/a.u. = |F|  Fx       Fy             Fz
+:FHF001:   1.ATOM      0.000000000000      0.000000000000      0.000000000000      0.000000000000
+
+     HELLMANN-FEYNMAN-FORCE IN mRy/a.u. = |F|  Fx       Fy             Fz
+:FHF002:   2.ATOM      0.000000000000      0.000000000000      0.000000000000      0.000000000000
+
+     HELLMANN-FEYNMAN-FORCE IN mRy/a.u. = |F|  Fx       Fy             Fz
+:FHF003:   3.ATOM      0.000407904700      0.000000000000      0.000000000000      0.000407904700
+
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.5359197E-02
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.5359197E-02
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.5359197E-02
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.5359197E-02
+:FIT003: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  3  0.3212196E-03
+:FIT003: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  3  0.3212196E-03
+:DEN  : DENSITY INTEGRAL  =        -12600.97571335   (Ry)
+       ELS_POTENTIAL_AT Z=0 and Z=0.5:   0.05472   0.05472
+       ELS_POTENTIAL_AT Y=0 and Y=0.5:   0.00000   0.00000
+:VZERO:v0,v0c,v0x  -0.55938   0.05472  -0.61411 v5,v5c,v5x  -0.55938   0.05472  -0.61411
+:VZERY:v0,v0c,v0x  -0.67533   0.00000  -0.67533 v5,v5c,v5x  -0.67533   0.00000  -0.67533
+:VZERX:v0,v0c,v0x  -0.89567  -0.21151  -0.68416 v5,v5c,v5x  -0.42034   0.23886  -0.65921

@@ -1,0 +1,83 @@
+--- a/SRC_lapw2/val_corr_stress.F
++++ b/SRC_lapw2/val_corr_stress.F
+@@ -670,7 +670,11 @@
+                                            !     buf_sph_val1_buf3(alpha,beta,num) = buf_sph_val1_buf3(alpha,beta,num) + & 
+                                                  gaunt1*gaunt2*conjg(c_am(alpha,t))*conjg(c_am(beta,u))*&
+                                                  conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
+-                                                 (elo(lp,jlop)-e(num))*jr3upu_22(jlo,jlop,l,lp)
++                                                 ! G2 differentiates the BRA radial function.  The integral
++                                                 ! table stores <i|r d_r|j>, so transpose BOTH
++                                                 ! LO and angular indices, while retaining the
++                                                 ! KET linearization energy elo(lp,jlop).
++                                                 (elo(lp,jlop)-e(num))*jr3upu_22(jlop,jlo,lp,l)
+                                               ENDIF
+                                            ENDDO                                           
+                                         ENDIF
+@@ -803,7 +807,9 @@
+        ! ATPAR/FORFHS writes all (m,m') replicas of one radial channel
+        ! consecutively, so comparison with the preceding record is sufficient
+        ! and avoids an O(ihmx**2) search at every k point.
+-       IF (ih.GT.1 .AND. lpv(ih-1).EQ.l .AND. lv(ih-1).EQ.lp .AND. &
++       ! Fortran .AND. need not short circuit: guard ih-1 separately.
++       IF (ih.GT.1) THEN
++       IF (lpv(ih-1).EQ.l .AND. lv(ih-1).EQ.lp .AND. &
+            llv(ih-1).EQ.llv(ih) .AND. mmv(ih-1).EQ.mmv(ih)) THEN
+           channel_diff = ABS(vpuu(ih-1)-vpuu(ih))+ &
+                          ABS(vpdd(ih-1)-vpdd(ih))+ &
+@@ -818,6 +824,7 @@
+                           ABS(wpud(ih))+ABS(wpdu(ih))
+           duplicate_radial_channel = &
+                channel_diff.LE.1.d-12*(1.d0+channel_scale)
++       ENDIF
+        ENDIF
+        IF (duplicate_radial_channel) CYCLE
+ 
+@@ -855,9 +862,14 @@
+                                IF (ABS(gaunt_couple).LT.1.d-30) CYCLE
+                                DO alpha = 1,3
+                                   DO beta = 1,3
++                                     ! This Gaunt ordering expands n_alpha*n_beta
++                                     ! on the KET side of <Y_bra|...|Y_ket>.
++                                     ! Conjugating c_am here reverses xy/yz signs.
++                                     ! The spherical block uses another ordering
++                                     ! and must NOT be changed in the same way.
+                                      radial_factor = &
+-                                          conjg(c_am(alpha,t))* &
+-                                          conjg(c_am(beta,u))*gaunt1* &
++                                          c_am(alpha,t)* &
++                                          c_am(beta,u)*gaunt1* &
+                                           gaunt_pot*gaunt_couple
+                                      radial_geom(alpha,beta) = &
+                                           radial_geom(alpha,beta)+radial_factor
+@@ -1037,7 +1049,9 @@
+        l  = lpv(ih)
+        lp = lv(ih)
+        duplicate_radial_channel = .FALSE.
+-       IF (ih.GT.1 .AND. lpv(ih-1).EQ.l .AND. lv(ih-1).EQ.lp .AND. &
++       ! Fortran .AND. need not short circuit: guard ih-1 separately.
++       IF (ih.GT.1) THEN
++       IF (lpv(ih-1).EQ.l .AND. lv(ih-1).EQ.lp .AND. &
+            llv(ih-1).EQ.llv(ih) .AND. mmv(ih-1).EQ.mmv(ih)) THEN
+           channel_diff = ABS(vpuu(ih-1)-vpuu(ih))+ &
+                          ABS(vpdd(ih-1)-vpdd(ih))+ &
+@@ -1053,6 +1067,7 @@
+           duplicate_radial_channel = &
+                channel_diff.LE.1.d-12*(1.d0+channel_scale)
+        ENDIF
++       ENDIF
+        IF (duplicate_radial_channel) CYCLE
+ 
+        DO mbra = -l,l
+@@ -1062,7 +1077,11 @@
+              index2 = lp*(lp+1)+mket+1
+              angular_geom = zeroc
+              DO v = -1,1,2
+-                IF (l+v.LT.0 .OR. l+v.GT.lmax2n) CYCLE
++                ! grad_Omega Y_l contains l+1 even for l=lmax2n.
++                ! This is an intermediate angular harmonic, not an extra
++                ! radial basis channel.  Cutting it spoils the exact zero
++                ! trace n dot grad_Omega=0, including in TRACE mode.
++                IF (l+v.LT.0) CYCLE
+                 DO t = -1,1
+                    IF (mbra+t.LT.-(l+v) .OR. &
+                        mbra+t.GT. (l+v)) CYCLE

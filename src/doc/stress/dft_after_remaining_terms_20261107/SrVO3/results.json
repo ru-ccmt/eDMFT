@@ -1,0 +1,157 @@
+{
+  "before": {
+    "diagonal_GPa": [
+      8.615402212893887,
+      8.615402212893887,
+      8.65019217231543
+    ],
+    "mean_GPa": 8.6269988660344,
+    "density_RyBohr3": [
+      [
+        14.949488763207,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        14.949488763207,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        14.949486308956
+      ]
+    ],
+    "core_RyBohr3": [
+      [
+        14.3196723002,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        14.3196723002,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        14.3196717967
+      ]
+    ]
+  },
+  "after": {
+    "diagonal_GPa": [
+      8.61713149294403,
+      8.61713149294403,
+      8.648250016376528
+    ],
+    "mean_GPa": 8.627504334088195,
+    "density_RyBohr3": [
+      [
+        14.949488880761,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        14.949488880761,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        14.949486176931
+      ]
+    ],
+    "core_RyBohr3": [
+      [
+        14.3196723002,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        14.3196723002,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        14.3196717967
+      ]
+    ]
+  },
+  "case": "SrVO3",
+  "source": "/Users/haule/projects/materials/SrVO3/DFT_center",
+  "input_hashes": {
+    "SrVO3.struct": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563",
+    "SrVO3.clmsum": "20d0c43a8f2e047107f8204bede9165a40406309efce853247f143fdd86a5cd5",
+    "SrVO3.clmup": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "SrVO3.clmdn": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "SrVO3.in0": "a5063cfa01bd56d3a41eb44304a7ef01f44e42435b8098edc1337624c101fb78",
+    "SrVO3.in1c": "45f176e2764a25a33d4976eafe043df3d55ebcb1f5ca7021a1b73721b3250aea",
+    "SrVO3.in2c": "9ac5e1940aa0c00e4309781280009241ab44b579af463419540d161224a489d5",
+    "SrVO3.inc": "251bc8a02b68d1000c2fd13645b61283a0aebdc758dd9e9e0123bd2b21d82dc7",
+    "SrVO3.inm": "727743e55e3d46ec4ec34a9284e78ed772f3c635e5bc79b085bcf043dc49eabc",
+    "SrVO3.klist": "c6939ae844372c9a9c8e45e47b220fa6b7a1aff54c42df87807006442c5d4b69",
+    "SrVO3.kgen": "304ca985c715bc11b266c76947ef618d38423fe86a1c8e5a5976bafacc27273f",
+    "SrVO3.rotlm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "SrVO3.vsp": "add80edb250060fc6f3add5a45c895fed4682c18fc9610ff0a4d300858cd9ba6",
+    "SrVO3.vns": "8c7a2e0d8ece3823a6cb95e5b26bfed1a47133f12d9b20e27d2395c2e56a679f",
+    "SrVO3.clmcor": "39bbca68821f09d6a6c3e8da2bd357a9f5d31f8f0217281ad09fac6a0f4e69bd",
+    "SrVO3.r2v": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "reference_dirs": [
+    "/Users/haule/projects/materials/SrVO3/DFT_m001",
+    "/Users/haule/projects/materials/SrVO3/DFT_center",
+    "/Users/haule/projects/materials/SrVO3/DFT_p001"
+  ],
+  "energies_Ry": [
+    -8592.40883374,
+    -8592.40820021,
+    -8592.40752198
+  ],
+  "charge_distances": [
+    5e-07,
+    0.0,
+    2e-07
+  ],
+  "Eorb_hashes": [
+    "e71de7fe271878c5e70cf17b4fd380882b049f1482b200ff4e9ba7f235ec8399",
+    "e71de7fe271878c5e70cf17b4fd380882b049f1482b200ff4e9ba7f235ec8399",
+    "e71de7fe271878c5e70cf17b4fd380882b049f1482b200ff4e9ba7f235ec8399"
+  ],
+  "volume": 382.70904,
+  "numerical_GPa": 8.403541158276836,
+  "after_minus_numeric_GPa": 0.2239631758113596,
+  "ordinary_outputs_identical": {
+    "vsp": true,
+    "vns": true,
+    "clmcor": true
+  },
+  "reference_input_hashes": [
+    {
+      "struct": "a44f84665fb00d0b8941bf4bfb64ccf517337e6da49c85175ffcdb7afae46bcf",
+      "in0": "2bee8d34243532ddadcbad51c4e68489c49188b8ade049aa78a4740b3c49d8a0",
+      "in1c": "684fb8b69725f38a5ec0db3b32341522dbaa9723aade427952f11cdb99fe49a1",
+      "in2c": "750f55b441458b3eefa30fb995bce82253b8e820cbc34546525f2a7342cfbd0c",
+      "klist": "c6939ae844372c9a9c8e45e47b220fa6b7a1aff54c42df87807006442c5d4b69"
+    },
+    {
+      "struct": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563",
+      "in0": "a5063cfa01bd56d3a41eb44304a7ef01f44e42435b8098edc1337624c101fb78",
+      "in1c": "45f176e2764a25a33d4976eafe043df3d55ebcb1f5ca7021a1b73721b3250aea",
+      "in2c": "9ac5e1940aa0c00e4309781280009241ab44b579af463419540d161224a489d5",
+      "klist": "c6939ae844372c9a9c8e45e47b220fa6b7a1aff54c42df87807006442c5d4b69"
+    },
+    {
+      "struct": "06338c0a3405ae621fc18ebdfa2c355c8e344e8832d9eddce5bc746efe092221",
+      "in0": "2bee8d34243532ddadcbad51c4e68489c49188b8ade049aa78a4740b3c49d8a0",
+      "in1c": "fde739f56114522affd0a55f9b4ba95a34f7c545de085adda80d206fd95e9db8",
+      "in2c": "61822f0e35fa6e72e58081dacaa00e5306853e3b61801c487a63823ba187c8e2",
+      "klist": "c6939ae844372c9a9c8e45e47b220fa6b7a1aff54c42df87807006442c5d4b69"
+    }
+  ]
+}

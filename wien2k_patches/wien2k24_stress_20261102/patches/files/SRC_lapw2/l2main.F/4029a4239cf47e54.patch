@@ -1,0 +1,824 @@
+--- a/SRC_lapw2/l2main.F
++++ b/SRC_lapw2/l2main.F
+@@ -56,15 +56,27 @@
+        ,aalm(3,nume,(LMAX2+1)*(LMAX2+1)) &
+        ,bblm(3,nume,(LMAX2+1)*(LMAX2+1)) &
+        ,cclm(3,nume,(LMAX2+1)*(LMAX2+1),nloat) &
+-       ,tuu(ngau),tdd(ngau),tud(ngau),tdu(ngau)
++       ,tuu(ngau),tdd(ngau),tud(ngau),tdu(ngau) &
++       ,wuu(ngau),wdd(ngau),wud(ngau),wdu(ngau) &
++       ,vpuu(ngau),vpdd(ngau),vpud(ngau),vpdu(ngau) &
++       ,wpuu(ngau),wpdd(ngau),wpud(ngau),wpdu(ngau)
+   COMPLEX*16               :: aalm_buf(3,nume,(LMAX2+1)*(LMAX2+1)) &
+        ,bblm_buf(3,nume,(LMAX2+1)*(LMAX2+1))
+   complex*16, allocatable :: ablm_buf_tmp(:,:,:) &
+-       ,tuu12(:,:),tuu21(:,:),tuu22(:,:,:),tud21(:,:),tdu12(:,:)
+-  integer     lv(ngau),lpv(ngau),mv(ngau),mpv(ngau)
++       ,tuu12(:,:),tuu21(:,:),tuu22(:,:,:),tud21(:,:),tdu12(:,:) &
++       ,wuu12(:,:),wuu21(:,:),wuu22(:,:,:),wud21(:,:),wdu12(:,:)
++  complex*16, allocatable :: vpuu12(:,:),vpuu21(:,:),vpuu22(:,:,:), &
++       vpud21(:,:),vpdu12(:,:),wpuu12(:,:),wpuu21(:,:),wpuu22(:,:,:), &
++       wpud21(:,:),wpdu12(:,:)
++  integer     lv(ngau),lpv(ngau),llv(ngau),mv(ngau),mpv(ngau),mmv(ngau)
+   logical, allocatable   :: forcea(:,:)
+   logical, allocatable   :: forcea_buf(:,:)
+-  logical     force,forout,forb_log1
++  logical     force,forout,forb_log1,g2_diag_enabled,g2_terms_enabled
++  integer     g2_diag_status,g2_mode_status,g2_legacy_status
++  character(len=32) :: g2_diag_env,g2_mode_env,g2_legacy_env
++  integer     g2_bad_count
++  real*8      g2_gnt,g2_record_err,g2_record_scale, &
++              g2_record_max,g2_record_max_lo
+   REAL*8                   :: vRHOLM(NRAD,NCOM),tc_buf(nrad),vtc_buf(nrad)
+   REAL*8                   :: s12(nloat),se12(nloat),s21(nloat),se21(nloat)
+   REAL*8                   :: s22(nloat,nloat)
+@@ -131,16 +143,61 @@
+ 
+ ! --The variables are defined to use for the stress tensor calculations
+ !======================================================================   
+-   complex*16, allocatable  :: buf_sph_val_fin(:,:,:), F_buf_total(:,:,:), buf_APW_surf(:,:,:)
++   complex*16, allocatable  :: buf_sph_val_fin(:,:,:), &
++                               buf_sph_val_parts(:,:,:,:),buf_nsp_match(:,:,:), &
++                               buf_nsp_radial(:,:,:),buf_nsp_angular(:,:,:), &
++                               buf_nsp_radial_parts(:,:,:,:), &
++                               buf_nsp_radial_direct(:),buf_nsp_radial_phase(:), &
++                               buf_nsp_v_direct(:),buf_nsp_v_parts(:,:), &
++                               F_buf_total(:,:,:),buf_APW_surf(:,:,:), &
++                               buf_rela_corr(:,:,:),buf_rela_sr(:,:,:), &
++                               buf_rela_old(:,:,:),buf_rela_surf(:,:,:), &
++                               buf_rmt_shape(:,:,:),buf_rmt_operator(:,:,:), &
++                               F_buf_parts(:,:,:,:)
+    real*8,     allocatable  :: buf_sum1p(:,:), F_total(:,:)
+-   real*8,     allocatable  :: buf_sum2p(:,:), val_sph_sum(:,:)
++   real*8,     allocatable  :: buf_sum2p(:,:), val_sph_sum(:,:), &
++                               buf_sum2p_parts(:,:,:),val_sph_parts_sum(:,:,:)
++   real*8,     allocatable  :: buf_sum_match(:,:), val_nsp_match_sum(:,:), &
++                               buf_sum_radial(:,:),val_nsp_radial_sum(:,:), &
++                               buf_sum_angular(:,:),val_nsp_angular_sum(:,:)
++   real*8,     allocatable  :: buf_sum_radial_parts(:,:,:), &
++                               val_nsp_radial_parts_sum(:,:,:)
++   real*8,     allocatable  :: val_nsp_match_atom(:,:,:), &
++                               val_nsp_radial_atom(:,:,:), &
++                               val_nsp_angular_atom(:,:,:)
++   real*8,     allocatable  :: buf_sum_parts(:,:,:), F_total_parts(:,:,:)
++   real*8                   :: g2_radial_direct_trace_sum, &
++                               g2_radial_phase_trace_sum, &
++                               g2_v_direct_sum,g2_v_parts_sum(4)
++   real*8,     allocatable  :: g2_v_atom_parts(:,:)
+    !extra surface to the APW+lo method
+    real*8                   :: buf_sum3p(1:3,1:3)
+-   real*8                   :: F_total_APW(1:3,1:3)   
+-   complex*16, allocatable  :: A_surf2(:,:),CAPD0LM_BUF(:,:), CAPD1LM_BUF(:,:)
++   real*8                   :: F_total_APW(1:3,1:3)
++   ! Candidate Reynolds/Hadamard boundary correction needed when the
++   ! numerical strain keeps muffin-tin radii fixed in Bohr.  It is kept
++   ! separate so the historical production stress is unchanged unless the
++   ! explicit diagnostic switch is enabled.
++   real*8                   :: buf_sum_rmt_shape(1:3,1:3)
++   real*8                   :: rmt_shape_total(1:3,1:3)
++   real*8                   :: buf_sum_rmt_operator(1:3,1:3)
++   real*8                   :: rmt_operator_total(1:3,1:3)
++   ! Scalar-relativistic kinetic correction.  Keep the Koelling-Harmon
++   ! result and the historical large+small p.p baseline separately so the
++   ! correction can be audited in every test calculation.
++   real*8                   :: buf_sum_rela_corr(1:3,1:3), &
++                               buf_sum_rela_sr(1:3,1:3), &
++                               buf_sum_rela_old(1:3,1:3), &
++                               buf_sum_rela_surf(1:3,1:3)
++   real*8                   :: rela_corr_total(1:3,1:3), &
++                               rela_sr_total(1:3,1:3), &
++                               rela_old_total(1:3,1:3), &
++                               rela_surf_total(1:3,1:3)
++   complex*16, allocatable  :: A_surf2(:,:),T_surf2(:,:), &
++                               CAPD0LM_BUF(:,:), CAPD1LM_BUF(:,:)
+    real*8                   :: h_bl_sr(iblock), bkrloc_st(3,iblock)   
+    
+    complex*16               :: h_surf2((LMAX2+1)*(LMAX2+1),iblock), &
++                               h_tsurf2((LMAX2+1)*(LMAX2+1),iblock), &
+                                dl0ab_buf( (lmax2+1)*(lmax2+1), iblock ), &
+                                dl1ab_buf( (lmax2+1)*(lmax2+1), iblock )
+                                
+@@ -162,7 +219,10 @@
+    integer, allocatable     :: Xxx(:),Yyy(:),Zzz(:)
+    complex*16               :: pcfac   
+    real*8                   :: time_cal_D, tim_tmp1_D,tim_tmp2_D, time_kin_int, &
+-                               time_kin_rmt, time_apw_srf, time_val_corr
++                               time_kin_rmt, time_kin_rmt_nr, time_kin_rmt_rela, &
++                               time_kin_rmt_nr_w, time_kin_rmt_rela_w, &
++                               tim_tmp1_w, tim_tmp2_w, &
++                               time_apw_srf, time_val_corr
+ ! end stress     
+ 
+   allocate (jatu_eece(nat),latu_eece(nat))
+@@ -203,6 +263,12 @@
+   allocate (forcea_buf(0:3,nat))
+   allocate(tuu12(nloat,ngau),tuu21(nloat,ngau),tud21(nloat,ngau), &
+        tdu12(nloat,ngau),tuu22(nloat,nloat,ngau))
++  allocate(wuu12(nloat,ngau),wuu21(nloat,ngau),wud21(nloat,ngau), &
++       wdu12(nloat,ngau),wuu22(nloat,nloat,ngau))
++  allocate(vpuu12(nloat,ngau),vpuu21(nloat,ngau),vpud21(nloat,ngau), &
++       vpdu12(nloat,ngau),vpuu22(nloat,nloat,ngau))
++  allocate(wpuu12(nloat,ngau),wpuu21(nloat,ngau),wpud21(nloat,ngau), &
++       wpdu12(nloat,ngau),wpuu22(nloat,nloat,ngau))
+ 
+ ! allocate arrays for tau
+   if (tau_write) then
+@@ -246,6 +312,46 @@
+ !   if(modus.eq.'FOR ') force=.true.
+     
+   STRESS = .FALSE. !.TRUE.!   ! here the switch for the stress is added and it reads from case.in2
++  g2_diag_env = ''
++  call get_environment_variable('WIEN_STRESS_G2_DIAG',g2_diag_env, &
++                                status=g2_diag_status)
++  g2_diag_enabled = g2_diag_status.eq.0 .and. &
++                    len_trim(g2_diag_env).gt.0 .and. &
++                    trim(g2_diag_env).ne.'0'
++  ! The independently validated hydrostatic TRACE of the nonspherical G2
++  ! terms is the production default.  It requires the extended force-file
++  ! records even when no diagnostic output was requested.  The environment
++  ! variable may still select NONE as an exact rollback to historical
++  ! WIEN2k behavior, or one of the component modes for diagnostics.
++  g2_terms_enabled = .true.
++  g2_mode_env = ''
++  call get_environment_variable('WIEN_STRESS_G2_MODE',g2_mode_env, &
++                                status=g2_mode_status)
++  if(g2_mode_status.eq.0 .and. len_trim(g2_mode_env).gt.0) then
++     select case(trim(adjustl(g2_mode_env)))
++     case('MATCH','match','RADIAL','radial','ANGULAR','angular', &
++          'TRACE','trace','AFFINE','affine','FULL','full')
++        g2_terms_enabled = .true.
++     case('NONE','none','0')
++        ! Exact rollback: old case.nsh files contain only the historical
++        ! record prefix, so NONE must also select the historical reader.
++        g2_terms_enabled = .false.
++     case default
++        ! symmetrization_stress prints the detailed error.  Enable the
++        ! extended read here so both parsers fail consistently rather than
++        ! first misreading a new record with the historical layout.
++        g2_terms_enabled = .true.
++     end select
++  else
++     ! With no explicit modern mode, retain TRACE as the default.  The first
++     ! experimental switch remains a compatibility request for all three
++     ! diagnostic tensor components; its absence must not disable TRACE.
++     g2_legacy_env = ''
++     call get_environment_variable('WIEN_STRESS_G2_MATCH',g2_legacy_env, &
++                                   status=g2_legacy_status)
++     if(g2_legacy_status.eq.0 .and. len_trim(g2_legacy_env).gt.0 .and. &
++        trim(g2_legacy_env).eq.'0') g2_terms_enabled = .true.
++  endif
+   if(modus.eq.'FOR ') then
+         force=.true.
+   elseif(modus .eq. 'STRF') then
+@@ -421,25 +527,91 @@
+ !--allocating arrays for stress 
+    If( stress ) then                   
+       allocate( F_buf_total(1:3,1:3,nume) )
++      allocate( F_buf_parts(1:3,1:3,nume,4) )
++      allocate( buf_rela_corr(1:3,1:3,nume), &
++                buf_rela_sr(1:3,1:3,nume), &
++                buf_rela_old(1:3,1:3,nume), &
++                buf_rela_surf(1:3,1:3,nume) )
+       allocate( buf_sum1p(1:3,1:3),F_total(1:3,1:3) )      
++      allocate( buf_sum_parts(1:3,1:3,4),F_total_parts(1:3,1:3,4) )
+       
+       allocate( buf_sph_val_fin(1:3,1:3,nume) )
++      allocate( buf_sph_val_parts(1:3,1:3,nume,3) )
+       allocate( buf_sum2p(1:3,1:3), val_sph_sum(1:3,1:3) )
++      allocate( buf_sum2p_parts(1:3,1:3,3), &
++                val_sph_parts_sum(1:3,1:3,3) )
++      allocate( buf_nsp_match(1:3,1:3,nume) )
++      allocate( buf_sum_match(1:3,1:3),val_nsp_match_sum(1:3,1:3) )
++      allocate( buf_nsp_angular(1:3,1:3,nume) )
++      allocate( buf_sum_angular(1:3,1:3),val_nsp_angular_sum(1:3,1:3) )
++      allocate( buf_nsp_radial(1:3,1:3,nume) )
++      allocate( buf_sum_radial(1:3,1:3),val_nsp_radial_sum(1:3,1:3) )
++      allocate( buf_nsp_radial_parts(1:3,1:3,nume,4) )
++      allocate( buf_nsp_radial_direct(nume) )
++      allocate( buf_nsp_radial_phase(nume) )
++      allocate( buf_nsp_v_direct(nume) )
++      allocate( buf_nsp_v_parts(nume,4) )
++      allocate( buf_sum_radial_parts(1:3,1:3,4), &
++                val_nsp_radial_parts_sum(1:3,1:3,4) )
++      allocate( val_nsp_match_atom(1:3,1:3,nat), &
++                val_nsp_radial_atom(1:3,1:3,nat), &
++                val_nsp_angular_atom(1:3,1:3,nat) )
++      allocate( g2_v_atom_parts(4,nat) )
+       
+       allocate( buf_APW_surf(1:3,1:3,nume) )      
++      allocate( buf_rmt_shape(1:3,1:3,nume) )
++      allocate( buf_rmt_operator(1:3,1:3,nume) )
+       ALLOCATE(A_surf2((lmax2+1)*(lmax2+1),nume))       
++      ALLOCATE(T_surf2((lmax2+1)*(lmax2+1),nume))
+       
+       ALLOCATE( CAPD0LM_BUF((lmax2+1)*(lmax2+1),nume) )
+       ALLOCATE( CAPD1LM_BUF((lmax2+1)*(lmax2+1),nume) )
+       
+       F_buf_total     = zeroc
++      F_buf_parts     = zeroc
++      buf_rela_corr   = zeroc
++      buf_rela_sr     = zeroc
++      buf_rela_old    = zeroc
++      buf_rela_surf   = zeroc
+       F_total         = zero
++      F_total_parts   = zero
++      rela_corr_total = zero
++      rela_sr_total   = zero
++      rela_old_total  = zero
++      rela_surf_total = zero
+             
+       buf_sph_val_fin = zeroc
++      buf_sph_val_parts = zeroc
+       val_sph_sum     = zero
++      val_sph_parts_sum = zero
++      buf_nsp_match   = zeroc
++      val_nsp_match_sum = zero
++      buf_nsp_angular = zeroc
++      val_nsp_angular_sum = zero
++      buf_nsp_radial = zeroc
++      val_nsp_radial_sum = zero
++      buf_nsp_radial_parts = zeroc
++      buf_nsp_radial_direct = zeroc
++      buf_nsp_radial_phase = zeroc
++      buf_nsp_v_direct = zeroc
++      buf_nsp_v_parts = zeroc
++      buf_sum_radial_parts = zero
++      val_nsp_radial_parts_sum = zero
++      val_nsp_match_atom = zero
++      val_nsp_radial_atom = zero
++      val_nsp_angular_atom = zero
++      g2_radial_direct_trace_sum = zero
++      g2_radial_phase_trace_sum = zero
++      g2_v_direct_sum = zero
++      g2_v_parts_sum = zero
++      g2_v_atom_parts = zero
+       
+       buf_APW_surf    = zeroc
+       F_total_APW     = zero
++      buf_rmt_shape   = zeroc
++      rmt_shape_total = zero
++      buf_rmt_operator = zeroc
++      rmt_operator_total = zero
+       
+       time_cal_D = zero
+       tim_tmp1_D = zero
+@@ -447,6 +619,10 @@
+       
+       time_kin_int = zero
+       time_kin_rmt = zero
++      time_kin_rmt_nr = zero
++      time_kin_rmt_rela = zero
++      time_kin_rmt_nr_w = zero
++      time_kin_rmt_rela_w = zero
+       time_apw_srf = zero
+       time_val_corr = zero
+    Endif    
+@@ -696,21 +872,50 @@
+ 
+ !bk   93/09/07: read from tape70,71
+ !     2. tape71 --> non-spherical matrixelements for [yu91]-force
+-     if (force) then
++     ! The nonspherical part of the valence-correction stress reuses the
++     ! matrix elements written by LAPW1 for forces, so stress-only mode needs
++     ! to read unit 2/71 as well.  FOMAI1 itself remains guarded by FORCE.
++     if (force.or.stress) then
+         do
+            read(2) ja
+            if (ja.gt.jatom) goto 900
+            DO ih=1,ngau
+-              read(2,end=669)  &
+-                   lpv(ih),ll,lv(ih),mpv(ih),mm,mv(ih), &
+-                   tuu(ih),tdd(ih),tud(ih),tdu(ih)
+-              if (ll.eq.0) goto 669
++              if(g2_terms_enabled) then
++                 read(2,end=669)  &
++                      lpv(ih),llv(ih),lv(ih),mpv(ih),mmv(ih),mv(ih), &
++                      tuu(ih),tdd(ih),tud(ih),tdu(ih), &
++                      wuu(ih),wdd(ih),wud(ih),wdu(ih), &
++                      vpuu(ih),vpdd(ih),vpud(ih),vpdu(ih), &
++                      wpuu(ih),wpdd(ih),wpud(ih),wpdu(ih)
++              else
++                 ! Read the historical prefix only.  This accepts both old
++                 ! force files and new records with appended G2 diagnostics.
++                 read(2,end=669)  &
++                      lpv(ih),llv(ih),lv(ih),mpv(ih),mmv(ih),mv(ih), &
++                      tuu(ih),tdd(ih),tud(ih),tdu(ih)
++              endif
++              if (llv(ih).eq.0) goto 669
+               IF ((LPV(IH) .LE. LOMAX).OR.(LV(IH) .LE. LOMAX)) then 
+-               read(2) (tuu21(i,ih),i=1,nloat)
+-               read(2) (tuu12(i,ih),i=1,nloat)
+-               read(2) (tud21(i,ih),i=1,nloat)
+-               read(2) (tdu12(i,ih),i=1,nloat)
+-               read(2) ((tuu22(i,j,ih),i=1,nloat),j=1,nloat)
++               if(g2_terms_enabled) then
++                  read(2) (tuu21(i,ih),i=1,nloat),(wuu21(i,ih),i=1,nloat), &
++                          (vpuu21(i,ih),i=1,nloat),(wpuu21(i,ih),i=1,nloat)
++                  read(2) (tuu12(i,ih),i=1,nloat),(wuu12(i,ih),i=1,nloat), &
++                          (vpuu12(i,ih),i=1,nloat),(wpuu12(i,ih),i=1,nloat)
++                  read(2) (tud21(i,ih),i=1,nloat),(wud21(i,ih),i=1,nloat), &
++                          (vpud21(i,ih),i=1,nloat),(wpud21(i,ih),i=1,nloat)
++                  read(2) (tdu12(i,ih),i=1,nloat),(wdu12(i,ih),i=1,nloat), &
++                          (vpdu12(i,ih),i=1,nloat),(wpdu12(i,ih),i=1,nloat)
++                  read(2) ((tuu22(i,j,ih),i=1,nloat),j=1,nloat), &
++                          ((wuu22(i,j,ih),i=1,nloat),j=1,nloat), &
++                          ((vpuu22(i,j,ih),i=1,nloat),j=1,nloat), &
++                          ((wpuu22(i,j,ih),i=1,nloat),j=1,nloat)
++               else
++                  read(2) (tuu21(i,ih),i=1,nloat)
++                  read(2) (tuu12(i,ih),i=1,nloat)
++                  read(2) (tud21(i,ih),i=1,nloat)
++                  read(2) (tdu12(i,ih),i=1,nloat)
++                  read(2) ((tuu22(i,j,ih),i=1,nloat),j=1,nloat)
++               endif
+ 
+               ELSE
+                  tuu21(:,ih)=(0.0d0,0.0d0)
+@@ -718,10 +923,77 @@
+                  tuu22(:,:,ih)=(0.0d0,0.0d0)
+                  tud21(:,ih)=(0.0d0,0.0d0)
+                  tdu12(:,ih)=(0.0d0,0.0d0)
++                 wuu21(:,ih)=(0.0d0,0.0d0)
++                 wuu12(:,ih)=(0.0d0,0.0d0)
++                 wuu22(:,:,ih)=(0.0d0,0.0d0)
++                 wud21(:,ih)=(0.0d0,0.0d0)
++                 wdu12(:,ih)=(0.0d0,0.0d0)
++                 vpuu21(:,ih)=(0.0d0,0.0d0); vpuu12(:,ih)=(0.0d0,0.0d0)
++                 vpuu22(:,:,ih)=(0.0d0,0.0d0)
++                 vpud21(:,ih)=(0.0d0,0.0d0); vpdu12(:,ih)=(0.0d0,0.0d0)
++                 wpuu21(:,ih)=(0.0d0,0.0d0); wpuu12(:,ih)=(0.0d0,0.0d0)
++                 wpuu22(:,:,ih)=(0.0d0,0.0d0)
++                 wpud21(:,ih)=(0.0d0,0.0d0); wpdu12(:,ih)=(0.0d0,0.0d0)
+               ENDIF
+            ENDDO
+            goto 910
+ 669        ihmx=ih-1
++          ! Verify the force-file representation before any stress algebra.
++          ! Every historical matrix WUU=GFAC*WNS must be reproduced by
++          ! GAUNT*(HPHASE*WNS).  A failure here means that the appended
++          ! phase-weighted radial data do not encode the same lattice/cubic
++          ! harmonic as the force matrix and cannot safely be recoupled.
++          if (g2_diag_enabled.and.myid.eq.0.and.ja.eq.jatom) then
++             g2_bad_count=0
++             g2_record_max=0.d0
++             g2_record_max_lo=0.d0
++             do i=1,ihmx
++                g2_gnt=GAUNT(lpv(i),llv(i),lv(i), &
++                             mpv(i),mmv(i),mv(i))
++                g2_record_err=maxval((/ &
++                     abs(wuu(i)-g2_gnt*wpuu(i)), &
++                     abs(wdd(i)-g2_gnt*wpdd(i)), &
++                     abs(wud(i)-g2_gnt*wpud(i)), &
++                     abs(wdu(i)-g2_gnt*wpdu(i)) /))
++                g2_record_scale=maxval((/ &
++                     abs(wuu(i)),abs(wdd(i)),abs(wud(i)),abs(wdu(i)), &
++                     abs(g2_gnt*wpuu(i)),abs(g2_gnt*wpdd(i)), &
++                     abs(g2_gnt*wpud(i)),abs(g2_gnt*wpdu(i)) /))
++                if (g2_record_err.gt.g2_record_max) &
++                     g2_record_max=g2_record_err
++                if (g2_record_err.gt.1.d-12*(1.d0+g2_record_scale)) then
++                   g2_bad_count=g2_bad_count+1
++                   if (g2_bad_count.le.40) write(21,*) &
++                        ':DBG_STR_G2_RECORD:',ja,i,lpv(i),llv(i),lv(i), &
++                        mpv(i),mmv(i),mv(i),g2_gnt,wuu(i), &
++                        g2_gnt*wpuu(i),g2_record_err
++                endif
++                if ((lpv(i).le.lomax).or.(lv(i).le.lomax)) then
++                   g2_record_err=maxval(abs( &
++                        wuu21(:,i)-g2_gnt*wpuu21(:,i)))
++                   if (g2_record_err.gt.g2_record_max_lo) &
++                        g2_record_max_lo=g2_record_err
++                   g2_record_err=maxval(abs( &
++                        wuu12(:,i)-g2_gnt*wpuu12(:,i)))
++                   if (g2_record_err.gt.g2_record_max_lo) &
++                        g2_record_max_lo=g2_record_err
++                   g2_record_err=maxval(abs( &
++                        wuu22(:,:,i)-g2_gnt*wpuu22(:,:,i)))
++                   if (g2_record_err.gt.g2_record_max_lo) &
++                        g2_record_max_lo=g2_record_err
++                   g2_record_err=maxval(abs( &
++                        wud21(:,i)-g2_gnt*wpud21(:,i)))
++                   if (g2_record_err.gt.g2_record_max_lo) &
++                        g2_record_max_lo=g2_record_err
++                   g2_record_err=maxval(abs( &
++                        wdu12(:,i)-g2_gnt*wpdu12(:,i)))
++                   if (g2_record_err.gt.g2_record_max_lo) &
++                        g2_record_max_lo=g2_record_err
++                endif
++             enddo
++             write(21,*) ':DBG_STR_G2_RECORD_SUM:',ja,ihmx,g2_bad_count, &
++                          g2_record_max,g2_record_max_lo
++          endif
+           if( (myid.eq.0) .and. ( (RESTRICT_OUTPUT .ne. 1) .or. (NAT .le. 5)))  &
+            write(6,*) 'NGAU for Atom',ja,ihmx
+            if (ja.eq.jatom) exit
+@@ -889,6 +1161,7 @@
+         
+         IF(STRESS) THEN
+            A_surf2(1:(lmax2+1)*(lmax2+1),nemin:nemax)=zeroc  !Kamal stress
++           T_surf2(1:(lmax2+1)*(lmax2+1),nemin:nemax)=zeroc
+            CAPD0LM_BUF(1:(lmax2+1)*(lmax2+1),nemin:nemax)=zeroc  
+            CAPD1LM_BUF(1:(lmax2+1)*(lmax2+1),nemin:nemax)=zeroc 
+            h_yl1 = zeroc 
+@@ -957,15 +1230,22 @@
+               argt=(argt+arg1+arg2+arg3)*twopi
+               phshel=dcmplx(dcos(argt),dsin(argt))
+ !             phshel=EXP( imag*(arg1+arg2+arg3+argt) )
+-!             index=0
+-!             DO  l=0,lmx
+-!                maxx=2*l+1
+-!                DO  m=1,maxx
+-!                   index=index+1
+-!                   h_yl(index,i3)=dCONJG(yl(index))*phshel
+-                    h_yl(1:LMX_tmp,i3)=dCONJG(yl(1:lmx_tmp))*phshel
+-!                ENDDO
+-!             ENDDO
++!             Keep this as an explicit scalar loop.  With gfortran 15.2 at
++!             -O2, tree vectorization of the equivalent array expression
++!             h_yl(1:LMX_tmp,i3)=dCONJG(yl(1:lmx_tmp))*phshel produced
++!             incorrect muffin-tin projections in both real and complex
++!             LAPW2.  The scalar form is portable and has negligible cost
++!             compared with the following BLAS matrix multiplications.
++              index=0
++              DO l=0,lmx
++                 maxx=2*l+1
++!GCC$ novector
++!DIR$ NOVECTOR
++                 DO m=1,maxx
++                    index=index+1
++                    h_yl(index,i3)=dCONJG(yl(index))*phshel
++                 ENDDO
++              ENDDO
+ 
+               IF(STRESS) THEN
+                 CALL YLM (bkrloc,lmax2+1,yl1)
+@@ -1008,6 +1288,14 @@
+                     h_blyl(index,i3)=h_bl(i3)*h_yl(index,i3)
+                                             
+                     h_surf2(index,i3) = h_bl_sr(i3)*h_yl(index,i3)                                             
++                    ! Angular coefficient of T=-nabla^2 acting on the
++                    ! interstitial plane wave.  Building it from the same
++                    ! matching combination avoids normalization or phase
++                    ! ambiguities in the operator-discontinuity diagnostic.
++                    h_tsurf2(index,i3) = &
++                         (bkrloc_st(1,i3)**2+bkrloc_st(2,i3)**2+ &
++                          bkrloc_st(3,i3)**2)* &
++                         (h_alyl(index,i3)*P(l)+h_blyl(index,i3)*PE(l))
+                  ENDDO
+               ENDDO
+            ENDDO
+@@ -1120,6 +1408,12 @@
+ 
+ !_COMPLEX           CALL zgemm('N','N',index,nemax-nemin+1,ibb,(1.d0,0.d0), &
+ !_COMPLEX            h_surf2,lda,a(ii,nemin),ldb,(1.d0,0.d0),A_surf2(1,nemin),ldc)
++
++!_REAL           CALL dgemm('N','N',2*index,nemax-nemin+1,ibb,1.d0, &
++!_REAL            h_tsurf2,lda,a(ii,nemin),ldb,1.d0,T_surf2(1,nemin),ldc)
++
++!_COMPLEX           CALL zgemm('N','N',index,nemax-nemin+1,ibb,(1.d0,0.d0), &
++!_COMPLEX            h_tsurf2,lda,a(ii,nemin),ldb,(1.d0,0.d0),T_surf2(1,nemin),ldc)
+                 call cputim(tim_tmp2)
+                 time_dgemm=time_dgemm+(tim_tmp2-tim_tmp1)
+              ENDIF   
+@@ -1230,6 +1524,7 @@
+                  blm(index,num)=blm(index,num)*cfac
+                  IF(STRESS) THEN
+                   A_surf2(index,num) = A_surf2(index,num)*cfac
++                  T_surf2(index,num) = T_surf2(index,num)*cfac
+ !                   CAPD0LM(1:3,1:3,index,num) = CAPD0LM(1:3,1:3,index,num)!*cfac
+ !                   CAPD1LM(1:3,1:3,index,num) = CAPD1LM(1:3,1:3,index,num)!*cfac
+                  ENDIF 
+@@ -1946,45 +2241,208 @@
+ !      !================The valence part of the stress tensor===================
+      IF( stress ) THEN
+         call cputim(tim_tmp1_D)
+-        CALL val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,RMT(jatom))        
++        call walltim(tim_tmp1_w)
++        CALL val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,F_buf_parts,RMT(jatom))        
+         call cputim(tim_tmp2_D)
+-        time_kin_rmt = time_kin_rmt + (tim_tmp2_D-tim_tmp1_D)
++        call walltim(tim_tmp2_w)
++        time_kin_rmt_nr = time_kin_rmt_nr + (tim_tmp2_D-tim_tmp1_D)
++        time_kin_rmt_nr_w = time_kin_rmt_nr_w + (tim_tmp2_w-tim_tmp1_w)
++
++        ! CALC=RELA needs the metric derivative of the Koelling-Harmon
++        ! operator, not the nonrelativistic p_alpha p_beta operator acting
++        ! on a relativistically normalized spinor.  The new routine returns
++        ! Q_SR-Q_old and both operands independently.  It is a no-op in NREL.
++        call cputim(tim_tmp1_D)
++        call walltim(tim_tmp1_w)
++        CALL val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
++                               buf_rela_corr,buf_rela_sr,buf_rela_old, &
++                               buf_rela_surf)
++        call cputim(tim_tmp2_D)
++        call walltim(tim_tmp2_w)
++        time_kin_rmt_rela = time_kin_rmt_rela + (tim_tmp2_D-tim_tmp1_D)
++        time_kin_rmt_rela_w = time_kin_rmt_rela_w + (tim_tmp2_w-tim_tmp1_w)
++        time_kin_rmt = time_kin_rmt_nr + time_kin_rmt_rela
+         
+         call cputim(tim_tmp1_D)
+-        call stress_APW_surface(nemin,nemax,jatom,rmt(jatom),ALM,BLM,CLM,A_surf2,buf_APW_surf)
++        call stress_APW_surface(nemin,nemax,jatom,rmt(jatom),ALM,BLM,CLM, &
++                                A_surf2,T_surf2,buf_APW_surf,buf_rmt_shape, &
++                                buf_rmt_operator)
+         call cputim(tim_tmp2_D)
+         time_apw_srf = time_apw_srf + (tim_tmp2_D-tim_tmp1_D)
+ !         
+           call cputim(tim_tmp1_D)
+-        call val_corr_stress(isize,ibpp_max,ibb,nemin,nemax,ALM,BLM,CLM,buf_sph_val_fin,jatom, rmt(jatom), &
+-                   latom, lfirst)               
++        call val_corr_stress(isize,ibpp_max,ibb,nemin,nemax,ALM,BLM,CLM, &
++                   buf_sph_val_fin,buf_sph_val_parts, &
++                   buf_nsp_match,buf_nsp_radial,buf_nsp_angular, &
++                   buf_nsp_radial_parts,buf_nsp_radial_direct, &
++                   buf_nsp_radial_phase,buf_nsp_v_direct,buf_nsp_v_parts, &
++                   jatom,rmt(jatom),latom,lfirst, &
++                   ihmx,tuu,tdd,tud,tdu,wuu,wdd,wud,wdu, &
++                   vpuu,vpdd,vpud,vpdu,wpuu,wpdd,wpud,wpdu, &
++                   tuu12,tuu21,tuu22,tud21,tdu12, &
++                   wuu12,wuu21,wuu22,wud21,wdu12, &
++                   vpuu12,vpuu21,vpuu22,vpud21,vpdu12, &
++                   wpuu12,wpuu21,wpuu22,wpud21,wpdu12, &
++                   lv,lpv,llv,mv,mpv,mmv,g2_terms_enabled)
+ !           call val_corr_stress(isize,ibpp_max,ibb,nemin,nemax,ALM,BLM,CLM,CAPD0LM,CAPD1LM,buf_sph_val_fin,jatom, rmt(jatom), &
+ !                    latom, lfirst)        
+           call cputim(tim_tmp2_D)         
+          time_val_corr = time_val_corr + (tim_tmp2_D-tim_tmp1_D) 
+ !                    
+-        buf_sum1p = zero; buf_sum2p = zero; buf_sum3p = zero  
++        buf_sum1p = zero; buf_sum2p = zero; buf_sum3p = zero
++        buf_sum_rmt_shape = zero
++        buf_sum_rmt_operator = zero
++        buf_sum_rela_corr = zero
++        buf_sum_rela_sr = zero
++        buf_sum_rela_old = zero
++        buf_sum_rela_surf = zero
++        buf_sum_parts = zero
++        buf_sum2p_parts = zero
++        buf_sum_match = zero
++        buf_sum_radial = zero
++        buf_sum_radial_parts = zero
++        buf_sum_angular = zero
+         DO num = nemin, nemax
+            DO ibeta = 1, 3
+               DO ialpha = 1, 3
+                  buf_sum1p(ialpha,ibeta) = buf_sum1p(ialpha,ibeta) -2.d0*&
+                                                 weight(num)*REAL(F_buf_total(ialpha,ibeta,num))                 
++                 DO ipart = 1,4
++                    buf_sum_parts(ialpha,ibeta,ipart) = &
++                         buf_sum_parts(ialpha,ibeta,ipart) - 2.d0*weight(num)* &
++                         REAL(F_buf_parts(ialpha,ibeta,num,ipart))
++                 ENDDO
+                  buf_sum2p(ialpha,ibeta) = buf_sum2p(ialpha,ibeta) - &
+                                          2.D0*weight(num)*REAL(buf_sph_val_fin(ialpha,ibeta,num))
++                 DO ipart=1,3
++                    buf_sum2p_parts(ialpha,ibeta,ipart) = &
++                         buf_sum2p_parts(ialpha,ibeta,ipart) - &
++                         2.D0*weight(num)* &
++                         REAL(buf_sph_val_parts(ialpha,ibeta,num,ipart))
++                 ENDDO
++                 buf_sum_match(ialpha,ibeta) = buf_sum_match(ialpha,ibeta) - &
++                                         2.D0*weight(num)*REAL(buf_nsp_match(ialpha,ibeta,num))
++                 buf_sum_angular(ialpha,ibeta) = buf_sum_angular(ialpha,ibeta) - &
++                                         2.D0*weight(num)*REAL(buf_nsp_angular(ialpha,ibeta,num))
++                 buf_sum_radial(ialpha,ibeta) = buf_sum_radial(ialpha,ibeta) - &
++                                         2.D0*weight(num)*REAL(buf_nsp_radial(ialpha,ibeta,num))
++                 DO ipart=1,4
++                    buf_sum_radial_parts(ialpha,ibeta,ipart) = &
++                         buf_sum_radial_parts(ialpha,ibeta,ipart) - &
++                         2.D0*weight(num)* &
++                         REAL(buf_nsp_radial_parts(ialpha,ibeta,num,ipart))
++                 ENDDO
+                  buf_sum3p(ialpha,ibeta) = buf_sum3p(ialpha,ibeta) + 2.d0*&
+                              weight(num)*REAL( buf_APW_surf(ialpha,ibeta,num) )                        
++                 ! buf_rmt_shape is already written with the physical
++                 ! fixed-RMT-minus-affine sign.  Do not fold it into one of
++                 ! the older valence terms: retaining it independently is
++                 ! what makes the convention test reversible and auditable.
++                 buf_sum_rmt_shape(ialpha,ibeta) = &
++                      buf_sum_rmt_shape(ialpha,ibeta) + 2.d0*weight(num)* &
++                      REAL(buf_rmt_shape(ialpha,ibeta,num))
++                 buf_sum_rmt_operator(ialpha,ibeta) = &
++                      buf_sum_rmt_operator(ialpha,ibeta) + &
++                      2.d0*weight(num)* &
++                      REAL(buf_rmt_operator(ialpha,ibeta,num))
++                 ! A strain derivative supplies a factor two multiplying
++                 ! the symmetric gradient bilinear.  WEIGHT already holds
++                 ! the band/k-point occupation used by every other valence
++                 ! stress term in this block.
++                 buf_sum_rela_corr(ialpha,ibeta) = &
++                      buf_sum_rela_corr(ialpha,ibeta) + &
++                      2.d0*weight(num)*REAL(buf_rela_corr(ialpha,ibeta,num))
++                 buf_sum_rela_sr(ialpha,ibeta) = &
++                      buf_sum_rela_sr(ialpha,ibeta) + &
++                      2.d0*weight(num)*REAL(buf_rela_sr(ialpha,ibeta,num))
++                 buf_sum_rela_old(ialpha,ibeta) = &
++                      buf_sum_rela_old(ialpha,ibeta) + &
++                      2.d0*weight(num)*REAL(buf_rela_old(ialpha,ibeta,num))
++                 ! The scalar-relativistic operator changes the normal
++                 ! muffin-tin flux from d_r(psi) to A*d_r(psi).  This is the
++                 ! matching surface companion of the volume correction, with
++                 ! the same occupation and spin factors as BUF_APW_SURF.
++                 buf_sum_rela_surf(ialpha,ibeta) = &
++                      buf_sum_rela_surf(ialpha,ibeta) + &
++                      2.d0*weight(num)*REAL(buf_rela_surf(ialpha,ibeta,num))
+               ENDDO
++           ENDDO
++           g2_radial_direct_trace_sum = g2_radial_direct_trace_sum - &
++                2.D0*weight(num)*REAL(buf_nsp_radial_direct(num))
++           g2_radial_phase_trace_sum = g2_radial_phase_trace_sum - &
++                2.D0*weight(num)*REAL(buf_nsp_radial_phase(num))
++           g2_v_direct_sum = g2_v_direct_sum + &
++                weight(num)*REAL(buf_nsp_v_direct(num))
++           DO ipart=1,4
++              g2_v_parts_sum(ipart) = g2_v_parts_sum(ipart) + &
++                   weight(num)*REAL(buf_nsp_v_parts(num,ipart))
++              g2_v_atom_parts(ipart,jatom) = &
++                   g2_v_atom_parts(ipart,jatom) + &
++                   weight(num)*REAL(buf_nsp_v_parts(num,ipart))
+            ENDDO
+         ENDDO
+ !         
+         call symmetry_stress_rotij(latom,jatom,buf_sum1p)
+         F_total = F_total + buf_sum1p 
+ 
++        ! Apply exactly the same equivalent-atom rotation to every Eq. (G1)
++        ! part.  These arrays are diagnostic only and cannot alter F_total.
++        DO ipart = 1,4
++           call symmetry_stress_rotij(latom,jatom,buf_sum_parts(:,:,ipart))
++           F_total_parts(:,:,ipart) = F_total_parts(:,:,ipart) + &
++                                        buf_sum_parts(:,:,ipart)
++        ENDDO
++
+         call symmetry_stress_rotij(latom,jatom,buf_sum2p)
+         val_sph_sum = val_sph_sum + buf_sum2p
++        DO ipart=1,3
++           call symmetry_stress_rotij(latom,jatom, &
++                                      buf_sum2p_parts(:,:,ipart))
++           val_sph_parts_sum(:,:,ipart) = &
++                val_sph_parts_sum(:,:,ipart) + &
++                buf_sum2p_parts(:,:,ipart)
++        ENDDO
++
++        call symmetry_stress_rotij(latom,jatom,buf_sum_match)
++        val_nsp_match_sum = val_nsp_match_sum + buf_sum_match
++        val_nsp_match_atom(:,:,jatom) = val_nsp_match_atom(:,:,jatom) + &
++                                         buf_sum_match
++
++        call symmetry_stress_rotij(latom,jatom,buf_sum_radial)
++        val_nsp_radial_sum = val_nsp_radial_sum + buf_sum_radial
++        val_nsp_radial_atom(:,:,jatom) = val_nsp_radial_atom(:,:,jatom) + &
++                                          buf_sum_radial
++
++        DO ipart=1,4
++           call symmetry_stress_rotij(latom,jatom, &
++                                       buf_sum_radial_parts(:,:,ipart))
++           val_nsp_radial_parts_sum(:,:,ipart) = &
++                val_nsp_radial_parts_sum(:,:,ipart) + &
++                buf_sum_radial_parts(:,:,ipart)
++        ENDDO
++
++        call symmetry_stress_rotij(latom,jatom,buf_sum_angular)
++        val_nsp_angular_sum = val_nsp_angular_sum + buf_sum_angular
++        val_nsp_angular_atom(:,:,jatom) = val_nsp_angular_atom(:,:,jatom) + &
++                                           buf_sum_angular
+         
+         call symmetry_stress_rotij(latom,jatom,buf_sum3p)
+         F_total_APW = F_total_APW + buf_sum3p
++
++        call symmetry_stress_rotij(latom,jatom,buf_sum_rmt_shape)
++        rmt_shape_total = rmt_shape_total + buf_sum_rmt_shape
++
++        call symmetry_stress_rotij(latom,jatom,buf_sum_rmt_operator)
++        rmt_operator_total = rmt_operator_total + buf_sum_rmt_operator
++
++        call symmetry_stress_rotij(latom,jatom,buf_sum_rela_corr)
++        rela_corr_total = rela_corr_total + buf_sum_rela_corr
++        call symmetry_stress_rotij(latom,jatom,buf_sum_rela_sr)
++        rela_sr_total = rela_sr_total + buf_sum_rela_sr
++        call symmetry_stress_rotij(latom,jatom,buf_sum_rela_old)
++        rela_old_total = rela_old_total + buf_sum_rela_old
++        call symmetry_stress_rotij(latom,jatom,buf_sum_rela_surf)
++        rela_surf_total = rela_surf_total + buf_sum_rela_surf
+ !         
+ !         
+      ENDIF
+@@ -2512,6 +2970,8 @@
+       WRITE(6,'(a,2f8.1)') '   write              (cpu,wall):',time_write,time_write_w
+       IF(STRESS) THEN
+         WRITE(6,'(a,2f8.1)') ' valence kinetic rmt/int  (cpu):',time_kin_rmt, time_kin_int
++        WRITE(6,'(a,2f8.1)') '   rmt nonrelativistic(cpu,wall):',time_kin_rmt_nr, time_kin_rmt_nr_w
++        WRITE(6,'(a,2f8.1)') '   rmt relativistic   (cpu,wall):',time_kin_rmt_rela, time_kin_rmt_rela_w
+         WRITE(6,'(a,2f8.1)') ' APW kinetic surface      (cpu):',time_apw_srf
+         WRITE(6,'(a,2f8.1)') ' valence correction stress(cpu):',time_val_corr
+ !         WRITE(6,'(a,2f8.1)') ' D from val_corr_stress   (cpu):',time_cal_D
+@@ -2560,7 +3020,53 @@
+ !********************************************************************* *PH*
+ 
+      IF( STRESS ) THEN
+-           call symmetrization_stress(val_sph_sum,F_total,F_total_APW,kin_int_fn)
++           call symmetrization_stress(val_sph_sum,val_sph_parts_sum, &
++                                      F_total,F_total_APW,kin_int_fn, &
++                                      F_total_parts,val_nsp_match_sum, &
++                                      val_nsp_radial_sum,val_nsp_angular_sum, &
++                                      val_nsp_radial_parts_sum,rmt_shape_total, &
++                                      rmt_operator_total,rela_corr_total, &
++                                      rela_sr_total,rela_old_total, &
++                                      rela_surf_total)
++           if(g2_diag_enabled) then
++              do jatom=1,nat
++                 do ialpha=1,3
++                    do ibeta=1,3
++                       write(21,8892) jatom,ialpha,ibeta, &
++                            val_nsp_match_atom(ialpha,ibeta,jatom)/vol, &
++                            val_nsp_radial_atom(ialpha,ibeta,jatom)/vol, &
++                            val_nsp_angular_atom(ialpha,ibeta,jatom)/vol, &
++                            (val_nsp_match_atom(ialpha,ibeta,jatom)+ &
++                             val_nsp_radial_atom(ialpha,ibeta,jatom)+ &
++                             val_nsp_angular_atom(ialpha,ibeta,jatom))/vol
++                    enddo
++                 enddo
++              enddo
++              write(21,8891) g2_radial_direct_trace_sum/vol, &
++                   g2_radial_phase_trace_sum/vol, &
++                   (val_nsp_radial_sum(1,1)+val_nsp_radial_sum(2,2)+ &
++                    val_nsp_radial_sum(3,3))/vol, &
++                   (g2_radial_direct_trace_sum-g2_radial_phase_trace_sum)/vol, &
++                   (g2_radial_phase_trace_sum-val_nsp_radial_sum(1,1)- &
++                    val_nsp_radial_sum(2,2)-val_nsp_radial_sum(3,3))/vol
++              write(6,8891) g2_radial_direct_trace_sum/vol, &
++                   g2_radial_phase_trace_sum/vol, &
++                   (val_nsp_radial_sum(1,1)+val_nsp_radial_sum(2,2)+ &
++                    val_nsp_radial_sum(3,3))/vol, &
++                   (g2_radial_direct_trace_sum-g2_radial_phase_trace_sum)/vol, &
++                   (g2_radial_phase_trace_sum-val_nsp_radial_sum(1,1)- &
++                    val_nsp_radial_sum(2,2)-val_nsp_radial_sum(3,3))/vol
++              write(21,8893) g2_v_direct_sum,g2_v_direct_sum/vol
++              write(6,8893) g2_v_direct_sum,g2_v_direct_sum/vol
++              do jatom=1,nat
++                 write(21,8894) jatom,g2_v_atom_parts(:,jatom), &
++                      sum(g2_v_atom_parts(:,jatom))
++                 write(6,8894) jatom,g2_v_atom_parts(:,jatom), &
++                      sum(g2_v_atom_parts(:,jatom))
++              enddo
++              write(21,8895) g2_v_parts_sum,sum(g2_v_parts_sum)
++              write(6,8895) g2_v_parts_sum,sum(g2_v_parts_sum)
++           endif
+ !            call symmetrization_stress(F_total)
+ !            call symmetrization_stress(F_total_APW)
+ !            call symmetrization_stress(val_sph_sum)
+@@ -2568,16 +3074,54 @@
+ !            call write_stress(F_total,F_total_APW,kin_int_fn,val_sph_sum)
+            
+            deallocate( F_buf_total )
++           deallocate( F_buf_parts )
++           deallocate( buf_rela_corr )
++           deallocate( buf_rela_sr )
++           deallocate( buf_rela_old )
++           deallocate( buf_rela_surf )
+            deallocate( buf_sum1p)           
+            deallocate( F_total  )
++           deallocate( buf_sum_parts )
++           deallocate( F_total_parts )
+            
+            deallocate( buf_sph_val_fin )
++           deallocate( buf_sph_val_parts )
+            deallocate( buf_sum2p )           
+            deallocate( val_sph_sum )
++           deallocate( buf_sum2p_parts )
++           deallocate( val_sph_parts_sum )
++           deallocate( buf_nsp_match )
++           deallocate( buf_sum_match )
++           deallocate( val_nsp_match_sum )
++           deallocate( buf_nsp_radial )
++           deallocate( buf_sum_radial )
++           deallocate( val_nsp_radial_sum )
++           deallocate( buf_nsp_radial_parts )
++           deallocate( buf_nsp_radial_direct )
++           deallocate( buf_nsp_radial_phase )
++           deallocate( buf_nsp_v_direct )
++           deallocate( buf_nsp_v_parts )
++           deallocate( buf_sum_radial_parts )
++           deallocate( val_nsp_radial_parts_sum )
++           deallocate( val_nsp_match_atom )
++           deallocate( val_nsp_radial_atom )
++           deallocate( val_nsp_angular_atom )
++           deallocate( buf_nsp_angular )
++           deallocate( buf_sum_angular )
++           deallocate( val_nsp_angular_sum )
+            
+            deallocate( buf_APW_surf )
++           deallocate( buf_rmt_shape )
++           deallocate( buf_rmt_operator )
+            deallocate( A_surf2 )           
++           deallocate( T_surf2 )
+      ENDIF
++
++8891 FORMAT(':DBG_STR_G2_W_TRACE:',5(1X,ES23.15))
++8892 FORMAT(':DBG_STR_G2_ATOM:',3I4,4(1X,ES23.15))
++8893 FORMAT(':DBG_STR_G2_V_TRACE:',2(1X,ES23.15))
++8894 FORMAT(':DBG_STR_G2_V_ATOM:',I4,5(1X,ES23.15))
++8895 FORMAT(':DBG_STR_G2_V_PART:',5(1X,ES23.15))
+ 
+ 
+ !     output of forces

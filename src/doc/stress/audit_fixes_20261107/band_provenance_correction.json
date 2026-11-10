@@ -1,0 +1,148 @@
+{
+  "V_plus_force": {
+    "files": [
+      "SrVO3.energy_0",
+      "SrVO3.energy_1",
+      "SrVO3.energy_2",
+      "SrVO3.energy_3",
+      "SrVO3.energy_4",
+      "SrVO3.energy_5",
+      "SrVO3.energy_6",
+      "SrVO3.energy_7",
+      "SrVO3.energy_8",
+      "SrVO3.energy_9",
+      "SrVO3.energy_10",
+      "SrVO3.energy_11"
+    ],
+    "kpoints": 75,
+    "bands": [
+      43
+    ],
+    "basis_dimension_range": [
+      473,
+      491
+    ],
+    "serial_vs_latest_sharded_max_energy_change_Ry": 1.075538769157447e-07
+  },
+  "V_strain_m001": {
+    "files": [
+      "SrVO3.energy_0",
+      "SrVO3.energy_1",
+      "SrVO3.energy_2",
+      "SrVO3.energy_3",
+      "SrVO3.energy_4",
+      "SrVO3.energy_5",
+      "SrVO3.energy_6",
+      "SrVO3.energy_7",
+      "SrVO3.energy_8",
+      "SrVO3.energy_9",
+      "SrVO3.energy_10",
+      "SrVO3.energy_11"
+    ],
+    "kpoints": 75,
+    "bands": [
+      43
+    ],
+    "basis_dimension_range": [
+      473,
+      491
+    ],
+    "serial_vs_latest_sharded_max_energy_change_Ry": 0.00011654715909603652
+  },
+  "V_strain_p001": {
+    "files": [
+      "SrVO3.energy_0",
+      "SrVO3.energy_1",
+      "SrVO3.energy_2",
+      "SrVO3.energy_3",
+      "SrVO3.energy_4",
+      "SrVO3.energy_5",
+      "SrVO3.energy_6",
+      "SrVO3.energy_7",
+      "SrVO3.energy_8",
+      "SrVO3.energy_9",
+      "SrVO3.energy_10",
+      "SrVO3.energy_11"
+    ],
+    "kpoints": 75,
+    "bands": [
+      43
+    ],
+    "basis_dimension_range": [
+      473,
+      491
+    ],
+    "serial_vs_latest_sharded_max_energy_change_Ry": 1.2872821919529542e-08
+  },
+  "SrVO3_same_k_basis_dimension_nbands_weight": true,
+  "FeSe_RELA": {
+    "files": [
+      "FeSe.energy_0",
+      "FeSe.energy_1",
+      "FeSe.energy_2",
+      "FeSe.energy_3",
+      "FeSe.energy_4",
+      "FeSe.energy_5",
+      "FeSe.energy_6",
+      "FeSe.energy_7",
+      "FeSe.energy_8",
+      "FeSe.energy_9",
+      "FeSe.energy_10",
+      "FeSe.energy_11"
+    ],
+    "kpoints": 140,
+    "bands": [
+      66
+    ],
+    "basis_dimension_range": [
+      492,
+      516
+    ],
+    "serial_vs_latest_sharded_max_energy_change_Ry": 0.0
+  },
+  "FeSe_RELA_strain_m001": {
+    "files": [
+      "FeSe.energy_0",
+      "FeSe.energy_1",
+      "FeSe.energy_2",
+      "FeSe.energy_3",
+      "FeSe.energy_4",
+      "FeSe.energy_5",
+      "FeSe.energy_6",
+      "FeSe.energy_7",
+      "FeSe.energy_8",
+      "FeSe.energy_9",
+      "FeSe.energy_10",
+      "FeSe.energy_11"
+    ],
+    "kpoints": 140,
+    "bands": [
+      66
+    ],
+    "basis_dimension_range": [
+      492,
+      516
+    ],
+    "serial_vs_latest_sharded_max_energy_change_Ry": 0.1606471914380725
+  },
+  "FeSe_RELA_strain_p001": {
+    "files": [
+      "FeSe.energy_0",
+      "FeSe.energy_1",
+      "FeSe.energy_2",
+      "FeSe.energy_3",
+      "FeSe.energy_4",
+      "FeSe.energy_5"
+    ],
+    "kpoints": 140,
+    "bands": [
+      66
+    ],
+    "basis_dimension_range": [
+      492,
+      516
+    ],
+    "serial_vs_latest_sharded_max_energy_change_Ry": 0.16089088300908472
+  },
+  "FeSe_same_k_basis_dimension_nbands_weight": true
+}

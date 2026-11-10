@@ -1,0 +1,7 @@
+STRF            (TOT,FOR,QTL,EFG,FERMI)
+   -13.0    64.0   0.50 0.05  1   EMIN, NE, ESEPERMIN, ESEPER0, iqtlsave
+TETRA    0.000      (GAUSS,ROOT,TEMP,TETRA,ALL      eval)
+  0 0  2 0 -3 2  4 0  4 4 -5 2  6 0  6 4
+  0 0  1 0  2 0  3 0  4 0  4 4  5 0  5 4  6 0  6 4
+ 11.988          GMAX
+NOFILE        FILE/NOFILE  write recprlist

@@ -1,0 +1,37 @@
+{
+  "case": "SrVO3",
+  "setup_seconds": 10.368693207856268,
+  "central_density_relative": 1.0758425466709253e-11,
+  "normalization_offset_norm": 0.1973926387182406,
+  "coupled_transpose": 6.679683858287981e-16,
+  "bands_transpose": 3.990126000517464e-16,
+  "steps": [
+    {
+      "step": 0.002,
+      "density_relative": 0.06872793836572788,
+      "density_maximum": 0.1859060084780578,
+      "H_relative": 2.2830890009871205e-07,
+      "O_relative": 5.008358189400587e-07,
+      "FD_norm": 11.109878593312752,
+      "analytic_norm": 11.156542724677813
+    },
+    {
+      "step": 0.001,
+      "density_relative": 0.06872882228195783,
+      "density_maximum": 0.18590502122111494,
+      "H_relative": 1.0093849879966199e-07,
+      "O_relative": 1.5022581114198444e-07,
+      "FD_norm": 11.109727378937034,
+      "analytic_norm": 11.156542724677813
+    },
+    {
+      "step": 0.0005,
+      "density_relative": 0.06872904656037435,
+      "density_maximum": 0.1859047783946893,
+      "H_relative": 8.574202966491984e-08,
+      "O_relative": 9.240743112217372e-08,
+      "FD_norm": 11.109689692152298,
+      "analytic_norm": 11.156542724677813
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "checks": {
+    "inverse_residual": 3.72222063305471e-10,
+    "wien_subspace_orthonormality": 3.5135458139601283e-06,
+    "central_energy_difference": 6.492372968125437e-07,
+    "central_projected_H_difference": 6.492372943700531e-07,
+    "radial_header_difference": 0.0,
+    "pw_gauge_fit_relative": 0.00046891699002100164,
+    "pw_gauge_unitarity": 0.002933221861715629,
+    "crossgauge_hamiltonian_error": 6.492372934818746e-07
+  },
+  "totals": {
+    "advection_": {
+      "fixed_X": -0.2601926026619872,
+      "normalization": -0.014238451312750833,
+      "total": -0.274431053974738,
+      "GPa": -3.5161786932134067
+    }
+  }
+}

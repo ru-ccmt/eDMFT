@@ -1,0 +1,10 @@
+{
+  "SrVO3_DMFT": {
+    "ranks": 4,
+    "max_difference_GPa": 0.0
+  },
+  "FeSe_DMFT": {
+    "ranks": 2,
+    "max_difference_GPa": 0.0
+  }
+}

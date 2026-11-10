@@ -1,0 +1,14 @@
+test_gaunt_spherical_limit_and_sine_hermiticity (test_lapw_augmentation_response.AugmentationTests.test_gaunt_spherical_limit_and_sine_hermiticity) ... ok
+test_invalid_and_missing_inputs_rejected (test_lapw_augmentation_response.AugmentationTests.test_invalid_and_missing_inputs_rejected) ... ok
+test_joint_contractions_nonlinear_and_reverse (test_lapw_augmentation_response.AugmentationTests.test_joint_contractions_nonlinear_and_reverse) ... ok
+test_native_matching_and_gaunt_inputs_are_used (test_lapw_augmentation_response.AugmentationTests.test_native_matching_and_gaunt_inputs_are_used) ... ok
+test_no_local_orbitals (test_lapw_augmentation_response.AugmentationTests.test_no_local_orbitals) ... ok
+test_prepared_derivative_and_reverse (test_lapw_augmentation_response.AugmentationTests.test_prepared_derivative_and_reverse) ... ok
+test_prepared_sums_match_full_native_coefficients (test_lapw_augmentation_response.AugmentationTests.test_prepared_sums_match_full_native_coefficients) ... ok
+test_radial_angular_transposes (test_lapw_augmentation_response.AugmentationTests.test_radial_angular_transposes) ... ok
+test_through_normalized_window_dmft_response (test_lapw_augmentation_response.AugmentationTests.test_through_normalized_window_dmft_response) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.027s
+
+OK

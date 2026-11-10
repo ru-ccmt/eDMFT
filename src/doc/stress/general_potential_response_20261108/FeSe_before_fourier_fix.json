@@ -1,0 +1,80 @@
+{
+  "case": "FeSe",
+  "setup_seconds": 3.4895977079868317,
+  "retained": 66,
+  "coefficient_size": 509,
+  "sectors": {
+    "nonspherical": {
+      "rows": [
+        {
+          "step": 0.001,
+          "density_relative": 1.96468827969636e-06,
+          "density_maximum": 2.6589225217421575e-08,
+          "density_fd_norm": 0.08551841732489794,
+          "H_relative": 2.883682785251975e-06,
+          "O_difference_norm": 0.0,
+          "raw_derivative_norm": 0.0
+        },
+        {
+          "step": 0.0005,
+          "density_relative": 3.1142096474055345e-06,
+          "density_maximum": 4.3834550890117785e-08,
+          "density_fd_norm": 0.08551841869801627,
+          "H_relative": 2.88286718948916e-06,
+          "O_difference_norm": 0.0,
+          "raw_derivative_norm": 0.0
+        }
+      ],
+      "forward_seconds": 0.41441316599957645
+    },
+    "interstitial": {
+      "rows": [
+        {
+          "step": 0.001,
+          "density_relative": 3.875257549588583e-07,
+          "density_maximum": 1.661370532249004e-08,
+          "density_fd_norm": 0.30558401817830366,
+          "H_relative": 2.174099724305674e-08,
+          "O_difference_norm": 0.0,
+          "raw_derivative_norm": 0.0
+        },
+        {
+          "step": 0.0005,
+          "density_relative": 8.025428262042932e-07,
+          "density_maximum": 3.433641750918634e-08,
+          "density_fd_norm": 0.30558401088333026,
+          "H_relative": 7.622900405075191e-08,
+          "O_difference_norm": 0.0,
+          "raw_derivative_norm": 0.0
+        }
+      ],
+      "forward_seconds": 0.42120449990034103
+    },
+    "joint": {
+      "rows": [
+        {
+          "step": 0.001,
+          "density_relative": 3.784662140043203e-07,
+          "density_maximum": 4.524467447364344e-07,
+          "density_fd_norm": 10.4525646516463,
+          "H_relative": 1.542347809488098e-07,
+          "O_difference_norm": 1.8190173715266979e-06,
+          "raw_derivative_norm": 0.8252159804294235
+        },
+        {
+          "step": 0.0005,
+          "density_relative": 1.3718464463406165e-07,
+          "density_maximum": 1.6859723106499303e-07,
+          "density_fd_norm": 10.452567347304047,
+          "H_relative": 1.2558999287306293e-07,
+          "O_difference_norm": 4.934848774918217e-07,
+          "raw_derivative_norm": 0.8252159804294235
+        }
+      ],
+      "forward_seconds": 1.0850518750958145
+    }
+  },
+  "potential_transpose": 1.000695366941721e-18,
+  "coupled_transpose": 4.566016945515106e-18,
+  "central_density_relative": 9.50357308954652e-13
+}

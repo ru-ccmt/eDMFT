@@ -1,0 +1,86 @@
+{
+  "created": "2026-11-08T21:48:32.007769+00:00",
+  "files": [
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/python/lapw_density_response.py",
+      "before": null,
+      "after": "85da2f9e7129502de4b994526584b2e9b0564a3ac4d8a323e9d179d50ab09828",
+      "source": "source/repo/src/python/lapw_density_response.py"
+    },
+    {
+      "target": "/Users/haule/dbin/lapw_density_response.py",
+      "before": null,
+      "after": "85da2f9e7129502de4b994526584b2e9b0564a3ac4d8a323e9d179d50ab09828",
+      "source": "source/dbin/lapw_density_response.py"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/python/lapw_radial_native.py",
+      "before": null,
+      "after": "f10ec627dd1c54d508ab98d0d761867173752ad8321c74feb3ec563e85c49f87",
+      "source": "source/repo/src/python/lapw_radial_native.py"
+    },
+    {
+      "target": "/Users/haule/dbin/lapw_radial_native.py",
+      "before": null,
+      "after": "f10ec627dd1c54d508ab98d0d761867173752ad8321c74feb3ec563e85c49f87",
+      "source": "source/dbin/lapw_radial_native.py"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/python/lapw_basis_density_response.py",
+      "before": null,
+      "after": "92bd7b333b91d26baadd4f8d0882f54778728ef6701c95047a335673deeecf58",
+      "source": "source/repo/src/python/lapw_basis_density_response.py"
+    },
+    {
+      "target": "/Users/haule/dbin/lapw_basis_density_response.py",
+      "before": null,
+      "after": "92bd7b333b91d26baadd4f8d0882f54778728ef6701c95047a335673deeecf58",
+      "source": "source/dbin/lapw_basis_density_response.py"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_density_response.py",
+      "before": null,
+      "after": "4add9d1ceb84f2254e0b1a56c9c4b19b147bad7827202f65240b84c4f3606709",
+      "source": "source/repo/src/python/tests/test_lapw_density_response.py"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_radial_native.py",
+      "before": null,
+      "after": "a04e5d609abdf95dde9da161558936c2b297a3b9f1593f34e06a6a3763fc9ffc",
+      "source": "source/repo/src/python/tests/test_lapw_radial_native.py"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/lapw_radial_capi.f90",
+      "before": null,
+      "after": "5d737ecabe48b7a82e8a6020f5ecfd7351e53669f3548755ad02128d91094aa9",
+      "source": "source/repo/src/dmft2/atpar/lapw_radial_capi.f90"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/Makefile",
+      "before": "22945833c38817eeccab86dbe17343df79ddb92cc43736ce176d8bca1447e32f",
+      "after": "1bdaa09ebe9d755d6c36ae50046c7581508c2f8dbb44799fe684d9fc2c077185",
+      "source": "source/repo/src/dmft2/atpar/Makefile"
+    },
+    {
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+      "before": "ea52390af5c12a3d1b2f6681b6976bf453de4bb5ff40b5f8007459e300c62c26",
+      "after": "b3c2b2d45ce64dcffea29a935e5e1e2cab04dec4676951d5ecee31f546673593",
+      "source": "source/repo/src/doc/stress/stress_response_roadmap_20261108.txt"
+    }
+  ],
+  "production_binaries_before": {
+    "/Users/haule/dbin/dmft2": "a95c3f7d4e95f0e0598d5a962f4a00b06e49644235c1cb1b0dbb0a2bf5f7abdc",
+    "/Users/haule/dbin/dmft2_response": "16844ec83836f27df60a605313993fef41b74dbf6048a040e063695e634f010c"
+  },
+  "validation": {
+    "source_tests": "----------------------------------------------------------------------\nRan 92 tests in 0.834s\n\nOK",
+    "dbin_tests": "----------------------------------------------------------------------\nRan 30 tests in 0.388s\n\nOK"
+  },
+  "scope": "optional spatial density and native radial response; no production stress switch",
+  "libraries": {
+    "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/liblapw_response.so": "1675e4318f3e262df742f806fd460c3083422d337ffa069194436cac45689752",
+    "/Users/haule/dbin/liblapw_response.so": "1675e4318f3e262df742f806fd460c3083422d337ffa069194436cac45689752"
+  },
+  "production_binaries_unchanged": true,
+  "complete": true
+}

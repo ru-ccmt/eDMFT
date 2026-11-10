@@ -1,0 +1,2245 @@
+--- a/src/python/frozen_sigma_response.py
++++ b/src/python/frozen_sigma_response.py
+@@ -145,7 +145,7 @@
+ 
+ class FrozenSigmaResponse:
+     @classmethod
+-    def from_export(cls, prefix):
++    def from_export(cls, prefix, **context_options):
+         """Read a standalone EDMFT_RESPONSE_EXPORT from a central TOT run."""
+         prefix = Path(prefix)
+         m = Metadata.read(str(prefix) + ".meta")
+@@ -231,6 +231,7 @@
+             normalized,
+             np.array(kw),
+             np.arange(d.dm_nemin - d.nemin, d.dm_nemax - d.nemin + 1),
++            **context_options,
+         )
+         return obj, records
+ 
+@@ -496,8 +497,22 @@
+         action="store_true",
+         help="hold mu fixed; default constrains total particle number",
+     )
++    parser.add_argument(
++        "--backend",
++        choices=["reference", "cached"],
++        default="reference",
++        help="cached reuses central Matsubara contractions; same stored-band approximation",
++    )
++    parser.add_argument("--cache-mb", type=float, default=256.0)
+     args = parser.parse_args(argv)
+-    model, records = FrozenSigmaResponse.from_export(args.export)
++    if args.backend == "cached":
++        from frozen_sigma_tangent import CachedFrozenSigmaResponse
++
++        model, records = CachedFrozenSigmaResponse.from_export(
++            args.export, cache_mb=args.cache_mb
++        )
++    else:
++        model, records = FrozenSigmaResponse.from_export(args.export)
+     perturbation = np.load(args.potential, allow_pickle=False)
+     rho, report = model.response(perturbation, fixed_number=not args.fixed_mu)
+     model.write_density(args.output, rho, records)
+@@ -505,6 +520,7 @@
+         approximation="fixed central LAPW basis and stored complement",
+         potential_units="Ry per unit strain",
+         ensemble="fixed mu" if args.fixed_mu else "fixed N",
++        backend=args.backend,
+     )
+     Path(str(args.output) + ".json").write_text(json.dumps(report, indent=2) + "\n")
+     print(json.dumps(report, indent=2))
+--- /dev/null
++++ b/src/python/frozen_sigma_tangent.py
+@@ -0,0 +1,616 @@
++#!/usr/bin/env python3
++"""Cached forward/adjoint of the frozen-Sigma, stored-band density map.
++
++The nonlinear endpoint implementation in frozen_sigma_response is deliberately
++kept independent as an oracle. This module differentiates that SAME map: the
++central LAPW basis is fixed and the complement contains only exported bands.
++It is not a substitute for radial, core, geometry, or potential response.
++
++All adjoints below use Re sum(conj(y)*x), with no implicit k, spin, orbital,
++or Matsubara weights. The output density already contains the 2*w_k factor.
++The forward and reverse operations both include window motion, symmetrized
++global overlap normalization, and (optionally) the fixed-N mu constraint.
++No numerical Jacobian, numerical transpose, or impurity vertex is used.
++"""
++from __future__ import annotations
++
++import argparse
++import copy
++import json
++import time
++from pathlib import Path
++
++import numpy as np
++from scipy.linalg import eigh
++from scipy.special import expit
++
++from frozen_sigma_response import FrozenSigmaResponse, herm
++
++
++def real_inner(a, b):
++    """Real Frobenius pairing, including every array index exactly once."""
++    return float(np.vdot(a, b).real)
++
++
++class CachedFrozenSigmaResponse(FrozenSigmaResponse):
++    """Reusable central context; callers must treat its central data as fixed.
++
++    WINDOW response contractions and/or resolvents are cached, never full-band
++    Green functions. cache_mb bounds their combined storage; overflow chunks
++    are recomputed. Static
++    eigensystems, divided differences, normalization derivatives, and the
++    chemical-potential response are computed once. Construct a new context
++    when mu, Sigma, projectors, bands, weights, or temperature change.
++    """
++
++    def __init__(
++        self, *args, cache_mb=256.0, frequency_chunk=32, precontract=True, **kwargs
++    ):
++        # Isolate the context from caller-owned arrays before caching. Updating
++        # an input self-energy or chemical potential requires a NEW context.
++        super().__init__(*copy.deepcopy(args), **copy.deepcopy(kwargs))
++        if not np.isfinite(cache_mb) or cache_mb < 0 or frequency_chunk < 1:
++            raise ValueError("invalid response cache limits")
++        self.cache_limit = int(cache_mb * 1024**2)
++        self.frequency_chunk = int(frequency_chunk)
++        self._greens = {}
++        self._kernels = {}
++        self._kernel_bytes = 0
++        self.precontract = bool(precontract)
++        self._cache_bytes = 0
++        self._ready = False
++        self._central_scalars = (self.meta.mu, self.meta.temperature)
++        self._inverse_count = 0
++        self._prepare_seconds = 0.0
++        self._norm = []
++        for c, n in enumerate(self.meta.dimensions):
++            active = np.flatnonzero(self.meta.active[:n, c])
++            ix = np.ix_(active, active)
++            if not len(active):
++                self._norm.append((ix, None, None))
++                continue
++            ex, v = eigh(herm(self.X[:, :, c][ix]))
++            if ex.min() <= 0:
++                raise ValueError("nonpositive normalization")
++            r = 1.0 / ex
++            divided = -1.0 / (r[:, None] * r[None, :] * (r[:, None] + r[None, :]))
++            self._norm.append((ix, v, divided))
++        self._denominators = [e[self.W][None, :] - e[self.Q][:, None] for e in self.eps]
++        for value in list(vars(self).values()) + list(vars(self.meta).values()):
++            if isinstance(value, np.ndarray):
++                value.flags.writeable = False
++
++    def normalization_action(self, ds):
++        """Frechet derivative of S^-1/2, self-adjoint on Hermitian blocks."""
++        result = np.zeros_like(self.X)
++        for c, (ix, v, divided) in enumerate(self._norm):
++            if v is not None:
++                result[:, :, c][ix] = (
++                    v
++                    @ ((v.conj().T @ herm(ds[:, :, c][ix]) @ v) * divided)
++                    @ v.conj().T
++                )
++        return result
++
++    def symmetry_adjoint(self, y):
++        """Transpose the actual exported REAL-linear Fortran symmetry map.
++
++        In particular, the map can conjugate its input. Multiplication by a
++        complex conjugate transpose alone would therefore be incorrect.
++        """
++        v = y.ravel(order="F")
++        result = (self.meta.sym_real.conj().T @ v).real + 1j * (
++            self.meta.sym_imag.conj().T @ v
++        ).real
++        return result.reshape(y.shape, order="F")
++
++    def embedding_response(self, dh):
++        W, Q = self.W, self.Q
++        dq = np.zeros_like(self.raw)
++        for k, denominator in enumerate(self._denominators):
++            a = dh[k][np.ix_(Q, W)] / denominator
++            dq[k, Q] = np.einsum("an,nic->aic", a, self.raw[k, W])
++            dq[k, W] = np.einsum("na,aic->nic", a.conj().T, self.raw[k, Q])
++        ds = self.meta.sym(
++            np.einsum("k,knic,knjc->ijc", self.kw, self.raw[:, W].conj(), dq[:, W])
++            + np.einsum("k,knic,knjc->ijc", self.kw, dq[:, W].conj(), self.raw[:, W])
++        )
++        dx = self.normalization_action(ds)
++        du = self.apply_x(dq, self.X)
++        du[:, W] += self.apply_x(self.raw[:, W], dx)
++        return self.meta.compact(du), ds, dx
++
++    def embedding_adjoint(self, y):
++        """Pull a projector covector back to a Hermitian band-potential matrix.
++
++        Reverse compacting, U=P X, dX, symmetry, the weighted k sum, and
++        finally dPi_W. The 1/2 in the last Hermitian projection is necessary:
++        both QW and WQ entries participate in the Frobenius pairing.
++        """
++        if y.shape != self.uc.shape or not np.all(np.isfinite(y)):
++            raise ValueError("invalid projector covector")
++        W, Q = self.W, self.Q
++        local = np.zeros_like(self.raw)
++        start = 0
++        for c, n in enumerate(self.meta.dimensions):
++            local[:, :, :n, c] = y[:, :, start : start + n]
++            start += n
++        dq_bar = self.apply_x(local, self.X.swapaxes(0, 1).conj())
++        dx_bar = np.einsum("knic,knjc->ijc", self.raw[:, W].conj(), local[:, W])
++        ds_bar = self.symmetry_adjoint(self.normalization_action(dx_bar))
++        ds_bar = ds_bar + ds_bar.swapaxes(0, 1).conj()
++        dq_bar[:, W] += self.kw[:, None, None, None] * self.apply_x(
++            self.raw[:, W], ds_bar
++        )
++        result = np.zeros((*self.eps.shape, self.eps.shape[1]), complex)
++        for k, denominator in enumerate(self._denominators):
++            a_bar = np.einsum("aic,nic->an", dq_bar[k, Q], self.raw[k, W].conj())
++            a_bar += np.einsum("aic,nic->an", self.raw[k, Q], dq_bar[k, W].conj())
++            result[k][np.ix_(Q, W)] = a_bar / denominator
++        return herm(result)
++
++    @staticmethod
++    def _divided_difference(e, temperature):
++        f = expit(-e / temperature)
++        gap = e[:, None] - e[None, :]
++        near = abs(gap) < 1e-8
++        divided = np.empty_like(gap)
++        np.divide(f[:, None] - f[None, :], gap, out=divided, where=~near)
++        mid = expit(-(e[:, None] + e[None, :]) / (2 * temperature))
++        divided[near] = (-mid * (1 - mid) / temperature)[near]
++        return divided
++
++    def prepare(self):
++        """Build the reusable central context and fixed-mu charge derivative."""
++        if (self.meta.mu, self.meta.temperature) != self._central_scalars:
++            raise ValueError(
++                "central mu/temperature changed; construct a new response context"
++            )
++        if self._ready:
++            return
++        started = time.monotonic()
++        self._static = []
++        W, Q = self.W, self.Q
++        for k, eps in enumerate(self.eps):
++            u = self.uc[k]
++            hi = np.diag(eps - self.meta.mu) + u @ self.sinf @ u.conj().T
++            e, v = eigh(hi)
++            ew, vw = eigh(hi[np.ix_(W, W)])
++            self._static.append(
++                (
++                    hi[np.ix_(W, W)],
++                    e,
++                    v,
++                    ew,
++                    vw,
++                    self._divided_difference(e, self.meta.temperature),
++                )
++            )
++        mu = []
++        projector_gradient = np.zeros_like(self.uc)
++        for k in range(len(self.eps)):
++            dm = self._fermi(k, -np.eye(self.eps.shape[1]))
++            _, e, v, _, _, _ = self._static[k]
++            u = self.uc[k]
++            rho_inf = (v * expit(-e / self.meta.temperature)) @ v.conj().T
++            projector_local = 2 * rho_inf @ u @ self.sinf
++            for a, stop, gw, gq, giw in self._chunks(k):
++                weights = 2 * self.meta.temperature * self.meta.weights[a:stop]
++                dm[np.ix_(W, W)] += np.einsum(
++                    "w,wij->ij", weights, herm(-gw @ gw + giw @ giw)
++                )
++                sigma = self.sigma[a:stop]
++                part = (
++                    (gw @ u[W]) @ sigma
++                    + (gw.swapaxes(-1, -2).conj() @ u[W])
++                    @ sigma.swapaxes(-1, -2).conj()
++                    - ((giw + giw.swapaxes(-1, -2).conj()) @ u[W]) @ self.sinf
++                )
++                projector_local[W] += np.einsum("w,wia->ia", weights, part)
++            mu.append(2 * self.kw[k] * herm(dm))
++            projector_gradient[k] = 2 * self.kw[k] * projector_local
++            if self.precontract:
++                self._prepare_contraction(k)
++        self.mu_response = np.asarray(mu)
++        self.mu_response.flags.writeable = False
++        self.compressibility = float(
++            np.trace(self.mu_response, axis1=1, axis2=2).real.sum()
++        )
++        self._projector_potential_gradient = self.embedding_adjoint(projector_gradient)
++        self._ready = True
++        self._prepare_seconds = time.monotonic() - started
++
++    def _fermi(self, k, d):
++        _, _, v, _, _, divided = self._static[k]
++        return v @ ((v.conj().T @ d @ v) * divided) @ v.conj().T
++
++    def _chunks(self, k):
++        hi, e, v, ew, vw, divided = self._static[k]
++        u = self.uc[k, self.W]
++        for a in range(0, len(self.meta.omega), self.frequency_chunk):
++            stop = min(a + self.frequency_chunk, len(self.meta.omega))
++            z = 1j * self.meta.omega[a:stop]
++            key = (k, a)
++            gw = self._greens.get(key)
++            if gw is None:
++                gw = np.linalg.inv(
++                    z[:, None, None] * np.eye(len(self.W))
++                    - hi[None]
++                    - (u @ (self.sigma[a:stop] - self.sinf)) @ u.conj().T
++                )
++                self._inverse_count += len(z)
++                if (
++                    self._cache_bytes + self._kernel_bytes + gw.nbytes
++                    <= self.cache_limit
++                ):
++                    gw.flags.writeable = False
++                    self._greens[key] = gw
++                    self._cache_bytes += gw.nbytes
++            gq = 1 / (z[:, None] - (self.eps[k, self.Q] - self.meta.mu))
++            giw = (vw[None] * (1 / (z[:, None] - ew))[:, None, :]) @ vw.conj().T
++            yield a, stop, gw, gq, giw
++
++    def cache_info(self):
++        return dict(
++            resolvent_bytes=self._cache_bytes,
++            resolvent_limit_bytes=self.cache_limit,
++            contraction_bytes=self._kernel_bytes,
++            total_cache_bytes=self._cache_bytes + self._kernel_bytes,
++            precontracted_kpoints=len(self._kernels),
++            dense_window_inversions=self._inverse_count,
++            preparation_seconds=self._prepare_seconds,
++            approximation="fixed central LAPW basis; stored complement",
++        )
++
++    @staticmethod
++    def _pack(matrices):
++        n = matrices.shape[-1]
++        i, j = np.triu_indices(n, 1)
++        return np.concatenate(
++            (
++                np.diagonal(matrices, axis1=-2, axis2=-1).real,
++                np.sqrt(2) * matrices[..., i, j].real,
++                np.sqrt(2) * matrices[..., i, j].imag,
++            ),
++            axis=-1,
++        )
++
++    @staticmethod
++    def _unpack(vector, n):
++        i, j = np.triu_indices(n, 1)
++        nu = len(i)
++        out = np.zeros((n, n), complex)
++        out[np.arange(n), np.arange(n)] = vector[:n]
++        out[i, j] = (vector[n : n + nu] + 1j * vector[n + nu :]) / np.sqrt(2)
++        out[j, i] = out[i, j].conj()
++        return out
++
++    def _prepare_contraction(self, k):
++        """Integrate the frequency dependence ONCE, if the memory cap allows.
++
++        Only the WW block is a fourth-rank tensor. WQ blocks are independent
++        for each outside band. QQ dynamic/static terms cancel identically.
++        Store real independent Hermitian coordinates for WW, not a redundant
++        complex susceptibility of the entire LAPW space. This is a local
++        frozen-Sigma bubble/embedding derivative, not an impurity vertex or a
++        dense spatial screening Jacobian.
++        """
++        nw, nq, m = len(self.W), len(self.Q), self.uc.shape[-1]
++        needed = 8 * (nw**4 + 2 * nw**3 * m) + 16 * nq * (nw * nw + nw * m)
++        reclaim = sum(
++            value.nbytes for (kk, a), value in self._greens.items() if kk == k
++        )
++        if self._cache_bytes + self._kernel_bytes - reclaim + needed > self.cache_limit:
++            return
++        th = np.zeros((nw, nw, nw, nw), complex)
++        tu = np.zeros((nw, nw, nw, m), complex)
++        tv = np.zeros_like(tu)
++        cross_h = np.zeros((nq, nw, nw), complex)
++        cross_u = np.zeros((nq, nw, m), complex)
++        u = self.uc[k, self.W]
++        for a, stop, gw, gq, giw in self._chunks(k):
++            weights = 2 * self.meta.temperature * self.meta.weights[a:stop]
++            sigma = self.sigma[a:stop]
++            th += np.einsum("w,wia,wbj->ijab", weights, gw, gw, optimize=True)
++            th -= np.einsum("w,wia,wbj->ijab", weights, giw, giw, optimize=True)
++            right = (sigma @ u.conj().T) @ gw
++            left = (gw @ u) @ sigma
++            right_i = (self.sinf @ u.conj().T) @ giw
++            left_i = (giw @ u) @ self.sinf
++            tu += np.einsum("w,wia,wbj->ijab", weights, gw, right, optimize=True)
++            tu -= np.einsum("w,wia,wbj->ijab", weights, giw, right_i, optimize=True)
++            tv += np.einsum("w,wib,waj->ijab", weights, left, gw, optimize=True)
++            tv -= np.einsum("w,wib,waj->ijab", weights, left_i, giw, optimize=True)
++            cross_h += np.einsum("w,wq,wij->qij", weights, gq, gw - giw, optimize=True)
++            conjugate_part = (gw.swapaxes(-1, -2).conj() @ u) @ sigma.swapaxes(
++                -1, -2
++            ).conj()
++            conjugate_part -= (giw.swapaxes(-1, -2).conj() @ u) @ self.sinf
++            cross_u += 0.5 * (
++                np.einsum("w,wq,wia->qia", weights, gq, left - left_i, optimize=True)
++                + np.einsum(
++                    "w,wq,wia->qia", weights, gq.conj(), conjugate_part, optimize=True
++                )
++            )
++        # Transform the input and output WW indices to independent real
++        # Hermitian coordinates without a dense change-of-basis multiply.
++        i, j = np.triu_indices(nw, 1)
++        cols_h = np.concatenate(
++            (
++                np.diagonal(th, axis1=2, axis2=3),
++                (th[:, :, i, j] + th[:, :, j, i]) / np.sqrt(2),
++                1j * (th[:, :, i, j] - th[:, :, j, i]) / np.sqrt(2),
++            ),
++            axis=-1,
++        )
++        kh = self._pack(herm(cols_h.transpose(2, 0, 1))).T.copy()
++        cols_u = np.concatenate(
++            ((tu + tv).reshape(nw, nw, -1), (1j * (tu - tv)).reshape(nw, nw, -1)),
++            axis=-1,
++        )
++        ku = self._pack(herm(cols_u.transpose(2, 0, 1))).T.copy()
++        cross_h = herm(cross_h)
++        kernels = (kh, ku, cross_h, cross_u)
++        size = sum(value.nbytes for value in kernels)
++        if size != needed:
++            raise RuntimeError("internal contraction cache accounting error")
++        # Resolvents for this k are no longer used by response/adjoint. They
++        # can still be recomputed on demand for independent scalar checks.
++        for key in list(self._greens):
++            if key[0] == k:
++                self._cache_bytes -= self._greens.pop(key).nbytes
++        for value in kernels:
++            value.flags.writeable = False
++        self._kernels[k] = kernels
++        self._kernel_bytes += size
++
++    def _contract_forward(self, k, dh, du):
++        kh, ku, cross_h, cross_u = self._kernels[k]
++        W, Q = self.W, self.Q
++        result = np.zeros_like(dh)
++        v = du[W].ravel()
++        result[np.ix_(W, W)] = self._unpack(
++            kh @ self._pack(dh[np.ix_(W, W)]) + ku @ np.r_[v.real, v.imag], len(W)
++        )
++        result[np.ix_(W, Q)] = np.einsum("qij,jq->iq", cross_h, dh[np.ix_(W, Q)])
++        result[np.ix_(W, Q)] += np.einsum("qia,qa->iq", cross_u, du[Q].conj())
++        result[np.ix_(Q, W)] = result[np.ix_(W, Q)].conj().T
++        return result
++
++    def _contract_adjoint(self, k, y):
++        kh, ku, cross_h, cross_u = self._kernels[k]
++        W, Q = self.W, self.Q
++        hbar, ubar = np.zeros_like(y), np.zeros_like(self.uc[k])
++        yy = self._pack(y[np.ix_(W, W)])
++        hbar[np.ix_(W, W)] = self._unpack(kh.T @ yy, len(W))
++        uv = ku.T @ yy
++        nm = len(W) * self.uc.shape[-1]
++        ubar[W] = (uv[:nm] + 1j * uv[nm:]).reshape(len(W), -1)
++        hbar[np.ix_(W, Q)] = np.einsum("qji,jq->iq", cross_h.conj(), y[np.ix_(W, Q)])
++        hbar[np.ix_(Q, W)] = hbar[np.ix_(W, Q)].conj().T
++        ubar[Q] = 2 * np.einsum("iq,qia->qa", y[np.ix_(W, Q)].conj(), cross_u)
++        return hbar, ubar
++
++    def _matrix(self, a, name):
++        a = np.asarray(a, complex)
++        shape = (*self.eps.shape, self.eps.shape[1])
++        if a.shape != shape or not np.all(np.isfinite(a)):
++            raise ValueError(f"{name} must be finite with shape {shape}")
++        if np.max(abs(a - a.swapaxes(-1, -2).conj())) > 1e-10 * max(
++            1.0, float(np.max(abs(a)))
++        ):
++            raise ValueError(f"{name} is not Hermitian")
++        return herm(a)
++
++    def _check_fixed_number(self):
++        if abs(self.compressibility) < 1e-8:
++            raise ValueError(
++                "ill-conditioned fixed-N response; select fixed mu explicitly"
++            )
++
++    def response(self, dh, fixed_number=True, embedding=True):
++        """JVP dH -> weighted d(rho); no central eigensystem is recomputed."""
++        started = time.monotonic()
++        dh = self._matrix(dh, "potential")
++        self.prepare()
++        du, ds, dx = self.embedding_response(dh)
++        if not embedding:
++            du[:] = 0
++        result = []
++        for k, u in enumerate(self.uc):
++            v = du[k]
++            di = dh[k] + v @ self.sinf @ u.conj().T + u @ self.sinf @ v.conj().T
++            dr = self._fermi(k, di)
++            if k in self._kernels:
++                dr += self._contract_forward(k, dh[k], v)
++                result.append(2 * self.kw[k] * herm(dr))
++                continue
++            for a, stop, gw, gq, giw in self._chunks(k):
++                sigma = self.sigma[a:stop]
++                d = dh[k][None] + (v @ sigma) @ u.conj().T + (u @ sigma) @ v.conj().T
++                dg = self.sandwich(gw, gq, d) - self.sandwich(giw, gq, di)
++                dr += np.einsum(
++                    "w,wij->ij",
++                    2 * self.meta.temperature * self.meta.weights[a:stop],
++                    herm(dg),
++                )
++            result.append(2 * self.kw[k] * herm(dr))
++        result = np.asarray(result)
++        dn = float(np.trace(result, axis1=1, axis2=2).real.sum())
++        mu1 = 0.0
++        if fixed_number:
++            self._check_fixed_number()
++            mu1 = -dn / self.compressibility
++            result += mu1 * self.mu_response
++        return result, dict(
++            seconds=time.monotonic() - started,
++            dN_fixed_mu=dn,
++            dN_dmu=self.compressibility,
++            dmu=mu1,
++            dN=float(np.trace(result, axis1=1, axis2=2).real.sum()),
++            minimum_window_gap_Ry=self.minimum_gap,
++            normalization_derivative_norm=float(np.linalg.norm(dx)),
++            cache=self.cache_info(),
++        )
++
++    def adjoint(self, y, fixed_number=True, embedding=True):
++        """VJP of response, including the nonlocal projector-normalization chain.
++
++        For fixed N, response = (I - b a^T/(a^T b)) response_mu, where b is
++        d(rho)/dmu and a^T extracts the total trace. Its transpose is NOT the
++        same projector. Apply it first, before the fixed-mu electronic VJP.
++        """
++        y = self._matrix(y, "density covector")
++        self.prepare()
++        if fixed_number:
++            self._check_fixed_number()
++            y -= (real_inner(self.mu_response, y) / self.compressibility) * np.eye(
++                self.eps.shape[1]
++            )
++        answer = np.zeros_like(y)
++        du_bar = np.zeros_like(self.uc)
++        for k, u in enumerate(self.uc):
++            yy = 2 * self.kw[k] * y[k]
++            di_bar = self._fermi(k, yy)
++            if k in self._kernels:
++                hbar, ubar = self._contract_adjoint(k, yy)
++                answer[k] = di_bar + hbar
++                du_bar[k] = 2 * di_bar @ u @ self.sinf + ubar
++                continue
++            for a, stop, gw, gq, giw in self._chunks(k):
++                weights = 2 * self.meta.temperature * self.meta.weights[a:stop]
++                # Positive-frequency Hermitian projection is self-adjoint.
++                # The resolvent sandwich itself is not: use both daggers.
++                dg_bar = self.sandwich(gw.swapaxes(-1, -2).conj(), gq.conj(), yy)
++                dgi_bar = self.sandwich(giw.swapaxes(-1, -2).conj(), gq.conj(), yy)
++                dg_bar *= weights[:, None, None]
++                di_bar -= np.einsum("w,wij->ij", weights, dgi_bar)
++                answer[k] += dg_bar.sum(axis=0)
++                sigma = self.sigma[a:stop]
++                du_bar[k] += (
++                    (dg_bar @ u) @ sigma.swapaxes(-1, -2).conj()
++                    + (dg_bar.swapaxes(-1, -2).conj() @ u) @ sigma
++                ).sum(axis=0)
++            di_bar = herm(di_bar)
++            answer[k] += di_bar
++            du_bar[k] += 2 * di_bar @ u @ self.sinf
++        answer = herm(answer)
++        if embedding:
++            answer += self.embedding_adjoint(du_bar)
++        return herm(answer)
++
++    def projector_potential_gradient(self):
++        """Common band-potential gradient of the normalized-projector term.
++
++        This is the gradient of the regularized lattice scalar with respect
++        to U, followed by embedding_adjoint. It contains ONLY the extra
++        dependence H -> Pi_W(H) phi X(H), not the direct Tr(rho dH) term.
++        Thus it must not be added to that direct term a second time.
++
++        If a spatial potential operator is V_band=B v and v=K q+v_exp,
++        the common charge covector is c=K^T B^T R, R=this result. The same R
++        is used for all six strain directions. Radial-projector and moving-
++        basis derivatives are separate chains not implemented by this map.
++        """
++        self.prepare()
++        return self._projector_potential_gradient.copy()
++
++    def lattice_scalar(self, dh=None, t=0.0, u=None):
++        """Independent nonlinear scalar oracle, NOT the total Klein functional.
++
++        L = 2 sum_k w_k [Omega(H_inf) + 2T sum_w w_w Re(log det
++            (iw-H_inf) - log det(iw-H-Sigma_emb))]. Energies are relative
++        to the fixed central mu. Its H derivative is density(); its extra
++        projector derivative is projector_potential_gradient(). The exact
++        same exported quadrature and static subtraction define all three.
++        This oracle deliberately uses full matrices, independently of the
++        block algorithm, and is not used in a production response action.
++        """
++        if u is None:
++            u = self.uc
++        total = 0.0
++        T = self.meta.temperature
++        for k, eps in enumerate(self.eps):
++            h = np.diag(eps - self.meta.mu).astype(complex)
++            if dh is not None:
++                h += t * dh[k]
++            hi = h + u[k] @ self.sinf @ u[k].conj().T
++            e = np.linalg.eigvalsh(hi)
++            value = -T * np.logaddexp(0, -e / T).sum()
++            for a in range(0, len(self.meta.omega), self.frequency_chunk):
++                stop = min(a + self.frequency_chunk, len(self.meta.omega))
++                z = 1j * self.meta.omega[a:stop]
++                static = z[:, None, None] * np.eye(len(eps)) - hi
++                dynamic = (
++                    z[:, None, None] * np.eye(len(eps))
++                    - h
++                    - (u[k] @ self.sigma[a:stop]) @ u[k].conj().T
++                )
++                value += (
++                    2
++                    * T
++                    * np.dot(
++                        self.meta.weights[a:stop],
++                        np.linalg.slogdet(static)[1] - np.linalg.slogdet(dynamic)[1],
++                    )
++                )
++            total += 2 * self.kw[k] * value
++        return float(total)
++
++
++def main(argv=None):
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--export", required=True, type=Path)
++    inputs = parser.add_mutually_exclusive_group(required=True)
++    inputs.add_argument(
++        "--input",
++        type=Path,
++        help="Hermitian band matrices (.npy), optionally a leading direction axis",
++    )
++    inputs.add_argument(
++        "--projector-gradient",
++        action="store_true",
++        help="export the common projector-potential covector",
++    )
++    parser.add_argument("--output", required=True, type=Path)
++    parser.add_argument("--adjoint", action="store_true")
++    parser.add_argument("--fixed-mu", action="store_true")
++    parser.add_argument(
++        "--cache-mb",
++        type=float,
++        default=256.0,
++        help="combined resolvent/contraction cache limit",
++    )
++    parser.add_argument(
++        "--no-precontract",
++        action="store_true",
++        help="keep frequency-by-frequency action as a control",
++    )
++    args = parser.parse_args(argv)
++    model, _ = CachedFrozenSigmaResponse.from_export(
++        args.export, cache_mb=args.cache_mb, precontract=not args.no_precontract
++    )
++    if args.projector_gradient:
++        if args.adjoint:
++            parser.error("--adjoint requires --input")
++        outgoing = model.projector_potential_gradient()
++    else:
++        incoming = np.load(args.input, allow_pickle=False)
++        if incoming.ndim not in (3, 4) or incoming.shape[0] == 0:
++            raise ValueError("input must be one band-matrix array or a nonempty batch")
++        batch = incoming.ndim == 4
++        directions = incoming if batch else incoming[None]
++        results = []
++        for direction in directions:
++            if args.adjoint:
++                result = model.adjoint(direction, fixed_number=not args.fixed_mu)
++            else:
++                result, _ = model.response(direction, fixed_number=not args.fixed_mu)
++            results.append(result)
++        outgoing = np.asarray(results) if batch else results[0]
++    np.save(args.output, outgoing)
++    print(json.dumps(model.cache_info(), indent=2))
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/src/python/stress_response_adjoint.py
+@@ -0,0 +1,293 @@
++#!/usr/bin/env python3
++"""Paired real linear operators and screened six-direction stress contractions.
++
++This layer never infers a transpose by probing one density coefficient at a
++time. Each physical adapter must supply BOTH its action and exact discrete
++transpose. Native LAPW spatial-potential/radial/core adapters must be validated
++before this solver can replace the finite-difference WIEN response backend.
++
++Coordinate convention: real Euclidean vectors. For Hermitian band matrices,
++HermitianCoordinates is an isometry for Re Tr(A^dagger B). Spatial density
++coefficients require their own explicit coordinates and all integration
++weights in their forward/pullback maps; no continuum metric is assumed here.
++"""
++from __future__ import annotations
++
++from dataclasses import dataclass
++import time
++from typing import Callable
++
++import numpy as np
++from scipy.sparse.linalg import LinearOperator, gmres
++
++RY_BOHR3_TO_GPA = 14710.507641078
++STRAIN_COMPONENTS = ("xx", "yy", "zz", "yz", "xz", "xy")
++
++
++def _real_vector(x, size, name):
++    x = np.asarray(x)
++    if np.iscomplexobj(x) or x.shape != (size,) or not np.all(np.isfinite(x)):
++        raise ValueError(f"{name} must be a finite real vector of length {size}")
++    return np.asarray(x, float)
++
++
++@dataclass(frozen=True)
++class PairedOperator:
++    input_size: int
++    output_size: int
++    action: Callable
++    transpose: Callable
++    name: str = "operator"
++
++    def __post_init__(self):
++        if self.input_size < 1 or self.output_size < 1:
++            raise ValueError("operator dimensions must be positive")
++
++    def matvec(self, x):
++        return _real_vector(
++            self.action(_real_vector(x, self.input_size, self.name)),
++            self.output_size,
++            self.name + " result",
++        )
++
++    def rmatvec(self, y):
++        return _real_vector(
++            self.transpose(_real_vector(y, self.output_size, self.name)),
++            self.input_size,
++            self.name + " transpose result",
++        )
++
++    def __matmul__(self, other):
++        if other.output_size != self.input_size:
++            raise ValueError("operator composition dimensions disagree")
++        return PairedOperator(
++            other.input_size,
++            self.output_size,
++            lambda x: self.matvec(other.matvec(x)),
++            lambda y: other.rmatvec(self.rmatvec(y)),
++            self.name + " @ " + other.name,
++        )
++
++    def __add__(self, other):
++        if (self.input_size, self.output_size) != (other.input_size, other.output_size):
++            raise ValueError("operator addition dimensions disagree")
++        return PairedOperator(
++            self.input_size,
++            self.output_size,
++            lambda x: self.matvec(x) + other.matvec(x),
++            lambda y: self.rmatvec(y) + other.rmatvec(y),
++            self.name + " + " + other.name,
++        )
++
++    def check_transpose(self, seed=59, samples=3, tolerance=1e-11):
++        rng = np.random.default_rng(seed)
++        errors = []
++        for _ in range(samples):
++            x, y = rng.normal(size=self.input_size), rng.normal(size=self.output_size)
++            ax, aty = self.matvec(x), self.rmatvec(y)
++            error = abs(np.dot(y, ax) - np.dot(x, aty))
++            scale = max(
++                np.linalg.norm(y) * np.linalg.norm(ax),
++                np.linalg.norm(x) * np.linalg.norm(aty),
++                np.finfo(float).tiny,
++            )
++            errors.append(float(error / scale))
++        if max(errors) > tolerance:
++            raise ValueError(f"{self.name}: transpose test failed: {max(errors):.3g}")
++        return max(errors)
++
++
++class HermitianCoordinates:
++    """Independent n^2 real coordinates per Hermitian n x n matrix.
++
++    Diagonal entries are unscaled; real/imaginary upper-triangle entries
++    carry sqrt(2). This avoids redundant variables and shear-like factors
++    of two in transpose tests and Krylov inner products.
++    """
++
++    def __init__(self, shape):
++        self.shape = tuple(shape)
++        if len(shape) < 2 or shape[-2] != shape[-1] or min(shape) < 1:
++            raise ValueError("invalid Hermitian matrix shape")
++        self.n = shape[-1]
++        self.count = int(np.prod(shape[:-2]))
++        self.size = self.count * self.n * self.n
++        self.upper = np.triu_indices(self.n, 1)
++
++    def pack(self, matrix):
++        matrix = np.asarray(matrix)
++        if matrix.shape != self.shape or not np.all(np.isfinite(matrix)):
++            raise ValueError("invalid Hermitian coordinate input")
++        if np.max(abs(matrix - matrix.swapaxes(-1, -2).conj())) > 1e-10 * max(
++            1.0, np.max(abs(matrix))
++        ):
++            raise ValueError("coordinate input is not Hermitian")
++        a = matrix.reshape((self.count, self.n, self.n))
++        upper = a[:, self.upper[0], self.upper[1]]
++        return np.concatenate(
++            (
++                np.diagonal(a, axis1=1, axis2=2).real,
++                np.sqrt(2) * upper.real,
++                np.sqrt(2) * upper.imag,
++            ),
++            axis=1,
++        ).ravel()
++
++    def unpack(self, vector):
++        v = _real_vector(vector, self.size, "Hermitian coordinates").reshape(
++            self.count, -1
++        )
++        a = np.zeros((self.count, self.n, self.n), complex)
++        diag = np.arange(self.n)
++        a[:, diag, diag] = v[:, : self.n]
++        nupper = len(self.upper[0])
++        upper = (
++            v[:, self.n : self.n + nupper] + 1j * v[:, self.n + nupper :]
++        ) / np.sqrt(2)
++        a[:, self.upper[0], self.upper[1]] = upper
++        a[:, self.upper[1], self.upper[0]] = upper.conj()
++        return a.reshape(self.shape)
++
++
++def electronic_operator(model, *, fixed_number=True, embedding=True):
++    coordinates = HermitianCoordinates((*model.eps.shape, model.eps.shape[1]))
++    return (
++        PairedOperator(
++            coordinates.size,
++            coordinates.size,
++            lambda x: coordinates.pack(
++                model.response(coordinates.unpack(x), fixed_number, embedding)[0]
++            ),
++            lambda y: coordinates.pack(
++                model.adjoint(coordinates.unpack(y), fixed_number, embedding)
++            ),
++            "frozen-Sigma electronic response",
++        ),
++        coordinates,
++    )
++
++
++class ResponseConvergenceError(RuntimeError):
++    def __init__(self, report):
++        super().__init__(
++            f"{report['direction']} screened response did not converge: residual {report['residual_norm']:.6g}"
++        )
++        self.report = report
++
++
++class ScreenedResponse:
++    """Solve (I-J)x=b or its transpose without assuming J is symmetric.
++
++    GMRES is appropriate for the non-self-adjoint normalized-projector map.
++    Always re-evaluate the final TRUE residual. Failure never yields a stress
++    result. No nonlinear charge loop or impurity solve occurs in this layer.
++    """
++
++    def __init__(self, jacobian):
++        if jacobian.input_size != jacobian.output_size:
++            raise ValueError("charge Jacobian must be square")
++        self.jacobian = jacobian
++
++    def solve(
++        self,
++        source,
++        *,
++        adjoint=False,
++        rtol=1e-9,
++        atol=1e-11,
++        restart=30,
++        max_cycles=20,
++        initial=None,
++    ):
++        n = self.jacobian.input_size
++        source = _real_vector(source, n, "response source")
++        if (
++            rtol < 0
++            or atol < 0
++            or not np.isfinite(rtol + atol)
++            or restart < 1
++            or max_cycles < 1
++        ):
++            raise ValueError("invalid screened solver controls")
++        if initial is not None:
++            initial = _real_vector(initial, n, "initial response")
++        count, norms = 0, []
++        started = time.monotonic()
++        action = self.jacobian.rmatvec if adjoint else self.jacobian.matvec
++
++        def apply(x):
++            nonlocal count
++            count += 1
++            return x - action(x)
++
++        operator = LinearOperator((n, n), matvec=apply, dtype=float)
++        answer, info = gmres(
++            operator,
++            source,
++            x0=initial,
++            rtol=rtol,
++            atol=atol,
++            restart=min(restart, n),
++            maxiter=max_cycles,
++            callback=lambda norm: norms.append(float(norm)),
++            callback_type="pr_norm",
++        )
++        residual = source - apply(answer)
++        norm = float(np.linalg.norm(residual))
++        threshold = max(atol, rtol * float(np.linalg.norm(source)))
++        report = dict(
++            converged=bool(info == 0 and norm <= threshold),
++            gmres_info=int(info),
++            direction="adjoint" if adjoint else "forward",
++            residual_norm=norm,
++            threshold=threshold,
++            actions=count,
++            inner_residual_history=norms,
++            seconds=time.monotonic() - started,
++        )
++        if not report["converged"]:
++            raise ResponseConvergenceError(report)
++        return answer, report
++
++    def contractions(self, gradient, sources, explicit=None, **controls):
++        """One adjoint for any number of sources of ONE scalar observable.
++
++        sources[:,nu]=b_nu, gradient=c, result_nu=a_nu+lambda^T b_nu.
++        Distinct observable gradients require distinct solves (or a block
++        solve); six unrelated gradients cannot share one adjoint.
++        """
++        sources = np.asarray(sources)
++        if (
++            np.iscomplexobj(sources)
++            or sources.ndim != 2
++            or sources.shape[0] != self.jacobian.input_size
++            or not np.all(np.isfinite(sources))
++        ):
++            raise ValueError("sources must have shape (charge coordinates, directions)")
++        count = sources.shape[1]
++        explicit = (
++            np.zeros(count)
++            if explicit is None
++            else _real_vector(explicit, count, "explicit derivatives")
++        )
++        lam, report = self.solve(gradient, adjoint=True, **controls)
++        return explicit + lam @ sources, lam, report
++
++
++def engineering_strain_bases():
++    """dF/deta for eta=(exx,eyy,ezz,2eyz,2exz,2exy), at F=I."""
++    basis = np.zeros((6, 3, 3))
++    for i in range(3):
++        basis[i, i, i] = 1
++    for nu, (i, j) in enumerate([(1, 2), (0, 2), (0, 1)], 3):
++        basis[nu, i, j] = basis[nu, j, i] = 0.5
++    return basis
++
++
++def tensile_tensor(derivatives, volume):
++    """Energy derivatives in Ry -> tensile-positive GPa; engineering shears."""
++    d = _real_vector(derivatives, 6, "six energy derivatives")
++    if not np.isfinite(volume) or volume <= 0:
++        raise ValueError("volume must be positive")
++    xx, yy, zz, yz, xz, xy = d * RY_BOHR3_TO_GPA / volume
++    return np.array([[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]])
+--- /dev/null
++++ b/src/python/wien_response_operators.py
+@@ -0,0 +1,156 @@
++"""Discrete charge normalization and transport derivatives for WIEN densities.
++
++These adapters use the exact coefficients and integration convention of the
++existing finite-difference response driver. They supply genuine transpose
++actions for the charge-assembly part of screening. They do not implement the
++Hartree/XC, core-state, radial-basis, or general-strain source operators.
++"""
++
++from __future__ import annotations
++
++import numpy as np
++from scipy.interpolate import CubicSpline
++from scipy.special import spherical_jn
++
++from stress_response_adjoint import PairedOperator
++from wstruct import Struct
++
++
++def charge_covectors(density, structure):
++    """MT and interstitial charge covectors in Density.vector() coordinates.
++
++    c_lm(r)=r^2 rho_lm(r). The existing charge assembler integrates the
++    not-a-knot cubic spline of r*c_00 on the log-r grid. Differentiating this
++    discrete integral, rather than substituting different quadrature weights,
++    is necessary for agreement and a correct transpose. Fourier coefficients
++    are star sums; theta includes every symmetry-equivalent sphere.
++    """
++    s = Struct()
++    s.ReadStruct(str(structure))
++    if s.lattyp.strip() != "P" or not np.allclose([s.alpha, s.beta, s.gamma], 90.0):
++        raise ValueError(
++            "charge adapter currently requires a primitive orthogonal cell"
++        )
++    vector = density.vector()
++    mt, ir = np.zeros_like(vector), np.zeros_like(vector)
++    offset = 0
++    integrals = {}
++    for (atom, ell, m), values in density.rad.items():
++        n = len(values)
++        if ell == m == 0:
++            grid = density.grids[atom]
++            key = tuple(grid)
++            if key not in integrals:
++                # Batched spline solves, not one nonlinear charge evaluation
++                # per coefficient. Temporary O(Nrad^2) storage is released
++                # after constructing this small, reusable quadrature vector.
++                weights = CubicSpline(grid, np.eye(n), axis=0).integrate(
++                    grid[0], grid[-1]
++                )
++                integrals[key] = weights * np.exp(grid)
++            mt[offset : offset + n] = density.mult[atom] * integrals[key]
++        offset += n
++    cell = np.array([s.a, s.b, s.c])
++    volume = float(np.prod(cell))
++    for g in density.pw:
++        g = np.asarray(g)
++        magnitude = np.linalg.norm(2 * np.pi * g / cell)
++        theta = complex(np.all(g == 0))
++        position = 0
++        for atom in range(s.nat):
++            x = magnitude * s.rmt[atom]
++            sphere = 1.0 if x == 0 else 3 * spherical_jn(1, x) / x
++            for _ in range(s.mult[atom]):
++                theta -= (
++                    4
++                    * np.pi
++                    * s.rmt[atom] ** 3
++                    / (3 * volume)
++                    * sphere
++                    * np.exp(-2j * np.pi * np.dot(s.pos[position], g))
++                )
++                position += 1
++        ir[offset : offset + 2] = volume * np.array([theta.real, theta.imag])
++        offset += 2
++    return mt, ir
++
++
++class InterstitialNormalization:
++    """Differentiate the actual interstitial-only normalization, not uniform scaling.
++
++    N(q) leaves all MT coefficients unchanged and multiplies the PW part p
++    by alpha=(Ntarget-M(q))/I(q). At q0,
++        dN = D dq - p0 ell^T dq,
++        D = diag(1_MT, alpha0_PW),
++        ell = (m + alpha0*i)/I0.
++    Its transpose is D y - ell*(p0^T y). The alpha0 factors remain necessary
++    away from an exactly normalized central output. Core density must already
++    be included before applying this map.
++    """
++
++    def __init__(self, density, structure, target_charge):
++        if not np.isfinite(target_charge):
++            raise ValueError("target charge must be finite")
++        self.base = density.vector().copy()
++        self.mt, self.ir = charge_covectors(density, structure)
++        self.target = float(target_charge)
++        self.nrad = sum(len(v) for v in density.rad.values())
++        m, i = self.mt @ self.base, self.ir @ self.base
++        if i <= 0:
++            raise ValueError("nonpositive central interstitial charge")
++        self.alpha = (self.target - m) / i
++        self.i0 = i
++        self.diagonal = np.ones(len(self.base))
++        self.diagonal[self.nrad :] = self.alpha
++        self.p0 = self.base.copy()
++        self.p0[: self.nrad] = 0
++        self.ell = (self.mt + self.alpha * self.ir) / i
++        self.operator = PairedOperator(
++            len(self.base),
++            len(self.base),
++            lambda x: self.diagonal * x - self.p0 * np.dot(self.ell, x),
++            lambda y: self.diagonal * y - self.ell * np.dot(self.p0, y),
++            "interstitial charge normalization",
++        )
++
++    def endpoint(self, vector):
++        """Independent nonlinear normalization used for directional checks."""
++        vector = np.asarray(vector, float)
++        if vector.shape != self.base.shape or not np.all(np.isfinite(vector)):
++            raise ValueError("invalid normalization endpoint")
++        i = self.ir @ vector
++        if i <= 0:
++            raise ValueError("nonpositive endpoint interstitial charge")
++        result = vector.copy()
++        result[self.nrad :] *= (self.target - self.mt @ vector) / i
++        return result
++
++    def explicit_geometry(self, mt_charge_derivative, ir_charge_derivative):
++        """Normalization source from changing integration geometry at fixed q.
++
++        The caller supplies M_nu(q0), I_nu(q0), derived with the same fixed-RMT
++        convention. Ignoring these in a general strain source changes total N.
++        This helper does not infer them from hydrostatic density transport.
++        """
++        return (
++            -self.p0
++            * (mt_charge_derivative + self.alpha * ir_charge_derivative)
++            / self.i0
++        )
++
++
++def hydrostatic_transport_source(density, *, pullback=False):
++    """Exact derivative of Density.transport at lambda=1, including MT edges.
++
++    Pushforward: dc/deta=-c-dc/dlog(r), dPW/deta=-3 PW.
++    Pullback has the opposite signs. This is the existing scalar affine
++    transport convention; it is not an anisotropic/shear source generator.
++    """
++    result = density.copy()
++    sign = 1.0 if pullback else -1.0
++    for key, values in density.rad.items():
++        grid = density.grids[key[0]]
++        result.rad[key] = sign * (values + CubicSpline(grid, values)(grid, 1))
++    for g, value in density.pw.items():
++        result.pw[g] = 3 * sign * value
++    return result
+--- /dev/null
++++ b/src/python/tests/test_frozen_sigma_tangent.py
+@@ -0,0 +1,232 @@
++"""Independent finite differences, reverse contractions, and cache checks."""
++
++import unittest
++from dataclasses import replace
++from unittest.mock import patch
++
++import numpy as np
++
++from frozen_sigma_response import Metadata, FrozenSigmaResponse, invsqrt, herm
++from frozen_sigma_tangent import CachedFrozenSigmaResponse, real_inner
++from test_frozen_sigma_response import model
++
++
++def complex_model(cls=CachedFrozenSigmaResponse, cache_mb=4):
++    """Two inequivalent k points, complex orbitals and nontrivial real symmetry.
++
++    Deliberately use a non-self-adjoint Hermiticity-preserving symmetry map.
++    An implementation that silently assumes every exported map is an
++    orthogonal projector will fail this stronger algebraic control.
++    """
++    rng = np.random.default_rng(91)
++    t = 0.07
++    om = np.pi * t * (2 * np.arange(45) + 1)
++    weights = rng.uniform(0.6, 1.8, len(om))
++    raw = 0.2 * (rng.normal(size=(2, 5, 2, 1)) + 1j * rng.normal(size=(2, 5, 2, 1)))
++    rotation = np.array([[1, 0.2j], [0.1, 0.8]], complex)
++
++    def sym(a):
++        return herm(rotation @ herm(a) @ rotation.conj().T)
++
++    re, im = [], []
++    for j in range(4):
++        unit = np.zeros(4, complex)
++        unit[j] = 1
++        re.append(sym(unit.reshape((2, 2), order="F")).ravel(order="F"))
++        im.append(sym(1j * unit.reshape((2, 2), order="F")).ravel(order="F"))
++    kw = np.array([0.3, 0.7])
++    x = invsqrt(
++        sym(np.einsum("k,kni,knj->ij", kw, raw[:, 1:4, :, 0].conj(), raw[:, 1:4, :, 0]))
++    )
++    si = np.array([[0.18, 0.03j], [-0.03j, -0.1]])
++    pole = np.array([[0.13, 0.02 + 0.015j], [0.02 - 0.015j, 0.08]])
++    sigma = si[:, :, None] + pole[:, :, None] / (1j * om - 0.5)
++    meta = Metadata(
++        0.1,
++        t,
++        om,
++        weights,
++        np.array([2]),
++        np.array([0]),
++        np.array([2]),
++        np.array([[0], [1]]),
++        np.ones((2, 1), bool),
++        x[:, :, None],
++        si[:, :, None],
++        sigma[:, :, None, :],
++        np.array(re).T,
++        np.array(im).T,
++    )
++    energies = np.array([[-1.4, -0.3, 0.08, 0.5, 1.5], [-1.1, -0.2, 0.1, 0.6, 1.8]])
++    normalized = np.einsum("knic,ij->knjc", raw, x)
++    args = (meta, energies, raw, normalized, kw, [1, 2, 3])
++    return cls(
++        *args, **({"cache_mb": cache_mb} if cls is CachedFrozenSigmaResponse else {})
++    )
++
++
++class TangentTests(unittest.TestCase):
++    def setUp(self):
++        self.m = complex_model()
++        rng = np.random.default_rng(73)
++        shape = (2, 5, 5)
++        self.x = herm(rng.normal(size=shape) + 1j * rng.normal(size=shape))
++        self.y = herm(rng.normal(size=shape) + 1j * rng.normal(size=shape))
++
++    def test_cached_forward_matches_independent_reference(self):
++        reference = complex_model(FrozenSigmaResponse)
++        for fixed_n in [False, True]:
++            for embedding in [False, True]:
++                expected, a = reference.response(self.x, fixed_n, embedding)
++                actual, b = self.m.response(self.x, fixed_n, embedding)
++                np.testing.assert_allclose(actual, expected, atol=3e-14, rtol=3e-13)
++                self.assertAlmostEqual(a["dmu"], b["dmu"], places=12)
++
++    def test_complex_normalized_endpoint(self):
++        actual, _ = self.m.response(self.x, fixed_number=False)
++        errors = []
++        for h in [1e-4, 5e-5]:
++            plus = self.m.density(self.x, h, self.m.embedding_endpoint(self.x, h))
++            minus = self.m.density(self.x, -h, self.m.embedding_endpoint(self.x, -h))
++            errors.append(np.linalg.norm((plus - minus) / (2 * h) - actual))
++        self.assertLess(errors[-1], 3e-6)
++        self.assertGreater(errors[0] / errors[1], 3.8)
++
++    def test_real_linear_symmetry_transpose(self):
++        rng = np.random.default_rng(20)
++        x = rng.normal(size=self.m.X.shape) + 1j * rng.normal(size=self.m.X.shape)
++        y = rng.normal(size=x.shape) + 1j * rng.normal(size=x.shape)
++        self.assertAlmostEqual(
++            real_inner(y, self.m.meta.sym(x)),
++            real_inner(self.m.symmetry_adjoint(y), x),
++            places=13,
++        )
++
++    def test_embedding_transpose(self):
++        rng = np.random.default_rng(28)
++        y = rng.normal(size=self.m.uc.shape) + 1j * rng.normal(size=self.m.uc.shape)
++        forward, _, _ = self.m.embedding_response(self.x)
++        self.assertAlmostEqual(
++            real_inner(y, forward),
++            real_inner(self.m.embedding_adjoint(y), self.x),
++            places=12,
++        )
++
++    def test_density_transpose_all_constraints(self):
++        for fixed_n in [False, True]:
++            for embedding in [False, True]:
++                f, _ = self.m.response(self.x, fixed_n, embedding)
++                b = self.m.adjoint(self.y, fixed_n, embedding)
++                np.testing.assert_allclose(
++                    real_inner(self.y, f), real_inner(b, self.x), atol=2e-12, rtol=2e-12
++                )
++
++    def test_fixed_n_charge_covector_is_null(self):
++        identity = np.broadcast_to(np.eye(5), self.x.shape)
++        np.testing.assert_allclose(self.m.adjoint(identity), 0, atol=1e-14)
++        rho, report = self.m.response(identity)
++        np.testing.assert_allclose(rho, 0, atol=2e-14)
++        self.assertAlmostEqual(report["dmu"], 1.0, places=12)
++
++    def test_warm_actions_do_not_diagonalize_or_invert(self):
++        self.m.prepare()
++        with patch(
++            "frozen_sigma_tangent.eigh",
++            side_effect=AssertionError("unexpected diagonalization"),
++        ), patch(
++            "numpy.linalg.inv", side_effect=AssertionError("unexpected inversion")
++        ):
++            self.m.response(self.x)
++            self.m.adjoint(self.y)
++        self.assertLessEqual(self.m.cache_info()["resolvent_bytes"], self.m.cache_limit)
++
++    def test_no_cache_agrees_in_both_directions(self):
++        uncached = complex_model(cache_mb=0)
++        for action in ["response", "adjoint"]:
++            a = getattr(self.m, action)(self.x)
++            b = getattr(uncached, action)(self.x)
++            np.testing.assert_allclose(
++                a[0] if action == "response" else a,
++                b[0] if action == "response" else b,
++                atol=1e-14,
++            )
++        self.assertEqual(uncached.cache_info()["resolvent_bytes"], 0)
++
++    def test_empty_complement(self):
++        original = model()
++        args = (
++            original.meta,
++            original.eps,
++            original.raw,
++            original.apply_x(original.raw, original.X),
++            original.kw,
++            np.arange(4),
++        )
++        m = CachedFrozenSigmaResponse(*args)
++        x, y = self.x[:, :4, :4], self.y[:, :4, :4]
++        du, _, _ = m.embedding_response(x)
++        np.testing.assert_array_equal(du, 0)
++        f, _ = m.response(x)
++        self.assertAlmostEqual(real_inner(y, f), real_inner(m.adjoint(y), x), places=12)
++
++    def test_scalar_projector_gradient_without_direct_density_term(self):
++        expected = real_inner(self.m.projector_potential_gradient(), self.x)
++        h = 1e-5
++        plus = self.m.lattice_scalar(u=self.m.embedding_endpoint(self.x, h))
++        minus = self.m.lattice_scalar(u=self.m.embedding_endpoint(self.x, -h))
++        self.assertAlmostEqual((plus - minus) / (2 * h), expected, places=7)
++
++    def test_complete_scalar_gradient(self):
++        gradient = self.m.density() + self.m.projector_potential_gradient()
++        h = 1e-5
++        plus = self.m.lattice_scalar(self.x, h, self.m.embedding_endpoint(self.x, h))
++        minus = self.m.lattice_scalar(self.x, -h, self.m.embedding_endpoint(self.x, -h))
++        self.assertAlmostEqual(
++            (plus - minus) / (2 * h), real_inner(gradient, self.x), places=7
++        )
++
++    def test_central_arrays_are_read_only(self):
++        for array in [self.m.eps, self.m.sigma, self.m.X, self.m.meta.weights]:
++            with self.assertRaises(ValueError):
++                array.flat[0] = 0
++
++    def test_changed_mu_rejects_stale_context(self):
++        self.m.prepare()
++        self.m.meta.mu += 0.01
++        with self.assertRaisesRegex(ValueError, "construct a new response context"):
++            self.m.response(self.x)
++
++    def test_partial_cache_matches_full_cache(self):
++        partial = complex_model(cache_mb=0.0035)
++        a, _ = partial.response(self.x)
++        b, _ = self.m.response(self.x)
++        np.testing.assert_allclose(a, b, atol=3e-14)
++        np.testing.assert_allclose(
++            partial.adjoint(self.y), self.m.adjoint(self.y), atol=3e-14
++        )
++        self.assertEqual(partial.cache_info()["precontracted_kpoints"], 1)
++        self.assertLessEqual(
++            partial.cache_info()["total_cache_bytes"], partial.cache_limit
++        )
++
++    def test_zero_self_energy_removes_all_projector_response(self):
++        m = self.m
++        meta = replace(
++            m.meta,
++            sigma=np.zeros_like(m.meta.sigma),
++            sigma_inf=np.zeros_like(m.meta.sigma_inf),
++        )
++        zero = CachedFrozenSigmaResponse(
++            meta, m.eps, m.raw, m.apply_x(m.raw, m.X), m.kw, m.W
++        )
++        np.testing.assert_allclose(zero.projector_potential_gradient(), 0, atol=1e-15)
++        a, _ = zero.response(self.x, embedding=True)
++        b, _ = zero.response(self.x, embedding=False)
++        np.testing.assert_allclose(a, b, atol=1e-15)
++        # With Sigma=0, equal k weights are not required: per-k scalar
++        # weights commute with the ordinary independent-electron response.
++        np.testing.assert_allclose(zero.adjoint(self.x), a, atol=3e-14)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- /dev/null
++++ b/src/python/tests/test_stress_response_adjoint.py
+@@ -0,0 +1,110 @@
++import unittest
++import numpy as np
++from frozen_sigma_tangent import real_inner
++from stress_response_adjoint import (
++    PairedOperator,
++    HermitianCoordinates,
++    electronic_operator,
++    ScreenedResponse,
++    ResponseConvergenceError,
++    tensile_tensor,
++    engineering_strain_bases,
++    RY_BOHR3_TO_GPA,
++)
++from test_frozen_sigma_tangent import complex_model
++
++
++def matrix_operator(a):
++    return PairedOperator(a.shape[1], a.shape[0], lambda x: a @ x, lambda y: a.T @ y)
++
++
++class AdjointTests(unittest.TestCase):
++    def test_hermitian_coordinates_are_isometric(self):
++        coordinates = HermitianCoordinates((2, 5, 5))
++        rng = np.random.default_rng(90)
++        x, y = rng.normal(size=(2, coordinates.size))
++        a, b = coordinates.unpack(x), coordinates.unpack(y)
++        np.testing.assert_allclose(coordinates.pack(a), x, atol=5e-16)
++        self.assertAlmostEqual(real_inner(a, b), x @ y, places=13)
++
++    def test_composed_rectangular_transpose(self):
++        rng = np.random.default_rng(18)
++        a, b = rng.normal(size=(6, 7)), rng.normal(size=(7, 3))
++        operator = matrix_operator(a) @ matrix_operator(b)
++        self.assertLess(operator.check_transpose(), 1e-14)
++
++    def test_electronic_transpose_coordinates(self):
++        operator, _ = electronic_operator(complex_model())
++        self.assertLess(operator.check_transpose(), 1e-13)
++
++    def test_one_adjoint_matches_six_forward_solves(self):
++        rng = np.random.default_rng(49)
++        j = rng.normal(size=(17, 17)) * 0.05
++        # A nonnormal map with unstable simple mixing; do not assume SPD.
++        j[0, 0] = -7
++        j[0, 1] = 1.7
++        solver = ScreenedResponse(matrix_operator(j))
++        sources = rng.normal(size=(17, 6))
++        gradient = rng.normal(size=17)
++        explicit = rng.normal(size=6)
++        answer, lam, report = solver.contractions(
++            gradient, sources, explicit, rtol=1e-12, atol=1e-13
++        )
++        forwards = np.column_stack(
++            [solver.solve(sources[:, nu], rtol=1e-12, atol=1e-13)[0] for nu in range(6)]
++        )
++        np.testing.assert_allclose(
++            answer, explicit + gradient @ forwards, rtol=1e-11, atol=1e-11
++        )
++        np.testing.assert_allclose(
++            lam, np.linalg.solve(np.eye(17) - j.T, gradient), atol=1e-11
++        )
++        self.assertTrue(report["converged"])
++
++    def test_physical_chain_electrons_and_common_gradient(self):
++        model = complex_model()
++        chi, coordinates = electronic_operator(model)
++        rng = np.random.default_rng(112)
++        # Reduced-coordinate diagnostic: a paired potential/reconstruction
++        # map. This is not a claimed LAPW spatial Hartree/XC operator.
++        b = rng.normal(size=(coordinates.size, 8)) * 0.01
++        potential = matrix_operator(b)
++        density = matrix_operator(b.T)
++        j = density @ chi @ potential
++        j.check_transpose()
++        c = potential.rmatvec(coordinates.pack(model.projector_potential_gradient()))
++        sources = rng.normal(size=(8, 6))
++        solver = ScreenedResponse(j)
++        answer, _, _ = solver.contractions(c, sources, rtol=1e-12, atol=1e-14)
++        forward = [
++            solver.solve(sources[:, i], rtol=1e-12, atol=1e-14)[0] for i in range(6)
++        ]
++        np.testing.assert_allclose(answer, np.array(forward) @ c, atol=1e-13)
++
++    def test_bad_transpose_rejected(self):
++        j = np.array([[0.1, 1.2], [-0.2, 0.4]])
++        wrong = PairedOperator(2, 2, lambda x: j @ x, lambda y: j @ y)
++        with self.assertRaisesRegex(ValueError, "transpose test failed"):
++            wrong.check_transpose()
++
++    def test_singular_screening_is_not_reported_as_stress(self):
++        solver = ScreenedResponse(matrix_operator(np.eye(2)))
++        with self.assertRaises(ResponseConvergenceError):
++            solver.contractions(np.ones(2), np.ones((2, 6)))
++
++    def test_shear_convention_and_hydrostatic_trace(self):
++        stress = np.array([[1.0, 4.0, 5.0], [4.0, 2.0, 6.0], [5.0, 6.0, 3.0]])
++        volume = 71.0
++        derivatives = (
++            np.einsum("vij,ij->v", engineering_strain_bases(), stress)
++            * volume
++            / RY_BOHR3_TO_GPA
++        )
++        np.testing.assert_allclose(tensile_tensor(derivatives, volume), stress)
++        self.assertAlmostEqual(
++            derivatives[:3].sum() * RY_BOHR3_TO_GPA / (3 * volume), np.trace(stress) / 3
++        )
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- /dev/null
++++ b/src/python/tests/test_wien_response_operators.py
+@@ -0,0 +1,75 @@
++import unittest
++from unittest.mock import patch
++from types import SimpleNamespace
++import numpy as np
++from wien_response_density import Density
++from wien_response_operators import (
++    charge_covectors,
++    InterstitialNormalization,
++    hydrostatic_transport_source,
++)
++
++
++def density_fixture():
++    d = Density.__new__(Density)
++    d.grids = [np.linspace(-4, 0.4, 41)]
++    d.mult = [2]
++    r = np.exp(d.grids[0])
++    d.rad = {(0, 0, 0): 0.3 * r * r * np.exp(-r), (0, 2, 0): 0.02 * r * r}
++    d.pw = {(0, 0, 0): 0.03 + 0j, (1, 0, 0): 0.002 + 0.001j, (0, 1, 1): 0.001 - 0.002j}
++    structure = SimpleNamespace(
++        lattyp="P",
++        alpha=90.0,
++        beta=90.0,
++        gamma=90.0,
++        a=5.0,
++        b=6.0,
++        c=7.0,
++        nat=1,
++        mult=[2],
++        rmt=[float(r[-1])],
++        pos=np.array([[0.1, 0.2, 0.3], [0.6, 0.7, 0.8]]),
++        ReadStruct=lambda path: None,
++    )
++    return d, structure
++
++
++class DensityOperatorTests(unittest.TestCase):
++    def test_normalization_tangent_and_transpose_off_fixed_point(self):
++        density, structure = density_fixture()
++        with patch("wien_response_operators.Struct", return_value=structure):
++            normal = InterstitialNormalization(density, "unused", 7.8)
++        self.assertGreater(abs(normal.alpha - 1), 0.1)
++        self.assertLess(normal.operator.check_transpose(), 1e-14)
++        rng = np.random.default_rng(98)
++        direction = rng.normal(size=len(normal.base)) * 0.01
++        h = 1e-4
++        fd = (
++            normal.endpoint(normal.base + h * direction)
++            - normal.endpoint(normal.base - h * direction)
++        ) / (2 * h)
++        np.testing.assert_allclose(fd, normal.operator.matvec(direction), atol=1e-11)
++        self.assertAlmostEqual(
++            (normal.mt + normal.ir) @ normal.operator.matvec(direction), 0, places=13
++        )
++        self.assertAlmostEqual(
++            (normal.mt + normal.ir) @ normal.endpoint(normal.base), 7.8, places=13
++        )
++
++    def test_transport_derivative_matches_same_spline_endpoints(self):
++        density, _ = density_fixture()
++        for pullback in [False, True]:
++            answer = hydrostatic_transport_source(density, pullback=pullback).vector()
++            errors = []
++            for h in [2e-4, 1e-4]:
++                fd = (
++                    density.transport(1 + h, pullback).vector()
++                    - density.transport(1 - h, pullback).vector()
++                ) / (2 * h)
++                errors.append(np.linalg.norm(fd - answer))
++            self.assertLess(errors[-1], 1e-7)
++            self.assertGreater(errors[0] / errors[1], 3.8)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- /dev/null
++++ b/src/dmft2/atpar/outwin_response.f90
+@@ -0,0 +1,318 @@
++module outwin_response
++  ! Exact directional and reverse derivatives of the DISCRETE OUTWIN solver.
++  !
++  ! We reuse OUTWIN for the central solution and differentiate its implicit
++  ! Adams--Moulton steps. No continuous (H-E)udot=u identity, potential finite
++  ! difference, or dense radial response matrix is substituted for the actual
++  ! algorithm. The first propagated point retains its fourth-order startup.
++  ! Both NREL and scalar RELA use exactly OUTWIN's small-component convention.
++  !
++  ! Scope: fixed radial grid, l, Z and REL flag; derivatives with respect to
++  ! V=r*V_spherical in Hartree and the supplied energy E in Hartree. Automatic
++  ! LAPW1 energy searches, DIRACOUT p1/2 orbitals, local-orbital ABC matching,
++  ! and moving-sphere derivatives are separate operations, not included here.
++  !
++  ! Normalized and energy-derivative functions use ATPARN's RINT13 metric,
++  ! +/-0.002 Hartree energy stencil, and final orthogonalization. Returned
++  ! channels are (A,B,AP,BP), with A=r*u and AP=r*d(u)/dr. Boundary values
++  ! VAL=A(n)/r(n), SLO=AP(n)/r(n) can be folded into the last-point covectors.
++  use iso_fortran_env, only: real64
++  implicit none
++  private
++  integer, parameter :: dp=real64
++  real(dp), parameter :: clight=137.0359895_dp
++  public :: radial_context, radial_pair_context
++  public :: prepare_radial, radial_value, radial_action, radial_pullback
++  public :: prepare_radial_pair, radial_pair_value
++  public :: radial_pair_action, radial_pair_pullback
++  public :: local_orbital_coefficients
++
++  type :: radial_context
++     integer :: n=0
++     real(dp) :: dx=0, c=0, norm=0
++     real(dp), allocatable :: r(:), y(:,:), f(:,:), output(:,:), metric(:,:)
++     real(dp), allocatable :: matrix(:,:,:), phi_slope(:), phi_v(:), phi_e(:)
++  end type
++
++  type :: radial_pair_context
++     type(radial_context) :: center, plus, minus
++     real(dp), allocatable :: u(:,:), raw_dot(:,:)
++     real(dp) :: cross=0
++     real(dp) :: stencil=0.25_dp/0.002_dp
++  end type
++
++contains
++
++  subroutine prepare_radial(ctx, rel, potential, r0, dx, energy, ell, charge)
++    type(radial_context), intent(out) :: ctx
++    logical, intent(in) :: rel
++    real(dp), intent(in) :: potential(:), r0, dx, energy, ell, charge
++    real(dp) :: a(size(potential)), b(size(potential)), ap(size(potential)), bp(size(potential))
++    real(dp) :: val, slo, phi, u, x, yy, cin, radius, ratio, rfirst
++    integer :: n, k, nodes, j, first
++    n=size(potential)
++    if (n<4.or.r0<=0.or.dx<=0) error stop 'invalid radial response grid'
++    ctx%n=n; ctx%dx=dx
++    ctx%c=2*clight
++    if (.not.rel) ctx%c=1.0e10_dp
++    allocate(ctx%r(n), ctx%y(n,2), ctx%f(n,2), ctx%output(n,4), ctx%metric(n,4))
++    allocate(ctx%matrix(2,2,n), ctx%phi_slope(n), ctx%phi_v(n), ctx%phi_e(n))
++    call outwin(a,b,ap,bp,nodes,val,slo,rel,potential,r0,dx,n,energy,ell,charge,n)
++    do k=1,n
++       ctx%r(k)=r0*exp(dx*real(k-1,dp))
++    enddo
++    ctx%output(:,1)=a; ctx%output(:,2)=b
++    ctx%output(:,3)=ap; ctx%output(:,4)=bp
++    ctx%y(:,1)=a; ctx%y(:,2)=b*2/ctx%c
++    ctx%f(:,1)=dx*(ctx%r*ap+a)
++    ctx%f(:,2)=dx*(ctx%r*bp+b)*2/ctx%c
++    do k=1,n
++       radius=ctx%r(k)
++       phi=(2*energy-2*potential(k)/radius)*dx*radius/ctx%c
++       u=dx*radius*ctx%c+phi
++       x=-dx
++       yy=-ell*(ell+1)*x*x/u+phi
++       ctx%matrix(1,1,k)=-x; ctx%matrix(1,2,k)=u
++       ctx%matrix(2,1,k)=-yy; ctx%matrix(2,2,k)=x
++       ctx%phi_slope(k)=1+ell*(ell+1)*x*x/(u*u)
++       ctx%phi_v(k)=-2*dx/ctx%c
++       ctx%phi_e(k)=2*dx*radius/ctx%c
++    enddo
++    ! Reproduce RINT13's actual end weights, including its origin term and
++    ! even-grid startup correction. Its NREL small metric is 1e-22, not zero.
++    ctx%metric=0
++    cin=1/(clight*clight)
++    if (.not.rel) cin=1.0e-22_dp
++    j=3-mod(n,2); first=j-1
++    ratio=exp(dx); radius=r0*ratio**(j-1); rfirst=radius/ratio
++    do
++       ctx%metric(j,1)=ctx%metric(j,1)+4*dx*radius/3
++       radius=radius*ratio; j=j+1
++       if (j>=n) exit
++       ctx%metric(j,1)=ctx%metric(j,1)+2*dx*radius/3
++       radius=radius*ratio; j=j+1
++    enddo
++    ctx%metric(j,1)=ctx%metric(j,1)+dx*radius/3
++    ctx%metric(first,1)=ctx%metric(first,1)+dx*rfirst/3
++    ctx%metric(1,1)=ctx%metric(1,1)+r0/3
++    if (first>1) then
++       ctx%metric(1,1)=ctx%metric(1,1)+0.5_dp*dx*r0
++       ctx%metric(first,1)=ctx%metric(first,1)+0.5_dp*dx*rfirst
++    endif
++    ctx%metric(:,2)=cin*ctx%metric(:,1)
++    ctx%norm=1/sqrt(sum(ctx%metric*ctx%output**2))
++  end subroutine
++
++  subroutine history(k, scale, weight, first)
++    integer, intent(in) :: k
++    real(dp), intent(out) :: scale, weight(4)
++    integer, intent(out) :: first
++    if (k==4) then
++       scale=8.0_dp/3
++       weight=[1.0_dp,-5.0_dp,19.0_dp,0.0_dp]/9
++       first=1
++    else
++       scale=720.0_dp/251
++       weight=[-19.0_dp,106.0_dp,-264.0_dp,646.0_dp]/251
++       first=k-4
++    endif
++  end subroutine
++
++  function solve_step(matrix, scale, rhs, transposed) result(answer)
++    real(dp), intent(in) :: matrix(2,2), scale, rhs(2)
++    logical, intent(in) :: transposed
++    real(dp) :: answer(2), a(2,2), determinant
++    a=-matrix
++    a(1,1)=a(1,1)+scale; a(2,2)=a(2,2)+scale
++    if (transposed) a=transpose(a)
++    determinant=a(1,1)*a(2,2)-a(1,2)*a(2,1)
++    answer(1)=(a(2,2)*rhs(1)-a(1,2)*rhs(2))/determinant
++    answer(2)=(a(1,1)*rhs(2)-a(2,1)*rhs(1))/determinant
++  end function
++
++  function radial_value(ctx, normalized) result(value)
++    type(radial_context), intent(in) :: ctx
++    logical, intent(in) :: normalized
++    real(dp) :: value(ctx%n,4)
++    value=ctx%output
++    if (normalized) value=ctx%norm*value
++  end function
++
++  subroutine radial_action(ctx, dv, de, derivative, normalized)
++    type(radial_context), intent(in) :: ctx
++    real(dp), intent(in) :: dv(ctx%n), de
++    real(dp), intent(out) :: derivative(ctx%n,4)
++    logical, intent(in) :: normalized
++    real(dp) :: dy(ctx%n,2), df(ctx%n,2), dl_y(2), rhs(2), phi, scale, weight(4), dn
++    integer :: k,j,first
++    ! Origin seeds are independent of V and E in the implemented OUTWIN.
++    dy=0; df=0
++    do k=4,ctx%n
++       call history(k,scale,weight,first)
++       rhs=scale*dy(k-1,:)
++       do j=first,k-1
++          rhs=rhs+weight(j-first+1)*df(j,:)
++       enddo
++       phi=ctx%phi_v(k)*dv(k)+ctx%phi_e(k)*de
++       dl_y=[phi*ctx%y(k,2), -ctx%phi_slope(k)*phi*ctx%y(k,1)]
++       dy(k,:)=solve_step(ctx%matrix(:,:,k),scale,rhs+dl_y,.false.)
++       df(k,:)=matmul(ctx%matrix(:,:,k),dy(k,:))+dl_y
++    enddo
++    derivative(:,1)=dy(:,1)
++    derivative(:,2)=dy(:,2)*ctx%c/2
++    derivative(:,3)=(df(:,1)/ctx%dx-dy(:,1))/ctx%r
++    derivative(:,4)=(df(:,2)/ctx%dx-dy(:,2))/ctx%r*ctx%c/2
++    if (normalized) then
++       dn=-ctx%norm**3*sum(ctx%metric*ctx%output*derivative)
++       derivative=ctx%norm*derivative+dn*ctx%output
++    endif
++  end subroutine
++
++  subroutine radial_pullback(ctx, covector, dv_bar, de_bar, normalized)
++    type(radial_context), intent(in) :: ctx
++    real(dp), intent(in) :: covector(ctx%n,4)
++    real(dp), intent(out) :: dv_bar(ctx%n), de_bar
++    logical, intent(in) :: normalized
++    real(dp) :: gradient(ctx%n,4), by(ctx%n,2), bf(ctx%n,2)
++    real(dp) :: rhs_bar(2), combined(2), scale, weight(4), phi_bar
++    integer :: k,j,first
++    gradient=covector
++    if (normalized) gradient=ctx%norm*gradient-ctx%norm**3 &
++         *sum(covector*ctx%output)*ctx%metric*ctx%output
++    by(:,1)=gradient(:,1)-gradient(:,3)/ctx%r
++    by(:,2)=(gradient(:,2)-gradient(:,4)/ctx%r)*ctx%c/2
++    bf(:,1)=gradient(:,3)/(ctx%dx*ctx%r)
++    bf(:,2)=gradient(:,4)/(ctx%dx*ctx%r)*ctx%c/2
++    dv_bar=0; de_bar=0
++    do k=ctx%n,4,-1
++       call history(k,scale,weight,first)
++       ! f_k=L_k*y_k followed the implicit solve. Reverse it first, then
++       ! solve (scale*I-L_k)^T for the implicit-step covector.
++       by(k,:)=by(k,:)+matmul(transpose(ctx%matrix(:,:,k)),bf(k,:))
++       combined=by(k,:)
++       rhs_bar=solve_step(ctx%matrix(:,:,k),scale,combined,.true.)
++       combined=bf(k,:)+rhs_bar
++       phi_bar=combined(1)*ctx%y(k,2)-ctx%phi_slope(k)*combined(2)*ctx%y(k,1)
++       dv_bar(k)=ctx%phi_v(k)*phi_bar
++       de_bar=de_bar+ctx%phi_e(k)*phi_bar
++       by(k-1,:)=by(k-1,:)+scale*rhs_bar
++       do j=first,k-1
++          bf(j,:)=bf(j,:)+weight(j-first+1)*rhs_bar
++       enddo
++    enddo
++  end subroutine
++
++  subroutine prepare_radial_pair(ctx,rel,potential,r0,dx,energy,ell,charge)
++    type(radial_pair_context), intent(out) :: ctx
++    logical, intent(in) :: rel
++    real(dp), intent(in) :: potential(:),r0,dx,energy,ell,charge
++    call prepare_radial(ctx%center,rel,potential,r0,dx,energy,ell,charge)
++    call prepare_radial(ctx%plus,rel,potential,r0,dx,energy+0.002_dp,ell,charge)
++    call prepare_radial(ctx%minus,rel,potential,r0,dx,energy-0.002_dp,ell,charge)
++    ctx%u=radial_value(ctx%center,.true.)
++    ctx%raw_dot=ctx%stencil*(radial_value(ctx%plus,.true.)-radial_value(ctx%minus,.true.))
++    ctx%cross=sum(ctx%center%metric*ctx%u*ctx%raw_dot)
++  end subroutine
++
++  function radial_pair_value(ctx) result(value)
++    type(radial_pair_context), intent(in) :: ctx
++    real(dp) :: value(ctx%center%n,4,2)
++    value(:,:,1)=ctx%u
++    value(:,:,2)=ctx%raw_dot-ctx%cross*ctx%u
++  end function
++
++  subroutine radial_pair_action(ctx,dv,de,derivative)
++    type(radial_pair_context), intent(in) :: ctx
++    real(dp), intent(in) :: dv(ctx%center%n),de
++    real(dp), intent(out) :: derivative(ctx%center%n,4,2)
++    real(dp) :: du(ctx%center%n,4),dz(ctx%center%n,4),temp(ctx%center%n,4),dcross
++    call radial_action(ctx%center,dv,de,du,.true.)
++    call radial_action(ctx%plus,dv,de,dz,.true.)
++    call radial_action(ctx%minus,dv,de,temp,.true.)
++    dz=ctx%stencil*(dz-temp)
++    dcross=sum(ctx%center%metric*(du*ctx%raw_dot+ctx%u*dz))
++    derivative(:,:,1)=du
++    derivative(:,:,2)=dz-dcross*ctx%u-ctx%cross*du
++  end subroutine
++
++  subroutine radial_pair_pullback(ctx,covector,dv_bar,de_bar)
++    type(radial_pair_context), intent(in) :: ctx
++    real(dp), intent(in) :: covector(ctx%center%n,4,2)
++    real(dp), intent(out) :: dv_bar(ctx%center%n),de_bar
++    real(dp) :: gu(ctx%center%n,4),gz(ctx%center%n,4),temp(ctx%center%n),te,s
++    s=sum(covector(:,:,2)*ctx%u)
++    gu=covector(:,:,1)-ctx%cross*covector(:,:,2)-s*ctx%center%metric*ctx%raw_dot
++    gz=covector(:,:,2)-s*ctx%center%metric*ctx%u
++    call radial_pullback(ctx%center,gu,dv_bar,de_bar,.true.)
++    call radial_pullback(ctx%plus,ctx%stencil*gz,temp,te,.true.)
++    dv_bar=dv_bar+temp; de_bar=de_bar+te
++    call radial_pullback(ctx%minus,-ctx%stencil*gz,temp,te,.true.)
++    dv_bar=dv_bar+temp; de_bar=de_bar+te
++  end subroutine
++
++  subroutine local_orbital_coefficients(lapw,jlo,x,coefficient,jacobian)
++    ! Differentiate the actual ABC/ABC0 formula, INCLUDING its CLO cap.
++    ! x=(p,dp,pe,dpe,pei,plo,dplo,pi12lo,pe12lo,RMT).
++    ! Jacobian is tiny (3 by 10), so store it directly. Its transpose is the
++    ! exact reverse action. All radial overlaps and boundary values must be
++    ! differentiated by the caller with the same radial/matching convention.
++    !
++    ! In particular, the LAPW branch follows ABC's RMT**2 factors; replacing
++    ! these by an exact boundary-matrix inverse would change the underlying
++    ! basis algorithm. This routine does not make that unvalidated change.
++    logical,intent(in) :: lapw
++    integer,intent(in) :: jlo
++    real(dp),intent(in) :: x(10)
++    real(dp),intent(out) :: coefficient(3),jacobian(3,10)
++    real(dp) :: eye(10,10),a,b,c,norm,da(10),db(10),dc(10),dn(10),r
++    integer :: i
++    eye=0
++    do i=1,10
++       eye(i,i)=1
++    enddo
++    coefficient=0;jacobian=0;r=x(10)
++    if (lapw) then
++       a=(x(6)*x(4)-x(7)*x(3))*r*r
++       b=-(x(6)*x(2)-x(7)*x(1))*r*r
++       da=(x(4)*eye(6,:)+x(6)*eye(4,:)-x(3)*eye(7,:)-x(7)*eye(3,:))*r*r &
++          +2*r*(x(6)*x(4)-x(7)*x(3))*eye(10,:)
++       db=-(x(2)*eye(6,:)+x(6)*eye(2,:)-x(1)*eye(7,:)-x(7)*eye(1,:))*r*r &
++          -2*r*(x(6)*x(2)-x(7)*x(1))*eye(10,:)
++       norm=1+a*(a+2*x(8))+b*(b*x(5)+2*x(9))
++       if(norm<=0) error stop 'nonpositive LO normalization'
++       dn=(2*a+2*x(8))*da+2*a*eye(8,:) &
++          +(2*b*x(5)+2*x(9))*db+b*b*eye(5,:)+2*b*eye(9,:)
++       c=1/sqrt(norm)
++       if(abs(c-200.0_dp)<1e-8_dp) error stop 'LO derivative at nondifferentiable CLO cap'
++       if(c>200) then
++          c=200;dc=0
++       else
++          dc=-0.5_dp*c**3*dn
++       endif
++       coefficient=[c*a,c*b,c]
++       jacobian(1,:)=c*da+a*dc
++       jacobian(2,:)=c*db+b*dc
++       jacobian(3,:)=dc
++    else if(jlo==1) then
++       if(abs(x(3))<tiny(1.0_dp)) error stop 'zero udot boundary value in APW+lo'
++       b=-x(1)/x(3)
++       db=-eye(1,:)/x(3)+x(1)*eye(3,:)/x(3)**2
++       norm=1+b*b*x(5)
++       if(norm<=0) error stop 'nonpositive APW+lo normalization'
++       dn=2*b*x(5)*db+b*b*eye(5,:)
++       a=1/sqrt(norm);da=-0.5_dp*a**3*dn
++       coefficient=[a,a*b,0.0_dp]
++       jacobian(1,:)=da;jacobian(2,:)=a*db+b*da
++    else
++       if(abs(x(6))<tiny(1.0_dp)) error stop 'zero LO boundary value in APW+LO'
++       b=-x(1)/x(6)
++       db=-eye(1,:)/x(6)+x(1)*eye(6,:)/x(6)**2
++       norm=1+b*b+2*b*x(8)
++       if(norm<=0) error stop 'nonpositive APW+LO normalization'
++       dn=(2*b+2*x(8))*db+2*b*eye(8,:)
++       a=1/sqrt(norm);da=-0.5_dp*a**3*dn
++       coefficient=[a,0.0_dp,a*b]
++       jacobian(1,:)=da;jacobian(3,:)=a*db+b*da
++    endif
++  end subroutine
++end module outwin_response
+--- a/src/dmft2/atpar/Makefile
++++ b/src/dmft2/atpar/Makefile
+@@ -1,6 +1,8 @@
+ include ../../Makefile.in
+ 
+-objs = outwin.o  rint13.o  abc.o  diracout.o  dergl.o  inouh.o  inth.o
++# The discrete radial tangent/adjoint is opt-in; ordinary ATPARN still calls
++# OUTWIN directly. Keep the response module available to future native workers.
++objs = outwin.o  outwin_response.o  rint13.o  abc.o  diracout.o  dergl.o  inouh.o  inth.o
+ #LIBOPT = -dynamiclib
+ 
+ libatpar.a : $(objs) atpar.o readPot.o
+--- /dev/null
++++ b/src/dmft2/tests/test_outwin_response.f90
+@@ -0,0 +1,60 @@
++program test_outwin_response
++  use iso_fortran_env, only: real64
++  use outwin_response
++  implicit none
++  integer, parameter :: dp=real64, maximum=401
++  type(radial_pair_context) :: center, plus, minus
++  real(dp) :: potential(maximum),dv(maximum),bar_v(maximum),r(maximum)
++  real(dp) :: tangent(maximum,4,2),covector(maximum,4,2),fd(maximum,4,2)
++  real(dp) :: values(maximum,4,2),step,dx,r0,de,bar_e,left,right,err,rev,maxfd,maxrev
++  real(dp) :: energy,ell,charge,first_error,last_error,zero(maximum,4,2),orthogonality
++  integer :: n,mode,l,i,j,k,ih
++  logical :: rel
++  maxfd=0;maxrev=0
++  r0=1.0e-4_dp;energy=0.17_dp;charge=26;de=0.03_dp
++  do n=400,401
++     dx=log(2.1_dp/r0)/(n-1)
++     do i=1,n
++        r(i)=r0*exp(dx*(i-1))
++        potential(i)=-charge*exp(-r(i))+0.15_dp*r(i)**2
++        dv(i)=0.07_dp*r(i)*sin(1.3_dp*r(i))
++        do j=1,4
++           do k=1,2
++              covector(i,j,k)=sin(0.2_dp*i+j+0.4_dp*k)*exp(-r(i))
++           enddo
++        enddo
++     enddo
++     do mode=0,1
++        rel=mode==1
++        do l=0,3
++           ell=real(l,dp)
++           call prepare_radial_pair(center,rel,potential(:n),r0,dx,energy,ell,charge)
++           values(:n,:,:)=radial_pair_value(center)
++           orthogonality=abs(sum(center%center%metric*values(:n,:,1)*values(:n,:,2)))
++           if (orthogonality>1e-12_dp) error stop 'udot orthogonality failure'
++           call radial_pair_action(center,dv(:n),de,tangent(:n,:,:))
++           call radial_pair_pullback(center,covector(:n,:,:),bar_v(:n),bar_e)
++           left=sum(covector(:n,:,:)*tangent(:n,:,:))
++           right=sum(bar_v(:n)*dv(:n))+bar_e*de
++           rev=abs(left-right)/max(1.0_dp,abs(left),abs(right))
++           maxrev=max(maxrev,rev)
++           do ih=1,2
++              step=0.002_dp/ih
++              call prepare_radial_pair(plus,rel,potential(:n)+step*dv(:n),r0,dx,energy+step*de,ell,charge)
++              call prepare_radial_pair(minus,rel,potential(:n)-step*dv(:n),r0,dx,energy-step*de,ell,charge)
++              fd(:n,:,:)=(radial_pair_value(plus)-radial_pair_value(minus))/(2*step)
++              err=sqrt(sum((fd(:n,:,:)-tangent(:n,:,:))**2)/sum(tangent(:n,:,:)**2))
++              if(ih==1) first_error=err
++              last_error=err
++           enddo
++           maxfd=max(maxfd,last_error)
++           call radial_pair_action(center,0*dv(:n),0.0_dp,zero(:n,:,:))
++           if(maxval(abs(zero(:n,:,:)))>0) error stop 'nonzero zero-direction response'
++           write(*,'(A,I4,A,L1,A,I2,A,ES12.4,A,ES12.4,A,F8.3)') &
++                'n=',n,' RELA=',rel,' l=',l,' FD=',last_error,' adjoint=',rev,' step ratio=',first_error/last_error
++        enddo
++     enddo
++  enddo
++  if(maxfd>1e-5_dp.or.maxrev>1e-10_dp) error stop 'radial tangent validation failed'
++  write(*,'(A,ES15.7,A,ES15.7)') 'PASS max FD relative=',maxfd,' max transpose=',maxrev
++end program
+--- /dev/null
++++ b/src/dmft2/tests/test_atpar_response.f90
+@@ -0,0 +1,41 @@
++program test_atpar_response
++  use iso_fortran_env, only: real64
++  use outwin_response
++  implicit none
++  integer, parameter :: dp=real64,n=401,lmax=3,nlo=1
++  type(radial_pair_context) :: ctx
++  real(dp) :: r(n),potential(n),r0,dx,energy,charge,error,largest,values(n,4,2)
++  real(dp) :: el(0:lmax),elo(0:lmax,nlo)
++  real(dp) :: u(n,0:lmax),du(n,0:lmax),b(n,0:lmax),db(n,0:lmax)
++  real(dp) :: up(n,0:lmax),dup(n,0:lmax),bp(n,0:lmax),dbp(n,0:lmax)
++  real(dp) :: alo_r(n,nlo,0:lmax),blo_r(n,nlo,0:lmax),aplo(n,nlo,0:lmax),bplo(n,nlo,0:lmax)
++  real(dp) :: boundary(nlo+2,0:lmax),slope(nlo+2,0:lmax),overlap(nlo+2,nlo+2,0:lmax)
++  real(dp) :: alo(0:lmax,nlo),blo(0:lmax,nlo),clo(0:lmax,nlo)
++  logical :: loor(nlo,0:lmax),rlo(nlo,0:lmax),lapw(0:lmax),rel
++  integer :: ilo(0:lmax),i,mode,l
++  r0=1e-4_dp;dx=log(2.1_dp/r0)/(n-1);energy=.17_dp;charge=26;largest=0
++  do i=1,n
++     r(i)=r0*exp(dx*(i-1))
++     potential(i)=-charge*exp(-r(i))+.15_dp*r(i)**2
++  enddo
++  loor=.false.;rlo=.false.;lapw=.true.;ilo=0;el=2*energy;elo=2*energy
++  do mode=0,1
++     rel=mode==1
++     call ATPARN(u,du,b,db,up,dup,bp,dbp, &
++          alo_r,blo_r,aplo,bplo,boundary,slope,overlap,alo,blo,clo, &
++          2*potential,n,el,elo,loor,rlo,lapw,0,0,0,ilo,rel,charge, &
++          .false.,n,r0,dx,r(n),lmax,lmax,nlo,n)
++     do l=0,lmax
++        call prepare_radial_pair(ctx,rel,potential,r0,dx,energy,real(l,dp),charge)
++        values=radial_pair_value(ctx)
++        error=max(maxval(abs(values(:,1,1)-u(:,l))),maxval(abs(values(:,2,1)-b(:,l))), &
++                  maxval(abs(values(:,3,1)-up(:,l))),maxval(abs(values(:,4,1)-bp(:,l))), &
++                  maxval(abs(values(:,1,2)-du(:,l))),maxval(abs(values(:,2,2)-db(:,l))), &
++                  maxval(abs(values(:,3,2)-dup(:,l))),maxval(abs(values(:,4,2)-dbp(:,l))))
++        largest=max(largest,error)
++        write(*,'(A,L1,A,I2,A,ES15.7)') 'RELA=',rel,' l=',l,' ATPARN max abs difference=',error
++     enddo
++  enddo
++  if(largest>2e-10_dp) error stop 'ATPAR central convention mismatch'
++  write(*,'(A,ES15.7)') 'PASS central ATPARN closure=',largest
++end program
+--- /dev/null
++++ b/src/dmft2/tests/test_lo_response.f90
+@@ -0,0 +1,40 @@
++program test_lo_response
++  use iso_fortran_env, only: real64
++  use outwin_response
++  implicit none
++  integer, parameter :: dp=real64
++  real(dp) :: x(10),xp(10),xm(10),c(3),reference(3),plus(3),minus(3),jac(3,10),fd(3,10),h,error
++  integer :: mode,jlo,i
++  logical :: lapw
++  do mode=1,4
++     lapw=mode==1.or.mode==4
++     jlo=1
++     if(mode==3) jlo=2
++     x=[.6_dp,.3_dp,-.4_dp,.8_dp,1.4_dp,.5_dp,-.6_dp,.2_dp,.1_dp,2.0_dp]
++     if(mode==4) x=[1.0_dp,0.0_dp,0.0_dp,-1.0_dp,1.0_dp,1.0_dp,0.0_dp, &
++                   1.0_dp-1e-6_dp,0.0_dp,1.0_dp]
++     call local_orbital_coefficients(lapw,jlo,x,c,jac)
++     call native(x,lapw,jlo,reference)
++     if(maxval(abs(c-reference))>1e-12_dp) error stop 'ABC central mismatch'
++     h=1e-7_dp
++     do i=1,10
++        xp=x;xm=x;xp(i)=xp(i)+h;xm(i)=xm(i)-h
++        call native(xp,lapw,jlo,plus)
++        call native(xm,lapw,jlo,minus)
++        fd(:,i)=(plus-minus)/(2*h)
++     enddo
++     error=maxval(abs(fd-jac))/max(1.0_dp,maxval(abs(jac)))
++     write(*,'(A,I2,A,ES15.7)') 'ABC branch ',mode,' FD Jacobian relative=',error
++     if(error>1e-7_dp) error stop 'ABC Jacobian mismatch'
++  enddo
++  print *, 'PASS ABC tangent and transpose matrix'
++contains
++  subroutine native(x,lapw,jlo,c)
++    real(dp),intent(in) :: x(10)
++    logical,intent(in) :: lapw
++    integer,intent(in) :: jlo
++    real(dp),intent(out) :: c(3)
++    call abc0(c(1),c(2),c(3),0,jlo,lapw,x(1),x(2),x(3),x(4),x(5), &
++              x(6),x(7),x(8),x(9),1,1,1,1,x(10),.false.)
++  end subroutine
++end program
+--- /dev/null
++++ b/src/dmft2/tests/radial_material_driver.f90
+@@ -0,0 +1,47 @@
++program radial_material_driver
++  use iso_fortran_env, only: real64
++  use outwin_response
++  implicit none
++  integer, parameter :: dp=real64
++  type(radial_pair_context) :: center,plus,minus
++  real(dp), allocatable :: v(:),dv(:),bv(:),direction(:,:,:),covector(:,:,:),fd(:,:,:)
++  real(dp) :: r0,dx,energy,ell,z,de,be,r,step,error,left,right,rev,t0,t1,t2
++  integer :: n,mode,i,j,k,iteration
++  character(1024) :: path
++  call get_command_argument(1,path)
++  open(10,file=trim(path),status='old')
++  read(10,*) n,mode,r0,dx,energy,ell,z
++  allocate(v(n),dv(n),bv(n),direction(n,4,2),covector(n,4,2),fd(n,4,2))
++  read(10,*) v
++  close(10)
++  do i=1,n
++     r=r0*exp(dx*(i-1))
++     dv(i)=0.07_dp*r*sin(1.3_dp*r)
++     do j=1,4
++        do k=1,2
++           covector(i,j,k)=sin(.2_dp*i+j+.4_dp*k)*exp(-r)
++        enddo
++     enddo
++  enddo
++  de=.03_dp;step=.002_dp
++  call prepare_radial_pair(center,mode==1,v,r0,dx,energy,ell,z)
++  call radial_pair_action(center,dv,de,direction)
++  call radial_pair_pullback(center,covector,bv,be)
++  left=sum(covector*direction);right=sum(bv*dv)+be*de
++  rev=abs(left-right)/max(1.0_dp,abs(left),abs(right))
++  call prepare_radial_pair(plus,mode==1,v+step*dv,r0,dx,energy+step*de,ell,z)
++  call prepare_radial_pair(minus,mode==1,v-step*dv,r0,dx,energy-step*de,ell,z)
++  fd=(radial_pair_value(plus)-radial_pair_value(minus))/(2*step)
++  error=sqrt(sum((fd-direction)**2)/sum(direction**2))
++  call cpu_time(t0)
++  do iteration=1,1000
++     call radial_pair_action(center,dv,de,direction)
++  enddo
++  call cpu_time(t1)
++  do iteration=1,1000
++     call radial_pair_pullback(center,covector,bv,be)
++  enddo
++  call cpu_time(t2)
++  write(*,'(4ES24.15)') error,rev,(t1-t0)/1000,(t2-t1)/1000
++  if(error>2e-5_dp.or.rev>2e-10_dp) error stop 'material radial validation failed'
++end program
+--- /dev/null
++++ b/src/dmft2/tests/check_radial_response.py
+@@ -0,0 +1,158 @@
++#!/usr/bin/env python3
++"""Build and check the native discrete radial tangent/adjoint in isolation.
++
++No installed executable or material file is modified. Without --work, build
++files are temporary. Optional --case-directory entries read actual spherical
++potentials and test l=0,2,4 at a stated test energy (0.17 Ha); they do NOT
++compute material stresses or assume these are the case's linearization energies.
++"""
++from pathlib import Path
++import argparse
++import hashlib
++import json
++import math
++import re
++import shutil
++import subprocess
++import sys
++import tempfile
++
++
++def run(compiler, root, work, case_directories):
++    tests = Path(__file__).resolve().parent
++    atpar = root / "src/dmft2/atpar"
++    flags = ["-O2", "-fcheck=bounds,pointer,mem,do", "-ffpe-trap=invalid,zero,overflow"]
++    results = {}
++    programs = {
++        "test_outwin_response": [],
++        "test_atpar_response": [
++            "atpar",
++            "rint13",
++            "abc",
++            "diracout",
++            "dergl",
++            "inouh",
++            "inth",
++        ],
++        "test_lo_response": ["abc"],
++    }
++    if case_directories:
++        programs["radial_material_driver"] = []
++    for name, dependencies in programs.items():
++        command = [
++            compiler,
++            *flags,
++            str(atpar / "outwin.f90"),
++            str(atpar / "outwin_response.f90"),
++            *[str(atpar / (dep + ".f90")) for dep in dependencies],
++            str(tests / (name + ".f90")),
++            "-o",
++            str(work / name),
++        ]
++        built = subprocess.run(command, cwd=work, capture_output=True, text=True)
++        (work / (name + ".build.log")).write_text(built.stdout + built.stderr)
++        built.check_returncode()
++        if name != "radial_material_driver":
++            tested = subprocess.run(
++                [str(work / name)], cwd=work, capture_output=True, text=True
++            )
++            (work / (name + ".log")).write_text(tested.stdout + tested.stderr)
++            tested.check_returncode()
++            if "PASS" not in tested.stdout:
++                raise RuntimeError("missing success marker: " + name)
++            results[name] = tested.stdout.strip().splitlines()[-1]
++    if case_directories:
++        sys.path.insert(0, str(root / "src/python"))
++        from wstruct import Struct
++
++        material_rows = []
++        for directory in case_directories:
++            structures = list(directory.glob("*.struct"))
++            if len(structures) != 1:
++                raise ValueError(
++                    "expected exactly one case.struct in " + str(directory)
++                )
++            structure = structures[0]
++            case = structure.stem
++            s = Struct()
++            s.ReadStruct(str(structure))
++            mode = int("RELA" in structure.read_text().splitlines()[2])
++            blocks = re.split(
++                r"ATOMNUMBER\s*=\s*\d+", (directory / (case + ".vsp")).read_text()
++            )[1:]
++            if len(blocks) != s.nat:
++                raise ValueError("VSP atom count differs from structure")
++            for atom, n in enumerate(s.jrj):
++                data = re.split(r"VLM\(R\)\s+FOR L\s+0\s+M=\s*0", blocks[atom])[1]
++                values = re.findall(r"[-+]?\d+\.\d+[DE][-+]\d+", data)[:n]
++                if len(values) != n:
++                    raise ValueError("truncated spherical potential")
++                potential = [float(v.replace("D", "E")) / 2 for v in values]
++                dx = math.log(s.rmt[atom] / s.r0[atom]) / (n - 1)
++                for ell in [0, 2, 4]:
++                    path = work / (case + f"_atom{atom+1}_l{ell}.input")
++                    path.write_text(
++                        f"{n} {mode} {s.r0[atom]:.17g} {dx:.17g} 0.17 {ell} {s.Znuc[atom]}\n"
++                        + "\n".join(f"{v:.17g}" for v in potential)
++                        + "\n"
++                    )
++                    result = subprocess.run(
++                        [str(work / "radial_material_driver"), str(path)],
++                        capture_output=True,
++                        text=True,
++                    )
++                    result.check_returncode()
++                    fd, adj, forward, reverse = map(float, result.stdout.split())
++                    material_rows.append(
++                        dict(
++                            case=case,
++                            atom=atom + 1,
++                            ell=ell,
++                            rela=bool(mode),
++                            energy_Ha=0.17,
++                            finite_difference_relative=fd,
++                            transpose_relative=adj,
++                            forward_seconds=forward,
++                            adjoint_seconds=reverse,
++                        )
++                    )
++        results["material_radial_controls"] = material_rows
++    results["source_sha256"] = {
++        name: hashlib.sha256((atpar / name).read_bytes()).hexdigest()
++        for name in [
++            "outwin.f90",
++            "outwin_response.f90",
++            "atpar.f90",
++            "rint13.f90",
++            "abc.f90",
++        ]
++    }
++    (work / "report.json").write_text(json.dumps(results, indent=2) + "\n")
++    return results
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--compiler", default=shutil.which("gfortran"))
++    parser.add_argument(
++        "--root", type=Path, default=Path(__file__).resolve().parents[3]
++    )
++    parser.add_argument("--work", type=Path)
++    parser.add_argument("--case-directory", type=Path, action="append", default=[])
++    args = parser.parse_args()
++    if args.compiler is None:
++        parser.error("gfortran not found; supply --compiler")
++    if args.work:
++        args.work = args.work.resolve()
++        args.work.mkdir(parents=True, exist_ok=False)
++        result = run(args.compiler, args.root.resolve(), args.work, args.case_directory)
++    else:
++        with tempfile.TemporaryDirectory(prefix="edmft-radial-response-") as folder:
++            result = run(
++                args.compiler, args.root.resolve(), Path(folder), args.case_directory
++            )
++    print(json.dumps(result, indent=2))
++
++
++if __name__ == "__main__":
++    main()

@@ -209,8 +209,15 @@ def scf(case, wopt, outfile='.scf'):
             dat += '\n------- '+case+'.scf'+i+' --------\n'
             dat += open(case+'.scf'+i,'r').readlines()
 
+    # Publish only after valence, density and fresh core parts are assembled.
+    # The helper replaces their total and verifies the exact response snapshot.
+    from stress_response_publish import response_rows, mark_published
+    current_iteration = ''.join(dat)
+    correction = response_rows(case, current_iteration)
+    dat += correction
     with open(case+outfile, 'a') as fs:
         fs.writelines(dat)
+    mark_published(case, correction, case+outfile, current_iteration=current_iteration)
 
 def scfm(fday, case, WIEN):
     dat=[]

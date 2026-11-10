@@ -1,0 +1,265 @@
+ACTUAL STRAIN POTENTIAL-OPERATOR TEST: SrVO3
+7 November 2026
+
+Outcome
+=======
+The complete material-coordinate KS potential derivative, contracted with
+both existing projector-window response matrices, gives -2.98675885 GPa.
+The present analytic hydrostatic mean stress is +5.67688415 GPa; adding
+this diagnostic contribution gives +2.69012530 GPa. The half-step relaxed
+frozen-effective-self-energy numerical value is +2.93383641 GPa. Thus the
+analytic-minus-numerical discrepancy changes from +2.74304774 to
+-0.24371111 GPa. This removes about 91% of its magnitude, but overshoots
+and does NOT establish complete stress accuracy.
+
+All values are mean tensile-sign stress, +(1/(3 Omega)) dGamma/deta,
+for F=(1+eta) I. Compressive pressure is the negative. These numbers are
+already divided by three. Omega=382.70904 bohr^3; conversion factor
+14710.507641078 GPa per Ry/bohr^3. The correction is -0.233110842923 Ry
+per unit isotropic length strain.
+
+No production source/executable was changed, and no original material
+calculation directory was modified. This is a postprocessed diagnostic,
+not an installed correction or a fresh complete SCF benchmark. Only SrVO3
+was tested here; FeSe, MnO, MnTe, shear, and band-complement convergence
+remain untested for this contribution.
+
+Important revision of the preceding interpretation
+==================================================
+The missing contribution is NOT identified merely as induced Hartree-XC
+response. The large term is the explicit coordinate derivative of the
+potential inside a muffin-tin. The fixed-geometry interstitial-potential
+probe established a nonzero functional projector response; it did not
+measure a strain correction or prove density response dominated it.
+
+A first subtraction of saved potential files gave +0.47188337 GPa. That
+is NOT the complete potential-operator derivative: the MT functions are
+stored at fixed physical radius, and the VNS Fourier coefficients contain
+the moving interstitial step function. In the correct material convention:
+
+  MT: Vop_eta(r) = (partial_eta V_eta^a(r))_fixed_r + r partial_r V_0^a(r)
+
+  I:  Vop_eta(s) = partial_eta V_eta(F_eta s) at fixed central coordinate s.
+
+The local atom center follows the lattice, and the MT radius is fixed in
+bohr. The derivative of the interstitial characteristic function belongs
+to the domain/basis bookkeeping, not to the potential operator itself.
+
+Measured decomposition, including normalization in every row:
+  MT potential change at fixed physical radius          +0.618040584 GPa
+  MT coordinate derivative r partial_r V_KS              -3.516178766 GPa
+  Interstitial material potential derivative             -0.088620668 GPa
+  TOTAL                                                   -2.986758850 GPa
+
+Equivalently, the naive saved-file result must be corrected by adding the
+MT coordinate term and removing the interstitial boundary contribution.
+The latter is approximately -0.057537 GPa in the raw file derivative.
+The actual half-step replacement of raw by unwarped interstitial potential
+is +0.057536549 GPa. A central analytic-step-function derivative gives
++0.057536892 GPa; their tiny difference includes endpoint discretization
+and the last density update used by the R2V reconstruction.
+
+The total decomposes by projector branch as
+  fixed-normalization window response                     -2.821768383 GPa
+  normalization-window response                            -0.164990467 GPa.
+Omitting the normalization derivative would therefore be material here.
+
+Klein functional and why this is a projector term
+================================================
+Use an auxiliary-field Klein functional schematically as
+
+ Gamma = L[H_KS,O,U,Sigma_tilde] - integral (V_KS-V_ext)n + E_Hxc[n]
+         + E_ion + Phi_imp[g]-Phi_DC[nloc] - Tr(Sigma_tilde g) + mu N.
+
+L is the consistently regularized lattice trace log. Sigma_tilde includes
+the double-counting subtraction. At the impurity stationary point,
+dPhi = Tr(Sigma_tilde dg), and the dg and dSigma_tilde variations cancel.
+Along the frozen-Sigma validation path we use the agreed linear impurity
+functional tangent, rather than claiming the unknown full impurity Phi is
+known at both endpoints.
+
+At fixed central representation define the gradient C by
+
+ delta_U Gamma = 2 Re sum_k Tr[C_k^dagger delta U_k].
+
+One explicit convention is C_k = w_k T sum_omega G_k U_k Sigma_tilde,
+with the full positive/negative frequency pairing and the same regulated
+high-frequency completion as L. Spin weights are included consistently.
+The code dumps already include k/spin/frequency weights; do not multiply
+them by another k-point or spin factor.
+
+Let phi be the fixed physical disk orbital column, Pi_W the projector onto
+fixed band indices W, and X=S^(-1/2). In a fixed Hilbert-space representation
+
+ U_k = Pi_W,k phi_k X,
+ S = Sym sum_k w_k phi_k^dagger Pi_W,k phi_k.
+
+Sym is the actual forward orbital/equivalent-atom averaging. This physical
+projector is not independent of V, despite phi being fixed. With geometry
+held fixed for a potential perturbation:
+
+ delta U = delta Pi_W phi X + Pi_W phi delta X,
+ delta S = Sym sum_k w_k phi^dagger delta Pi_W phi,
+ X^(-1) delta X + delta X X^(-1) = -X delta S X.
+
+The last equation is the exact inverse-square-root Frechet derivative,
+valid without assuming S and delta S commute. In an eigenbasis of S with
+positive eigenvalues s_i:
+
+ (delta X)_ij = -(delta S)_ij /
+                 [sqrt(s_i) sqrt(s_j) (sqrt(s_i)+sqrt(s_j))].
+
+The symmetry adjoint must be applied in the correct reverse order when
+forming a contraction with delta S; the current installed exact adjoint
+was used in these tests.
+
+For n inside W and a outside W,
+
+ delta Pi_W = sum_(n,a) [ |a><a|delta V|n><n|/(epsilon_n-epsilon_a)
+                         + Hermitian conjugate ].
+
+No energy-window edge derivative is introduced: the band indices are
+fixed. Smoothness still requires an uncut gap between W and its complement.
+Here all 75 k points have 43 stored bands, W=[12,31], and the minimum
+inside/outside separation is 0.05641984 Ry.
+
+Substitution gives
+
+ delta_U Gamma = Re sum_k Tr[(R_k+R_k^N) delta V_k].
+
+R is the fixed-X window response and R^N the normalization-window response.
+They are already constructed in dmft2. To make the fixed-X formula explicit,
+let q_a=<psi_a|phi>, F_a=q_a X denote the untruncated normalized raw overlap,
+and C_n the gradient defined above. Then, in the indicated trace convention,
+
+ R_an = sum_l F_al C_nl^* / (epsilon_n-epsilon_a),
+ R_na = R_an^*,
+
+with zero other blocks. R^N is the same chain rule through S and X. F_a is
+not the physically truncated embedding U_a, which is zero outside W.
+Confusing those two would incorrectly eliminate the response.
+
+For the actual strain calculation,
+
+ Delta D_eta = Re sum_k Tr[(R_k+R_k^N) Vop_eta,k],
+ Delta mean_stress = Delta D_eta/(3 Omega).
+
+This is a contraction with a potential DERIVATIVE. It is not a derivative
+of R and not a second derivative of the Klein functional. All R matrices
+are evaluated at the central state. No impurity vertex is needed for this
+first-derivative term in the stationary/tangent formulation.
+
+Where the current implementation omits it
+========================================
+The material-coordinate matrix decomposition previously derived is
+
+ H_eta = T_eta + B_eta + Vop_eta,
+ O_eta = O_eta,basis,
+
+where T is the kinetic operator derivative and B the basis/Pulay variation.
+Blaha's G1/G2 generalizations implement the T/B/metric and corresponding
+surface pieces. The usual DFT cancellation of the potential variation uses
+the physical charge n_G, not the extra window-response density R+R^N.
+
+src/dmft2/l2main.f90 builds the response matrices near line 1033 and passes
+them to cmp_dmft_stress near line 1382. The normalization/fused pass is in
+l2mainSubs.f90 near lines 3761-3841. cmp_dmft_stress contracts the kinetic,
+G2 basis, APW/surface and relativistic kernels. The ordinary charge calls
+cmp_MT_density (l2main near 1218) and cmp_interstitial (near 1441) receive
+the physical density, not these response matrices. There is no corresponding
+R Vop contraction or R-dependent lapw0 electrostatic/XC density assembly.
+
+The V_KS already present INSIDE G2's matrix elements (basis_derivative|
+H_KS-epsilon|psi) does not supply the separate operator derivative Vop.
+This distinction is the source-level reason that adding the measured term
+is consistent with the previously derived decomposition, rather than an
+empirical adjustment based on numerical agreement.
+
+Numerical method and checks
+===========================
+1. Saved full +/-0.001 and converged half +/-0.00049997741149 SrVO3
+   endpoints were used. No new charge or impurity convergence was performed.
+2. WIEN_LAPW1_BASIS_VSP holds the radial basis at the central potential while
+   the physical Hamiltonian changes. All test geometries are the central
+   geometry for matrix-element extraction. Radial-energy headers were
+   identical across the physical-potential probes.
+3. A complete central WIEN LAPW eigensystem supplies the dual coefficient
+   basis, avoiding an incorrect identification of WIEN and dftKS auxiliary
+   LO coordinates. Only the original 43 bands enter the response sum. The
+   full auxiliary eigensystem here does NOT mean complement convergence was
+   improved. Endpoint Hamiltonians projected into the central 43-state space
+   have truncation errors at finite perturbation; their centered derivative
+   is checked by halving the step.
+4. The dftKS/WIEN band gauge is aligned only inside degenerate blocks (and
+   by a phase for nondegenerate states). Maximum central eigenvalue mismatch
+   is 6.5e-7 Ry. An unconstrained all-band least-squares gauge was rejected.
+   An initial direct use of the dftKS overlap metric on WIEN LO coordinates
+   failed normalization and was rejected; its preliminary numbers are NOT
+   used in the final result.
+5. R2V output supplies unwarped potential star coefficients. Their star-sum
+   convention differs from VNS's star-average convention: divide VTOTAL
+   coefficients by each star's size before expanding. Independently
+   reconstructing central VNS via the exact Fourier interstitial step on
+   the 60^3 FFT mesh agrees within 4.9e-14 Ry coefficient-wise, including
+   the required complex conjugation for case.vector coefficients.
+6. Central MT potentials supply r dV/dr using cubic interpolation on the
+   logarithmic radial mesh. For VSP storing s=rV the stored derivative is
+   d s/d(log r)-s; for VNS radial harmonics it is d V_L/d(log r).
+   Fixed-basis Hamiltonian probes at +/-3e-5 and +/-1.5e-5 yield MT advection
+   -3.516178693 and -3.516178766 GPa, respectively.
+7. Total correction using full-step potentials: -2.986775592 GPa;
+   half-step: -2.986758850 GPa. Difference 0.000016742 GPa.
+8. Independent nonlinear lattice trace-log endpoints are evaluated with
+   fixed physical embedding versus updated Pi_W and X, along the extracted
+   material potential direction. Differences in their slopes are
+   -2.986735999 GPa (h=1e-5) and -2.986735057 GPa (h=5e-6), versus direct
+   R/R^N contraction -2.986758850 GPa. Residual <0.000024 GPa, retained rather
+   than described as roundoff; the earlier trace-log tail diagnostic showed
+   small differences in production functional/gradient tail completion.
+9. A separate installed dmft2 run on central WIEN eigenvectors reconstructs
+   R and R^N directly. It gives -2.986759413 GPa, differing by 0.000000563 GPa
+   from the primary result. Central subspace metric error 2.3e-13 and maximum
+   response-matrix difference 3.7e-9. Thus the large correction is not caused
+   by a dftKS/WIEN LO convention mismatch.
+10. All auxiliary calculations were isolated under /private/tmp. Prior
+    production source changes visible in git status were left untouched.
+
+Cost and practical implementation
+=================================
+The dominant coordinate term is inexpensive: it is a local operator whose
+radial and angular integrals can be cached alongside existing V_ns matrices
+and contracted with the already available R/R^N. This is differentiation
+of the potential's coordinate argument, NOT the omitted change of the
+radial LAPW solution. It does not require an impurity solve or another SCF
+loop. A general strain tensor needs the angular terms in r_beta partial_alpha
+V, not just the isotropic r partial_r V tested here.
+
+A complete analytic Vop additionally needs the strain response of the
+self-consistent KS potential. For the current frozen-Sigma protocol it can
+be obtained by one-particle charge linear response including the finite
+window and normalization, plus Coulomb/XC response and the chosen number
+constraint. Schematically:
+
+ delta n = b_eta + chi_fr delta V_Hxc,
+ delta V_Hxc = f_Hxc delta n,
+ (1-chi_fr f_Hxc) delta n = b_eta.
+
+The geometric potential source and material-coordinate/Jacobian terms must
+be included consistently in b_eta/the potential decomposition. This is not
+provided by the simple affine-density guess alone. An analytic response
+solver is a separate implementation and its timing has not been measured.
+A fully self-consistent DMFT response problem is different from this frozen
+Sigma tangent test; do not infer that all higher responses are vertex-free.
+
+For scale: central/perturbed WIEN lapw1 runs here took about 15 seconds each;
+R2V lapw0 evaluations took about 0.8 seconds; one additional MPI4 dmft2
+control took 20.9 seconds. Those are diagnostic timings, not a production
+stress overhead forecast. The earlier SrVO3 charge-relaxed half-step runs
+cost about 3.3 minutes each and already existed for this test.
+
+Recommended next action: implement the explicit potential-operator
+contraction as a DEFAULT-OFF diagnostic (after asking for source-change
+permission), first the central geometric MT and interstitial bookkeeping,
+then compare the complete term from saved potentials in FeSe as well as
+SrVO3. The remaining ~0.244 GPa must not be dismissed as radial/basis error
+without further tests. No empirical scaling or fitted subtraction is proposed.

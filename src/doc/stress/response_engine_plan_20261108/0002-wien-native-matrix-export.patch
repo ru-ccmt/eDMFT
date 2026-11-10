@@ -1,0 +1,138 @@
+diff --git a/SRC_lapw1/calkpt.F b/SRC_lapw1/calkpt.F
+--- a/SRC_lapw1/calkpt.F
++++ b/SRC_lapw1/calkpt.F
+@@ -126,6 +126,9 @@
+ !
+ !        Locals
+ !
++      integer, save :: dump_kpoint=0
++      character(len=1024) :: matrix_prefix
++      integer :: matrix_status, matrix_length
+       logical            nmat_only
+       INTEGER            NU, NLDAU, LLDAU, i, j
+       DOUBLE PRECISION   TSEC1, TSEC2
+@@ -212,6 +215,24 @@
+       endif
+ 
+       CALL STOP_TIMER(time_horb)
++
++! Default-off assembled-matrix diagnostic.  Unlike inversion of a complete
++! eigensystem, this exports the matrices before Cholesky/diagonalization.
++! Intended only for isolated response probes; no ordinary path is changed.
++      dump_kpoint=dump_kpoint+1
++      matrix_prefix=''
++      call get_environment_variable('WIEN_LAPW1_MATRIX_DUMP',matrix_prefix, &
++           length=matrix_length,status=matrix_status)
++      if (matrix_status.eq.-1) error stop 'WIEN_LAPW1_MATRIX_DUMP too long'
++      if (matrix_status.eq.0.and.matrix_length.gt.0) then
++#ifdef Parallel
++         error stop 'WIEN_LAPW1_MATRIX_DUMP requires serial LAPW1'
++#else
++         call DumpAssembledMatrices(trim(matrix_prefix),dump_kpoint, &
++              (/SX1,SY1,SZ1/),KZZ,HS,HSDIAG,HSROWS,nlo)
++#endif
++      endif
++
+ 
+ #ifdef Parallel
+       call start_timer(time_sync)
+@@ -265,3 +286,99 @@
+ !        End of 'CALKPT'
+ !
+       END
++
++SUBROUTINE DumpAssembledMatrices(prefix,kpoint,kfrac,kzz, &
++     mixed,hdiag,nbasis,nlo)
++  USE, INTRINSIC :: ISO_FORTRAN_ENV, ONLY: INT32, REAL64
++  IMPLICIT NONE
++  CHARACTER(len=*), INTENT(in) :: prefix
++  INTEGER, INTENT(in) :: kpoint,nbasis,nlo
++  REAL*8, INTENT(in) :: kfrac(3)
++  INTEGER, INTENT(in) :: kzz(3,nbasis)
++!_REAL REAL*8, INTENT(in) :: mixed(nbasis,nbasis),hdiag(nbasis)
++!_COMPLEX COMPLEX*16, INTENT(in) :: mixed(nbasis,nbasis),hdiag(nbasis)
++
++  CHARACTER(len=8), PARAMETER :: overlapMagic='EDMFTOV1'
++  CHARACTER(len=8), PARAMETER :: hamiltonianMagic='EDMFTHV1'
++  CHARACTER(len=1200) :: filename
++  INTEGER :: unit,ios,i,j
++  INTEGER(INT32) :: marker,header(8)
++  INTEGER(INT32), ALLOCATABLE :: labels(:,:)
++  COMPLEX(REAL64), ALLOCATABLE :: column(:)
++
++  marker=INT(Z'01020304',INT32)
++  header=(/ INT(1,INT32),INT(kpoint,INT32),INT(0,INT32), &
++       INT(nbasis,INT32),INT(nlo,INT32),INT(2,INT32), &
++       INT(1,INT32),INT(1,INT32) /)
++  WRITE(filename,'(A,".k",I8.8,".bin")') trim(prefix),kpoint
++
++  OPEN(NEWUNIT=unit,FILE=trim(filename),ACCESS='STREAM', &
++       FORM='UNFORMATTED',STATUS='REPLACE',ACTION='WRITE',IOSTAT=ios)
++  if (ios.ne.0) then
++     WRITE(6,'(A,1X,A,1X,A,I0)') ':WIEN_MATRIX_DUMP_ERROR:', &
++          trim(filename),'open iostat=',ios
++     STOP 'cannot open generalized-overlap dump'
++  endif
++
++  allocate(labels(3,nbasis),column(nbasis))
++  labels=INT(kzz(:,1:nbasis),INT32)
++  WRITE(unit,IOSTAT=ios) overlapMagic
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) marker
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) header
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) REAL(kfrac,REAL64)
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) labels
++  do j=1,nbasis
++     if (ios.ne.0) exit
++     do i=1,j
++!_REAL         column(i)=CMPLX(mixed(i,j),0.0_REAL64,KIND=REAL64)
++!_REAL         if (i.eq.j) column(i)=CMPLX(hdiag(j),0.0_REAL64,KIND=REAL64)
++!_COMPLEX         ! TAPEWF writes CONJG(Z) in the complex executable.  Express the
++!_COMPLEX         ! metric in that same coefficient convention: if A=CONJG(Z), then
++!_COMPLEX         ! A^+ CONJG(O) A = CONJG(Z^+ O Z) = I.  Without this conjugation a
++!_COMPLEX         ! diagnostic normalization check fails even though LAPW1 itself is
++!_COMPLEX         ! correct.
++!_COMPLEX         column(i)=CMPLX(DBLE(mixed(i,j)),-AIMAG(mixed(i,j)), &
++!_COMPLEX              KIND=REAL64)
++!_COMPLEX         if (i.eq.j) column(i)=conjg(hdiag(j))
++     enddo
++     WRITE(unit,IOSTAT=ios) column(1:j)
++  enddo
++  CLOSE(unit)
++
++  if (ios.ne.0) then
++     WRITE(6,'(A,1X,A,1X,A,I0)') ':WIEN_MATRIX_DUMP_ERROR:', &
++          trim(filename),'write iostat=',ios
++     STOP 'cannot write generalized-overlap dump'
++  endif
++
++  ! The complementary file contains the Hamiltonian in the identical
++  ! case.vector coefficient convention.  At this point MIXED holds the lower triangle and diagonal of H;
++  ! HDIAG holds the diagonal of O.  Pack an upper Hermitian
++  ! triangle so the Python reader can treat H and O uniformly.
++  WRITE(filename,'(A,".ham.k",I8.8,".bin")') trim(prefix),kpoint
++  OPEN(NEWUNIT=unit,FILE=trim(filename),ACCESS='STREAM', &
++       FORM='UNFORMATTED',STATUS='REPLACE',ACTION='WRITE',IOSTAT=ios)
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) hamiltonianMagic
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) marker
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) header
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) REAL(kfrac,REAL64)
++  if (ios.eq.0) WRITE(unit,IOSTAT=ios) labels
++  do j=1,nbasis
++     if (ios.ne.0) exit
++     do i=1,j-1
++!_REAL         column(i)=CMPLX(mixed(j,i),0.0_REAL64,KIND=REAL64)
++!_COMPLEX         column(i)=CMPLX(DBLE(mixed(j,i)),-AIMAG(mixed(j,i)), &
++!_COMPLEX              KIND=REAL64)
++     enddo
++!_REAL      column(j)=CMPLX(mixed(j,j),0.0_REAL64,KIND=REAL64)
++!_COMPLEX      column(j)=CMPLX(DBLE(mixed(j,j)),-AIMAG(mixed(j,j)),KIND=REAL64)
++     WRITE(unit,IOSTAT=ios) column(1:j)
++  enddo
++  CLOSE(unit)
++  deallocate(labels,column)
++  if (ios.ne.0) then
++     WRITE(6,'(A,1X,A,1X,A,I0)') ':WIEN_MATRIX_DUMP_ERROR:', &
++          trim(filename),'write iostat=',ios
++     STOP 'cannot write generalized-Hamiltonian dump'
++  endif
++END SUBROUTINE DumpAssembledMatrices

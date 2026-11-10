@@ -1,0 +1,39 @@
+ 3,'0_800_MnTe.rhopw',   'unknown','formatted',0
+ 4,'0_800_MnTe.inm',     'unknown','formatted',0
+ 5,'0_800_MnTe.in0',     'old',    'formatted',0
+ 6,'0_800_MnTe.output0', 'unknown','formatted',0
+ 7,'0_800_MnTe.vorbup',  'unknown','formatted',0
+ 8,'0_800_MnTe.clmsum',  'old',    'formatted',0
+ 9,'0_800_MnTe.vtotal',  'unknown','formatted',0
+10,'0_800_MnTe.vcoul',   'unknown','formatted',0
+11,'0_800_MnTe.r2v',     'unknown','formatted',0
+12,'0_800_MnTe.clmup',   'unknown','formatted',0
+13,'0_800_MnTe.clmdn',   'unknown','formatted',0
+14,'0_800_MnTe.mbjmix',     'unknown','formatted',0
+15,'0_800_MnTe.r2v2',     'unknown','formatted',0
+16,'0_800_MnTe.vsp','unknown','formatted',0
+17,'0_800_MnTe.vspdn',   'unknown','formatted',0
+18,'0_800_MnTe.vns','unknown','formatted',0
+19,'0_800_MnTe.vnsdn',   'unknown','formatted',0
+20,'0_800_MnTe.struct',  'old',    'formatted',0         
+21,'0_800_MnTe.scf0',    'unknown','formatted',0
+28,'0_800_MnTe.vrespsum','unknown','formatted',0
+29,'0_800_MnTe.vrespup', 'unknown','formatted',0
+30,'0_800_MnTe.vrespdn', 'unknown','formatted',0
+38,'0_800_MnTe.tausum','unknown','formatted',0
+39,'0_800_MnTe.tauup', 'unknown','formatted',0
+40,'0_800_MnTe.taudn', 'unknown','formatted',0
+50,'0_800_MnTe.eeceup', 'unknown','formatted',0
+51,'0_800_MnTe.eecedn', 'unknown','formatted',0
+62,'0_800_MnTe.grr',    'unknown','formatted',0
+63,'/Users/haule/wien2k_24/SRC_lapw0/xc_funcs.h','unknown','formatted',0
+64,'0_800_MnTe.r2v_nonloc',     'unknown','formatted',0
+88,'0_800_MnTe.vlapl','unknown','formatted',0
+89,'0_800_MnTe.vlapldn',   'unknown','formatted',0
+91,'0_800_MnTe.vtau','unknown','formatted',0
+92,'0_800_MnTe.vtaudn',   'unknown','formatted',0
+93,'0_800_MnTe.clmcor',   'unknown','formatted',0
+94,'0_800_MnTe.clmcordn',   'unknown','formatted',0
+95,'0_800_MnTe.taucor',   'unknown','formatted',0
+96,'0_800_MnTe.taucordn',   'unknown','formatted',0
+61,'0_800_MnTe.in0abp',     'unknown','formatted',0

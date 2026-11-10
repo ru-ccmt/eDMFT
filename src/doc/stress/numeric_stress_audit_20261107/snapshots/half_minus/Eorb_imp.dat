@@ -1,0 +1,12 @@
+--- impurity 0 with degeneracy 1 ---
+#  Phidc= 4.8980666539
+#  Tr(Sigma*G)/2= 2.39565466346
+#  Tr(Sigma*G)/2-Phidc= -2.50241199044
+#  Phi_DMFT= 3.6108948611324294
+#  Phi_DMFT-Phi_DC= -1.287171792764183
+#  Tr(log(-Gimp))= -7.52915745892912
+#  Fimpurity+TS= -8.735084272343745
+#  E_pot+E_kin-Tr(w*dD/dw)= -1.948945636352576
+:EORB   -0.183923905033
+:XEORB  -0.0946053901107
+:ZEORB  -0.503246165316

@@ -1,0 +1,17 @@
+{
+  "case": "SrVO3",
+  "reference": "/Users/haule/projects/eDMFT_new/src/doc/stress/frozen_sigma_response_20261108/SrVO3/reference_inputs",
+  "workspace": "/private/tmp/edmft_response_SrVO3_new",
+  "wien_root": "/Users/haule/wien2k_24",
+  "dmft2": "/Users/haule/dbin/dmft2_response",
+  "lapw1_definition": "/Users/haule/projects/eDMFT_new/src/doc/stress/frozen_sigma_response_20261108/SrVO3/reference_inputs/lapw1.def",
+  "dmft2_definition": "/Users/haule/projects/eDMFT_new/src/doc/stress/frozen_sigma_response_20261108/SrVO3/reference_inputs/dmft2.def",
+  "mpi": [
+    "/opt/homebrew/bin/mpirun",
+    "-n",
+    "4"
+  ],
+  "strain": 0.00025,
+  "probe_step": 1e-05,
+  "max_iterations": 15
+}

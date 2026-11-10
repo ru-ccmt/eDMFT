@@ -1,0 +1,225 @@
+--- a/src/python/lapw_total_stress.py
++++ b/src/python/lapw_total_stress.py
+@@ -15,6 +15,7 @@
+ 
+ from dataclasses import dataclass
+ import time
++import warnings
+ import numpy as np
+ from scipy.linalg import null_space
+ from lapw_density_response import checked
+@@ -121,9 +122,11 @@
+     so the final derivative is coordinate independent at the fixed point.
+ 
+     Central states must be freshly exported using the same IN1/search policy
+-    as the finite-difference reference. The fixed-point check is distinct from
+-    the native reconstruction check and catches stale-but-internally-consistent
+-    vector exports. Its norm is in native density coordinates, not electrons.
++    as the finite-difference reference. The fixed-point residual is distinct
++    from native reconstruction checks: it measures the remaining charge-map
++    error in unweighted native density coordinates, not electrons or WIEN DIS.
++    A finite residual above the reporting threshold warns and remains recorded;
++    it does not prevent computing a useful stress during charge convergence.
+     """
+ 
+     def __init__(
+@@ -137,6 +140,7 @@
+         fixed_point_tolerance=1e-3,
+         progress=None,
+         diagnostic=False,
++        warning=None,
+     ):
+         branches = getattr(state.valence, "branches", [state.valence])
+         omitted = any(getattr(v.model, "diagnostic_only", False) for v in branches)
+@@ -147,11 +151,33 @@
+             dict(spin_channel=getattr(v, "spin_channel", ""), **v.model.window_gap_report())
+             for v in branches if hasattr(v.model, "window_gap_report")
+         ]
+-        residual = state.metadata["central_fixed_point_residual_norm"]
++        residual = float(state.metadata["central_fixed_point_residual_norm"])
+         if not np.isfinite(fixed_point_tolerance) or fixed_point_tolerance <= 0:
+-            raise ValueError("positive fixed-point tolerance required")
++            raise ValueError("positive finite fixed-point warning threshold required")
++        if not np.isfinite(residual) or residual < 0:
++            raise ValueError("central charge-map residual must be finite and nonnegative")
++        # This is an unweighted Euclidean norm of stored radial samples and
++        # plane-wave density coefficients. Its scale depends on the mesh and
++        # representation; it is neither WIEN's DIS nor a particle-number error.
++        # Do not use it as a universal abort criterion. Keep both its value and
++        # threshold in the report so an unconverged center cannot be mistaken
++        # for an exact stationary point merely because the adjoint converged.
++        message = None
+         if residual > fixed_point_tolerance:
+-            raise ValueError(f"central charge map is not converged: {residual:g}")
++            message = (f"Central charge-map residual {residual:.8g} exceeds the warning "
++                       f"threshold {fixed_point_tolerance:g} in native density coordinates "
++                       "(not WIEN :DIS:). Continuing stress evaluation; "
++                       "the central charge is not converged to this threshold.")
++        self.charge_fixed_point = dict(
++            residual_norm=residual, warning_threshold=float(fixed_point_tolerance),
++            within_threshold=residual <= fixed_point_tolerance,
++            metric="unweighted Euclidean norm of native density entries", warning=message,
++        )
++        if message and getattr(getattr(state, "parallel", None), "root", True):
++            if warning is not None:
++                warning(message)
++            else:
++                warnings.warn(message, RuntimeWarning, stacklevel=2)
+         self.strains = invariant_strains(state.potential_core.structure)
+         # Structural symmetry alone does not prove that a noisy frozen Sigma
+         # respects it. Its Hermitian real/imaginary parts must each be invariant
+@@ -287,6 +313,7 @@
+             diagnostic_only=self.diagnostic_only,
+             stress_ready=not self.diagnostic_only,
+             window_gap_treatment=self.window_gap_treatment,
++            charge_fixed_point=self.charge_fixed_point,
+             sigma_symmetry_relative_error=self.sigma_symmetry_error,
+             tensor_is_symmetry_projection=self.sigma_symmetry_error > 1e-10,
+             unrestricted_tensor_validated=False,
+--- a/src/python/lapw_total_stress_driver.py
++++ b/src/python/lapw_total_stress_driver.py
+@@ -121,6 +121,7 @@
+             library=library,
+             fixed_point_tolerance=fixed_point_tolerance,
+             diagnostic=diagnostic_gap_cutoff is not None,
++            warning=lambda message: progress("WARNING: " + message),
+             progress=lambda i, x: progress(
+                 f"Prepared radial energy search {i+1}: atom {x['atom']+1}, l={x['l']}"
+             ),
+@@ -277,7 +278,8 @@
+     p.add_argument("--library", type=Path)
+     p.add_argument("--progress-file", type=Path,
+                    help="append live root-rank progress to the parent response text summary")
+-    p.add_argument("--fixed-point-tolerance", type=float, default=1e-3)
++    p.add_argument("--fixed-point-tolerance", type=float, default=1e-3,
++                   help="warning threshold for the central charge residual in native density coordinates")
+     p.add_argument(
+         "--mpi", action="store_true", help="distribute k points over MPI ranks"
+     )
+--- a/src/python/stress_response_summary.py
++++ b/src/python/stress_response_summary.py
+@@ -172,11 +172,14 @@
+                       f"{gap['affected_kpoint_weight']:.8g}.\n",
+                       f"Threshold: |energy gap| <= {gap['cutoff_Ry']:g} Ry. "
+                       "All regular pairs, k points and central projectors are retained.\n"]
++    fixed_point = report.get("charge_fixed_point", {})
++    if fixed_point.get("warning"):
++        lines.append("\nWARNING: " + fixed_point["warning"] + "\n")
+     central = report.get("central", {})
+     adjoint = report.get("adjoint", {})
+     timing = report.get("timings", {})
+     lines += ["\nCONVERGENCE AND COMPUTATIONAL WORK\n",
+-              f"Response converged: {report.get('converged', 'not recorded')}\n",
++              f"Response solver converged: {report.get('converged', 'not recorded')}\n",
+               f"k points: {central.get('kpoints', 'not recorded')}; retained bands: "
+               f"{central.get('retained_bands', 'not recorded')}; MPI ranks: "
+               f"{report.get('parallel', {}).get('ranks', central.get('mpi_ranks', 'not recorded'))}\n",
+@@ -188,6 +191,9 @@
+                   "; common mu: " + _number(central.get('common_mu_Ry')) + " Ry\n",
+               "Central charge fixed-point residual (native coordinates): " +
+               _number(central.get("central_fixed_point_residual_norm")) + "\n",
++              "Central charge warning threshold / within threshold: " +
++              _number(fixed_point.get("warning_threshold")) + " / " +
++              str(fixed_point.get("within_threshold", "not recorded")) + "\n",
+               "Native valence/core reconstruction relative errors: " +
+               _number(central.get("central_valence_relative_error")) + " / " +
+               _number(central.get("central_core_relative_error")) + "\n",
+--- a/src/python/tests/test_lapw_total_stress.py
++++ b/src/python/tests/test_lapw_total_stress.py
+@@ -3,6 +3,8 @@
+ from itertools import permutations, product
+ from types import SimpleNamespace as NS
+ import unittest
++import warnings
++from unittest.mock import patch
+ import numpy as np
+ from lapw_total_stress import diagonal_invariant_strains, stress_from_contractions
+ 
+@@ -27,6 +29,56 @@
+         with self.assertRaisesRegex(NotImplementedError, "window-omission"):
+             PreparedTotalStress(state, ".", "case", complex_vectors=False,
+                                 library="unused")
++
++    def charge_context(self, residual, *, root=True, threshold=1e-3, warning=None):
++        from lapw_total_stress import PreparedTotalStress
++        meta = NS(sigma_inf=np.zeros((1, 1, 1)), sigma=np.zeros((1, 1, 1, 1)),
++                  omega=np.ones(1), sym=lambda x: x)
++        state = NS(valence=NS(branches=(NS(model=NS(diagnostic_only=False, meta=meta)),)),
++                   metadata={'central_fixed_point_residual_norm': residual},
++                   potential_core=NS(structure=structure([np.eye(3)])),
++                   parallel=NS(root=root))
++        with patch('lapw_total_stress.invariant_strains', return_value=np.eye(3)[None]), \
++             patch('lapw_total_stress.PreparedKleinFunctional') as functional, \
++             patch('lapw_total_stress.SearchedEnergyResponse') as energy:
++            result = PreparedTotalStress(state, '.', 'case', complex_vectors=False,
++                library='unused', fixed_point_tolerance=threshold, warning=warning)
++            functional.assert_called_once_with(state)
++            energy.assert_called_once()
++            return result
++
++    def test_finite_charge_residual_warns_and_continues(self):
++        with self.assertWarnsRegex(RuntimeWarning, 'Central charge-map residual'):
++            total = self.charge_context(.00503141)
++        self.assertFalse(total.diagnostic_only)
++        self.assertFalse(total.charge_fixed_point['within_threshold'])
++        self.assertEqual(total.charge_fixed_point['residual_norm'], .00503141)
++        self.assertEqual(total.charge_fixed_point['warning_threshold'], .001)
++        self.assertIn('not WIEN :DIS:', total.charge_fixed_point['warning'])
++
++    def test_charge_warning_uses_root_callback_and_is_silent_below_threshold(self):
++        messages = []
++        self.charge_context(.005, warning=messages.append)
++        self.assertEqual(len(messages), 1)
++        with warnings.catch_warnings(record=True) as emitted:
++            warnings.simplefilter('always')
++            worker = self.charge_context(.005, root=False, warning=messages.append)
++            converged = self.charge_context(.0001, warning=messages.append)
++            boundary = self.charge_context(.001, warning=messages.append)
++        self.assertFalse(emitted)
++        self.assertEqual(len(messages), 1)
++        self.assertIsNotNone(worker.charge_fixed_point['warning'])
++        self.assertTrue(converged.charge_fixed_point['within_threshold'])
++        self.assertTrue(boundary.charge_fixed_point['within_threshold'])
++        self.assertIsNone(converged.charge_fixed_point['warning'])
++
++    def test_invalid_charge_residual_or_threshold_still_fails(self):
++        for residual in [float('nan'), float('inf'), -1.0]:
++            with self.subTest(residual=residual), self.assertRaisesRegex(ValueError, 'finite and nonnegative'):
++                self.charge_context(residual)
++        for threshold in [0, -1, float('nan'), float('inf')]:
++            with self.subTest(threshold=threshold), self.assertRaisesRegex(ValueError, 'positive finite'):
++                self.charge_context(.005, threshold=threshold)
+ 
+     def test_tetragonal_two_sources_reconstruct_three_axes(self):
+         r = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
+--- a/src/python/tests/test_stress_response_summary.py
++++ b/src/python/tests/test_stress_response_summary.py
+@@ -119,6 +119,16 @@
+             self.assertIn('1e-10 Ry', text)
+             self.assertIn('0.029513889', text)
+ 
++    def test_charge_warning_distinguishes_solver_and_central_convergence(self):
++        with case() as (root, status, report):
++            report['charge_fixed_point'] = dict(residual_norm=.00503141,
++                warning_threshold=.001, within_threshold=False,
++                warning='Central charge-map residual 0.00503141 exceeds threshold 0.001.')
++            text = summary._report_text(report)
++            self.assertIn('WARNING: Central charge-map residual 0.00503141', text)
++            self.assertIn('Response solver converged: True', text)
++            self.assertIn('0.001 / False', text)
++
+     def test_shear_values_are_printed_when_present(self):
+         tensor=np.array([[1.,2.,3.],[2.,4.,5.],[3.,5.,6.]])
+         text=summary._stress_table([('Complete stress',tensor)])
+--- a/src/python/tests/test_stress_response_publish.py
++++ b/src/python/tests/test_stress_response_publish.py
+@@ -109,6 +109,9 @@
+             report.write_text(json.dumps(dict(
+                 converged=True, full_tensor_within_symmetry=True,
+                 diagnostic_only=False, stress_ready=True,
++                charge_fixed_point=dict(residual_norm=.00503141,
++                    warning_threshold=.001, within_threshold=False,
++                    warning='Central charge-map residual exceeds warning threshold.'),
+                 window_gap_treatment=[dict(policy='omit_singular_pairs',
+                     cutoff_Ry=1e-10, omitted_pairs=9, affected_kpoints=8)],
+                 stress_Ry_Bohr3=sigma.tolist())))

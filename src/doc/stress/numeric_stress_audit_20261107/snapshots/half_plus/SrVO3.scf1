@@ -1,0 +1,62 @@
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  Sr        
+:e__0001: OVERALL ENERGY PARAMETER IS    0.3000
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0001: E( 0)=    0.3000
+             APW+lo
+:E0_0001: E( 0)=   -1.8154   E(BOTTOM)=   -2.108   E(TOP)=   -1.523  3  4   187
+             LOCAL ORBITAL
+:E1_0001: E( 1)=    0.7000
+             APW+lo
+:E1_0001: E( 1)=   -0.5810   E(BOTTOM)=   -1.056   E(TOP)=   -0.106  2  3   174
+             LOCAL ORBITAL
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  V         
+:e__0002: OVERALL ENERGY PARAMETER IS    0.3000
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0002: E( 0)=    0.3000
+             APW+lo
+:E0_0002: E( 0)=   -4.2285   E(BOTTOM)=   -4.592   E(TOP)=   -3.865  2  3   157
+             LOCAL ORBITAL
+:E1_0002: E( 1)=    0.3000
+             APW+lo
+:E1_0002: E( 1)=   -2.3996   E(BOTTOM)=   -2.908   E(TOP)=   -1.891  1  2   151
+             LOCAL ORBITAL
+:E2_0002: E( 2)=    0.3000   E(BOTTOM)=   -0.205   E(TOP)= -200.000  0 -1   113
+             APW+lo
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  O         
+:e__0003: OVERALL ENERGY PARAMETER IS    0.3000
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0003: E( 0)=    0.7000
+             APW+lo
+:E0_0003: E( 0)=   -0.6540   E(BOTTOM)=   -1.740   E(TOP)=    0.432  1  2   207
+             LOCAL ORBITAL
+:E1_0003: E( 1)=    0.3000
+             APW+lo
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  O         
+:e__0004: OVERALL ENERGY PARAMETER IS    0.3000
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0004: E( 0)=    0.7000
+             APW+lo
+:E0_0004: E( 0)=   -0.6539   E(BOTTOM)=   -1.740   E(TOP)=    0.432  1  2   210
+             LOCAL ORBITAL
+:E1_0004: E( 1)=    0.3000
+             APW+lo
+
+       K=   0.05000   0.05000   0.05000            1
+:RKM  : MATRIX SIZE   703LOs:  36  RKM= 7.99  WEIGHT= 8.00  PGR:    
+       EIGENVALUES ARE:
+:EIG00001:      -4.1598750   -2.3278998   -2.3278532   -2.3278475   -1.7748348
+:EIG00006:      -0.7990076   -0.7131610   -0.7131044   -0.5596721   -0.5596683
+:EIG00011:      -0.5573884    0.2315909    0.2361720    0.2361742    0.3735870
+:EIG00016:       0.3735994    0.3936465    0.4254615    0.4385962    0.4388217
+:EIG00021:       0.4966313    0.4978904    0.4980166    0.6573043    0.6573908
+:EIG00026:       0.8817361    0.8817535    0.9943114    1.0914748    1.0922607
+:EIG00031:       1.0922649    1.5844608    1.7448729    1.7448806    1.7574542
+:EIG00036:       1.9423238    2.0255848    2.0255911    2.0596527    2.0596708
+:EIG00041:       2.1073825    2.1560658    2.1581405
+       ********************************************************
+
+:KPT   :      NUMBER OF K-POINTS:    75

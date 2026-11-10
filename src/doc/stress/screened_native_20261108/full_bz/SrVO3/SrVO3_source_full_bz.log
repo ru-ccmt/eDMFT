@@ -1,0 +1,151 @@
+SrVO3 central native completed
+SrVO3 source_p_0.00025 native completed
+SrVO3 source_m_0.00025 native completed
+SrVO3 source_p_0.000125 native completed
+SrVO3 source_m_0.000125 native completed
+{
+  "central_relative_error": 1.2627697204368448e-18,
+  "target_charge": 85.0,
+  "target_band_number": 41.0018262968246,
+  "scope": "hydrostatic one-step source at the archived central state; not final stress",
+  "steps": {
+    "0.00025": {
+      "norm": 1486.6605021781993,
+      "actual_difference": 0.0004999774114888833,
+      "charge": -2.0179413695586845e-11
+    },
+    "0.000125": {
+      "norm": 1486.6622688038283,
+      "actual_difference": 0.0002501264405685433,
+      "charge": 4.18403089952335e-11
+    }
+  },
+  "step_relative_difference": 9.45901612101265e-06,
+  "timings": [
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central",
+      "program": "lapw0",
+      "seconds": 0.7857576659880579
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central",
+      "program": "lapw1",
+      "seconds": 14.861603500088677
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central",
+      "program": "dmft2",
+      "seconds": 4.7287804170046
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central",
+      "program": "dmft2_fixed_n",
+      "seconds": 4.7727480828762054
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/central",
+      "program": "lcore",
+      "seconds": 0.03063175012357533
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.00025",
+      "program": "lapw0",
+      "seconds": 0.7462266250513494
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.00025",
+      "program": "lapw1",
+      "seconds": 14.623453125124797
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.00025",
+      "program": "dmft2",
+      "seconds": 4.723239958053455
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.00025",
+      "program": "dmft2_fixed_n",
+      "seconds": 4.744909292086959
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.00025",
+      "program": "lcore",
+      "seconds": 0.03104508318938315
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.00025",
+      "program": "lapw0",
+      "seconds": 0.7287885840050876
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.00025",
+      "program": "lapw1",
+      "seconds": 14.732040375005454
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.00025",
+      "program": "dmft2",
+      "seconds": 5.150036625098437
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.00025",
+      "program": "dmft2_fixed_n",
+      "seconds": 4.924784417031333
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.00025",
+      "program": "lcore",
+      "seconds": 0.0357717911247164
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.000125",
+      "program": "lapw0",
+      "seconds": 0.7917790000792593
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.000125",
+      "program": "lapw1",
+      "seconds": 15.223573666997254
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.000125",
+      "program": "dmft2",
+      "seconds": 4.96648587519303
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.000125",
+      "program": "dmft2_fixed_n",
+      "seconds": 4.969390165992081
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_p_0.000125",
+      "program": "lcore",
+      "seconds": 0.03639037488028407
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.000125",
+      "program": "lapw0",
+      "seconds": 0.7934099580161273
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.000125",
+      "program": "lapw1",
+      "seconds": 15.967003708006814
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.000125",
+      "program": "dmft2",
+      "seconds": 5.128259416203946
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.000125",
+      "program": "dmft2_fixed_n",
+      "seconds": 5.193997874855995
+    },
+    {
+      "folder": "/private/tmp/edmft_screened_native_20261108/full_bz/SrVO3/source_m_0.000125",
+      "program": "lcore",
+      "seconds": 0.03850820800289512
+    }
+  ]
+}

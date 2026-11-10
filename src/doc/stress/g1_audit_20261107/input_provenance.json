@@ -1,0 +1,16 @@
+{
+  "FeSe": {
+    "source": "/Users/haule/projects/materials/FeSe_again/FeSe_stress/FeSe_RELA",
+    "input_file": "/Users/haule/projects/materials/FeSe_again/FeSe_stress/FeSe_RELA/FeSe.in1",
+    "input_sha256": "28679f9bcbedcb4933d74cdc3cd827e9d6db9c4842011997849623727d70182c",
+    "rkmax": 8.0,
+    "original_vector_identical_to_test": true
+  },
+  "SrVO3": {
+    "source": "/Users/haule/projects/materials/SrVO3/V_plus_force",
+    "input_file": "/Users/haule/projects/materials/SrVO3/V_plus_force/SrVO3.in1c",
+    "input_sha256": "87353038680f660ea8b8954ea041a7f57e74f62dd16c3e96c1bb0ef2a4bf01c9",
+    "rkmax": 7.0,
+    "original_vector_identical_to_test": true
+  }
+}

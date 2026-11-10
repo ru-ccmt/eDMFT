@@ -1,0 +1,327 @@
+COUPLED VALENCE RESPONSE: SPHERICAL POTENTIAL INPUT
+Checkpoint of 8 November 2026
+
+RESULT AND SCOPE
+
+The joint spherical-potential -> H/O/raw-projector -> electronic density ->
+spatial valence-density response now agrees with independent native endpoints
+in FeSe RELA and SrVO3 NREL when the entire finite LAPW basis is represented.
+The native radial response, both matching legs, nonspherical CENTRAL potential,
+moving overlap metric, normalized projector/window, and direct basis-density
+derivative are included. Forward and transpose operations agree near roundoff.
+
+A controlled test exposes a major truncation error: restricting the response
+to the usual stored band set can lose a large part of this density derivative,
+even though the ground-state density is already accurate. This is a requirement
+for the new response engine. It does not establish that the same omission is
+the sole cause of earlier analytic-versus-numeric PRESSURE discrepancies.
+
+These are optional response modules. They do not change ordinary dmft2 stress,
+the production dmft2 executable, or the user's converged material directories.
+No new corrected pressure or six-component stress tensor is claimed here.
+
+The tested input is a spherical muffin-tin potential perturbation at fixed
+geometry, RMT, local frames, local self-energy, double counting, chemical
+potential, band-index window and radial linearization/LO energies. The tests
+use nonmagnetic, non-SOC, primitive orthogonal cells. General nonspherical and
+interstitial potential INPUTS, automatic radial-energy search, core response,
+Hartree/XC response and the final stress contraction are not completed here.
+
+1. THE OPERATION THAT WAS CONNECTED
+
+Let v_a(r)=r delta V_a,spherical(r) in Ry, with one radial mesh for each
+inequivalent atom a. All derivatives below refer to this input, not to strain.
+
+Let H_k and O_k be the Hamiltonian and overlap matrices in the fixed CENTRAL
+band-coefficient representation. Phi_k contains raw band/local-orbital overlaps.
+Let rho_k be the contravariant band density matrix, already including spin and
+k-point weights. Let Psi_k(r) be the row of spatial trial functions formed with
+the central coefficients and the potential-dependent LAPW augmentation.
+
+  n(r) = sum_k Psi_k(r) rho_k Psi_k(r)^dagger.
+
+Consequently,
+
+  delta n = R delta rho + D_s v,
+  (delta H,delta O,delta Phi) = B_s v,
+  delta rho = E(delta H,delta O,delta Phi),
+
+  delta n = (R E B_s + D_s) v.                              (1)
+
+R is spatial density reconstruction with basis fixed. D_s contains BOTH direct
+basis terms delta Psi rho Psi^dagger + Psi rho delta Psi^dagger. E is the existing
+cached frozen-self-energy electronic response. B_s is the newly connected
+spherical-input operator. Its output contains full off-diagonal band matrices.
+
+All maps use explicitly packed real coordinates; complex matrices use the
+real Frobenius pairing Re Tr(A^dagger B). Reverse operations are transposes
+in these coordinates, including the actual discrete integration weights.
+
+The coefficient trace alone is not the particle-number derivative:
+
+  delta N = sum_k Tr(delta rho_k + rho_k delta O_k).        (2)
+
+The independent real-space integrated-charge check remains a completion test
+for the broader potential/charge adapter. This checkpoint tests pointwise
+stored spatial coefficients and the complete forward/transpose pairing.
+
+2. SPHERICAL H AND O WITHOUT REBUILDING A LARGE PW MATRIX
+
+For one atom/site/angular channel l, let phi_i(r) be the native primitive
+radials (u, udot, ordinary LO radials). The stored four components are
+(A,B,AP,BP). The native metric W_rc is obtained from the prepared radial solver;
+it includes its origin treatment and small-component convention.
+
+  S_ij = sum_rc phi_rci W_rc phi_rcj.
+
+The native assembler imposes S_00=1 and S_01=S_10=0, so their derivatives must
+also be set to zero. These are discrete implementation identities, not an
+invitation to replace the remaining metric with a continuum approximation.
+
+Define T = diag(E,E,E_LO,...) + e_0 e_1^T, with all energies in Ry. If Vphys
+is the physical spherical potential and Vbasis generates the radial functions,
+
+  K = (S T + T^T S)/2
+      + phi^T W (Vphys-Vbasis) phi.                        (3)
+
+Z_min contains matched primitive coefficients for harmonic m and central band
+n, including LOs. Zpw uses only the PW contribution. At radius R=RMT define
+
+  p_mn = sum_i A_i(R) Zpw_min / R,
+  d_mn = sum_i AP_i(R) Z_min / R.
+
+Native LO boundary VALUES are zero in this assembler; their boundary SLOPES
+are retained. The spherical contributions are
+
+  O = sum_m Z_m^dagger S Z_m,
+  H = sum_m Z_m^dagger K Z_m
+      + R^2/2 (p^dagger d + d^dagger p) + H_ordered.        (4)
+
+Both matching legs, S, K, p and d are differentiated. For the present physical
+spherical perturbation Vphys and Vbasis move together, so the difference in
+(3) and its tangent are zero. A separate frozen-physical-H control instead
+sets delta[r(Vphys-Vbasis)]=-v. These tests must not be confused.
+
+The native upper-triangle-copy convention needs a small ordered correction.
+For LAPW matching define j_i=j_l(q_i R), dj_i=q_i j_l'(q_i R), and
+
+  M1_i = R(A_udot dj_i - AP_udot j_i),
+  M2_i = R(AP_u j_i - A_u dj_i),
+  Wb   = AP_u A_udot - A_u AP_udot.
+
+The ordered native PW term is (Wb-1)(M1_i M2_j-M2_i M1_j)/2. Since
+
+  M1_i M2_j-M2_i M1_j = R^2 Wb(dj_i j_j-j_i dj_j),
+
+prepare ONCE
+
+  Tord = Cpw^dagger F[angular_ij(dj_i j_j-j_i dj_j)] Cpw,
+  angular_ij = 4 pi/volume (2l+1) P_l(qhat_i.qhat_j)
+               times conjugate(site_phase_i)*site_phase_j.               (5)
+
+Cpw is the central PW coefficient matrix. F keeps the native upper triangle,
+copies its conjugate to the lower triangle and makes the diagonal real.
+It is not the symmetric average of the original ordered matrix.
+
+  H_ordered = R^2/2 Wb(Wb-1) Tord,
+  delta H_ordered = R^2/2 (2Wb-1) delta Wb Tord.            (6)
+
+For APW, M2=0 and this ordered term vanishes. Formula (6) allows subsequent
+actions and transposes in small primitive/band spaces without a new Npw^2
+matrix. The global spherical frame is used; rounded local axes are not needed
+for an isotropic kernel.
+
+3. NONSPHERICAL CENTRAL POTENTIAL AND PROJECTOR
+
+The nonspherical part retains all ordered l,l' radial pairs and native Gaunt
+coefficients. For each harmonic h,
+
+  I_ijh^(l,l') = sum_rc phi_l,rci W_rc V_h(r) phi_l',rcj.  (7)
+
+Here V_h is the actual potential in Ry, not r V_h. Both radial legs and both
+matching legs in Z^dagger K_ns Z are differentiated. The generic class also
+accepts delta V_h. The current joint spherical-input adapter holds V_h fixed,
+while retaining its radial/matching response. Omitting this distinction would
+drop a real contribution to the spherical-input Hamiltonian derivative.
+
+For projector 5, let P_a(r) be the fixed radial projector stored on disk,
+Wp the NREL/RELA native projector metric, and L_ma the orbital transformation:
+
+  q_i = sum_rc Wp_rc phi_rci P_rc,
+  Phi_na = sum_mi conjugate(Z_min) q_i L_ma + Phi_tail,na,
+
+  delta Phi_na = sum_mi [conjugate(delta Z_min) q_i
+                         + conjugate(Z_min) delta q_i] L_ma.             (8)
+
+Only the two radial value components enter q. Native NREL projector integration
+sets its small-component weight to zero. For one non-SOC block L=CF^T, following
+the native final conjugation; using CF^dagger here would give the wrong gauge.
+
+At fixed geometry and fixed central coefficients, a supplied interstitial
+projector tail is constant for this potential response. This is NOT a formula
+for its geometric strain or moving-boundary derivative. The material fixtures
+have no nonzero radial interval outside RMT; their actual tails are zero.
+
+The actual local/equivalent-site frame and Bloch phase are essential. A
+symmetry mapping R pos_first+tau to an equivalent site supplies the unwrapped
+position R pos_first+tau, including its lattice translation. The raw-projector
+phase uses G+k. A scalar k-dependent site phase may cancel from a density or
+Hamiltonian matrix but cannot be discarded from a raw projector comparison.
+Using these native conventions reproduces the exported raw projectors to
+2--5e-15 without fitting, gauge alignment or a pseudoinverse.
+
+E applies the normalized-projector chain ONCE after (8):
+
+  P_k = Pi_W,k Phi_k X,
+  X = [Sym(sum_k w_k Phi_k^dagger Pi_W,k Phi_k)]^(-1/2),
+
+  delta P_k = delta Pi_W,k Phi_k X
+              + Pi_W,k delta Phi_k X + Pi_W,k Phi_k delta X.             (9)
+
+Pi_W is the fixed-index spectral subspace, not a fixed set of real-space
+functions. Metric orthonormalization is included in E before this chain.
+Band storage truncation is separate from the chosen DMFT window W.
+
+4. INDEPENDENT NATIVE TEST AND THE MISSING COMPLEMENT
+
+Native endpoints run lapw1 and dmft2_response in scratch, with fresh SOlapm.dat,
+fixed Sigma/mu, identical frozen radial-energy inputs and identical PW labels.
+The spherical perturbation is delta(rV)=0.07*r*sin(1.3*r), multiplied by h.
+Reported errors use ||analytic-FD||_2/||FD||_2 on the packed spatial-density
+coefficients. This is a coordinate norm, not a pressure or a maximum physical
+density error. No fitting to endpoint derivatives is used.
+
+The strongest convergence control uses exactly the same ONE-k-point central
+calculation and native endpoints, truncating only the analytic response space:
+
+                            Usual stored set       200 states      Full basis
+  FeSe RELA (509 basis)      0.544603 (66 states)   0.176345        1.5358e-7
+  SrVO3 NREL (703 basis)     0.190156 (43 states)   0.030142        7.2177e-7
+
+This table uses h=0.0005. It must not be compared as a k-convergence table with
+the separately archived three-k probes. The three-k probes give errors 0.5707
+and 0.4314 for the usual FeSe/SrVO3 storage; their 200-state errors are 0.1834
+and 0.06873. The comparison within each set is consistent.
+
+Full-basis step convergence:
+
+  h                 FeSe RELA                  SrVO3 NREL
+  0.001             4.2643e-7                  2.8691e-6
+  0.0005            1.5358e-7                  7.2177e-7
+  0.00025           1.1936e-7                  1.7755e-7
+
+SrVO3 follows quadratic central-difference convergence; FeSe approaches a
+small numerical floor. The full-basis central density matches native output
+to 9.5e-13 (FeSe) and 1.63e-12 (SrVO3). Coupled transpose errors are 1.43e-15
+and 4.26e-16, respectively. This checks one smooth physical potential direction,
+not every possible perturbation or all k points.
+
+Why the truncation matters: even an empty high-energy state |a> contributes
+to motion of a low-energy state |n> through
+
+  <a|delta n> = <a|(delta H-epsilon_n delta O)|n>
+                /(epsilon_n-epsilon_a), a != n.            (10)
+
+This off-diagonal mixing changes the density and the moving window. Negligible
+occupation of |a> does not imply a negligible sum of all such contributions.
+An accurate central density therefore does not certify an accurate response.
+For DMFT the full off-diagonal electronic density and normalized-projector
+chain still have to be retained; (10) alone is not a replacement for E.
+
+SrVO3 has an additional diagnostic bookkeeping detail: lapw1 writes 703 states,
+but dmft2's reader/export ceiling of 100 Ry leaves only 701. The last two actual
+vector states lie above 100 Ry. The full-basis fixture adds their actual energies,
+coefficients and analytically assembled raw overlaps, all outside the DMFT
+window and thermally empty. The central density is checked unchanged. It does
+not extrapolate eigenstates or modify the production reader. Initial 703/701
+dimension failure was a fixture failure, not a physical discrepancy.
+
+The full-array normalization offset in SrVO3 includes an inactive block. The
+active correlated blocks agree to roundoff; the inactive offset is not evidence
+of a stale SOlapm in these tests.
+
+Separate small-band H'/O' checks agree with native endpoints at about 1e-8--1e-7.
+In the complete 703-state SrVO3 space, H' differs by roughly 1e-5 in full-matrix
+norm, concentrated in this harder high-energy comparison; O' is about 1e-6.
+Thus we do not claim machine-precision agreement of every high-energy matrix
+entry. The coupled density itself passes the step-convergent test above.
+
+5. SOFTWARE, COST, AND VALIDATION
+
+New optional helpers:
+  lapw_spherical_response.py          cached spherical H/O and ordered term
+  lapw_nonspherical_response.py       radial/matching/nonspherical H map
+  lapw_projector_response.py          raw projector-5 map in explicit gauge
+  lapw_spherical_potential_response.py shared B_s action and transpose
+
+The in-memory radial C API is version 2. It exports its actual prepared radial
+mesh and overlap/projector metrics. The Python wrapper and shared library must
+be installed together. Existing radial actions are unchanged. Contexts are
+shared per atom/l; B_s accumulates H/O/projector covectors from all k/sites
+before one radial reverse call per channel. D_s separately pools its density
+covectors. Fusing their remaining repeated radial action/reverse calls is a
+small future optimization, not already an implemented speedup. Registry calls
+are serialized per process.
+
+The ordered PW tensor is prepared once. Actions use small radial kernels and
+cached matching coefficients; no new LAPW diagonalization is performed inside
+an action. However, using a full spectral representation has preparation and
+memory costs that are not yet a production solution to complement response.
+
+The isolated spherical all-channel action took about 0.11 s in FeSe and 0.07 s
+in SrVO3 in the recorded small-band first-k probes. The larger full-basis setup
+and first forward density action took about 10 s and 23 s. These are component
+measurements, NOT end-to-end screened-stress speedups. Transpose costs and
+production MPI scaling still need profiling once the complete operator is wired.
+
+A clean native library build and 96 source Python tests pass, including four
+new independent spherical/projector/nonspherical derivative and transpose
+controls. The spherical value test compares the compact formula against explicit
+PW/LO matrix assembly with a deliberately non-unit Wronskian. Tests cover complex
+off-diagonal covectors, LAPW/APW and both radial legs. Native NREL/RELA radial
+controls remain enabled. Installed-source/helper results are in INSTALLATION.json.
+
+6. NEXT IMPLEMENTATION STEPS
+
+(a) Keep the full-basis result as an independent reference. Do not silently use
+    the truncated response in a converged screened solve. Add a response-space
+    convergence criterion; ordinary ground-state or projector-window convergence
+    alone is inadequate. Do not enlarge the DMFT window just to add response
+    states: these are different controls.
+
+(b) Implement the missing complement economically. At fixed geometry prepare
+    the native central H/O once. Compare a complete spectral baseline with a
+    projected linear solve in the coefficient-space complement. Reuse central
+    factorizations/preconditioners for forward and adjoint actions. Preserve
+    generalized-metric, off-diagonal DMFT, window and normalization terms; a
+    diagonal DFT occupied/unoccupied formula is insufficient. Select the faster
+    accurate route by measurements, not by assuming full diagonalization cheap.
+
+(c) Extend B_s to arbitrary nonspherical and interstitial potential inputs;
+    complete spatial charge/gauge tests and fixed-N material endpoint tests.
+    Turn the limited material fixture into a validated reusable adapter with
+    explicit supported geometry, local frames, energy policy and failure checks.
+
+(d) Add native Hartree/XC and core forward/reverse operations. Connect the full
+    unmixed charge-map derivative J and validate it against the native reference.
+    Only then use (I-J) delta n=b or its adjoint as the fast screening engine.
+
+(e) Complete the common stress gradient, six physical strain sources, and
+    direct corrections. Validate forward versus adjoint contractions and the
+    matched frozen-Sigma functional finite differences before publishing a
+    corrected tensor through the existing final-only dmft2 wrapper.
+
+EVIDENCE AND REPLAY
+
+results/ contains scalar JSON reports for central projectors, spherical matrix
+factorization, full coupled endpoints and controlled band subsets. test_drivers/
+contains the recorded scratch drivers; MATERIAL_FINGERPRINTS.json identifies
+their inputs and native executable versions. These are diagnostic fixtures with
+explicit scratch paths, not a new public material CLI. Large vectors/endpoints
+remain in /private/tmp/edmft_coupled_valence_response_20261108. The directory name
+m_3e-04/p_3e-04 is the one-significant-digit label for h=0.00025; JSON step values
+and the endpoint generator contain the exact value.
+
+Source snapshots, previous versions, installed hashes and test logs accompany
+this checkpoint. The roadmap records what is installed versus what is actually
+connected to production stress.

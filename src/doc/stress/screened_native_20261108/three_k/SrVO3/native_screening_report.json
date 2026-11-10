@@ -1,0 +1,76 @@
+{
+  "converged": true,
+  "threshold": 0.0005,
+  "iterations": [
+    {
+      "iteration": 0,
+      "residual_norm": 1666.2023195973413,
+      "seconds": 4.864957792218775
+    },
+    {
+      "iteration": 1,
+      "residual_norm": 932.6887906339614,
+      "seconds": 4.832596540916711
+    },
+    {
+      "iteration": 2,
+      "residual_norm": 1053.3759778266233,
+      "seconds": 4.889271874912083
+    },
+    {
+      "iteration": 3,
+      "residual_norm": 328.8991539506503,
+      "seconds": 4.983626999892294
+    },
+    {
+      "iteration": 4,
+      "residual_norm": 30.452187256100245,
+      "seconds": 4.99319262499921
+    },
+    {
+      "iteration": 5,
+      "residual_norm": 12.57213902325697,
+      "seconds": 4.942996500059962
+    },
+    {
+      "iteration": 6,
+      "residual_norm": 1.726151693364979,
+      "seconds": 4.960318374913186
+    },
+    {
+      "iteration": 7,
+      "residual_norm": 0.7618261014657012,
+      "seconds": 5.00382574996911
+    },
+    {
+      "iteration": 8,
+      "residual_norm": 0.047286125469211196,
+      "seconds": 5.003755500074476
+    },
+    {
+      "iteration": 9,
+      "residual_norm": 0.017533031664325776,
+      "seconds": 4.780259667197242
+    },
+    {
+      "iteration": 10,
+      "residual_norm": 0.004220260951896816,
+      "seconds": 4.562668500002474
+    },
+    {
+      "iteration": 11,
+      "residual_norm": 0.0005591396791945219,
+      "seconds": 4.791548375040293
+    },
+    {
+      "iteration": 12,
+      "residual_norm": 0.00025116522063841826,
+      "seconds": 4.86886225012131
+    }
+  ],
+  "seconds": 63.512255124980584,
+  "density_relative_difference": 2.1710346853061454e-07,
+  "density_difference_norm": 0.0002307493876537654,
+  "source_norm": 1515.7670661704196,
+  "scope": "independent cold-start native finite-difference charge map; same local central tangent and source"
+}

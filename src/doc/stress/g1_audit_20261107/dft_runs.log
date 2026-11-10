@@ -1,0 +1,12 @@
+START SrVO3 before
+START FeSe before
+DONE SrVO3 before 28.52
+START SrVO3 radial_only
+DONE FeSe before 40.53
+START FeSe radial_only
+DONE SrVO3 radial_only 28.15
+START SrVO3 corrected
+DONE FeSe radial_only 39.89
+START FeSe corrected
+DONE SrVO3 corrected 28.13
+DONE FeSe corrected 38.84

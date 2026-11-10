@@ -1,0 +1,343 @@
+{
+  "converged": true,
+  "threshold": 0.02,
+  "iterations": [
+    {
+      "iteration": 0,
+      "residual_norm": 4900.653296889779,
+      "seconds": 12.376257000025362
+    },
+    {
+      "iteration": 1,
+      "residual_norm": 7154.4874201525145,
+      "seconds": 12.565158708952367
+    },
+    {
+      "iteration": 2,
+      "residual_norm": 560.2609338069254,
+      "seconds": 12.9696573340334
+    },
+    {
+      "iteration": 3,
+      "residual_norm": 110.31041532522403,
+      "seconds": 13.0415399170015
+    },
+    {
+      "iteration": 4,
+      "residual_norm": 21.9630796488633,
+      "seconds": 12.374226625077426
+    },
+    {
+      "iteration": 5,
+      "residual_norm": 3.6627567408795647,
+      "seconds": 12.573707167059183
+    },
+    {
+      "iteration": 6,
+      "residual_norm": 1.4076366789229384,
+      "seconds": 12.369878290919587
+    },
+    {
+      "iteration": 7,
+      "residual_norm": 0.5271125396758739,
+      "seconds": 12.342597959097475
+    },
+    {
+      "iteration": 8,
+      "residual_norm": 0.04225290218517439,
+      "seconds": 12.33615641691722
+    },
+    {
+      "iteration": 9,
+      "residual_norm": 0.02545176319626128,
+      "seconds": 12.311676791869104
+    },
+    {
+      "iteration": 10,
+      "residual_norm": 0.008929913525840147,
+      "seconds": 12.32000512513332
+    }
+  ],
+  "timings": [
+    {
+      "folder": "central",
+      "program": "lapw0",
+      "seconds": 0.6962131250184029
+    },
+    {
+      "folder": "central",
+      "program": "lapw1",
+      "seconds": 6.638335624942556
+    },
+    {
+      "folder": "central",
+      "program": "dmft2",
+      "seconds": 6.612075541866943
+    },
+    {
+      "folder": "central",
+      "program": "lcore",
+      "seconds": 0.07826716592535377
+    },
+    {
+      "folder": "source_plus",
+      "program": "lapw0",
+      "seconds": 0.6145424589049071
+    },
+    {
+      "folder": "source_plus",
+      "program": "lapw1",
+      "seconds": 5.271089709131047
+    },
+    {
+      "folder": "source_plus",
+      "program": "dmft2",
+      "seconds": 6.098115334054455
+    },
+    {
+      "folder": "source_plus",
+      "program": "lcore",
+      "seconds": 0.06449187500402331
+    },
+    {
+      "folder": "source_minus",
+      "program": "lapw0",
+      "seconds": 0.5801502079702914
+    },
+    {
+      "folder": "source_minus",
+      "program": "lapw1",
+      "seconds": 5.282215167069808
+    },
+    {
+      "folder": "source_minus",
+      "program": "dmft2",
+      "seconds": 6.1419507910031825
+    },
+    {
+      "folder": "source_minus",
+      "program": "lcore",
+      "seconds": 0.06760208401829004
+    },
+    {
+      "folder": "action_000",
+      "program": "lapw0",
+      "seconds": 0.5801859579514712
+    },
+    {
+      "folder": "action_000",
+      "program": "lapw1",
+      "seconds": 5.264626458054408
+    },
+    {
+      "folder": "action_000",
+      "program": "dmft2",
+      "seconds": 6.107143874978647
+    },
+    {
+      "folder": "action_000",
+      "program": "lcore",
+      "seconds": 0.06731149996630847
+    },
+    {
+      "folder": "action_001",
+      "program": "lapw0",
+      "seconds": 0.5737173750530928
+    },
+    {
+      "folder": "action_001",
+      "program": "lapw1",
+      "seconds": 5.275280625093728
+    },
+    {
+      "folder": "action_001",
+      "program": "dmft2",
+      "seconds": 6.26670500007458
+    },
+    {
+      "folder": "action_001",
+      "program": "lcore",
+      "seconds": 0.07674641697667539
+    },
+    {
+      "folder": "action_002",
+      "program": "lapw0",
+      "seconds": 0.6386543340049684
+    },
+    {
+      "folder": "action_002",
+      "program": "lapw1",
+      "seconds": 5.5953766668681055
+    },
+    {
+      "folder": "action_002",
+      "program": "dmft2",
+      "seconds": 6.2668128330260515
+    },
+    {
+      "folder": "action_002",
+      "program": "lcore",
+      "seconds": 0.07552441698499024
+    },
+    {
+      "folder": "action_003",
+      "program": "lapw0",
+      "seconds": 0.6328846670221537
+    },
+    {
+      "folder": "action_003",
+      "program": "lapw1",
+      "seconds": 5.642966541927308
+    },
+    {
+      "folder": "action_003",
+      "program": "dmft2",
+      "seconds": 6.284951915964484
+    },
+    {
+      "folder": "action_003",
+      "program": "lcore",
+      "seconds": 0.08069379115477204
+    },
+    {
+      "folder": "action_004",
+      "program": "lapw0",
+      "seconds": 0.601009750040248
+    },
+    {
+      "folder": "action_004",
+      "program": "lapw1",
+      "seconds": 5.25200391584076
+    },
+    {
+      "folder": "action_004",
+      "program": "dmft2",
+      "seconds": 6.099973333999515
+    },
+    {
+      "folder": "action_004",
+      "program": "lcore",
+      "seconds": 0.06351700006052852
+    },
+    {
+      "folder": "action_005",
+      "program": "lapw0",
+      "seconds": 0.5720577919855714
+    },
+    {
+      "folder": "action_005",
+      "program": "lapw1",
+      "seconds": 5.360725124832243
+    },
+    {
+      "folder": "action_005",
+      "program": "dmft2",
+      "seconds": 6.218750957865268
+    },
+    {
+      "folder": "action_005",
+      "program": "lcore",
+      "seconds": 0.06777937500737607
+    },
+    {
+      "folder": "action_006",
+      "program": "lapw0",
+      "seconds": 0.5803533331491053
+    },
+    {
+      "folder": "action_006",
+      "program": "lapw1",
+      "seconds": 5.2585890418849885
+    },
+    {
+      "folder": "action_006",
+      "program": "dmft2",
+      "seconds": 6.113823249936104
+    },
+    {
+      "folder": "action_006",
+      "program": "lcore",
+      "seconds": 0.0644583331886679
+    },
+    {
+      "folder": "action_007",
+      "program": "lapw0",
+      "seconds": 0.57469916716218
+    },
+    {
+      "folder": "action_007",
+      "program": "lapw1",
+      "seconds": 5.238860083045438
+    },
+    {
+      "folder": "action_007",
+      "program": "dmft2",
+      "seconds": 6.109378959052265
+    },
+    {
+      "folder": "action_007",
+      "program": "lcore",
+      "seconds": 0.06528195808641613
+    },
+    {
+      "folder": "action_008",
+      "program": "lapw0",
+      "seconds": 0.5707452080678195
+    },
+    {
+      "folder": "action_008",
+      "program": "lapw1",
+      "seconds": 5.239212749991566
+    },
+    {
+      "folder": "action_008",
+      "program": "dmft2",
+      "seconds": 6.098419249989092
+    },
+    {
+      "folder": "action_008",
+      "program": "lcore",
+      "seconds": 0.07224441692233086
+    },
+    {
+      "folder": "action_009",
+      "program": "lapw0",
+      "seconds": 0.5755544160492718
+    },
+    {
+      "folder": "action_009",
+      "program": "lapw1",
+      "seconds": 5.232662374852225
+    },
+    {
+      "folder": "action_009",
+      "program": "dmft2",
+      "seconds": 6.08275125012733
+    },
+    {
+      "folder": "action_009",
+      "program": "lcore",
+      "seconds": 0.06832824996672571
+    },
+    {
+      "folder": "action_010",
+      "program": "lapw0",
+      "seconds": 0.5644556251354516
+    },
+    {
+      "folder": "action_010",
+      "program": "lapw1",
+      "seconds": 5.226408666931093
+    },
+    {
+      "folder": "action_010",
+      "program": "dmft2",
+      "seconds": 6.107378541957587
+    },
+    {
+      "folder": "action_010",
+      "program": "lcore",
+      "seconds": 0.06907720910385251
+    }
+  ]
+}

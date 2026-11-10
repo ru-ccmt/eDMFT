@@ -1,0 +1,60 @@
+--- a/SRC_lapw2/lapw2.F
++++ b/SRC_lapw2/lapw2.F
+@@ -15,6 +15,7 @@
+       USE lo
+       USE lohelp
+       use tau, only: tau_write
++      use, intrinsic :: ISO_C_BINDING, only: C_INT
+ ! QDMFT !! 
+ #ifndef Parallel
+       USE qdmft
+@@ -52,7 +53,17 @@
+       save TTOTAL,TFERMI,TCLM,TFOUR,tstart,errfn                          
+       
+ #ifdef FFTW_OMP
+-      integer omp_error, omp_get_max_threads
++      integer(C_INT) omp_error
++      integer omp_get_max_threads
++      interface
++         subroutine fftw_plan_with_nthreads(nthreads) bind(C, name='fftw_plan_with_nthreads')
++            import :: C_INT
++            integer(C_INT), value :: nthreads
++         end subroutine fftw_plan_with_nthreads
++         integer(C_INT) function fftw_init_threads() bind(C, name='fftw_init_threads')
++            import :: C_INT
++         end function fftw_init_threads
++      end interface
+ #endif
+       
+       nspin1=2
+@@ -141,11 +152,6 @@
+          close(13)
+ !para begin
+ 
+-#ifdef FFTW_OMP
+-         call dfftw_init_threads(omp_error)
+-         call dfftw_plan_with_nthreads(omp_get_max_threads())
+-#endif 
+-
+ ! remember head of vector file for subsequent opening
+ ! of splitted case.vector_*
+          if(iunit.eq.9)  VECFND=FNAME
+@@ -158,6 +164,18 @@
+       GOTO 10
+    20 CONTINUE
+       CLOSE (1)
++
++! Initialize FFTW threading once, after processing the definition file.
++! Use the stable C API: recent FFTW builds no longer provide the legacy
++! dfftw_init_threads/dfftw_plan_with_nthreads Fortran wrapper symbols.
++#ifdef FFTW_OMP
++      omp_error = fftw_init_threads()
++      if (omp_error.eq.0_C_INT) then
++         write(6,*) 'ERROR: FFTW thread initialization failed in LAPW2'
++         stop 1
++      endif
++      call fftw_plan_with_nthreads(int(omp_get_max_threads(),C_INT))
++#endif
+ 
+ #ifdef Parallel
+   call init_parallel_2

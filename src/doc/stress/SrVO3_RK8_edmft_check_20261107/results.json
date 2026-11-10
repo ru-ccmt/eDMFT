@@ -1,0 +1,311 @@
+{
+  "V_strain_m001": {
+    "charge_residual": 8e-07,
+    "charge_pw_representatives": 1648,
+    "scfm_mtime": "2026-11-07T14:16:41.390036",
+    "nonempty_error_files": [],
+    "selfenergy_tail_good_count": 3,
+    "files": {
+      "SrVO3.scfm": {
+        "sha256": "9e201586c49dfd9650090d2e9132079679614e627c2bfbef6f3b8bdb1d986766",
+        "mtime": "2026-11-07T14:16:41.390036"
+      },
+      "SrVO3.scf2": {
+        "sha256": "0bd2ee1865aed292dfd865f09c2e21ea3cfc351ce173b58615e82d3d0d728b10",
+        "mtime": "2026-11-07T14:16:41.179336"
+      },
+      "SrVO3.scf": {
+        "sha256": "fee93ce5aaa3ccd14cf2a3a1ef1b6ed6998528e39ca3eb534c8f5c4d3a648e50",
+        "mtime": "2026-11-07T14:16:41.399525"
+      },
+      "SrVO3.dayfile": {
+        "sha256": "2b0a4c58ba31da22918766b1d3a8ffa37f80460363cdb9e3ed6ac52767b913a0",
+        "mtime": "2026-11-07T14:16:48.365775"
+      },
+      "SOlapm.dat": {
+        "sha256": "02f86d67fe41bf181c9fbcd10aa0e922d22d926933f2d319f3280b6a699b293a",
+        "mtime": "2026-11-07T14:16:37.733416"
+      },
+      "params.dat": {
+        "sha256": "7bb94612a587d38ebd06e247095f5245fc3148e3bde48ea55e7d042eebdf9644",
+        "mtime": "2026-11-07T14:15:18.831321"
+      },
+      "SrVO3.in1c": {
+        "sha256": "43ed648f32f9cc28d9cc54994d93d761bfec99443a420d6055c7333a44dbe8bf",
+        "mtime": "2026-11-07T14:15:47.970295"
+      },
+      "SrVO3.in2c": {
+        "sha256": "81ec259eb0571c241d805ed5901e47f9c45361d0256a29e73e39c2ba3123e2d4",
+        "mtime": "2026-11-07T14:00:20.165358"
+      },
+      "SrVO3.struct": {
+        "sha256": "a44f84665fb00d0b8941bf4bfb64ccf517337e6da49c85175ffcdb7afae46bcf",
+        "mtime": "2026-11-02T12:21:20.451540"
+      }
+    }
+  },
+  "V_plus_force": {
+    "charge_residual": 5e-07,
+    "charge_pw_representatives": 1648,
+    "scfm_mtime": "2026-11-07T14:23:57.135860",
+    "nonempty_error_files": [],
+    "selfenergy_tail_good_count": 3,
+    "files": {
+      "SrVO3.scfm": {
+        "sha256": "9808ea0826a5f8135adf70c2dc2ed98dccf8e987d0f667d4e28c6be755a17a3f",
+        "mtime": "2026-11-07T14:23:57.135860"
+      },
+      "SrVO3.scf2": {
+        "sha256": "7ace3111747a54e1ddba394ab1351890b6060bc11cf88ff9c81f909d9dca4a1a",
+        "mtime": "2026-11-07T14:23:56.958324"
+      },
+      "SrVO3.scf": {
+        "sha256": "87bc88694104f7de1323d0dcbe52d31d93d77876f69785d2f4cbed6cb48eecab",
+        "mtime": "2026-11-07T14:23:57.143101"
+      },
+      "SrVO3.dayfile": {
+        "sha256": "1833399cbf67dd6ff60906bfc3ad1a1e4a7676f652955c6eabb19c0bf06ec587",
+        "mtime": "2026-11-07T14:24:18.992711"
+      },
+      "SOlapm.dat": {
+        "sha256": "e70843d2bb44fd454ca98d509b2b978e84bdfa7a972c6ba4cdd984bb91af13f2",
+        "mtime": "2026-11-07T14:22:26.820354"
+      },
+      "params.dat": {
+        "sha256": "8cca25f3f9ad7972cc741ca7b19fe3545756279f497e7df7cdf97bc786c33ea0",
+        "mtime": "2026-11-07T14:22:00.936864"
+      },
+      "SrVO3.in1c": {
+        "sha256": "57ac22293ec25002eab28af5eb5f36354d4250e3760aba37a19e467186675732",
+        "mtime": "2026-11-07T14:23:57.123885"
+      },
+      "SrVO3.in2c": {
+        "sha256": "9ac5e1940aa0c00e4309781280009241ab44b579af463419540d161224a489d5",
+        "mtime": "2026-11-07T14:21:54.320782"
+      },
+      "SrVO3.struct": {
+        "sha256": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563",
+        "mtime": "2026-11-02T12:21:07.831573"
+      }
+    }
+  },
+  "V_strain_p001": {
+    "charge_residual": 8e-07,
+    "charge_pw_representatives": 1648,
+    "scfm_mtime": "2026-11-07T14:16:26.218629",
+    "nonempty_error_files": [],
+    "selfenergy_tail_good_count": 3,
+    "files": {
+      "SrVO3.scfm": {
+        "sha256": "57a72ccd08e7ed4d5001548930ccdb328222f91e48d9f6e51317c874348403be",
+        "mtime": "2026-11-07T14:16:26.218629"
+      },
+      "SrVO3.scf2": {
+        "sha256": "03e94b121b896a9a7fab5adb2e75c7d272bc946a1f8fa55f6f70e6c7dfc96ca1",
+        "mtime": "2026-11-07T14:16:25.938401"
+      },
+      "SrVO3.scf": {
+        "sha256": "1d7dd6e0b78fb8e4d3719829f750e4715f2dbf441e0c30fdde196c014ff2cebe",
+        "mtime": "2026-11-07T14:16:26.230910"
+      },
+      "SrVO3.dayfile": {
+        "sha256": "fe7f68d3033fb5504337f4448ae75849b66c1ebb2b0744173c6522679c2a4ab3",
+        "mtime": "2026-11-07T14:16:34.723702"
+      },
+      "SOlapm.dat": {
+        "sha256": "bc00cb335cd3f763e343c145c723468cb65576fc6c1b8d1018cf8f5964d62bd9",
+        "mtime": "2026-11-07T14:16:20.615817"
+      },
+      "params.dat": {
+        "sha256": "7bb94612a587d38ebd06e247095f5245fc3148e3bde48ea55e7d042eebdf9644",
+        "mtime": "2026-11-07T14:15:28.366001"
+      },
+      "SrVO3.in1c": {
+        "sha256": "8de17bffd57daa45f4f66c479d48652431ba2d16eca9edd32d7d11f8da44ebb0",
+        "mtime": "2026-11-07T14:15:58.521517"
+      },
+      "SrVO3.in2c": {
+        "sha256": "ddcf353555b8fb99649f21841d817a2558034033bba69b903700cd78440c710c",
+        "mtime": "2026-11-07T14:00:10.241577"
+      },
+      "SrVO3.struct": {
+        "sha256": "06338c0a3405ae621fc18ebdfa2c355c8e344e8832d9eddce5bc746efe092221",
+        "mtime": "2026-11-02T12:21:28.896703"
+      }
+    }
+  },
+  "frozen_klein": {
+    "d_k_d_strain": 0.22892699962540064,
+    "delta_k_plus_minus": 0.0004578539992508013,
+    "frozen_input_checks": [
+      {
+        "file": "sig.inp",
+        "identical": true,
+        "records": [
+          {
+            "directory": "/Users/haule/projects/materials/SrVO3/V_plus_force",
+            "exists": true,
+            "sha256": "afd51952d7681b01fadb3ea256214f2e4b684c275dfb19d10d749475db8bb7a5"
+          },
+          {
+            "directory": "/Users/haule/projects/materials/SrVO3/V_strain_m001",
+            "exists": true,
+            "sha256": "afd51952d7681b01fadb3ea256214f2e4b684c275dfb19d10d749475db8bb7a5"
+          },
+          {
+            "directory": "/Users/haule/projects/materials/SrVO3/V_strain_p001",
+            "exists": true,
+            "sha256": "afd51952d7681b01fadb3ea256214f2e4b684c275dfb19d10d749475db8bb7a5"
+          }
+        ]
+      },
+      {
+        "file": "Eorb_imp.dat",
+        "identical": true,
+        "records": [
+          {
+            "directory": "/Users/haule/projects/materials/SrVO3/V_plus_force",
+            "exists": true,
+            "sha256": "e71de7fe271878c5e70cf17b4fd380882b049f1482b200ff4e9ba7f235ec8399"
+          },
+          {
+            "directory": "/Users/haule/projects/materials/SrVO3/V_strain_m001",
+            "exists": true,
+            "sha256": "e71de7fe271878c5e70cf17b4fd380882b049f1482b200ff4e9ba7f235ec8399"
+          },
+          {
+            "directory": "/Users/haule/projects/materials/SrVO3/V_strain_p001",
+            "exists": true,
+            "sha256": "e71de7fe271878c5e70cf17b4fd380882b049f1482b200ff4e9ba7f235ec8399"
+          }
+        ]
+      }
+    ],
+    "minus": {
+      "band_sum": -27.76172911,
+      "case": "SrVO3",
+      "directory": "/Users/haule/projects/materials/SrVO3/V_strain_m001",
+      "ene": -8592.30575923,
+      "eorb": -0.183923905033,
+      "frozen_aligned": -8592.305637309075,
+      "frozen_reduced": -8592.216106291966,
+      "on_shell_free_energy": -8592.306526792076,
+      "scf2_files": [
+        "SrVO3.scf2"
+      ],
+      "sigma_g": -0.004184890000001218,
+      "volume": 381.56212,
+      "vsum": -27.856000077,
+      "xeorb": -0.0946053901107,
+      "ysum": -27.851815187
+    },
+    "plus": {
+      "band_sum": -27.96250399,
+      "case": "SrVO3",
+      "directory": "/Users/haule/projects/materials/SrVO3/V_strain_p001",
+      "ene": -8592.30371863,
+      "eorb": -0.183923905033,
+      "frozen_aligned": -8592.305179455076,
+      "frozen_reduced": -8592.215648437967,
+      "on_shell_free_energy": -8592.304303328077,
+      "scf2_files": [
+        "SrVO3.scf2"
+      ],
+      "sigma_g": -0.005950499999997305,
+      "volume": 383.85827,
+      "vsum": -28.058357703,
+      "xeorb": -0.0946053901107,
+      "ysum": -28.052407203
+    },
+    "reference": {
+      "band_sum": -27.862269741,
+      "case": "SrVO3",
+      "directory": "/Users/haule/projects/materials/SrVO3/V_plus_force",
+      "ene": -8592.30475392,
+      "eorb": -0.183923905033,
+      "frozen_aligned": -8592.305429640077,
+      "frozen_reduced": -8592.215898622968,
+      "on_shell_free_energy": -8592.305429640077,
+      "scf2_files": [
+        "SrVO3.scf2"
+      ],
+      "sigma_g": -0.005074372999999355,
+      "volume": 382.70904,
+      "vsum": -27.957338349,
+      "xeorb": -0.0946053901107,
+      "ysum": -27.952263976
+    },
+    "reference_volume_bohr3": 382.70904,
+    "strain_magnitude": 0.001,
+    "stress_derivative_gpa": 8.799458662482905,
+    "stress_derivative_ry_per_bohr3": 0.0005981750512749859,
+    "stress_sign_convention": "+(1/Omega) dGamma/d(strain)"
+  },
+  "analytic_tensor_gpa": [
+    [
+      5.54471,
+      -0.0,
+      -0.0
+    ],
+    [
+      -0.0,
+      5.54471,
+      -0.0
+    ],
+    [
+      -0.0,
+      -0.0,
+      5.54678
+    ]
+  ],
+  "assembled_tensor_gpa": [
+    [
+      5.544684077745933,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      5.544684077745933,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      5.546755980427406
+    ]
+  ],
+  "analytic_mean_gpa": 5.545400000000001,
+  "numerical_mean_gpa": 2.933152887494302,
+  "difference_gpa": 2.612247112505699,
+  "energy_metadata_check": "75 k points; 43 bands each; matrix dimensions 690..713; per-k coordinates, weights, dimensions and band counts identical",
+  "projector_window": [
+    12,
+    31
+  ],
+  "minimum_edge_gaps_ry": [
+    0.6188794817,
+    0.0563899486
+  ],
+  "vectors_note": "MPI vectors deleted by normal run_dmft cleanup; actual G arrays were not re-read in this check",
+  "charge_g_identical": true,
+  "current_processes": "No run_dmft, dmft2 or lapw1 processes remained at final check",
+  "assembled_same_cycle_tensor_gpa": [
+    [
+      5.544707952919955,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      5.544707952919955,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      5.546781091264003
+    ]
+  ],
+  "same_cycle_assembly_error_gpa": 2.04708004503118e-06
+}

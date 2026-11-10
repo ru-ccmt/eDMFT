@@ -770,7 +770,49 @@ contains
 end module out
 
 !--------------------------------------------------------------
+! Optional matrix evaluation used by the stress-response worker.  This state
+! is initialized before opening definition-file outputs.  Keeping the switch
+! here lets initialization avoid touching vector/energy/NSH files when no
+! eigenproblem will be solved.  Normal band calculations are unchanged.
+module response_run
+  implicit none
+  logical :: response_matrices_only=.false.
+contains
+  subroutine initialize_response_run(info,message)
+    integer, intent(out) :: info
+    character(len=*), intent(out) :: message
+    character(len=32) :: value
+    integer :: status
+    info=0
+    message=''
+    value=''
+    call get_environment_variable('DFTKS_MATRICES_ONLY',value,status=status)
+    if (status.eq.1) return
+    if (status.ne.0) then
+       info=1
+       message='DFTKS_MATRICES_ONLY value is too long or unavailable'
+       return
+    endif
+    select case(trim(adjustl(value)))
+    case('','0','OFF','off','FALSE','false')
+       response_matrices_only=.false.
+    case('1','ON','on','TRUE','true')
+       response_matrices_only=.true.
+    case default
+       info=1
+       message='DFTKS_MATRICES_ONLY must be 0 or 1'
+    end select
+  end subroutine initialize_response_run
+end module response_run
+
 module potnlc
+  ! Optional alternate radial basis at a fixed physical KS operator.
+  ! VR remains the potential used by the radial solver.  BASIS_DELTA_VR is
+  ! r*(Vphysical-Vbasis) in Hartree.  Low-l/LO restoration uses the existing
+  ! Gaunt path; high-l augmentation uses three spherical radial integrals.
+  logical :: basis_potential_enabled=.false.
+  integer :: basis_restore_lmin=0
+  real*8, allocatable :: basis_delta_vr(:,:),basis_restore_spherical(:,:,:)
   !        VR(j,i) - spherical part (l=0, m=0) of the total potential r*V
   !                  at mesh point j for atom i
   DOUBLE PRECISION, allocatable :: VR(:,:)

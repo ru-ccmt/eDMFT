@@ -1,0 +1,99 @@
+{
+  "scope": "cached electronic forward/adjoint checkpoint; native total-stress integration incomplete",
+  "authorization": "User: OK, the plan sound good. Can you execute it.",
+  "files": [
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/frozen_sigma_response.py",
+      "sha256_after": "d33529f45ac812d93fe6cb1373b7762832adc91522156dcc110e6fb05000287a",
+      "sha256_before": "66dbe7e5c4e8094fac529bb88e0e8b184eff4e61069dfd4afe79f927653ce22c",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/adjoint_response_20261108/before_installation/source/frozen_sigma_response.py"
+    },
+    {
+      "path": "/Users/haule/dbin/frozen_sigma_response.py",
+      "sha256_after": "d33529f45ac812d93fe6cb1373b7762832adc91522156dcc110e6fb05000287a",
+      "sha256_before": "66dbe7e5c4e8094fac529bb88e0e8b184eff4e61069dfd4afe79f927653ce22c",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/adjoint_response_20261108/before_installation/dbin/frozen_sigma_response.py"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/frozen_sigma_tangent.py",
+      "sha256_after": "efb33cfea28fc171ce0ffe22a5545efdf60538710c26897db562e249ade60094",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/dbin/frozen_sigma_tangent.py",
+      "sha256_after": "efb33cfea28fc171ce0ffe22a5545efdf60538710c26897db562e249ade60094",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/stress_response_adjoint.py",
+      "sha256_after": "6407b9ba44d93965e652bf94a9130ddbda0bba55312a55fb11afabd6e1c03036",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/dbin/stress_response_adjoint.py",
+      "sha256_after": "6407b9ba44d93965e652bf94a9130ddbda0bba55312a55fb11afabd6e1c03036",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/wien_response_operators.py",
+      "sha256_after": "718adf9ad595376e7d73b04fa6b4632c309d39033d73fcc2ed5c7c9b12075a9a",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/dbin/wien_response_operators.py",
+      "sha256_after": "718adf9ad595376e7d73b04fa6b4632c309d39033d73fcc2ed5c7c9b12075a9a",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_frozen_sigma_tangent.py",
+      "sha256_after": "70ee61f6fffaccf05ab740aa29fa2520b385965d4675a19e905cf6a222d1a208",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_stress_response_adjoint.py",
+      "sha256_after": "d6999e054b22cd862672affd8a435da5a47a49c980bb1686e784fddddbe922c6",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_wien_response_operators.py",
+      "sha256_after": "24c2ee84028e9a10f76796a233bcbce7d3e5db8c5ed71f03021507c95db10ac2",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/outwin_response.f90",
+      "sha256_after": "0402f2d3cdf723bf3cb06428f39be75be2ee4bb5fd14e62d0491aed7d843a527",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/Makefile",
+      "sha256_after": "df1d275eb5d07ed949a7d6db0348f1d0186cc81d43c1f14e0788b5f448675dbd",
+      "sha256_before": "ef9a355fe29274cbeac47381c57c1c9edc4034546070f87e3669c1f07f21c3a4",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/adjoint_response_20261108/before_installation/atpar/Makefile"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dmft2/tests/test_outwin_response.f90",
+      "sha256_after": "beba1d8a6b50a7884ffc72ddf46fbb4cb420ec061c0c35c0458cbf3dd8e2c2d2",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dmft2/tests/test_atpar_response.f90",
+      "sha256_after": "cbe67b9263540d69a423606d1c1f84b97612cc916accfb5048c14b87195bebcb",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dmft2/tests/test_lo_response.f90",
+      "sha256_after": "f7573bae100123aacea165af103cfb4d4343804b3c5af2abe600150c2c65d997",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dmft2/tests/radial_material_driver.f90",
+      "sha256_after": "21278c2b8950146424737f8a3aeb54fe84b1d1233571966ce00a79601bf4ad55",
+      "created": true
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dmft2/tests/check_radial_response.py",
+      "sha256_after": "53e6ef3abdd98ec9e375a8b5ac11045b04c7c65623df843784700b179af9fd46",
+      "created": true
+    }
+  ]
+}

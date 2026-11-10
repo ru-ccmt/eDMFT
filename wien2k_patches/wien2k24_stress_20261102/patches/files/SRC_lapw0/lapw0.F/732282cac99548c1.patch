@@ -1,0 +1,181 @@
+--- a/SRC_lapw0/lapw0.F
++++ b/SRC_lapw0/lapw0.F
+@@ -20,9 +20,10 @@
+       use norm_kub,   only: c_kub, init_c_kub
+       USE PW_mult,    only: DECOUL_POT_PW,CFFT_STR,SGGP,CFFT8,SGGP_GGA, &          !CKAMAL
+                             CFFT_STR_GGA,META_FFT
+-      use gga_str_kb,  only: gga_int !, sigma_str
++      use gga_str_kb,  only: gga_int, gga_mt_metric, gga_metric_full !, sigma_str
+       use str_switch,  only: SW_STRESS, SW_TOT_STR
+       use stress_time
++      use, intrinsic :: ISO_C_BINDING, only: C_INT
+       
+       USE fftw_parallel_base
+       USE TestCases,only        : CoulEM
+@@ -30,7 +31,9 @@
+       use libxc_mod, only: libxc_init, libxc_end
+ #endif
+ #if defined Parallel
+-      USE fftw_parallel, only: prepare_parallel_ffts
++      USE fftw_parallel, only: prepare_parallel_ffts, cleanup_ffts
++#else
++      USE fftw_serial, only: cleanup_ffts
+ #endif
+ !      USE fftw_para, only : iff3_g, local_last_start
+       implicit none
+@@ -46,7 +49,7 @@
+ ! DIMENSION OF YKA, QQ,..
+ !     
+       LOGICAL          LR2V, force,force_buf,lrhopw,xcpot1qq,isopen, &
+-           vsp_only, core_add, core_sub
++           vsp_only, core_add, core_sub, stress_int_delta_diag
+       LOGICAL,ALLOCATABLE :: logefg(:)
+       CHARACTER*19     nkktext
+       CHARACTER*11     STATUS,FORM
+@@ -56,6 +59,7 @@
+       CHARACTER*77     RMARGI
+       CHARACTER*180     fname,fnavn(99)
+       CHARACTER*80     DEFFN, ERRFN, parseline
++      CHARACTER*32     stress_int_delta_env
+       CHARACTER*60     EX_SWITCH_TMP, EC_SWITCH_TMP, VX_SWITCH_TMP, VC_SWITCH_TMP, VCVDISP_SWITCH_TMP
+       integer            :: I,J,k,JJ,J1,J2,iunit,iunitr2v,irecl,il,lmma,nuc, &
+                             iunit_vtau, iunit_vlapl
+@@ -70,6 +74,7 @@
+       integer            :: l_max,l_min
+       integer            :: ib_max
+       integer            :: ios,iprint,luse2,inod,numbeece,nxcprint
++      integer            :: stress_int_delta_status
+       integer            :: i1,i2,i3
+       integer            :: it1, it2, ibbuff, myid1
+       REAL*8             :: MP,av(3),dfak(42),pi,sqfp,sqrt2,pi4
+@@ -122,6 +127,7 @@
+ !=============defining the variables for the stress tensor calculation==============
+       real*8,allocatable       :: sigma_str(:,:,:,:)
+       REAL*8                   :: fac1_p,E_xc_m_V_xc,E_xc_m_V_xc_rmt(1:9)      
++      REAL*8                   :: electrostatic_int_jacobian
+       INTEGER                  :: index_p,alpha1,beta1, indexp
+       COMPLEX*16               :: coulomb_str_int(1:9),gga_str_int(1:9)      
+       
+@@ -157,7 +163,17 @@
+ #endif
+ 
+ #ifdef FFTW_OMP
+-      integer omp_error, omp_get_max_threads
++      integer(C_INT) omp_error
++      integer omp_get_max_threads
++      interface
++         subroutine fftw_plan_with_nthreads(nthreads) bind(C, name='fftw_plan_with_nthreads')
++            import :: C_INT
++            integer(C_INT), value :: nthreads
++         end subroutine fftw_plan_with_nthreads
++         integer(C_INT) function fftw_init_threads() bind(C, name='fftw_init_threads')
++            import :: C_INT
++         end function fftw_init_threads
++      end interface
+ #endif
+ 
+ ! additional variables for EECE
+@@ -186,6 +202,25 @@
+       ALLOCATE(WLDM(NRAD) ) ! *** LDM ADDITION
+       force_buf = .FALSE.
+ 
++!     Equation (G5) contains two interstitial electrostatic terms:
++!
++!       1/2 int_I rho [ -delta_ab V_C + dV_C/d epsilon_ab ].
++!
++!     The historical stress path constructs the second term in
++!     CFFT_STR.  The first, purely diagonal Jacobian term is tested below
++!     behind an environment switch until finite-difference validation is
++!     complete.  It costs no extra FFT: EKVOL1 is the interstitial integral
++!     of rho*(V_xc-e_xc+V_C/2), while E_xc_m_V_xc is the integral of
++!     rho*(e_xc-V_xc); their sum is exactly int_I rho*V_C/2 in the same
++!     normalization used by REAN3.
++      stress_int_delta_env = ''
++      call get_environment_variable('WIEN_STRESS_INTERSTITIAL_DELTA', &
++                                    stress_int_delta_env, &
++                                    status=stress_int_delta_status)
++      stress_int_delta_diag = stress_int_delta_status.eq.0 .and. &
++           len_trim(stress_int_delta_env).gt.0 .and. &
++           trim(stress_int_delta_env).ne.'0'
++
+ 
+ ! Double factorial
+       dfak(1)=1.d0
+@@ -209,8 +244,12 @@
+       CALL GTFNAM(DEFFN,ERRFN)
+       CALL ERRFLG(ERRFN,'Error in LAPW0')
+ #ifdef FFTW_OMP
+-     call dfftw_init_threads(omp_error)
+-     call dfftw_plan_with_nthreads(omp_get_max_threads())
++     omp_error = fftw_init_threads()
++     if (omp_error.eq.0_C_INT) then
++        write(6,*) 'ERROR: FFTW thread initialization failed in LAPW0'
++        stop 1
++     endif
++     call fftw_plan_with_nthreads(int(omp_get_max_threads(),C_INT))
+ #endif      
+ !print*, myid,deffn
+ !      if(myid.eq.1) then
+@@ -1061,6 +1100,9 @@
+       
+       allocate( SGGP_GGA(nkk,1:9) )
+       allocate( gga_int(1:nkk,1:9) )       !contains gga correction term
++      ! Keep the former harmonic-diagonal GGA contraction available only
++      ! for regression diagnostics. FULL evaluates the derived metric term.
++      call init_gga_metric(nat)
+       gga_int        = zeroc
+       SGGP_GGA       = zero
+       
+@@ -2365,6 +2407,13 @@
+ 
+       if (.not.coul) goto 888
+ 
++      ! The alternate .xcpot1q path does not supply gradient stress data.
++      ! Do not emit an apparently valid GGA tensor with its MT term absent.
++      if(SW_STRESS.eq.'YES'.and.GGA_SWITCH.and.xcpot1qq)then
++         call outerr('LAPW0','GGA stress requires standard XCPOT1; remove .xcpot1q')
++         goto 999
++      endif
++
+ !
+ ! Exchange-correlation inside the spheres
+ !  
+@@ -2734,6 +2783,21 @@
+ !               ENDDO            
+            ENDIF         
+          ENDDO   
++
++!        Add the missing -delta_ab/2 * int_I rho V_C part of Eq. (G5)
++!        only in diagnostic mode.  Indices 1,5,9 are xx,yy,zz in the
++!        flattened tensor convention used throughout LAPW0.
++         electrostatic_int_jacobian = EKVOL1 + E_xc_m_V_xc
++         if(myid.eq.0) write(21,2091) electrostatic_int_jacobian, &
++              stress_int_delta_diag
++         if(stress_int_delta_diag) then
++            coulomb_str_int(1) = coulomb_str_int(1) - &
++                                 electrostatic_int_jacobian
++            coulomb_str_int(5) = coulomb_str_int(5) - &
++                                 electrostatic_int_jacobian
++            coulomb_str_int(9) = coulomb_str_int(9) - &
++                                 electrostatic_int_jacobian
++         endif
+          !columb+Madelung stress+exchange-correlation for lda
+          call exchange_str(lm,lmmax,E_xc_m_V_xc_rmt)
+          IF(GGA_SWITCH .eqv. .TRUE.) then
+@@ -3578,6 +3642,8 @@
+ 
+  889  CONTINUE
+ 
++      call cleanup_ffts()
++
+ #ifdef Parallel
+       call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+       call MPI_FINALIZE(ierr)
+@@ -3721,6 +3787,7 @@
+ 2060  FORMAT(/,13X,I6)
+ 2070  FORMAT(3X,3I5,2E15.7)
+ 2071  FORMAT(3X,3I5,2ES19.12)
++2091  FORMAT(':DBG_STR_INT_COUL_JAC:',1X,ES23.15,1X,L1)
+ 3000  FORMAT(/,/,3X,'=====>>> CPU-TIME SUMMARY',/, &
+              12X,'TOTAL CPU/WALL-TIME USED  : ',2(F7.1,5X,F4.0,' PERCENT'))
+ 3010  FORMAT(12X,'TIME MULTIPOLMOMENTS      :      ',2(F7.1,5X,F4.0,' PERCENT'))

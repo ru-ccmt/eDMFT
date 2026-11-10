@@ -1,0 +1,74 @@
+Four-material analytic/numerical stress comparison
+7 November 2026
+
+All values are mean normal stress in GPa: trace(sigma)/3.
+Difference = analytic minus numerical. Do not divide differences by 3 again.
+Thermodynamic compressive pressure is the negative of this convention.
+
+Case                  Analytic       Numerical        Difference
+DFT_SrVO3               8.516855       10.115115         -1.598260
+DFT_FeSe               11.995096       12.138195         -0.143099
+DFT_MnO                35.085133       34.017149         +1.067984
+DFT_MnTe               15.884272       17.199374         -1.315102
+DMFT_SrVO3              5.223963        4.617396         +0.606567
+DMFT_FeSe              -0.488870       -1.049104         +0.560234
+DMFT_MnO              -16.405955      -72.347433        +55.941478
+DMFT_MnTe              -5.701083       -0.667237         -5.033846
+
+Provenance and interpretation
+-----------------------------
+SrVO3/FeSe: unchanged rows from the second-pass G1/G2 audit. Their central
+analytic runs were refreshed in that pass, with existing converged FD references.
+
+MnO/MnTe DFT: one full current lapw0 -> lapw1 -> lapw2 -> lcore -> merge ->
+mixer evaluation on all three saved densities, in isolated copies. No new
+full charge convergence. Stale impurity energy and SCF records were excluded
+from pure-DFT assembly. Both use RELA and central RKMAX=7.
+
+DFT MnO: 72 identical k points; 23 bands each; matching matrix dimensions
+and plane-wave G sets across all three geometries. Final charge distances
+are 1.0e-6, 1.2e-6, 1.2e-6 (minus, center, plus). Tetrahedron integration.
+
+DFT MnTe: PROVISIONAL finite-difference comparison. The k points and weights
+match, but the matrix sizes, band counts, and plane-wave G sets do not.
+The central band counts range from 58 to 66. Charge distances are 3.916e-4,
+5.31e-5, 8.454e-4. These endpoints need fixed-basis preparation and tighter
+convergence before this difference is interpreted as a pure stress-code error.
+
+DFT MnTe entropy convention: original TEMP=0.005 Ry adds -(T*S)/2 to SUM.
+Analytic finite-temperature variational stress is compared here with the
+full Mermin energy, using TEMPS. A second lapw2/mixer check on the identical
+potential and vectors confirms the extra half-entropy energy shift and
+byte-identical valence densities. Raw TEMP FD = 17.544477599 GPa; full TEMPS
+FD = 17.199374314 GPa; analytic = 15.884272168 GPa. This entropy correction
+does not fix the basis/convergence issues. Repeating the same density made
+the copied endpoint MSR1 histories singular; only those scratch histories
+were archived/reset before successful mixer verification. Originals untouched.
+
+DMFT MnO: current dmft2 on the prior controlled fixed-mu dense-mesh inputs,
+mu=6.609509262416999 eV, 601 Matsubara rows, with the current captured core.
+This differs from the user -15.96903 GPa run, which recalculated mu and used
+a 131-row mesh. Both are documented in the prior controls; do not mix them.
+The existing endpoint valence charges are 20.992718 and 21.008041 at fixed mu.
+The projector window [6,16] cuts a degenerate multiplet. The +55.94 GPa
+number is therefore an APPARENT mismatch against a questionable reference,
+not an established 55.94 GPa analytic-stress error. No mu*dN correction was
+subtracted by hand. frozen_sigma_klein.py was rerun read-only on the original
+endpoints, with identical frozen sig.inp and Eorb_imp.dat verified.
+
+DMFT MnTe: current dmft2 rerun for BOTH full-cell magnetic mappings, with
+the common captured central chemical potential and 501-row meshes. The
+valence tensors are AVERAGED, then core and density contributions included
+once. This is not a single up-spin result and is not a sum of two full-cell
+valence tensors. The frozen-Sigma numerical reference averages SUM and VSUM
+in the same convention. Its endpoints recalculate mu and keep charges close
+to target; the [21,51] projector window still cuts some degeneracies and
+endpoint convergence remains a limitation. No impurity solve or full DMFT
+charge reconvergence was performed. Both magnetic runs terminate normally.
+
+No production source or original calculation directory was modified.
+Expanded JSON, input/output records, executable hashes, and session-specific
+reproduction scripts accompany this report. Scratch root: /private/tmp/edmft_four_material_table_20261107
+
+MnTe magnetic mapping mean stresses (GPa): [-5.6845752192989885, -5.717591669038693]
+MnTe combined diagonal (GPa): [-5.860244359423148, -5.860244359423148, -5.38276161366186]

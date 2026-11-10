@@ -1,0 +1,17 @@
+:DMFT_G2_COMPLETE_CACHE:      1    36     2    5.55132543E-16    1.38777878E-17
+{
+  "primitive_count": 36,
+  "two_LO_energies_per_l": true,
+  "complex_pseudo_bands": 3,
+  "nonidentity_local_axes": true,
+  "matrix_max_errors": {
+    "s0": 5.452364448821356e-09,
+    "v0": 9.250390120563168e-09,
+    "sr": 1.4457039676507577e-08,
+    "sa": 1.6128626767475396e-09,
+    "vr": 2.4234162274150428e-08,
+    "va": 1.13314266275036e-08
+  },
+  "six_G2_contractions_max_error": 8.764380515831728e-08
+}
+PASS: complete all-LO radial matrices and all six complex G2 contractions

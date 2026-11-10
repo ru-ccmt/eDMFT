@@ -1,0 +1,131 @@
+"""Isolated radial-basis stress controls. Does not edit any production source.
+
+Geometry and physical H are held at the center. WIEN_LAPW1_BASIS_VSP
+changes only the radial trial functions. LAPW2 dumps exactly those functions
+after switching its VSP to the basis potential; its saved eigenvalues still
+belong to the center physical operator in that trial space.
+"""
+from pathlib import Path
+import os, re, shutil, subprocess, time, json, sys
+import numpy as np
+
+ROOT=Path(__file__).resolve().parent
+WIEN=Path('/Users/haule/wien2k_24')
+ARCH=Path('/Users/haule/projects/eDMFT_new/src/doc/stress/frozen_sigma_response_20261108')
+OLD=Path('/private/tmp/edmft_linear_response_20261108')
+ENV=os.environ.copy()
+for key in list(ENV):
+    if key.startswith(('EDMFT_', 'WIEN_STRESS_', 'WIEN_LAPW1_', 'DFTKS_')): del ENV[key]
+ENV.update(WIENROOT=str(WIEN), WIEN_DMFT_ROOT='/Users/haule/dbin', OMP_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1', VECLIB_MAXIMUM_THREADS='1')
+
+def execute(d,label,args,extra=None):
+    print('START',d.name,label,flush=True); t=time.monotonic()
+    with (d/(label+'.log')).open('w') as out:
+        r=subprocess.run(args,cwd=d,env=ENV|dict(extra or {}),stdout=out,stderr=subprocess.STDOUT)
+    text=(d/(label+'.log')).read_text(errors='replace')
+    if r.returncode or any(s in text for s in ['Fortran runtime error','ERROR STOP','Error termination']):
+        raise RuntimeError(str(d/(label+'.log'))+'\n'+text[-1500:])
+    program=label.split('_')[0]
+    for p in d.glob(program+'.error*'):
+        if p.read_text(errors='replace').strip(): raise RuntimeError(str(p)+': '+p.read_text())
+    print('END',d.name,label,round(time.monotonic()-t,2),flush=True)
+
+def clone(src,d,case):
+    d.mkdir(parents=True)
+    suffixes={'struct','in0','in1','in1c','in2','in2c','inc','inm','indmf2','indmfl','indmfi','klist','kgen','rotlm','clmsum','clmcor','vsp','vns','vtotal'}
+    for p in src.iterdir():
+        if p.is_file() and ((p.name.startswith(case+'.') and p.name.split('.',1)[1] in suffixes) or p.name in ['lapw1.def','lapw2.def','dmft2.def','projectorw.dat','EF.dat','Eorb_imp.dat'] or re.fullmatch(r'sig\.inp\d*',p.name)):
+            shutil.copy2(p,d/p.name)
+    for p in d.glob('*.def'):
+        text=p.read_text().replace('_x','')
+        for line in text.splitlines():
+            fields=line.split(',')
+            if len(fields)>2:
+                f=fields[1].strip().strip("'")
+                if Path(f).is_absolute() or '..' in Path(f).parts: raise ValueError(f)
+        p.write_text(text)
+
+def read_dump(path):
+    rad,lo,coef={},{},{}
+    for line in path.read_text().splitlines():
+        a=line.split()
+        if not a: continue
+        if a[0]==':RADIAL_FD': rad[tuple(map(int,a[1:4]))]=np.array(list(map(float,a[4:])))
+        elif a[0]==':RADIAL_LO_FD': lo[tuple(map(int,a[1:5]))]=np.array(list(map(float,a[5:])))
+        elif a[0]==':RADIAL_LO_COEFF': coef[tuple(map(int,a[1:4]))]=np.array(list(map(float,a[5:8])))
+    complete={}
+    for key,b in lo.items():
+        atom,l,j,ir=key; a=rad[atom,l,ir]; A,B,C=coef[atom,l,j]
+        complete[key]=np.r_[b[0],A*a[[2,3,6,7]]+B*a[[4,5,8,9]]+C*b[1:]]
+    return rad,complete
+
+def derivative(minus,plus,h,path):
+    rm,lm=read_dump(minus);rp,lp=read_dump(plus)
+    assert rm.keys()==rp.keys() and lm.keys()==lp.keys()
+    with path.open('w') as out:
+        out.write('# d/d hydrostatic linear strain at fixed physical atom-centered radius\n')
+        for key in sorted(rm):
+            assert abs(rp[key][0]-rm[key][0])<1e-13
+            v=(rp[key][2:]-rm[key][2:])/(2*h)
+            out.write(':DR '+' '.join(map(str,key))+' '+f'{rm[key][0]:.16e} '+' '.join(f'{x:.16e}' for x in v)+'\n')
+        for key in sorted(lm):
+            v=(lp[key][1:]-lm[key][1:])/(2*h)
+            out.write(':DL '+' '.join(map(str,key))+' '+f'{lm[key][0]:.16e} '+' '.join(f'{x:.16e}' for x in v)+'\n')
+
+def run(case,kind):
+    name=case+'_'+kind; root=ROOT/name;root.mkdir()
+    dmft=OLD/('portable_SrVO3_fixedg' if case=='SrVO3' else 'portable_FeSe_fixedg_real')/'central'
+    src=dmft if kind=='DMFT' else Path('/private/tmp/dft_after_remaining_dftks_20261107')/case
+    original=Path('/Users/haule/projects/materials/SrVO3') if case=='SrVO3' else Path('/Users/haule/projects/materials/FeSe_again/FeSe_stress')
+    if kind=='DMFT':
+        eps=0.00025; pm=[ARCH/case/('potential_'+x) for x in ['minus','plus']]
+    else:
+        eps=0.001;pm=[original/('DFT_'+s if case=='SrVO3' else 'DFT_RELA_'+s) for s in ['m001','p001']]
+    center=root/'center';clone(src,center,case)
+    # DMFT inputs are needed only for the strict DFT contraction diagnostic.
+    if kind=='DFT':
+        for p in dmft.iterdir():
+            if p.name in ['dmft2.def','EF.dat','projectorw.dat'] or re.fullmatch(r'sig\.inp\d*',p.name) or p.suffix in ['.indmf2','.indmfl','.indmfi']:
+                shutil.copy2(p,center/p.name)
+    if not (center/'lapw2.def').exists():
+        source=original/('DFT_center' if case=='SrVO3' else 'DFT_RELA')/'lapw2.def'
+        shutil.copy2(source,center/'lapw2.def')
+    unit5=next(l for l in (center/'lapw1.def').read_text().splitlines() if l.split(',')[0].strip()=='5')
+    complex_case='in1c' in unit5
+    l1=str(WIEN/('lapw1c' if complex_case else 'lapw1'))
+    l2=str(WIEN/('lapw2c' if complex_case else 'lapw2'))
+    in2=case+('.in2c' if complex_case else '.in2')
+    p=center/in2;a=p.read_text().splitlines();a[0]='TOT '+a[0][4:];p.write_text('\n'.join(a)+'\n')
+    (center/'lapw1.fixgvec.write').touch()
+    execute(center,'lapw1',[l1,'lapw1.def'])
+    execute(center,'lapw2',[l2,'lapw2.def'],{'WIEN_STRESS_RADIAL_DUMP':str(center/'radial.dump')})
+    shutil.copy2(center/(case+'.scf2'),root/'central_lapw2.scf2')
+    for sign,pot in zip(['minus','plus'],pm):
+        d=root/sign;clone(center,d,case)
+        shutil.copy2(center/'lapw1.fixgvec',d/'lapw1.fixgvec');(d/'lapw1.fixgvec.read').touch()
+        shutil.copy2(pot/(case+'.vsp'),d/'basis.vsp')
+        execute(d,'lapw1',[l1,'lapw1.def'],{'WIEN_LAPW1_BASIS_VSP':str(d/'basis.vsp')})
+        shutil.copy2(d/(case+'.vsp'),d/'physical.vsp')
+        shutil.copy2(d/'basis.vsp',d/(case+'.vsp'))
+        execute(d,'lapw2',[l2,'lapw2.def'],{'WIEN_STRESS_RADIAL_DUMP':str(d/'radial.dump')})
+    response=root/'radial_response.dat'
+    derivative(root/'minus/radial.dump',root/'plus/radial.dump',eps,response)
+    p=center/in2;a=p.read_text().splitlines();a[0]='STR '+a[0][4:];p.write_text('\n'.join(a)+'\n')
+    p=center/(case+'.indmf2');a=p.read_text().splitlines();i=next(i for i,l in enumerate(a) if l.strip() and not l.startswith('#'))
+    old=a[i].split();old[2]='-1' if kind=='DFT' else '1';a[i]=' '.join(old);p.write_text('\n'.join(a)+'\n')
+    extra={'EDMFT_STRESS_RADIAL_RESPONSE':str(response),'EDMFT_STRESS_DETAILED_DIAGNOSTICS':'1'}
+    execute(center,'dmft2_radial',['/opt/homebrew/bin/mpirun','-n','4','/Users/haule/dbin/dmft2_response','dmft2.def'],extra)
+    shutil.copy2(center/(case+'.outputdmf2'),root/'radial_contraction.out')
+    shutil.copy2(center/(case+'.scf2'),root/'baseline.scf2')
+    sums={}
+    for name in ['center','minus','plus']:
+        txt=(root/'central_lapw2.scf2' if name=='center' else root/name/(case+'.scf2')).read_text()
+        vals=re.findall(r'^:SUM.*?=\s*([-+0-9.EeDd]+)',txt,re.M)
+        if vals:sums[name]=float(vals[-1].replace('D','E'))
+    struct=(center/(case+'.struct')).read_text().splitlines();vol=float(np.prod([float(struct[3][i:i+10]) for i in [0,10,20]]))
+    result={'case':case,'kind':kind,'step':eps,'volume':vol,'sums':sums}
+    if 'plus' in sums and 'minus' in sums: result['band_fd_GPa']=(sums['plus']-sums['minus'])/(2*eps*3*vol)*14710.507641078
+    (root/'summary.json').write_text(json.dumps(result,indent=2)+'\n')
+    print(result,flush=True)
+
+if __name__=='__main__': run(*sys.argv[1:])

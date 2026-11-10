@@ -1,0 +1,39 @@
+ 3,'MnO.rhopw',   'unknown','formatted',0
+ 4,'MnO.inm',     'unknown','formatted',0
+ 5,'MnO.in0',     'old',    'formatted',0
+ 6,'MnO.output0', 'unknown','formatted',0
+ 7,'MnO.vorbup',  'unknown','formatted',0
+ 8,'MnO.clmsum',  'old',    'formatted',0
+ 9,'MnO.vtotal',  'unknown','formatted',0
+10,'MnO.vcoul',   'unknown','formatted',0
+11,'MnO.r2v',     'unknown','formatted',0
+12,'MnO.clmup',   'unknown','formatted',0
+13,'MnO.clmdn',   'unknown','formatted',0
+14,'MnO.mbjmix',     'unknown','formatted',0
+15,'MnO.r2v2',     'unknown','formatted',0
+16,'MnO.vsp','unknown','formatted',0
+17,'MnO.vspdn',   'unknown','formatted',0
+18,'MnO.vns','unknown','formatted',0
+19,'MnO.vnsdn',   'unknown','formatted',0
+20,'MnO.struct',  'old',    'formatted',0         
+21,'MnO.scf0',    'unknown','formatted',0
+28,'MnO.vrespsum','unknown','formatted',0
+29,'MnO.vrespup', 'unknown','formatted',0
+30,'MnO.vrespdn', 'unknown','formatted',0
+38,'MnO.tausum','unknown','formatted',0
+39,'MnO.tauup', 'unknown','formatted',0
+40,'MnO.taudn', 'unknown','formatted',0
+50,'MnO.eeceup', 'unknown','formatted',0
+51,'MnO.eecedn', 'unknown','formatted',0
+62,'MnO.grr',    'unknown','formatted',0
+63,'/Users/haule/wien2k_24/SRC_lapw0/xc_funcs.h','unknown','formatted',0
+64,'MnO.r2v_nonloc',     'unknown','formatted',0
+88,'MnO.vlapl','unknown','formatted',0
+89,'MnO.vlapldn',   'unknown','formatted',0
+91,'MnO.vtau','unknown','formatted',0
+92,'MnO.vtaudn',   'unknown','formatted',0
+93,'MnO.clmcor',   'unknown','formatted',0
+94,'MnO.clmcordn',   'unknown','formatted',0
+95,'MnO.taucor',   'unknown','formatted',0
+96,'MnO.taucordn',   'unknown','formatted',0
+61,'MnO.in0abp',     'unknown','formatted',0

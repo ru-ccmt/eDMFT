@@ -1,0 +1,63 @@
+{
+  "authorization": "user: yes, you can",
+  "sources": [
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dftKS/modules.FPP",
+      "before_sha256": "dbfa6c216ee70266f403e15180f8b974b7233355f4afe9205ed87d7d8edf9f81",
+      "after_sha256": "f4f975e4211b4718ca0d36fc1acc97f129dbac83f8ef93d96a327b15abaee0f5"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dftKS/read_and_initialize.FPP",
+      "before_sha256": "000316f171ee5170d9ae3531746cee62702ad8d8183917564d9b40dd1569fcc2",
+      "after_sha256": "ddf4ceb4b6260f65b62994b766cc11127db000bc9e0601a0f6a079d54325f990"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dftKS/atpar.f90",
+      "before_sha256": "fe9fbee643c020b205c1b507256bb7b408ea124dc9b9a14796a6a6c1f3d61869",
+      "after_sha256": "d605259201cc0aea9b70e2d90a2fa5f39829bc9d29c0b4d9463821bcc3178470"
+    },
+    {
+      "path": "/Users/haule/projects/eDMFT_new/src/dftKS/hamilt.FPP",
+      "before_sha256": "7422bf1cf81dc79b9ae7f6a85329dc1bc1500e39caa4ac88d4e1c3d956e1a2a3",
+      "after_sha256": "b1a1e39858446ebdee5866637d2dff2199dc0f3ced1efd7375d27a4e211f4926"
+    },
+    {
+      "path": "/Users/haule/wien2k_24/SRC_lapw1/modules.F",
+      "before_sha256": "c3171392c823b2fc43c1c41acb102a11fe607d80807ffafeed729929bbca4055",
+      "after_sha256": "8c953ce5736e129dade19e6e9d3eb8e26c82766ec886ced0a1ce55e58459bac2"
+    },
+    {
+      "path": "/Users/haule/wien2k_24/SRC_lapw1/atpar.F",
+      "before_sha256": "4d918488f17b9da3a1953169d1e6c07b7d48b718af59d210594d9754bf3c1d7c",
+      "after_sha256": "d15a6ab7b419bd973c6318ee013f4746a78deea07754a0815bc7790016277174"
+    },
+    {
+      "path": "/Users/haule/wien2k_24/SRC_lapw1/hamilt.F",
+      "before_sha256": "36a5a236aaead2d0890831596720ddc3935d072fbfc920b8c37756df6339efb7",
+      "after_sha256": "c609892451fdc91b199409a605e43dea5ed78c224435711b026cd4327d05d698"
+    }
+  ],
+  "executables": [
+    {
+      "path": "/Users/haule/dbin/lapw1",
+      "before_sha256": "a6fb6d24cf3f594ff1e1123197fd093c4b0803e69b5c08828ff197c330c25eeb",
+      "after_sha256": "d2c3350254d63424da471c5698d84d135bd236a90e9fa4b06727f4383ad5ef02"
+    },
+    {
+      "path": "/Users/haule/dbin/lapw1c",
+      "before_sha256": "8f801c509d2bf2834b1379150f5bf1e28e0a82a481c0c22445f86a23fba6203d",
+      "after_sha256": "91aeebaabf66e0bcd2032a96d0226715c4d26bf28669b56b8ede844f8903ee6c"
+    },
+    {
+      "path": "/Users/haule/wien2k_24/lapw1",
+      "before_sha256": "c7afbf3381a8ea5cedf12385ce7bd4f70cf50c51521b6690f54f8de39be2eb0f",
+      "after_sha256": "671739c0efd44b0f74515fcdf3df4a5a3125e992d0605c65674184438691fa4d"
+    },
+    {
+      "path": "/Users/haule/wien2k_24/lapw1c",
+      "before_sha256": "15340bd2b16aa08a1b4d7f5f6197e84690916e179c38408d360c9e126945cb06",
+      "after_sha256": "d7e150c0e8bda5c8bd0bc0d7cf21d08dc881561db19cab54a21bca212e533470"
+    }
+  ],
+  "production_radial_correction_enabled": false
+}

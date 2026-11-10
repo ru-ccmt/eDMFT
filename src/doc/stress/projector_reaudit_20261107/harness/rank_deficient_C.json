@@ -1,0 +1,9 @@
+{
+  "rank_U_window": 1,
+  "orbital_dimension": 2,
+  "B_reconstruction_residual": 1.8044535949760208e-16,
+  "C_error": 0.0,
+  "functional_fd": 0.00808216168435294,
+  "direct_C_contraction": 0.008082161704585304,
+  "production_C_contraction": 0.008082161704585304
+}

@@ -1,0 +1,35 @@
+--- a/SRC_lapw1/hamilt.F
++++ b/SRC_lapw1/hamilt.F
+@@ -21,6 +21,8 @@
+       use rotmat, only: ROTIJ, ROTLOC
+       use struk, only : NDF,multmax
+       use coml, only   : mgga
++      use atspdt, only: basis_restore_spherical,basis_restore_high_l, &
++           basis_restore_lmin
+       use albl
+       use stdmath
+       IMPLICIT NONE
+@@ -663,7 +665,22 @@
+                              TMP3*(ATMP1*AL_r(J,L)+Btmp1*BL_r(J,L))
+                      end do
+                   endif
+-                  
++
++                  if (basis_restore_high_l.and.L.ge.basis_restore_lmin) then
++                     ! Complete the fixed-operator probe above the HNS
++                     ! orbital cutoff.  Spherical DeltaV is diagonal in
++                     ! (l,m); the sum over m supplies P_l and (2l+1).
++                     ! Both mixed terms are required.  BL is zero for APW,
++                     ! so the same expression also covers that channel.
++                     ! No overlap, surface or ordinary stress term changes.
++                     do J=1,j_end(ihelp)
++                        TMP1(J)=TMP1(J)+DLL1*P(J,L,ihelp)*( &
++                             basis_restore_spherical(1,L+1,JNEQ)*AL_c(L,ihelp)*AL_r(J,L) &
++                            +basis_restore_spherical(2,L+1,JNEQ)*BL_c(L,ihelp)*BL_r(J,L) &
++                            +basis_restore_spherical(3,L+1,JNEQ)*( &
++                                 AL_c(L,ihelp)*BL_r(J,L)+BL_c(L,ihelp)*AL_r(J,L)))
++                     enddo
++                  endif
+                enddo
+ !$omp simd
+                DO J = 1, j_end(ihelp)

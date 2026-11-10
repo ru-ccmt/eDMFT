@@ -1,0 +1,51 @@
+{
+  "installed_at": "2026-11-08T21:20:39.910558-05:00",
+  "backup": "/private/tmp/edmft_full_k_response_20261108/before_install_20261108_212039",
+  "destinations": [
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_compact_blocks.py",
+    "/Users/haule/dbin/lapw_compact_blocks.py",
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_compact_response.py",
+    "/Users/haule/dbin/lapw_compact_response.py",
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_native_snapshot.py",
+    "/Users/haule/dbin/lapw_native_snapshot.py",
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_nonspherical_response.py",
+    "/Users/haule/dbin/lapw_nonspherical_response.py",
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_potential_response.py",
+    "/Users/haule/dbin/lapw_potential_response.py",
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_spherical_response.py",
+    "/Users/haule/dbin/lapw_spherical_response.py",
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_valence_state.py",
+    "/Users/haule/dbin/lapw_valence_state.py",
+    "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_compact_response.py",
+    "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_valence_state.py",
+    "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt"
+  ],
+  "evidence": "/Users/haule/projects/eDMFT_new/src/doc/stress/full_k_response_20261108",
+  "status": "installed and verified",
+  "verified_at": "2026-11-08T21:21:50.635234-05:00",
+  "post_install_checks": {
+    "repository": {
+      "passed": 179,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "verified_installed_imports": true,
+      "log": "post_install_repository.log"
+    },
+    "dbin": {
+      "passed": 179,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "verified_installed_imports": true,
+      "log": "post_install_dbin.log"
+    }
+  },
+  "installed_hashes_verified": 17,
+  "current_phase": 2,
+  "physical_screened_solve_started": false,
+  "remaining": [
+    "Audit small constant-potential gauge residual",
+    "Reduce preparation memory before production-scale meshes"
+  ]
+}

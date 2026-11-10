@@ -1,0 +1,10 @@
+{
+  "/Users/haule/projects/eDMFT_new/src/dmft2/l2mainSubs.f90": "6247b4fc1f921ed71bce004c5e341f13a2fcbfeb4d4fbbea924cdfd1a04a5201",
+  "/Users/haule/projects/eDMFT_new/src/dmft2/stress_kernels.f90": "674e7c6531aed7a12c6818fcee5bd5bd2d8e0dedc5a0c78ffeb228f2d10ed935",
+  "/Users/haule/projects/eDMFT_new/src/dmft2/stress_g2_matrices.f90": "e15de0ad367add607c65d835782696b9153b14062967f2008430eb53b7d50bf1",
+  "/Users/haule/projects/eDMFT_new/src/dmft2/cmp_dmft_weights.f90": "83033d6b1668379feabe2fd14830f39f1c53d0c91cf7dfea9628c4835966c63a",
+  "/Users/haule/projects/eDMFT_new/src/dmft2/gaunt.f90": "452be00f2f2b5d6122eea92b54eec91fb7debbd985eb99cb0933c00f8be860c0",
+  "/Users/haule/projects/eDMFT_new/src/dmft2/t3j.f90": "04607faf50f178fb0f88e4a48dab6cffc11c2ced6f381e6d7c074c18bde2a886",
+  "/Users/haule/projects/eDMFT_new/src/dmft2/notri.f90": "31e17b3de719a326bba3001a2884e2c22af4310f527787acac0b1c623d49408f",
+  "/Users/haule/projects/eDMFT_new/src/dmft2/ylm.f90": "a27fb2f25fb7977159e7db8bf75b83e7c48b0f66839845095ea8a0040f703644"
+}

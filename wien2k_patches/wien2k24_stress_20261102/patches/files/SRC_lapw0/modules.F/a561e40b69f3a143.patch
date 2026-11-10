@@ -1,0 +1,11 @@
+--- a/SRC_lapw0/modules.F
++++ b/SRC_lapw0/modules.F
+@@ -294,4 +294,8 @@
+ !  real*8                  :: sig_str_u, sig_str_d, sig_str_ud  
+   real*8                  :: GGA_INTER(1:9,1:2) 
+   real*8                  :: gga_fin_str(1:9)
++! Full angular-grid integral of the gradient metric tensor, per atom type.
++! Allocated only for a stress calculation; XCPOT1 writes disjoint atom slots.
++  real(8),allocatable     :: gga_mt_metric(:,:)
++  logical                :: gga_metric_full=.true.
+ end module gga_str_kb

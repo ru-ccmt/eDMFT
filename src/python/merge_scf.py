@@ -143,6 +143,9 @@ def merge(case: str, components: list[Path], replace: bool) -> Path:
     """Atomically append or replace case.scf with the selected components."""
     destination = Path(f"{case}.scf")
     old_mode = destination.stat().st_mode if destination.exists() else None
+    from stress_response_publish import response_rows, mark_published
+    current_iteration = '\n'.join(p.read_text() for p in components)
+    correction = response_rows(case, current_iteration)
 
     fd, temporary_name = tempfile.mkstemp(
         prefix=f".{case}.scf.merge.", dir=Path.cwd()
@@ -170,6 +173,7 @@ def merge(case: str, components: list[Path], replace: bool) -> Path:
                         if source.read(1) != b"\n":
                             output.write(b"\n")
 
+            output.write(correction.encode('utf-8'))
             output.flush()
             os.fsync(output.fileno())
 
@@ -180,6 +184,7 @@ def merge(case: str, components: list[Path], replace: bool) -> Path:
         temporary.unlink(missing_ok=True)
         raise
 
+    mark_published(case, correction, destination, current_iteration=current_iteration)
     return destination
 
 

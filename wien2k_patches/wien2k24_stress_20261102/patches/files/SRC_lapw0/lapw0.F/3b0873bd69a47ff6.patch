@@ -1,0 +1,35 @@
+--- a/SRC_lapw0/lapw0.F
++++ b/SRC_lapw0/lapw0.F
+@@ -20,7 +20,7 @@
+       use norm_kub,   only: c_kub, init_c_kub
+       USE PW_mult,    only: DECOUL_POT_PW,CFFT_STR,SGGP,CFFT8,SGGP_GGA, &          !CKAMAL
+                             CFFT_STR_GGA,META_FFT
+-      use gga_str_kb,  only: gga_int !, sigma_str
++      use gga_str_kb,  only: gga_int, gga_mt_metric, gga_metric_full !, sigma_str
+       use str_switch,  only: SW_STRESS, SW_TOT_STR
+       use stress_time
+       use, intrinsic :: ISO_C_BINDING, only: C_INT
+@@ -1100,6 +1100,9 @@
+       
+       allocate( SGGP_GGA(nkk,1:9) )
+       allocate( gga_int(1:nkk,1:9) )       !contains gga correction term
++      ! Keep the former harmonic-diagonal GGA contraction available only
++      ! for regression diagnostics. FULL evaluates the derived metric term.
++      call init_gga_metric(nat)
+       gga_int        = zeroc
+       SGGP_GGA       = zero
+       
+@@ -2403,6 +2406,13 @@
+  2835 continue
+ 
+       if (.not.coul) goto 888
++
++      ! The alternate .xcpot1q path does not supply gradient stress data.
++      ! Do not emit an apparently valid GGA tensor with its MT term absent.
++      if(SW_STRESS.eq.'YES'.and.GGA_SWITCH.and.xcpot1qq)then
++         call outerr('LAPW0','GGA stress requires standard XCPOT1; remove .xcpot1q')
++         goto 999
++      endif
+ 
+ !
+ ! Exchange-correlation inside the spheres

@@ -1,0 +1,14 @@
+ 4,'0_800_MnTe.klist',          'unknown','formatted',-1
+ 5,'0_800_MnTe.in1',   'old',    'formatted',-1
+ 6,'0_800_MnTe.output1','unknown','formatted',0
+10,'./0_800_MnTe.vector', 'unknown','unformatted',9000
+11,'0_800_MnTe.energy', 'unknown','formatted',0
+15,'0_800_MnTe.vtau',       'unknown',    'formatted',-1
+17,'0_800_MnTe.vspmgga',       'unknown',    'formatted',-1
+18,'0_800_MnTe.vsp',       'old',    'formatted',-1
+19,'0_800_MnTe.vns',       'unknown','formatted',-1
+20,'0_800_MnTe.struct',         'old',    'formatted',-1
+21,'0_800_MnTe.scf1',   'unknown','formatted',0
+55,'0_800_MnTe.vec',            'unknown','formatted',0
+71,'0_800_MnTe.nsh',    'unknown','unformatted',0
+200,'./0_800_MnTe.storeHinv', 'replace','unformatted',9000

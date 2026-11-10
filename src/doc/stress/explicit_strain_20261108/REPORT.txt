@@ -1,0 +1,292 @@
+EXPLICIT HYDROSTATIC POTENTIAL SOURCE FOR THE eDMFT STRESS RESPONSE
+8 November 2026
+
+STATUS: installed in eDMFT_new and dbin after explicit user approval.
+Post-install validation: 201/201 tests passed in each location, zero skips;
+all twelve checked helpers and all six checked tests imported from installed paths.
+
+The preceding projector-functional patch IS installed in eDMFT_new and dbin,
+with 194/194 installed-only checks passing in both locations. This checkpoint
+adds the next piece: the ANALYTIC hydrostatic explicit potential source, and
+strict matching of native potential coordinates for independent tests.
+
+The analytic source requires no LAPW0/LAPW1 launch, finite-difference geometry,
+or self-consistent loop. In the material fixtures it takes roughly 0.2 s for
+SrVO3 and 0.5 s for FeSe after the potential/core state is prepared. It operates
+on spatial potential data, so its cost does not scale with the k-point count.
+
+We remain in point 3. This completes the hydrostatic explicit POTENTIAL source;
+it is not the entire explicit CHARGE source s_nu, the six strain sources, or
+the final stress tensor. No production pressure correction is installed here.
+
+1. THE SOURCE AND THE DENSITY RESPONSE ARE DIFFERENT OBJECTS
+
+Let eta be an infinitesimal lattice-scale change, A_eta=(1+eta)A_0. Fractional
+ionic positions, RMT, radial grids, local axes, selected reciprocal labels and
+the prepared electronic energy policy are fixed. The present source is for
+primitive orthogonal, nonmagnetic LDA/PBE cells under hydrostatic strain.
+
+Let T_eta push a density in central material coordinates into the deformed
+cell, using the SAME transport as the native screening reference. Write
+
+  n_eta = T_eta [ n_0 + eta q + O(eta^2) ],
+  tau_n = (d T_eta/deta)_0 n_0,
+  P_eta[n] = native potential-construction map in native FILE coordinates,
+  K = (partial P_0/partial n)_n0.
+
+The potential response is then
+
+  v' = s_V + K q,
+  s_V = (partial_eta P_eta[n_0])_0 + K tau_n.                 (1)
+
+The partial derivative in (1) holds the native density COEFFICIENTS fixed.
+It includes ionic and geometric Coulomb, XC and interstitial-mask changes.
+q is the density tangent found from (I-J)q=s_charge. It does not include tau_n;
+adding K tau_n again to Kq would double count the density transport.
+
+The CHARGE source s_charge also needs explicit H/O/raw-projector geometry,
+moving-basis density reconstruction, core/coordinate transport and output
+normalization. Those ingredients are not replaced by s_V alone. Existing
+screening tests used a native numerical hydrostatic charge source and remain
+the independent reference until all analytic charge-source pieces are assembled.
+
+2. EXACT COORDINATES AND RADIAL CONVENTIONS
+
+Input density coefficients are c_00=4*pi*r^2*n_spherical, c_lm=r^2*n_lm for
+the other harmonics, and Fourier density STAR SUMS. For lambda=1+eta,
+
+  (T_eta c)_lm(r) = c_lm(r/lambda)/lambda,
+  (tau_n c)_lm(r) = -c_lm(r) - d c_lm/dlog(r),
+  (tau_n rho)_G = -3 rho_G.                                (2)
+
+The derivative follows the same cubic interpolation as Density.transport,
+including its small fixed-RMT edge extrapolation. No value is set to zero at
+the sphere boundary. It is an explicit reference coordinate convention, not
+an assertion that the physical self-consistent density merely dilates.
+
+Potential coordinates have DIFFERENT radial units:
+  spherical VSP: F_00(r)=r*V_spherical(r),
+  nonspherical VNS: V_lm(r),
+  interstitial: masked per-member Fourier coefficients in Ry.
+
+The prepared field uses INTERNAL REAN4 Fourier coefficients. A complex VNS
+file contains their conjugates. NativePotentialFileLayout uses the existing
+selector/transposed selector, so conjugation occurs exactly once. It matches
+atom/harmonic/G LABELS, not positions in a file. Missing requested modes,
+nonzero additional active cutoff modes, duplicate/truncated data and an
+observable with support in unexported channels are rejected.
+
+The response operator B maps changes in these potentials at FIXED radial r
+into H/O/raw-projector derivatives. One must not insert r.grad(V) without
+also transforming the band-geometry derivative to that convention.
+
+For comparison, converting a fixed-r derivative to material radial coordinates
+would add
+
+  spherical:    dF_00/dlog(r) - F_00,
+  nonspherical: dV_lm/dlog(r).                              (3)
+
+These are derived from F_eta(lambda*r)/lambda and V_lm,eta(lambda*r).
+They are supplied as a separate diagnostic, NOT added to (1). For a point
+nucleus F=-2Z, the fixed-r derivative is zero, while (3) gives +2Z. This simple
+control detects an incorrect density-like scaling of potential coordinates.
+
+3. COULOMB AND IONIC GEOMETRY DERIVATIVE
+
+This differentiates the native finite pseudocharge/radial construction, not
+a continuum scaling estimate or two separately converged strained calculations.
+All symbols in the following are the prepared Hartree operator's factors:
+
+  m: radial electron multipole moments in complex-harmonic normalization;
+  S: conversion from native signed real harmonics to complex multipoles;
+  rho: density Fourier star sums;
+  D: multipoles of the Fourier continuation inside the fixed MT spheres;
+  Q_ion = S z, z_(a,00)=Z_a/sqrt(4*pi), other z entries zero;
+  Q = -S m + D rho + Q_ion;
+  L_G = 8*pi/|G|^2 for G!=0, L_0=0;
+  A: pseudocharge multipole-to-potential map;
+  p = L rho + A Q: unmasked Coulomb potential star sums;
+  B: star-to-radial-boundary map; b=Re(B p);
+  M: native Fourier truncation/reanalysis/interstitial-mask map.
+
+For hydrostatic strain at fixed native density coefficients,
+  G'=-G, Omega'=3 Omega; radial m, S, Q_ion and RMT do not change.
+  L'=2L, Q'=D' rho,
+  p'=2L rho + A' Q + A D' rho,
+  b'=Re(B' p + B p').                                     (4)
+
+The maps contain spherical Bessel functions j_l(x), x=|G|R. Fractional Bloch
+phases and Y_lm(local G) are fixed for hydrostatic strain. With geometry-
+independent factors suppressed,
+
+  D ~ j_(l+1)(x)/|G|,
+  D' ~ [j_(l+1)(x)-x j'_(l+1)(x)]/|G|,
+  B ~ j_l(x),             B' ~ -x j'_l(x),
+  A ~ [L/Omega] j_(n+1)(x)/x^p, p=n-l+1,
+  A' ~ [L/Omega] { (p-1)j_(n+1)(x)/x^p
+                                  - j'_(n+1)(x)/x^(p-1) }. (5)
+
+n is the native pseudocharge order (9 in these fixtures). The implementation
+never divides by j_l, so Bessel-function zeros do not create singular ratios.
+The existing G=0 Coulomb gauge is retained, with its separate regular limits.
+
+At fixed radial grids the Coulomb MT Dirichlet operation has no geometric
+change in its interior kernel. Its explicit response is its boundary factor
+times b'. The point-nucleus interior term is -2Z(1-r/R) in rV units and is
+constant under this fixed-RMT geometry variation. Its PERIODIC/boundary
+response is already in Q_ion through A', B' and the changing cell.
+
+The interstitial Coulomb response is
+  v_C,IR' = M p' + M' p.                                  (6)
+
+The source returned by hydrostatic_coulomb_geometry includes both terms and
+the full ionic contribution. The central Coulomb potential is reconstructed
+separately and compared with native total potential after adding central XC;
+agreement is 7.02e-14 relative (SrVO3) and 8.21e-14 (FeSe). This is a useful
+check of nuclear sign, harmonic normalization and the native Coulomb gauge.
+
+4. THE FIXED-RMT INTERSTITIAL SURFACE TERM
+
+For a general symmetric direction e, A_eta=(I+eta e)A, the mask on the FULL
+native FFT reciprocal box is
+
+  M_G = delta_G0 - sum_a [4*pi*R_a^3/Omega] f(x_a) exp(iG.R_a),
+  f(x)=j_1(x)/x, x_a=|G|R_a.
+
+Fractional sites stay fixed, so the phases do not vary. Define
+  d_G = G^T e G/|G|^2, with d_0=0.
+Then
+  M_G' = sum_a [4*pi*R_a^3/Omega] exp(iG.R_a)
+                      [tr(e) f(x_a) + d_G x_a f'(x_a)].    (7)
+
+For hydrostatic e=I, 3f+x f'=j_0(x). The G=0 limit is
+  M_0' = sum_a 4*pi*R_a^3/Omega.
+
+Thus the surface term survives for a CONSTANT potential. Its inverse FFT,
+multiplication with the central potential on the native grid, and native
+star collection give M'p in (6). This preserves finite FFT aliasing and the
+native real-linear convention. Applying only the density scaling would omit
+this source. The general tensor mask component is tested, but that does not
+mean the complete six-component potential/charge source is implemented.
+
+5. XC GEOMETRY AND ASSEMBLY
+
+MT radial/angular grids are fixed, so their explicit XC geometry derivative
+at fixed native density coefficients is zero. Their density-transport response
+is in K tau_n. In the interstitial quadratic fit, at fixed grid density values,
+
+  n'=0, (partial_i n)'=-partial_i n,
+        (partial_i partial_j n)'=-2 partial_i partial_j n. (8)
+
+The existing analytic LDA/PBE formulas evaluate the directional derivative
+of V_xc with these field changes using complex-step differentiation on the
+central branch. Native positivity/low-density averaging, representative-star
+selection, Fourier truncation and masking follow in their original order.
+
+  v_xc,IR,geometry' = M (V_xc,unmasked,geometry') + M' V_xc,unmasked.
+
+There is no differential XC geometry term in LDA before masking; M' still
+contributes. PBE adds the spatial-derivative changes in (8).
+
+Finally,
+  s_V = K tau_n + v_C,geometry' + v_xc,geometry'.           (9)
+
+hydrostatic_explicit_potential returns (9) and separately named components.
+The user of the function adds Kq exactly once. Fixed Sigma, double counting,
+radial energy and projector policies remain those of the prepared state.
+
+6. INDEPENDENT TESTS
+
+201/201 tests pass with repository dependencies and with dbin dependencies,
+zero skips. Seven new tests cover label/conjugation matching, malformed files,
+unequal centered steps, mixed radial transport units, general hydrostatic/shear
+mask derivatives, the full nonconstant-potential mask source, and nuclear plus
+electronic Coulomb geometry against a fresh nonlinear Poisson construction.
+
+Two kinds of native LAPW0 comparisons were performed, all in scratch:
+
+(a) Existing numerical explicit source plus analytic Kq, compared with a new
+    native potential for T_eta(n0+eta q). The previous full-mesh q was reused.
+    Relative errors for h=.00025 -> .000125:
+      SrVO3: 1.57e-7 -> 4.32e-8
+      FeSe:  2.38e-4 -> 5.99e-5
+    This checks the coordinate split independently of the new analytic source.
+
+(b) Fully analytic (9), compared with native LAPW0 at prescribed hydrostatic
+    inputs. A scratch-only readstruct switch applies a double-precision uniform
+    lattice scale after reading the central structure. The native potential
+    algorithm is unchanged. This avoids the six-decimal struct rounding that
+    makes the existing FeSe direction (0.999874,0.999874,1.000252) rather than
+    exactly (1,1,1). That anisotropy cannot be mistaken for an analytic error.
+    The precision switch is NOT installed in WIEN2k or included in production.
+
+    Relative explicit-source error:
+                  h=.00025       h=.000125        Richardson
+      SrVO3       3.5464e-8       9.1228e-9         3.2063e-9
+      FeSe        4.4803e-6       1.1408e-6         4.3048e-7
+
+    Relative error for analytic s_V+Kq against an independent native combined
+    strain/density perturbation:
+                  h=.00025       h=.000125        Richardson
+      SrVO3       2.3973e-7       6.1044e-8         1.6635e-8
+      FeSe        2.0107e-4       5.0562e-5         3.7319e-6
+
+The combined derivative is smaller than its components, making relative
+errors more demanding. FeSe's largest extrapolated residual is near the
+innermost spherical grid (maximum about 3--4e-5 in native potential units).
+Its origin has not been established by these checks; exact pointwise agreement
+is not claimed. The projector-gradient contractions are much less sensitive:
+extrapolated combined errors are 3.99e-11 Ry (SrVO3) and 6.86e-10 Ry (FeSe).
+
+For the EXACT SAME rounded-strain/density-direction test in (a), the partial
+projector potential contributions are, in Ry per lattice-scale parameter:
+
+               Explicit potential       Induced potential        Sum
+  SrVO3          +0.6357997492             -0.4972441407       +0.1385556085
+  FeSe          +15.2711788990            -13.1928721893       +2.0783067097
+
+These numbers demonstrate cancellation in this coordinate decomposition.
+They are NOT total stress, pressure, or an approved additive correction to
+production stress. Geometric H/O/raw terms and direct functional contributions
+can cancel further. The pure-hydrostatic test uses a slightly different FeSe
+direction, so its numbers should not be interchanged with this table.
+
+7. WHERE THIS LEAVES THE DEVELOPMENT PLAN
+
+Installed: potential/core and valence response; complete J and numerical
+hydrostatic charge-source tests; prepared projector-only gradient and adjoint.
+
+Ready in this patch: analytic hydrostatic s_V, its native coordinate adapter,
+MT coordinate conversion and the analytic fixed-RMT mask derivative. The source
+is inexpensive and can be prepared with the central potential/core context.
+
+Next: finish the explicit joint band-geometry source
+  s_band = (partial_eta H, partial_eta O, partial_eta phi)_native potential fixed,
+and reconcile its contraction plus direct radial terms with the existing
+analytic stress. The moving mask in (7) belongs in s_V in this FILE-coordinate
+decomposition. Existing stress formulas expressed at fixed physical potential
+may place it elsewhere; they cannot simply be added without this bookkeeping.
+
+Then assemble the fully analytic charge source (including direct density/core
+transport and normalization geometry), validate the combined hydrostatic
+functional derivative, extend all source terms to six strains, and publish the
+validated tensor through the isolated final response step. No extra impurity
+solve is introduced. Magnetic/SOC/general-cell extensions and the deferred
+force-window audit remain later work.
+
+8. REVIEWABLE FILES AND REPRODUCTION
+
+Proposed source changes:
+  src/python/lapw_strain_potential.py (also ~/dbin)
+  src/python/lapw_hydrostatic_potential.py (also ~/dbin)
+  src/python/tests/test_lapw_strain_potential.py
+  src/doc/stress/stress_response_roadmap_20261108.txt
+
+Evidence includes material reports, derivative arrays, source fingerprints,
+native logs and the exact scratch readstruct precision patch. Native source
+and helper locations are recorded in the reproduction drivers. No material
+calculation directory, installed native executable or SCF history was changed.
+
+The guarded installer checks source hashes and destination preimages, preserves
+overwritten preimages, and requires --apply after approval. Installed-only
+201-test verification is prepared for both repository and dbin.

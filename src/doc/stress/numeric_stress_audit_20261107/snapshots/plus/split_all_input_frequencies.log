@@ -1,0 +1,7 @@
+case=SrVO3, nom=100000, ntail=0, insig=sig.inp, outsig=sig.inp[1-n], extn=
+shape(sigdata)= (7, 2387)
+s_oo= [7.83471236450844, 7.832267589646329, 7.836188142173863]
+Edc= [4.0, 4.0, 4.0]
+..... Creating logarithmic mesh
+..... Going over all correlated blocks
+icix= 1 colsp= [np.int64(1), np.int64(2), np.int64(3)] colsm= [] 

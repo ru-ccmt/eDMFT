@@ -1,0 +1,17 @@
+{
+  "case": "SrVO3",
+  "kind": "DMFT",
+  "step": 0.00025,
+  "volume": 382.70904262161486,
+  "sums": {
+    "minus": -27.991000682,
+    "plus": -27.991001649
+  },
+  "band_fd_GPa": -0.02477959203454151,
+  "vsum_basis_only": {
+    "minus": -27.957335045,
+    "plus": -27.957337088
+  },
+  "basis_free_energy_fd_GPa": -0.052352333394768205,
+  "sums_note": "LAPW2 endpoint band sums; DMFT lattice comparison uses the separate vsum_basis_only field."
+}

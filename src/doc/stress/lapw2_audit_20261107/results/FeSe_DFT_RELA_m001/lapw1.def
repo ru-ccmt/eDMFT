@@ -1,0 +1,14 @@
+ 4,'FeSe.klist',          'unknown','formatted',-1
+ 5,'FeSe.in1',   'old',    'formatted',-1
+ 6,'FeSe.output1','unknown','formatted',0
+10,'./FeSe.vector', 'unknown','unformatted',9000
+11,'FeSe.energy', 'unknown','formatted',0
+15,'FeSe.vtau',       'unknown',    'formatted',-1
+17,'FeSe.vspmgga',       'unknown',    'formatted',-1
+18,'FeSe.vsp',       'old',    'formatted',-1
+19,'FeSe.vns',       'unknown','formatted',-1
+20,'FeSe.struct',         'old',    'formatted',-1
+21,'FeSe.scf1',   'unknown','formatted',0
+55,'FeSe.vec',            'unknown','formatted',0
+71,'FeSe.nsh',    'unknown','unformatted',0
+200,'./FeSe.storeHinv', 'replace','unformatted',9000

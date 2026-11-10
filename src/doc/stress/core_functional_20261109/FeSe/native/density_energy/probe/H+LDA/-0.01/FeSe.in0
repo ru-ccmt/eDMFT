@@ -1,0 +1,3 @@
+TOT XC_LDA
+NR2V      IFFT      (R2V)
+   30   30   40    2.00  1 NCON 9  # min IFFT-parameters, enhancement factor, iprint, NCON n

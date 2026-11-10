@@ -1,0 +1,107 @@
+{
+  "d_k_d_strain": -2.1853554999324842,
+  "delta_k_plus_minus": -0.0043707109998649685,
+  "frozen_input_checks": [
+    {
+      "file": "sig.inp",
+      "identical": true,
+      "records": [
+        {
+          "directory": "/Users/haule/projects/materials/MnO/MnO_center",
+          "exists": true,
+          "sha256": "c4bbebc72fb8969265667ef09ca06b967cc835686b6c64ea1e22d71d4bb0f2df"
+        },
+        {
+          "directory": "/Users/haule/projects/materials/MnO/MnO_m_0.001",
+          "exists": true,
+          "sha256": "c4bbebc72fb8969265667ef09ca06b967cc835686b6c64ea1e22d71d4bb0f2df"
+        },
+        {
+          "directory": "/Users/haule/projects/materials/MnO/MnO_p_0.001",
+          "exists": true,
+          "sha256": "c4bbebc72fb8969265667ef09ca06b967cc835686b6c64ea1e22d71d4bb0f2df"
+        }
+      ]
+    },
+    {
+      "file": "Eorb_imp.dat",
+      "identical": true,
+      "records": [
+        {
+          "directory": "/Users/haule/projects/materials/MnO/MnO_center",
+          "exists": true,
+          "sha256": "6cd4c23ec5b6875bd5084ace5e0c7b0d42382aa012024e59089ef6360fa90b3a"
+        },
+        {
+          "directory": "/Users/haule/projects/materials/MnO/MnO_m_0.001",
+          "exists": true,
+          "sha256": "6cd4c23ec5b6875bd5084ace5e0c7b0d42382aa012024e59089ef6360fa90b3a"
+        },
+        {
+          "directory": "/Users/haule/projects/materials/MnO/MnO_p_0.001",
+          "exists": true,
+          "sha256": "6cd4c23ec5b6875bd5084ace5e0c7b0d42382aa012024e59089ef6360fa90b3a"
+        }
+      ]
+    }
+  ],
+  "minus": {
+    "band_sum": -27.550092771,
+    "case": "MnO",
+    "directory": "/Users/haule/projects/materials/MnO/MnO_m_0.001",
+    "ene": -2467.78275634,
+    "eorb": -0.35859766085288414,
+    "frozen_aligned": -2467.782633678874,
+    "frozen_reduced": -2471.270747707147,
+    "on_shell_free_energy": -2467.7826082178744,
+    "scf2_files": [
+      "MnO.scf2"
+    ],
+    "sigma_g": -2.1169634970000004,
+    "volume": 147.67325,
+    "vsum": -31.396681799,
+    "xeorb": 1.3711759922731515,
+    "ysum": -29.279718302
+  },
+  "plus": {
+    "band_sum": -27.595145701,
+    "case": "MnO",
+    "directory": "/Users/haule/projects/materials/MnO/MnO_p_0.001",
+    "ene": -2467.7861823,
+    "eorb": -0.35859766085288414,
+    "frozen_aligned": -2467.787004389874,
+    "frozen_reduced": -2471.275118418147,
+    "on_shell_free_energy": -2467.7870973268737,
+    "scf2_files": [
+      "MnO.scf2"
+    ],
+    "sigma_g": -2.116845098999999,
+    "volume": 148.56196,
+    "vsum": -31.44267948,
+    "xeorb": 1.3711759922731515,
+    "ysum": -29.325834381
+  },
+  "reference": {
+    "band_sum": -27.573314916,
+    "case": "MnO",
+    "directory": "/Users/haule/projects/materials/MnO/MnO_center",
+    "ene": -2467.7844562,
+    "eorb": -0.35859766085288414,
+    "frozen_aligned": -2467.784864891874,
+    "frozen_reduced": -2471.272978920147,
+    "on_shell_free_energy": -2467.784864891874,
+    "scf2_files": [
+      "MnO.scf2"
+    ],
+    "sigma_g": -2.1169380360000005,
+    "volume": 148.11716,
+    "vsum": -31.420435297,
+    "xeorb": 1.3711759922731515,
+    "ysum": -29.303497261
+  },
+  "reference_volume_bohr3": 148.11716,
+  "strain_magnitude": 0.001,
+  "stress_derivative_gpa": -217.04229800401683,
+  "stress_derivative_ry_per_bohr3": -0.014754235768039869,
+  "stress_sign_convention": "+(1/Omega) dGamma/d(strain)"
+}

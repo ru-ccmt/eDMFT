@@ -1,0 +1,38 @@
+{
+  "authorization": "Can you implement dmft2->response integration; response only at the last eDMFT iteration",
+  "sources": [
+    {
+      "source": "/Users/haule/projects/eDMFT_new/src/python/x_dmft.py",
+      "before_sha256": "1105375f662fcb5a2146b4e3af3641c2d7d8f655b4488d6e2b5b5b909e43ec0b",
+      "after_sha256": "fcb51e3a0659b6ae61205879401317be3697271b09eff20ed217728390283c51"
+    },
+    {
+      "source": "/Users/haule/projects/eDMFT_new/src/python/run_dmft.py",
+      "before_sha256": "76d0553b1e6a7ee0e0d124ff824904664a1e2c588d1269390c87ffdea02df170",
+      "after_sha256": "819c09e7578aba83fe9f0af97c6b87124bacafae66d547161587ce1124a068c1"
+    },
+    {
+      "source": "/Users/haule/projects/eDMFT_new/src/python/wien_frozen_sigma_response.py",
+      "before_sha256": "74b69ffde7d32e354c8d914917e6eb72bb3386f90c286b1f243b7bb69891d76d",
+      "after_sha256": "1bd285bff95dfc09f9a53c49eff243074e9c65c7e517525b951926160ab245a8"
+    },
+    {
+      "source": "/Users/haule/projects/eDMFT_new/src/python/dmft2_step.py",
+      "before_sha256": null,
+      "after_sha256": "ca912616036addcfd2925e10d3ddc17fbb35e8b440ac56b1f3ccc996e4bf61c6"
+    },
+    {
+      "source": "/Users/haule/projects/eDMFT_new/src/python/tests/test_dmft2_step.py",
+      "before_sha256": null,
+      "after_sha256": "a057599dd4b51b4aac3829c77820c5dd994a634cc01ab47b527334534f826b29"
+    }
+  ],
+  "installed_scripts": {
+    "/Users/haule/dbin/x_dmft.py": "fcb51e3a0659b6ae61205879401317be3697271b09eff20ed217728390283c51",
+    "/Users/haule/dbin/run_dmft.py": "819c09e7578aba83fe9f0af97c6b87124bacafae66d547161587ce1124a068c1",
+    "/Users/haule/dbin/wien_frozen_sigma_response.py": "1bd285bff95dfc09f9a53c49eff243074e9c65c7e517525b951926160ab245a8",
+    "/Users/haule/dbin/dmft2_step.py": "ca912616036addcfd2925e10d3ddc17fbb35e8b440ac56b1f3ccc996e4bf61c6"
+  },
+  "ordinary_core_binary_changed": false,
+  "stress_tensor_application": false
+}

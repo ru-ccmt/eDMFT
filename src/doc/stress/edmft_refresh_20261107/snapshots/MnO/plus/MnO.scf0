@@ -1,0 +1,44 @@
+ Euler-Maclaurian Coulomb
+ Consistent 3/8+Simpson combinations at start/end
+ New Mode for Coulomb Integral
+ Extension of core to zero
+ LDM version in phi
+ Fifth-order quadrature in outwin
+ Lebedev-Laikov Grid in lapw0
+
+
+            ---------
+:ITE375:375. ITERATION
+            ---------
+
+:NATO :    2 INDEPENDENT AND    2 TOTAL ATOMS IN UNITCELL
+       SUBSTANCE: MnO                                                         
+
+       LATTICE                      = F   
+:LAT  : LATTICE CONSTANTS=  8.40729  8.40729  8.40729    1.571    1.571    1.571
+:VOL  : UNIT CELL VOLUME =     148.56196
+:POT  : POTENTIAL OPTION EX_PBE EC_PBE VX_PBE VC_PBE
+       MODE OF CALCULATION IS       = RELA
+       NON-SPINPOLARIZED CALCULATION
+:IFFT  : FFT-parameters:   72   72   72 Factor: 2.00
+
+
+   CONVERGENCE PARAMETER FOR PSEUDOCHARGE: NCON=  9
+   MAXIMAL VALUE OF RMT(JATOM)*ABSK(NKK) : RK  =26.78502
+
+
+:VKCOUL :  VK-COUL convergence: 0.400E-06
+ Lebedev grid of          350
+ :rho_min:   2.0000000000000000E-008   1.0000000000000001E-009
+:VCOUL001 ATOMNUMBER=  1 O       VCOUL-ZERO =  0.53721E+00
+:VCOUL002 ATOMNUMBER=  2 Mn      VCOUL-ZERO =  0.32288E+00
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991624E-03
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991624E-03
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551694E-01
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551694E-01
+:DEN  : DENSITY INTEGRAL  =         -1044.11670710   (Ry)
+       ELS_POTENTIAL_AT Z=0 and Z=0.5:  -2.15996  -2.15996
+       ELS_POTENTIAL_AT Y=0 and Y=0.5:   0.00000   0.00000
+:VZERO:v0,v0c,v0x  -3.32118  -2.15996  -1.16122 v5,v5c,v5x  -3.32118  -2.15996  -1.16122
+:VZERY:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+:VZERX:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401

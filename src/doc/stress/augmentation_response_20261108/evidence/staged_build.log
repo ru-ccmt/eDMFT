@@ -1,0 +1,14 @@
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c outwin.f90 -o outwin.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c outwin_response.f90 -o outwin_response.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c rint13.f90 -o rint13.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c abc.f90 -o abc.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c diracout.f90 -o diracout.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c dergl.f90 -o dergl.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c inouh.f90 -o inouh.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c inth.f90 -o inth.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c atpar.f90 -o atpar.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c readPot.f90 -o readPot.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c lapw_radial_response.f90 -o lapw_radial_response.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c lapw_radial_hamiltonian.f90 -o lapw_radial_hamiltonian.o
+/opt/homebrew/bin/mpif90 -fPIC -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -c lapw_radial_potential.f90 -o lapw_radial_potential.o
+ar  rcs libatpar.a outwin.o  outwin_response.o  lapw_radial_response.o  lapw_radial_hamiltonian.o  lapw_radial_potential.o  rint13.o  abc.o  diracout.o  dergl.o  inouh.o  inth.o atpar.o readPot.o

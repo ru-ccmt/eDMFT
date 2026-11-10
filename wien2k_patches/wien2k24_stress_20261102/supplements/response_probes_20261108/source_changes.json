@@ -1,0 +1,18 @@
+{
+  "SRC_lapw1/atpar.F": {
+    "before_sha256": "19959272c21a22e2bc8133c71c0c2c5e47588171cbfc29a6e56d795f9393da9d",
+    "after_sha256": "d15a6ab7b419bd973c6318ee013f4746a78deea07754a0815bc7790016277174"
+  },
+  "SRC_lapw1/calkpt.F": {
+    "before_sha256": "6fad2f27083e4ca17da1ef55eb5af4d3b869654825036ce5e6f821e9fb1708d1",
+    "after_sha256": "9b16ef1ff09438b83481dacaf78655068889d91fae3ffc58d3e5da12eeccab4e"
+  },
+  "SRC_lapw1/modules.F": {
+    "before_sha256": "c3171392c823b2fc43c1c41acb102a11fe607d80807ffafeed729929bbca4055",
+    "after_sha256": "8c953ce5736e129dade19e6e9d3eb8e26c82766ec886ced0a1ce55e58459bac2"
+  },
+  "SRC_lapw1/hamilt.F": {
+    "before_sha256": "36a5a236aaead2d0890831596720ddc3935d072fbfc920b8c37756df6339efb7",
+    "after_sha256": "c609892451fdc91b199409a605e43dea5ed78c224435711b026cd4327d05d698"
+  }
+}

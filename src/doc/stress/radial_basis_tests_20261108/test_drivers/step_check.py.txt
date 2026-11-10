@@ -1,0 +1,58 @@
+"""Half-step and zero-perturbation controls for basis-only derivatives."""
+from run_tests import *
+
+def interpolate(base,end,out,factor):
+    a=base.read_text().splitlines();b=end.read_text().splitlines()
+    assert len(a)==len(b)
+    numeric=re.compile(r'[-+]?\d+\.\d+[EeDd][-+]\d+')
+    result=[]
+    for x,y in zip(a,b):
+        xx=list(numeric.finditer(x));yy=list(numeric.finditer(y))
+        if not xx:result.append(x);continue
+        assert len(xx)==len(yy)
+        z=x
+        for mx,my in reversed(list(zip(xx,yy))):
+            val=float(mx.group())+factor*(float(my.group())-float(mx.group()))
+            field=f'{val:{mx.end()-mx.start()}.12E}'
+            # Existing adjacent 19-wide VSP fields include leading blanks.
+            if len(field)!=mx.end()-mx.start():raise ValueError((field,mx.group()))
+            z=z[:mx.start()]+field+z[mx.end():]
+        result.append(z)
+    out.write_text('\n'.join(result)+'\n')
+
+def run(case,kind):
+    root=ROOT/(case+'_'+kind);c=root/'center';s=json.loads((root/'summary.json').read_text())
+    is_c='in1c' in next(l for l in (c/'lapw1.def').read_text().splitlines() if l.split(',')[0].strip()=='5')
+    in2=case+('.in2c' if is_c else '.in2');l1='lapw1c' if is_c else 'lapw1';l2='lapw2c' if is_c else 'lapw2'
+    vals={}
+    for sign in ['minus','plus','zero']:
+        d=root/('half_'+sign);clone(c,d,case)
+        shutil.copy2(c/'lapw1.fixgvec',d/'lapw1.fixgvec');(d/'lapw1.fixgvec.read').touch()
+        if sign=='zero':shutil.copy2(c/(case+'.vsp'),d/'basis.vsp')
+        else:interpolate(c/(case+'.vsp'),root/sign/'basis.vsp',d/'basis.vsp',0.5)
+        execute(d,'lapw1',[str(WIEN/l1),'lapw1.def'],{'WIEN_LAPW1_BASIS_VSP':str(d/'basis.vsp')})
+        shutil.copy2(d/'basis.vsp',d/(case+'.vsp'))
+        p=d/in2;a=p.read_text().splitlines();a[0]='TOT '+a[0][4:];p.write_text('\n'.join(a)+'\n')
+        if kind=='DMFT':execute(d,'dmft2_free',['/opt/homebrew/bin/mpirun','-n','4','/Users/haule/dbin/dmft2_response','dmft2.def']);tag='VSUM'
+        else:execute(d,'lapw2',[str(WIEN/l2),'lapw2.def']);tag='SUM'
+        vals[sign]=float(re.findall(r'^:'+tag+r'.*?=\s*([-+0-9.Ee]+)',(d/(case+'.scf2')).read_text(),re.M)[-1])
+    result={'values':vals,'half_step_GPa':(vals['plus']-vals['minus'])/(s['step']*3*s['volume'])*14710.507641078}
+    if kind=='DFT':
+        def weights(path):
+            out=[]
+            for l in path.read_text().splitlines():
+                a=l.split()
+                if len(a)==4 and a[0].isdigit() and a[1].isdigit():out.append(list(map(float,a)))
+            return np.array(out)
+        wc=weights(c/(case+'.weight'));wm=weights(root/'half_minus'/(case+'.weight'));wp=weights(root/'half_plus'/(case+'.weight'));wz=weights(root/'half_zero'/(case+'.weight'))
+        result['half_fixed_weights_GPa']=float(np.dot(wc[:,3],(wp[:,2]-wm[:,2]))/s['step']/(3*s['volume'])*14710.507641078)
+        result['zero_max_energy_error_Ry']=float(np.max(abs(wz[:,2]-wc[:,2])))
+    else:
+        reference=root/'baseline.scf2'
+        if not reference.exists():
+            reference=OLD/('portable_SrVO3_fixedg' if case=='SrVO3' else 'portable_FeSe_fixedg_real')/'central'/(case+'.scf2')
+        center_vsum=float(re.findall(r'^:VSUM.*?=\s*([-+0-9.Ee]+)',reference.read_text(),re.M)[-1])
+        result['zero_vsum_error_Ry']=vals['zero']-center_vsum
+    (root/'step_check.json').write_text(json.dumps(result,indent=2)+'\n');print(result,flush=True)
+
+if __name__=='__main__':run(*sys.argv[1:])

@@ -1,0 +1,30 @@
+{
+  "material": "SrVO3",
+  "transpose": {
+    "forward": -1.4989451060307175,
+    "reverse": -1.498945106030722,
+    "relative": 2.9626782732960247e-15
+  },
+  "direct_basis_norm": 0.09796258780535735,
+  "density_matrix_norm": 2.2029407931306677,
+  "steps": [
+    {
+      "step": 0.002,
+      "relative": 2.5852608893510933e-08,
+      "maximum": 4.350291876731305e-09,
+      "frozen_basis_relative": 0.043880966433777736
+    },
+    {
+      "step": 0.001,
+      "relative": 6.422086671124825e-09,
+      "maximum": 1.1592437010321532e-09,
+      "frozen_basis_relative": 0.04388097526217433
+    },
+    {
+      "step": 0.0005,
+      "relative": 1.6863691595214527e-09,
+      "maximum": 6.199715185672972e-10,
+      "frozen_basis_relative": 0.04388097769571267
+    }
+  ]
+}

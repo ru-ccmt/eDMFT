@@ -1,0 +1,143 @@
+{
+  "converged": true,
+  "threshold": 0.02,
+  "iterations": [
+    {
+      "iteration": 0,
+      "residual_norm": 0.046913539127638966,
+      "seconds": 12.992128583835438
+    },
+    {
+      "iteration": 1,
+      "residual_norm": 0.06147516202181279,
+      "seconds": 13.071101958164945
+    },
+    {
+      "iteration": 2,
+      "residual_norm": 0.008919686428054678,
+      "seconds": 13.122555375099182
+    }
+  ],
+  "timings": [
+    {
+      "folder": "central",
+      "program": "lapw0",
+      "seconds": 0.6168749579228461
+    },
+    {
+      "folder": "central",
+      "program": "lapw1",
+      "seconds": 6.514130749972537
+    },
+    {
+      "folder": "central",
+      "program": "dmft2",
+      "seconds": 6.451292333193123
+    },
+    {
+      "folder": "central",
+      "program": "lcore",
+      "seconds": 0.07732174987904727
+    },
+    {
+      "folder": "source_plus",
+      "program": "lapw0",
+      "seconds": 0.641050708014518
+    },
+    {
+      "folder": "source_plus",
+      "program": "lapw1",
+      "seconds": 5.561724792001769
+    },
+    {
+      "folder": "source_plus",
+      "program": "dmft2",
+      "seconds": 6.240688625024632
+    },
+    {
+      "folder": "source_plus",
+      "program": "lcore",
+      "seconds": 0.07188362488523126
+    },
+    {
+      "folder": "source_minus",
+      "program": "lapw0",
+      "seconds": 0.6418669170234352
+    },
+    {
+      "folder": "source_minus",
+      "program": "lapw1",
+      "seconds": 5.635848332894966
+    },
+    {
+      "folder": "source_minus",
+      "program": "dmft2",
+      "seconds": 6.6562101659365
+    },
+    {
+      "folder": "source_minus",
+      "program": "lcore",
+      "seconds": 0.07700899988412857
+    },
+    {
+      "folder": "action_000",
+      "program": "lapw0",
+      "seconds": 0.6358125419355929
+    },
+    {
+      "folder": "action_000",
+      "program": "lapw1",
+      "seconds": 5.600058749783784
+    },
+    {
+      "folder": "action_000",
+      "program": "dmft2",
+      "seconds": 6.280876792035997
+    },
+    {
+      "folder": "action_000",
+      "program": "lcore",
+      "seconds": 0.0791012910194695
+    },
+    {
+      "folder": "action_001",
+      "program": "lapw0",
+      "seconds": 0.643068749923259
+    },
+    {
+      "folder": "action_001",
+      "program": "lapw1",
+      "seconds": 5.56797374994494
+    },
+    {
+      "folder": "action_001",
+      "program": "dmft2",
+      "seconds": 6.391362707829103
+    },
+    {
+      "folder": "action_001",
+      "program": "lcore",
+      "seconds": 0.07728112512268126
+    },
+    {
+      "folder": "action_002",
+      "program": "lapw0",
+      "seconds": 0.6356131250504404
+    },
+    {
+      "folder": "action_002",
+      "program": "lapw1",
+      "seconds": 5.595504084136337
+    },
+    {
+      "folder": "action_002",
+      "program": "dmft2",
+      "seconds": 6.453231249935925
+    },
+    {
+      "folder": "action_002",
+      "program": "lcore",
+      "seconds": 0.06441291701048613
+    }
+  ]
+}

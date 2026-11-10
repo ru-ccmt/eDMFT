@@ -1,0 +1,28 @@
+solver              ='CTQMC'         # impurity solver
+DCs                 ='exacty'        # double counting scheme
+max_dmft_iterations =1               # number of iteration of the dmft-loop only
+max_lda_iterations  =100             # one final stress-enabled magnetic assembly cycle
+finish              =1               # one outer frozen-Sigma cycle; keep projector refresh separate from mixer history
+ntail               =300             # on imaginary axis, number of points in the tail of the logarithmic mesh
+cc                  =2e-04           # practical magnetic integration floor for this stress test
+ec                  =1e-05           # the energy precision to stop the LDA+DMFT run
+recomputeEF         =1               # Recompute EF in dmft2 step. If recomputeEF = 2, it tries to find an insulating gap.
+mix_delta = 0.3
+runIMP         = False
+
+# Impurity problem number 0
+iparams0={
+     "exe"               : ["ctqmc"        , "# Name of the executable"],
+     "U"                 : [6.0           , "# Coulomb repulsion (F0) for Mn"],
+     "J"                 : [0.8            , "# Hunds coupling  (J) for Mn"],
+     "CoulombF"          : ["'Full'"      , "# Can be set to Full"],
+     "beta"              : [100            , "# Inverse temperature"],
+     "svd_lmax"          : [30             , "# We will use SVD basis to expand G, with this cutoff"],
+     "M"                 : [20000000        , "# Total number of Monte Carlo steps"],
+     "mode"              : ["SH"           , "# We will use self-energy sampling, and Hubbard I tail"],
+     "nom"               : [200            , "# Number of Matsubara frequency points sampled"],
+     "tsample"           : [400            , "# How often to record measurements"],
+     "GlobalFlip"        : [1000000        , "# How often to try a global flip"],
+     "warmup"            : [300000         , "# Warmup number of QMC steps"],
+     "nf0"               : [5              , "# Nominal occupancy nd for double-counting"],
+}

@@ -1,0 +1,11 @@
+{
+  "mean_GPa": 12.234726020720684,
+  "diagonal_GPa": [
+    13.494846729299152,
+    13.494846729299152,
+    9.714484603563749
+  ],
+  "numeric_GPa": 12.138890191714445,
+  "density_and_core_source": "/private/tmp/dft_after_remaining_dftks_20261107/FeSe",
+  "fresh_valence_source": "/private/tmp/radial_stress_response_20261108/FeSe_DFT/center/FeSe.scf2"
+}

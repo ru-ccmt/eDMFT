@@ -1,6 +1,22 @@
 
 module mod_lo ! We need moule to be able to pass allocatable arrays
 CONTAINS
+  ! Physical local axes expressed in the GLOBAL Cartesian frame. ROTIJ is
+  ! stored in fractional reciprocal coordinates. XROTLOC alone maps from
+  ! the representative-atom frame, not from the global frame:
+  !     L = XROTLOC * (BR1 ROTIJ BR1^{-1}).
+  ! Fixed physical local axes mean q=L K and dq=-L epsilon K. Rotating K
+  ! first and then applying the same epsilon would instead give
+  ! -XROTLOC epsilon (R K), which is wrong when [R,epsilon] /= 0.
+  SUBROUTINE ProjectorGlobalAxes(axes,xrot,br,rotfrac)
+    IMPLICIT NONE
+    REAL*8,intent(out) :: axes(3,3)
+    REAL*8,intent(in) :: xrot(3,3),br(3,3),rotfrac(3,3)
+    REAL*8 :: brinv(3,3)
+    call inv_3x3(br,brinv)
+    axes=matmul(xrot,matmul(br,matmul(rotfrac,brinv)))
+  END SUBROUTINE ProjectorGlobalAxes
+
   SUBROUTINE lomain(XROTLOC,is,nemin,nemax,lfirst,latom,n,jatom,alm,blm,clm,Qforce_j,aalm,bblm,cclm,lmax2)
     USE param,ONLY: lomax, nume, nloat
     USE defs, ONLY: TWO, PI, IMAG
@@ -130,7 +146,7 @@ CONTAINS
   ! from legacy lomain so ordinary charge and force paths retain the original
   ! well-tested calling interface.
   SUBROUTINE lomain_strain(XROTLOC,is,nemin,nemax,lfirst,latom,jatom, &
-       salm,sblm,sclm,lmax2)
+       salm,sblm,sclm,lmax2,global_strain)
     USE param,ONLY: lomax,nume,nloat
     USE defs,ONLY: TWO,PI,IMAG
     USE structure,ONLY: mult,rotij,tauij,BR1,POS
@@ -139,6 +155,12 @@ CONTAINS
     USE dmfts,ONLY: shft
     IMPLICIT NONE
     REAL*8,intent(in) :: XROTLOC(3,3)
+    ! DFT G2 coefficients use the representative-atom tensor and rotate it
+    ! after contraction. The explicit DMFT projector is contracted directly
+    ! in l2main, so its optional global path must do that rotation here.
+    LOGICAL,optional,intent(in) :: global_strain
+    LOGICAL :: global_frame
+    REAL*8 :: strain_axes(3,3),strain_k(3)
     INTEGER,intent(in) :: is,nemin,nemax,lfirst,latom,jatom,lmax2
     COMPLEX*16,allocatable,intent(inout) :: salm(:,:,:),sblm(:,:,:), &
          sclm(:,:,:,:)
@@ -152,6 +174,11 @@ CONTAINS
     COMPLEX*16,allocatable :: yl(:)
     INTEGER,allocatable :: iind(:,:,:)
 
+    global_frame=.false.
+    if (present(global_strain)) global_frame=global_strain
+    strain_axes=XROTLOC
+    if (global_frame) call ProjectorGlobalAxes(strain_axes,XROTLOC, &
+         BR1,rotij(:,:,latom))
     allocate(yl((lomax+2)*(lomax+2)))
     nmult=maxval(mult)
     allocate(iind((lomax+1)*(lomax+1),nloat,nmult))
@@ -178,6 +205,8 @@ CONTAINS
                 bkrot2=matmul(rotij(:,:,latom),bkrot)
                 bkrot3=matmul(BR1,bkrot2)
                 bkrloc=matmul(XROTLOC,bkrot3)
+                strain_k=bkrot3
+                if (global_frame) strain_k=matmul(BR1,bkrot)
                 akg=sqrt(dot_product(bkrot3,bkrot3))
                 call YLM(bkrloc,lomax+1,yl,(lomax+2)*(lomax+2))
                 arg1=dot_product(bkrot2,POS(:,lfirst))*twopi
@@ -202,8 +231,8 @@ CONTAINS
                                   ! akg converts it to the Cartesian gradient.
                                   dy=dy-0.5d0* &
                                        conjg(ca_st_lm(igamma,iv,it))* &
-                                       (XROTLOC(igamma,ia)*bkrot3(ib)+ &
-                                        XROTLOC(igamma,ib)*bkrot3(ia))* &
+                                       (strain_axes(igamma,ia)*strain_k(ib)+ &
+                                        strain_axes(igamma,ib)*strain_k(ia))* &
                                        conjg(yl(index1))/akg
                                enddo
                             enddo

@@ -1,0 +1,9 @@
+The four *_response workers are separate native export executables.
+They are installed only in ~/dbin, not over production WIEN executables.
+The source archive records the precise Fortran sources and Makefiles used.
+Build on the target platform with its WIEN compiler/BLAS configuration; the
+included binaries are local macOS/arm64 workers with Homebrew GCC/FFTW and
+Accelerate dependencies. Do not copy these binaries to rupc Linux.
+The existing dmft2_response and liblapw_response.so are reused (hashes in JSON).
+Native export instrumentation is documented by the earlier augmentation and
+XC/core checkpoints. It writes extra files in the isolated response workspace.

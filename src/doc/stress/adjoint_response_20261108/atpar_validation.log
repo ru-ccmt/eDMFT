@@ -1,0 +1,9 @@
+RELA=F l= 0 ATPARN max abs difference=  4.5723425E-12
+RELA=F l= 1 ATPARN max abs difference=  4.4479975E-12
+RELA=F l= 2 ATPARN max abs difference=  1.0491608E-13
+RELA=F l= 3 ATPARN max abs difference=  5.8120175E-14
+RELA=T l= 0 ATPARN max abs difference=  2.3852031E-12
+RELA=T l= 1 ATPARN max abs difference=  1.2021495E-12
+RELA=T l= 2 ATPARN max abs difference=  2.7200464E-13
+RELA=T l= 3 ATPARN max abs difference=  4.0190073E-14
+PASS central ATPARN closure=  4.5723425E-12

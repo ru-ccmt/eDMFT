@@ -1,0 +1,40 @@
+{
+  "installed_at": "2026-11-08T22:54:45.901295-05:00",
+  "backup": "/private/tmp/edmft_screened_native_20261108/before_install_20261108_225445",
+  "destinations": [
+    "/Users/haule/projects/eDMFT_new/src/python/lapw_screened_state.py",
+    "/Users/haule/dbin/lapw_screened_state.py",
+    "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_screened_state.py",
+    "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt"
+  ],
+  "evidence": "/Users/haule/projects/eDMFT_new/src/doc/stress/screened_native_20261108",
+  "status": "installed and verified",
+  "verified_at": "2026-11-08T22:55:36.181201-05:00",
+  "post_install_checks": {
+    "repository": {
+      "passed": 188,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "verified_installed_imports": true,
+      "log": "post_install_repository.log"
+    },
+    "dbin": {
+      "passed": 188,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "verified_installed_imports": true,
+      "log": "post_install_dbin.log"
+    }
+  },
+  "installed_hashes_verified": 4,
+  "current_phase": 3,
+  "physical_screened_solve_started": true,
+  "next_step": "Point 3: physical functional covector and total potential/stress contraction; then general strain sources and production integration",
+  "limitations": [
+    "Broader geometry/spin support remains pending",
+    "MPI/streaming remains needed for large meshes",
+    "No new production stress or pressure agreement is claimed"
+  ]
+}

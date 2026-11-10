@@ -1,0 +1,44 @@
+[
+  {
+    "source": "/private/tmp/edmft_core_functional_20261109/stage/lapw_functional_cancellation.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_functional_cancellation.py",
+    "source_sha256": "f1e626bf082b62bbd4caf9ad77d92a01bfd2d7a05f5c2f02c83a99fe6a2a29d5",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_core_functional_20261109/stage/lapw_functional_cancellation.py",
+    "destination": "/Users/haule/dbin/lapw_functional_cancellation.py",
+    "source_sha256": "f1e626bf082b62bbd4caf9ad77d92a01bfd2d7a05f5c2f02c83a99fe6a2a29d5",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_core_functional_20261109/stage/lapw_xc_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_xc_response.py",
+    "source_sha256": "5e020eb7384c374aacf7dbd77df1e7610a732edb6106be7cb949f4cf71fa425e",
+    "before_sha256": "d8163f2f39af707a7b91f99369187c5324cc6a4a542cf4aa98fd6811281330d4"
+  },
+  {
+    "source": "/private/tmp/edmft_core_functional_20261109/stage/lapw_xc_response.py",
+    "destination": "/Users/haule/dbin/lapw_xc_response.py",
+    "source_sha256": "5e020eb7384c374aacf7dbd77df1e7610a732edb6106be7cb949f4cf71fa425e",
+    "before_sha256": "d8163f2f39af707a7b91f99369187c5324cc6a4a542cf4aa98fd6811281330d4"
+  },
+  {
+    "source": "/private/tmp/edmft_core_functional_20261109/stage/tests/test_lapw_functional_cancellation.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_functional_cancellation.py",
+    "source_sha256": "776e56b44ee562e24d141165a4933185fc7aa7bf7d64f3f0d4da8c42ce6ba7bc",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_core_functional_20261109/stage/tests/test_lapw_xc_energy.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_xc_energy.py",
+    "source_sha256": "11072b7b72730eb91bccf45cb019242cdfeecbed2777a74a6ac6b1b3d91b9a41",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_core_functional_20261109/stage/stress_response_roadmap_20261108.txt",
+    "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+    "source_sha256": "9ab4f27b8f5f680e77c7a3b346d09a95443f7d6889d9479b674dabcdd65f7e17",
+    "before_sha256": "4fe1e9e1d8c6f32737f586177c647096352d777c58de86c1c2f0547361ae7593"
+  }
+]

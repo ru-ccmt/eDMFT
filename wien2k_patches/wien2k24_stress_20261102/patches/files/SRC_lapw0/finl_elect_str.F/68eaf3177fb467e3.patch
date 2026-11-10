@@ -1,0 +1,89 @@
+--- a/SRC_lapw0/finl_elect_str.F
++++ b/SRC_lapw0/finl_elect_str.F
+@@ -171,12 +171,13 @@
+      ctest=zero
+      
+      DO lm1 = 1, lmtot1             
+-        l0 = lmtot(1,lm1)
++        ! The lattice-harmonic sign is encoded in fc; Gaunt uses |l|.
++        l0 = abs(lmtot(1,lm1))
+         m0 = lmtot(2,lm1)
+         pone = (-1.0)**m0
+         
+         DO lm1p = 1, lmtot1
+-           l0p = lmtot(1,lm1p)
++           l0p = abs(lmtot(1,lm1p))
+            m0p = lmtot(2,lm1p)
+            
+            DO j = 1, imax
+@@ -228,7 +229,7 @@
+     ! WRITE(21,*) ':MADELUNG_STR  ==========Madelung Stress ========================='     
+      madelung_1 = zero
+      DO lm1 = 1, lmtot1        
+-        l0 = lmtot(1,lm1)
++        l0 = abs(lmtot(1,lm1))
+         m0 = lmtot(2,lm1)
+         pone = (-1)**m0
+           DO J = 1, imax
+@@ -279,7 +280,7 @@
+ !====potential involves in the Madelung potential===============    
+      madelung_3 = zero
+      DO lm1 = 1, lmtot1          
+-        l0   = lmtot(1,lm1)
++        l0   = abs(lmtot(1,lm1))
+         m0   = lmtot(2,lm1)        
+         pone = (-1)**m0
+         IF( NOTRI(l0,1,1) .lt. 0 ) CYCLE
+@@ -389,20 +390,22 @@
+ !    WRITE(21,*)   
+ !*************************************************************************************   
+    
++   ! col_pot_1 is REAL*8 already. REAL(real8) without KIND rounds to
++   ! default REAL before the large density/core/valence cancellation.
+    write(6,*) '===== Total STRESS DECOMPOSITION ======='
+    write(6,'("  i  j     coul_pot_sp      madelung     Coul_pot_int     exc_vxc       GGA_cont")')
+    index2 = 0
+    DO beta = 1, 3
+       DO alpha = 1, 3
+          index2 = index2 + 1
+-         tot_stress(alpha,beta) =  0.5*REAL(col_pot_1(index2))  + &
++         tot_stress(alpha,beta) =  0.5d0*col_pot_1(index2)  + &
+                                    madelung_final(index2)       + &
+                                    coulomb_str_int(index2)      + &
+                                    exc_vxc(index2)              - &
+                                    gga_fin_str(index2)                                        
+          if(stress_debug .and. myid.eq.0) then
+             write(21,81) alpha,beta, &
+-                         0.5d0*REAL(col_pot_1(index2))/vol, &
++                         0.5d0*col_pot_1(index2)/vol, &
+                          madelung_final(index2)/vol, &
+                          REAL(coulomb_str_int(index2))/vol, &
+                          exc_vxc(index2)/vol, &
+@@ -419,17 +422,24 @@
+    tot_stress = tot_stress /vol
+    
+    if(myid.eq.0) then
+-     if(irel.eq.'NREL') then             ! print only in nrel case
++     ! The electrostatic and exchange-correlation stress evaluated in this
++     ! routine is a functional of the charge density and potential.  Nothing
++     ! in finl_elect_str assumes a nonrelativistic valence Hamiltonian: RELA
++     ! merely changes the self-consistent density supplied to LAPW0.  The old
++     ! NREL-only output guard therefore discarded a valid contribution and,
++     ! worse, allowed mixer to reuse stale :STR_DENS records from an earlier
++     ! NREL calculation.  Always write the tensor when the STR path called
++     ! this routine.  Relativistic kinetic/Pulay corrections belong to LAPW2,
++     ! not to this density-functional contribution.
+      WRITE(21,*)
+      WRITE(21,80)    
+      DO alpha = 1, 3
+         WRITE(21,77) alpha, (tot_stress(alpha,beta),beta = 1, 3)
+      ENDDO
+      WRITE(21,*)
+-     endif  
+    endif  
+ !    DO index2 = 1, 9
+-!       tot_stress(index2) =  0.5*REAL(col_pot_1(index2))   + &
++!       tot_stress(index2) =  0.5d0*col_pot_1(index2)   + &
+ !                             REAL(madelung_final(index2))  + &
+ !                             REAL(coulomb_str_int(index2)) + &
+ !                             REAL(exc_vxc(index2))         !- &

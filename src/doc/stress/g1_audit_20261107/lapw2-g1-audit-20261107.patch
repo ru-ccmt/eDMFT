@@ -1,0 +1,204 @@
+--- a/SRC_lapw2/val_kinstrmt.F
++++ b/SRC_lapw2/val_kinstrmt.F
+@@ -31,7 +31,7 @@
+     REAL*8,  external          :: GAUNT
+     real*8                     :: gaunt1,gaunt2,gaunt3,RMT2
+     REAL*8, PARAMETER          :: ohalf = 1.D0/2.D0    
+-    real*8                     :: g1_deriv_scale
++    real*8                     :: g1_deriv_scale, g1_lo_scale
+     integer                    :: g1_legacy_status
+     character(len=32)          :: g1_legacy_env
+     complex*16                 :: c_am(3,-1:1), ca_st_lm(3,-1:1,-1:1), &
+@@ -50,20 +50,29 @@
+     lmax = lmax2n        !at least lmax = 7 is needed
+ !=====================                                      
+ 
+-    ! Eq. (G1) has one overall factor 1/2 in front of all four
+-    ! muffin-tin terms.  In the historical F3 implementation the
+-    ! first-radial-derivative piece duplicated its angular factor and
+-    ! therefore lost this 1/2, whereas the accompanying -u/r**2 piece kept
+-    ! it.  Restoring the common 1/2 removes the full traceless discrepancy
+-    ! in the exact fixed-G FeSe finite-difference test.  The legacy switch is
+-    ! retained only to reproduce and diagnose historical WIEN2k results.
+-    g1_deriv_scale = 0.5d0
++    ! G1 product rule (audit 2026-11-07): F2 differentiates n_alpha only.
++    ! The derivative of Y in D_beta(n_alpha*Y) belongs in F3 as well as
++    ! the separate n_beta*D_alpha(Y) row. Thus F3 is
++    !       (2*R1-R0) * (n_alpha*D_beta+n_beta*D_alpha)/2,
++    ! R1=int r*u_bra*u'_ket dr, R0=int u_bra*u_ket dr.
++    ! Halving the R1 coefficient was an incorrect earlier correction.
++    ! In particular psi=r*Y_10 is proportional to z and has ZERO Hessian;
++    ! the halved coefficient gives a spurious, traceless tensor instead.
++    ! LO--LO products have no extra multiplicity: the ordered pair sum
++    ! already contains every primitive pair, just as for u and udot.
++    ! PREAUDIT explicitly reproduces the two old angular defects for
++    ! diagnostics only; the physical/default scales are both one.
++    g1_deriv_scale = 1.d0
++    g1_lo_scale = 1.d0
+     g1_legacy_env = ''
+-    call get_environment_variable('WIEN_STRESS_G1_LEGACY',g1_legacy_env, &
++    call get_environment_variable('WIEN_STRESS_G1_PREAUDIT',g1_legacy_env, &
+                                   status=g1_legacy_status)
+     if(g1_legacy_status.eq.0 .and. len_trim(g1_legacy_env).gt.0 .and. &
+-       trim(g1_legacy_env).ne.'0') g1_deriv_scale = 1.d0
+-                                  
++       trim(g1_legacy_env).ne.'0') then
++       g1_deriv_scale = 0.5d0
++       g1_lo_scale = 2.d0
++    endif
++
+     DO l = 0, lmax
+        FF(0,l)   = P(l)
+        FF(1,l)   = PE(l)
+@@ -288,10 +297,10 @@
+                                   IF(.NOT.loor(jlo,l)) CYCLE
+                                   DO jlop = 1,ilo(lp)
+                                      IF(.NOT.loor(jlop,lp)) CYCLE
+-                                     radial_buf1 = radial_buf1 + 2.d0* &
++                                     radial_buf1 = radial_buf1 + g1_lo_scale* &
+                                           conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
+                                           judu_22(jlo,jlop,l,lp)
+-                                     radial_buf2 = radial_buf2 + 2.d0* &
++                                     radial_buf2 = radial_buf2 + g1_lo_scale* &
+                                           conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
+                                           juu_22(jlo,jlop,l,lp)
+                                   ENDDO
+--- a/SRC_lapw2/kin_str_integrals.F
++++ b/SRC_lapw2/kin_str_integrals.F
+@@ -34,7 +34,6 @@
+                           UCL(nrad),UCS(nrad),UCLP(nrad),UCSP(nrad),   &
+                           UAB(nrad),UBA(nrad), &
+                           UAA(nrad), r1(nrad)                                                     
+-   logical             :: IsEven                       
+    real*8              :: CIN,CINP,g0,TC, VALUE(nrad)                          
+    
+    
+@@ -55,24 +54,22 @@
+           UBS(i) = rade2(i,lp)/r1(i)           
+        ENDDO       
+              
+-!        IsEven = .false.
+-!        IF(2*(lp/2) .eq. lp) IsEven = .true.
+-       call dergl(imax,r1,UAL,UAA,IsEven,g0)   !in new dergl last logic is absent              
+-       call dergl(imax,r1,UAS,UAB,IsEven,g0)       
+-       
+-       call dergl(imax,r1,UAA,UAL,IsEven,g0)
+-       call dergl(imax,r1,UAB,UAS,IsEven,g0)
++       call g1_radial_derivative(imax,r1,UAL,UAA)   !in new dergl last logic is absent              
++       call g1_radial_derivative(imax,r1,UAS,UAB)       
++       
++       call g1_radial_derivative(imax,r1,UAA,UAL)
++       call g1_radial_derivative(imax,r1,UAB,UAS)
+        
+        DO i = 1, imax
+           uppl2(i,lp) = UAL(i)*r1(i)
+           upps2(i,lp) = UAS(i)*r1(i)
+        ENDDO       
+        
+-       call dergl(imax,r1,UBL,UAA,IsEven,g0)
+-       call dergl(imax,r1,UBS,UAB,IsEven,g0)
+-       
+-       call dergl(imax,r1,UAA,UBL,IsEven,g0)
+-       call dergl(imax,r1,UAB,UBS,IsEven,g0)
++       call g1_radial_derivative(imax,r1,UBL,UAA)
++       call g1_radial_derivative(imax,r1,UBS,UAB)
++       
++       call g1_radial_derivative(imax,r1,UAA,UBL)
++       call g1_radial_derivative(imax,r1,UAB,UBS)
+        
+        DO i = 1, imax
+           udppl2(i,lp) = UBL(i)*r1(i)
+@@ -101,13 +98,11 @@
+              UBLP(i) = rade1(i,l)/r1(i) 
+              UBSP(i) = rade2(i,l)/r1(i)              
+           ENDDO        
+-!           IsEven = .false.
+-!           IF(2*(lp/2) .eq. lp) IsEven = .true.
+-          call dergl(imax,r1,UAL,dul,IsEven,g0)
+-          call dergl(imax,r1,UAS,dus,IsEven,g0)
+-             
+-          call dergl(imax,r1,UBL,dudl,IsEven,g0)
+-          call dergl(imax,r1,UBS,duds,IsEven,g0)
++          call g1_radial_derivative(imax,r1,UAL,dul)
++          call g1_radial_derivative(imax,r1,UAS,dus)
++             
++          call g1_radial_derivative(imax,r1,UBL,dudl)
++          call g1_radial_derivative(imax,r1,UBS,duds)
+           
+           CALL RINT13(rel,rrad1(1,l),rrad2(1,l),dul(1),dus(1),  TC2S00(l,lp), jatom)   !integrand contains just product of two functions: r*u_llmd*du_llmdp; d derivative
+           CALL RINT13(rel,rrad1(1,l),rrad2(1,l),dudl(1),duds(1),TC2S01(l,lp), jatom)
+@@ -130,11 +125,11 @@
+                    UCL(i) = a1lo(i,jlop,lp)/r1(i)                         !large comp of LO fun ul(e2)
+                    UCS(i) = b1lo(i,jlop,lp)/r1(i)                         !small comp of LO fun us(e2)
+                 ENDDO
+-                call dergl(imax,r1,UCL,dulol,.true.,g0)         !first derivative of  ul(r,e2)
+-                call dergl(imax,r1,UCS,dulos,.true.,g0)         !first derivative of  uS(r,e2)
+-                
+-                call dergl(imax,r1,dulol,ddulol,.true.,g0)      !2nd derivative of  ul(r,e2)
+-                call dergl(imax,r1,dulos,ddulos,.true.,g0)      !2nd derivative of  us(r,e2)  
++                call g1_radial_derivative(imax,r1,UCL,dulol)         !first derivative of  ul(r,e2)
++                call g1_radial_derivative(imax,r1,UCS,dulos)         !first derivative of  uS(r,e2)
++                
++                call g1_radial_derivative(imax,r1,dulol,ddulol)      !2nd derivative of  ul(r,e2)
++                call g1_radial_derivative(imax,r1,dulos,ddulos)      !2nd derivative of  us(r,e2)  
+              
+                 DO i = 1, imax
+                    ddulol(i) = r1(i)*ddulol(i)
+@@ -171,11 +166,11 @@
+                 UBL(i) = rade1(i,lp)/r1(i) 
+                 UBS(i) = rade2(i,lp)/r1(i) 
+             ENDDO                  
+-            call dergl(imax,r1,UAL,dul,.true.,g0)
+-            call dergl(imax,r1,UAS,dus,.true.,g0)
+-             
+-            call dergl(imax,r1,UBL,dudl,.true.,g0)
+-            call dergl(imax,r1,UBS,duds,.true.,g0)
++            call g1_radial_derivative(imax,r1,UAL,dul)
++            call g1_radial_derivative(imax,r1,UAS,dus)
++             
++            call g1_radial_derivative(imax,r1,UBL,dudl)
++            call g1_radial_derivative(imax,r1,UBS,duds)
+             
+             CALL RINT13(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),uppl2(1,lp),upps2(1,lp),  juddu_20(jlo,l,lp),jatom)     !integral u times double radia derivative
+             CALL RINT13(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),udppl2(1,lp),udpps2(1,lp),juddu_21(jlo,l,lp),jatom)
+@@ -209,11 +204,11 @@
+              UCL(i) = a1lo(i,jlop,lp)/r1(i)                         !large comp of LO fun ul(e2)
+              UCS(i) = b1lo(i,jlop,lp)/r1(i)                         !small comp of LO fun us(e2)
+           ENDDO
+-          call dergl(imax,r1,UCL,dulol,.true.,g0)         !first derivative of  ul(r,e2)
+-          call dergl(imax,r1,UCS,dulos,.true.,g0)         !first derivative of  uS(r,e2)
+-                
+-          call dergl(imax,r1,dulol,ddulol,.true.,g0)      !2nd derivative of  ul(r,e2)
+-          call dergl(imax,r1,dulos,ddulos,.true.,g0)      !2nd derivative of  us(r,e2)  
++          call g1_radial_derivative(imax,r1,UCL,dulol)         !first derivative of  ul(r,e2)
++          call g1_radial_derivative(imax,r1,UCS,dulos)         !first derivative of  uS(r,e2)
++                
++          call g1_radial_derivative(imax,r1,dulol,ddulol)      !2nd derivative of  ul(r,e2)
++          call g1_radial_derivative(imax,r1,dulos,ddulos)      !2nd derivative of  us(r,e2)  
+              
+           DO i = 1, imax
+              ddulol(i) = r1(i)*ddulol(i)
+@@ -253,3 +248,23 @@
+     
+ return
+ end subroutine kin_str_integrals
++
++subroutine g1_radial_derivative(n,r,f,df)
++  ! Stress-only derivative on the physical positive-r mesh.
++  ! The old G1 path passed an UNINITIALIZED IsEven to DERGL, which
++  ! actually uses the flag to mirror f across r=0. Even a specified
++  ! parity is not generally valid for Coulomb-cusp/RELA radial functions,
++  ! or for both a radial function and its derivative. No extrapolated
++  ! negative-radius samples are needed: SPLINE already supplies a
++  ! one-sided endpoint condition from positive-mesh divided differences.
++  ! Keep the existing cubic interpolation and twice-differentiated
++  ! strategy; this repair does NOT add physical radial response to strain.
++  ! Generic DERGL and non-stress density/force routines are untouched.
++  implicit none
++  integer,intent(in) :: n
++  real*8,intent(in) :: r(n),f(n)
++  real*8,intent(out) :: df(n)
++  real*8 :: c(n),d(n)
++  if(n.lt.4) stop 'G1 radial derivative requires at least four points'
++  call spline(n,r,f,df,c,d)
++end subroutine g1_radial_derivative

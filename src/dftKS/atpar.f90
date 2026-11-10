@@ -9,7 +9,7 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
        VNS1,VNS2,VNS3,WNS1,WNS2,WNS3,WNS4,GFAC
   use structure, only  : jri, dx, r0, aname
   use loint, only : VNS1LO,VNS2LO,VNS3LO,WNS1LO,WNS2LO,WNS3LO,WNS4LO,WNS5LO
-  use potnlc, only: VR 
+  use potnlc, only: VR,basis_potential_enabled,basis_delta_vr,basis_restore_spherical 
   use structure, only : IATNR
   use mgaunt, only: gaunt1
   use mpi, only : myrank, master, mpi_bcast_V_vns, Qprint, stop_MPI
@@ -139,6 +139,19 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
         ! the radial derivatives as to their primitive radial functions.
         APE(1:JRI_) = APE(1:JRI_) - CROSS*AP(1:JRI_)
         BPE(1:JRI_) = BPE(1:JRI_) - CROSS*BP(1:JRI_)
+        if (basis_potential_enabled.and.l.gt.LNSMAX) then
+           ! All-l restoration: never truncate a spherical operator at the
+           ! nonspherical orbital cutoff.  This uses precisely the radial
+           ! normalization and RELA metric used in the low-l Gaunt path.
+           ! The factor 2 converts Hartree to Ry; the potential file stores r*V.
+           AW(1:JRI_)=A(1:JRI_)*2.d0*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
+           BW(1:JRI_)=B(1:JRI_)*2.d0*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
+           AEW(1:JRI_)=AE(1:JRI_)*2.d0*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
+           BEW(1:JRI_)=BE(1:JRI_)*2.d0*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
+           basis_restore_spherical(1,l+1,jatom)=RINT13(REL,AW,BW,A,B,NRAD,DX_,JRI_,R0_)
+           basis_restore_spherical(2,l+1,jatom)=RINT13(REL,AEW,BEW,AE,BE,NRAD,DX_,JRI_,R0_)
+           basis_restore_spherical(3,l+1,jatom)=RINT13(REL,AW,BW,AE,BE,NRAD,DX_,JRI_,R0_)
+        endif
         ! stores radial functions into A1, B1, AE1, BE1
         IF ((l+1) .LE. NSLMAX) THEN
            A1(1:JRI_,l+1) = A(1:JRI_)
@@ -223,6 +236,21 @@ SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,lmmx,lomax,ngau,nrad,nslmax)
      endif
      !call mpi_bcast_V_vns(Vlm,lmmax(jatom),lm_stored,LM(:,:,jatom),jatom,nrad,jri(jatom),lmmx,lnsmax)
      call mpi_bcast_V_vns(Vlm,lmmax(jatom),lm_stored,LM(:,:,jatom),nrad,lmmx)
+     if (basis_potential_enabled) then
+        ! Reuse the fully coupled low-l and local-orbital machinery for L=0.
+        ! DeltaV_00=sqrt(4*pi)*(Vphysical-Vbasis); HNS supplies the Gaunt
+        ! coefficient.  The high-l Legendre path does NOT use this Y00 factor.
+        if (lm_stored.ge.lmmx) then
+           if (Qprint) write(6,*) 'No free potential harmonic for alternate-basis restoration'
+           call stop_MPI()
+           stop 1
+        endif
+        lm_stored=lm_stored+1
+        lmmax(jatom)=max(lmmax(jatom),lm_stored)
+        LM(:,lm_stored,jatom)=0
+        VLM(:,lm_stored)=0.d0
+        VLM(1:JRI_,lm_stored)=2.d0*sqrt(4.d0*acos(-1.d0))*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
+     endif
      !        calculate possible nonspherical contributions to H
      if (Qprint) then
         WRITE (6,*) ' POSSIBLE NONSPHERICAL CONTRIBUTIONS TO H: '

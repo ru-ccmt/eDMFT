@@ -1,0 +1,98 @@
+[
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/lapw_compact_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_compact_response.py",
+    "source_sha256": "8e30838d0c94392f55bf4051bdf02f9a08911d8763dc298d0018bfc740476959",
+    "before_sha256": "ff2b6552ea5f89585badd6420442d51530d973e99a5b8ec08f93068e6eeb742a"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/lapw_compact_response.py",
+    "destination": "/Users/haule/dbin/lapw_compact_response.py",
+    "source_sha256": "8e30838d0c94392f55bf4051bdf02f9a08911d8763dc298d0018bfc740476959",
+    "before_sha256": "ff2b6552ea5f89585badd6420442d51530d973e99a5b8ec08f93068e6eeb742a"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/lapw_radial_native.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_radial_native.py",
+    "source_sha256": "7c6e01a516c91580eb3c24778dcb35cf2d44a12c7ace88c4cdd8aa26d7dc44e8",
+    "before_sha256": "c647ce5b7456e3e349897fbfa6fbdfac7cbc121494cd2adb0049d2f2060c64c5"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/lapw_radial_native.py",
+    "destination": "/Users/haule/dbin/lapw_radial_native.py",
+    "source_sha256": "7c6e01a516c91580eb3c24778dcb35cf2d44a12c7ace88c4cdd8aa26d7dc44e8",
+    "before_sha256": "c647ce5b7456e3e349897fbfa6fbdfac7cbc121494cd2adb0049d2f2060c64c5"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/lapw_spherical_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_spherical_response.py",
+    "source_sha256": "dd253e2b5c2c72340935a08e3bfc27d8384b81ea7844a370c0f8e01f34561f5a",
+    "before_sha256": "33e8f86024ddf7d19e24b16c01e4caee43eb68b299f11ceec9a5fefedcae4ba4"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/lapw_spherical_response.py",
+    "destination": "/Users/haule/dbin/lapw_spherical_response.py",
+    "source_sha256": "dd253e2b5c2c72340935a08e3bfc27d8384b81ea7844a370c0f8e01f34561f5a",
+    "before_sha256": "33e8f86024ddf7d19e24b16c01e4caee43eb68b299f11ceec9a5fefedcae4ba4"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/lapw_valence_state.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_valence_state.py",
+    "source_sha256": "cfb6cf5f2d7c1f71e6633b42f189e7438b001c8e312f8fc01d857b2ca562fe71",
+    "before_sha256": "65249523ed592929746591145b1dc2b663521209840a173acc7e519e77df9ed1"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/lapw_valence_state.py",
+    "destination": "/Users/haule/dbin/lapw_valence_state.py",
+    "source_sha256": "cfb6cf5f2d7c1f71e6633b42f189e7438b001c8e312f8fc01d857b2ca562fe71",
+    "before_sha256": "65249523ed592929746591145b1dc2b663521209840a173acc7e519e77df9ed1"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/tests/test_lapw_radial_quadrature.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_radial_quadrature.py",
+    "source_sha256": "e6e43a8f17860390ce4cbfd868f687045c7dab032636b32ee9297ca079ff9f15",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/stage/tests/test_lapw_valence_state.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_valence_state.py",
+    "source_sha256": "795d49941e6c36936912b5f19cda02b719a20008f27c1efeae131bb8b84d3a87",
+    "before_sha256": "6e76d1a15906a7463b19cc72f57567cb96d623db83ca3e8b434c00db3c9d3b7f"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/build/outwin_response.f90",
+    "destination": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/outwin_response.f90",
+    "source_sha256": "0b209a79c4174e089c4e2502c4e90fe8ca9234133cd1158430f5186b2bffd105",
+    "before_sha256": "0402f2d3cdf723bf3cb06428f39be75be2ee4bb5fd14e62d0491aed7d843a527"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/build/lapw_radial_response.f90",
+    "destination": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/lapw_radial_response.f90",
+    "source_sha256": "b7b8e1271036a60fee4104912c32a3896a6928c72ac79c8f447a947be7fd541b",
+    "before_sha256": "391bd3914b0757ce35e8571053d59b5b21b939f2e584d13e82b9efd0b702da1c"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/build/lapw_radial_capi.f90",
+    "destination": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/lapw_radial_capi.f90",
+    "source_sha256": "24175bc4fb3d30ed2d5d7f8cdac99276ee473e925ff48b2edf39408fe51b7335",
+    "before_sha256": "71b2172418d1767b9b4a8c6d0b2cb93f0509decc933e85f35236488b04884a2d"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/build_final/liblapw_response.so",
+    "destination": "/Users/haule/projects/eDMFT_new/src/dmft2/atpar/liblapw_response.so",
+    "source_sha256": "19533e60a0b40dbe7a472d510dbffa3c19af87c29b4e461a743a89439948f00d",
+    "before_sha256": "aed7006b61e1f2e6abbabe38ecf1b470c94e6f34c9cbe82c0432a2181437c20d"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/build_final/liblapw_response.so",
+    "destination": "/Users/haule/dbin/liblapw_response.so",
+    "source_sha256": "19533e60a0b40dbe7a472d510dbffa3c19af87c29b4e461a743a89439948f00d",
+    "before_sha256": "aed7006b61e1f2e6abbabe38ecf1b470c94e6f34c9cbe82c0432a2181437c20d"
+  },
+  {
+    "source": "/private/tmp/edmft_phase2_gauge_memory_20261108/roadmap.txt",
+    "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+    "source_sha256": "33e6a2bf09702d3921a96e3ba5b92ba75214b195f7162bd09f9422eda928afb6",
+    "before_sha256": "0a1a3cd10db062a8e22526dee0d1664e5d99102c109477d954bae8574a0d7a9a"
+  }
+]

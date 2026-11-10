@@ -1,0 +1,13 @@
+ 5,'0_800_MnTe.inm',       'old',    'formatted',-1
+ 6,'0_800_MnTe.outputm',   'unknown','formatted',0
+ 7,'0_800_MnTe.inc',       'old',    'formatted',-1
+10,'0_800_MnTe.clmsum_old','unknown','formatted',0
+17,'0_800_MnTe.clmval',    'unknown','formatted',-1
+18,'0_800_MnTe.clmsc',     'unknown','formatted',0
+19,'0_800_MnTe.clmcor',    'unknown','formatted',0
+20,'0_800_MnTe.struct',    'old',    'formatted',0
+21,'0_800_MnTe.scfm',      'unknown','formatted',0
+22,'0_800_MnTe.scf',       'unknown','formatted',0
+31,'0_800_MnTe.broyd1',    'unknown','unformatted',164896
+32,'0_800_MnTe.broyd2',    'unknown','unformatted',164896
+51,'0_800_MnTe.clmsum',    'unknown','formatted',0

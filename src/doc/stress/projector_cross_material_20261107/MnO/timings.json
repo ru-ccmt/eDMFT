@@ -1,0 +1,46 @@
+{
+  "central_lapw1": {
+    "rc": 0,
+    "seconds": 0.5780419581569731
+  },
+  "prepare": {
+    "rc": 0,
+    "seconds": 0.431297916918993
+  },
+  "dmft2": {
+    "rc": 0,
+    "seconds": 26.328007916919887
+  },
+  "complete_center": {
+    "rc": 0,
+    "seconds": 0.6215501660481095
+  },
+  "minus": {
+    "rc": 0,
+    "seconds": 0.5972239999100566
+  },
+  "plus": {
+    "rc": 0,
+    "seconds": 0.5576089578680694
+  },
+  "advection_minus": {
+    "rc": 0,
+    "seconds": 0.5596025830600411
+  },
+  "advection_plus": {
+    "rc": 0,
+    "seconds": 0.5618174578994513
+  },
+  "r2v_center": {
+    "rc": 0,
+    "seconds": 0.6680510421283543
+  },
+  "r2v_minus": {
+    "rc": 0,
+    "seconds": 0.6791172078810632
+  },
+  "r2v_plus": {
+    "rc": 0,
+    "seconds": 0.6593452917877585
+  }
+}

@@ -428,6 +428,8 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     total = 0.0
+    diagonal_total = 0.0
+    offdiagonal_total = 0.0
     worst_norm = 0.0
     worst_overlap_herm = 0.0
     worst_moment_herm = 0.0
@@ -480,7 +482,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         band_derivative = _band_metric(central.coefficients, derivative)
         value = float(2.0 * np.real(np.trace(central.moment @ band_derivative)))
+        diagonal_moment = np.diag(np.diag(central.moment))
+        diagonal_value = float(
+            2.0 * np.real(np.trace(diagonal_moment @ band_derivative))
+        )
+        offdiagonal_value = value - diagonal_value
         total += value
+        diagonal_total += diagonal_value
+        offdiagonal_total += offdiagonal_value
         worst_norm = max(worst_norm, norm_error)
         worst_overlap_herm = max(worst_overlap_herm, overlap_herm)
         worst_moment_herm = max(worst_moment_herm, moment_herm)
@@ -497,6 +506,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"max overlap Hermiticity error         {worst_overlap_herm:.12e}")
     print(f"max M_Sigma Hermiticity error         {worst_moment_herm:.12e}")
     print(f"2 Re sum_k Tr[M_Sigma O_,strain]      {total:+.12e} Ry")
+    print(f"  diagonal M_Sigma contribution       {diagonal_total:+.12e} Ry")
+    print(f"  off-diagonal M_Sigma contribution   {offdiagonal_total:+.12e} Ry")
     if args.analytic is not None:
         difference = total - args.analytic
         scale = max(abs(total), abs(args.analytic), np.finfo(float).tiny)

@@ -1,0 +1,96 @@
+{
+  "time": "20261108_184930",
+  "files": [
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/stage/lapw_hartree_periodic.py",
+      "target": "/Users/haule/projects/eDMFT_new/src/python/lapw_hartree_periodic.py",
+      "old_sha256": null,
+      "new_sha256": "dc1bb6e84b7d8cd5b573550311371125016d551c310806f21cb07858e65195f2"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/stage/test_lapw_hartree_periodic.py",
+      "target": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_hartree_periodic.py",
+      "old_sha256": null,
+      "new_sha256": "ff511d28165537e1f0db132c600429c593e2c649316976f4f83c4ede36a29654"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/stage/stress_response_roadmap_20261108.txt",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+      "old_sha256": "f7dab17e482c0b590b3e8d0f4c0f699a9082ea0f36bf02eebc98ed9aca80f64b",
+      "new_sha256": "afaa61ae3157456e8e70295248916f2b1c9f763020d217a0609dd2c490f2c41c",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt.before_periodic_hartree_20261108_184930"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/REPORT.txt",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/REPORT.txt",
+      "old_sha256": null,
+      "new_sha256": "272a7d27c392b4e6168cb84e42255f1a7939b9f3d197507b929d6a0bf36d61a1"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/prepare_native.py",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/prepare_native.py",
+      "old_sha256": null,
+      "new_sha256": "2e3443192a0072703f557ed86c879c20949a648f3e14d76a76b5057bef8e4b21"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/native_instrumentation.txt",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/native_instrumentation.txt",
+      "old_sha256": null,
+      "new_sha256": "c704cf4bee8ea25fd1a2462bcc14979073d5da6694eb7e991a3acab26c604baf"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/setup_endpoints.py",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/setup_endpoints.py",
+      "old_sha256": null,
+      "new_sha256": "40bc1ae5a047d0bbe11f43d8fff49fce928c39571cb98681b6b3bc0ae5ed8c43"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/check_material.py",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/check_material.py",
+      "old_sha256": null,
+      "new_sha256": "22c398b5da8a6b30a38b720d4ee934b8bd1867e681410c40d077544e9091ab16"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/check_composition.py",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/check_composition.py",
+      "old_sha256": null,
+      "new_sha256": "ef4f99944d456f2e74f95b08fa0b27e2ee349408491675a9271fa7cb81eee543"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/material_periodic_hartree.json",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/material_periodic_hartree.json",
+      "old_sha256": null,
+      "new_sha256": "ac3e1c1a278d4980ccd698d12f2da92d2aade449d06524fc073e0e7f63f3234f"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/FeSe_composition.json",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/FeSe_composition.json",
+      "old_sha256": null,
+      "new_sha256": "ff25338d48d05212a9695f7ad45e67c56c81643dbb15320d25184bba9e0f1b90"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/SrVO3_composition.json",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/SrVO3_composition.json",
+      "old_sha256": null,
+      "new_sha256": "a0ef94551ff9303a5de7c27de3357c2c453b10c336044dac8bdb4f56eabab5e7"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/full_tests.log",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/full_tests.log",
+      "old_sha256": null,
+      "new_sha256": "c9746d0df366fdebaa386547dc0af5b0180e26b5b1511a83b4b2fc20e7036545"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/expected_before_installation.json",
+      "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/expected_before_installation.json",
+      "old_sha256": null,
+      "new_sha256": "7fbaaeee1508d8da6226d3b19ff201630a3fe35a2f4734b3fa244f593d060818"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_periodic_20261108/stage/lapw_hartree_periodic.py",
+      "target": "/Users/haule/dbin/lapw_hartree_periodic.py",
+      "old_sha256": null,
+      "new_sha256": "dc1bb6e84b7d8cd5b573550311371125016d551c310806f21cb07858e65195f2"
+    }
+  ]
+}

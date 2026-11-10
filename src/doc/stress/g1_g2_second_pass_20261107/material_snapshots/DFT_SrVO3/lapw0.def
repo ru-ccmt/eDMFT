@@ -1,0 +1,39 @@
+ 3,'SrVO3.rhopw',   'unknown','formatted',0
+ 4,'SrVO3.inm',     'unknown','formatted',0
+ 5,'SrVO3.in0',     'old',    'formatted',0
+ 6,'SrVO3.output0', 'unknown','formatted',0
+ 7,'SrVO3.vorbup',  'unknown','formatted',0
+ 8,'SrVO3.clmsum',  'old',    'formatted',0
+ 9,'SrVO3.vtotal',  'unknown','formatted',0
+10,'SrVO3.vcoul',   'unknown','formatted',0
+11,'SrVO3.r2v',     'unknown','formatted',0
+12,'SrVO3.clmup',   'unknown','formatted',0
+13,'SrVO3.clmdn',   'unknown','formatted',0
+14,'SrVO3.mbjmix',     'unknown','formatted',0
+15,'SrVO3.r2v2',     'unknown','formatted',0
+16,'SrVO3.vsp','unknown','formatted',0
+17,'SrVO3.vspdn',   'unknown','formatted',0
+18,'SrVO3.vns','unknown','formatted',0
+19,'SrVO3.vnsdn',   'unknown','formatted',0
+20,'SrVO3.struct',  'old',    'formatted',0         
+21,'SrVO3.scf0',    'unknown','formatted',0
+28,'SrVO3.vrespsum','unknown','formatted',0
+29,'SrVO3.vrespup', 'unknown','formatted',0
+30,'SrVO3.vrespdn', 'unknown','formatted',0
+38,'SrVO3.tausum','unknown','formatted',0
+39,'SrVO3.tauup', 'unknown','formatted',0
+40,'SrVO3.taudn', 'unknown','formatted',0
+50,'SrVO3.eeceup', 'unknown','formatted',0
+51,'SrVO3.eecedn', 'unknown','formatted',0
+62,'SrVO3.grr',    'unknown','formatted',0
+63,'/Users/haule/wien2k_24/SRC_lapw0/xc_funcs.h','unknown','formatted',0
+64,'SrVO3.r2v_nonloc',     'unknown','formatted',0
+88,'SrVO3.vlapl','unknown','formatted',0
+89,'SrVO3.vlapldn',   'unknown','formatted',0
+91,'SrVO3.vtau','unknown','formatted',0
+92,'SrVO3.vtaudn',   'unknown','formatted',0
+93,'SrVO3.clmcor',   'unknown','formatted',0
+94,'SrVO3.clmcordn',   'unknown','formatted',0
+95,'SrVO3.taucor',   'unknown','formatted',0
+96,'SrVO3.taucordn',   'unknown','formatted',0
+61,'SrVO3.in0abp',     'unknown','formatted',0

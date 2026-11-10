@@ -1,5 +1,6 @@
 SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   USE defs,  ONLY: PI, ZERO
+  USE stress_g2_matrices, ONLY: prepare_g2_matrices,release_g2_matrices
   USE param, ONLY: IBLOCK, LMAX2, LOMAX, NCOM, NLOAT, NRAD, NMAT, NUME, NSYM, NKPT, fh_vec, numkpt, filename_V_nsh, filename_V_vns, filename_V_sph, nwave, iff1, iff2, iff3, kmax!, NGAU
   USE atspdt,ONLY: e_store!, EL, P, DP, PE, DPE, PEI
   USE com,   ONLY: NAT, EMIN, EMAX, ELECN, XWT!, rel, NSPIN, NK, EF, NB, weigh, MAXWAV, MINWAV,  NBAND
@@ -12,7 +13,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   USE xa,    ONLY: LM, R, fj, dfj, E, WEIGHT, init_xa, fini_xa !, TC100, TCA100, TCB100, SUMA, SUMB, SUMAB, SUMBA, AVEC, BK, BKRLOC, BKROT
   USE xa3,   ONLY: bk3, aK, bk3lo, init_xa3, fini_xa3, k3, k3lo, As, As_lo!, A, A_lo
   USE reclat,ONLY: inst, tauk, kzz
-  USE muzero,ONLY: nomq, jomq, iomq, womq, abom, n0_om, init_muzero, fini_muzero
+  USE muzero,ONLY: nomq, jomq, iomq, womq, abom, n0_om, init_muzero, fini_muzero, matsum_weight
   USE com_mpi,ONLY: nprocs,myrank,master,FilenameMPI,Reduce_MPI,Reduce_MPI0, &
        Gather_procs,FindMax_MPI,pr_proc,pr_procr,pr_procs,vector_para, &
        vectors,nvector,fvectors,VECFN,FindMaxK_MPI,Qprint,stop_MPI
@@ -36,11 +37,39 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
        stress_nsp_match,stress_nsp_radial,stress_nsp_angular, &
        stress_rela_corr,stress_rela_surf, &
        stress_diag_main,stress_diag_window,stress_diag_norm, &
+       stress_diag_response_overlap, &
        stress_diag_sigma_moment,stress_sigma_diag_enabled, &
+       stress_diag_sigma_match,stress_diag_sigma_radial, &
+       stress_diag_sigma_angular,stress_diag_sigma_interstitial, &
+       stress_diag_sigma_coeff_fd_mt, &
+       stress_diag_sigma_coeff_analytic_mt, &
+       stress_diag_paired_window_matching,stress_paired_diag_enabled, &
+       stress_diag_paired_norm_matching, &
+       stress_diag_paired_main_correction_matching, &
+       stress_diag_paired_window_complete, &
+       stress_diag_paired_norm_complete, &
+       stress_diag_paired_main_correction_complete, &
+       stress_diag_paired_window_kinetic_matching, &
+       stress_diag_paired_norm_kinetic_matching, &
+       stress_diag_paired_main_correction_kinetic_matching, &
+       stress_diag_paired_window_kinetic_complete, &
+       stress_diag_paired_norm_kinetic_complete, &
+       stress_diag_paired_main_correction_kinetic_complete, &
+       stress_diag_paired_sigma_matching, &
+       stress_diag_paired_sigma_complete, &
+       stress_diag_paired_diagonal_reference, &
+       stress_diag_density_diagonal,stress_diag_density_offdiagonal, &
+       stress_matrix_decomposition_enabled, &
        stress_rela_setup_wall,stress_rela_band_wall, &
-       stress_detailed_diagnostics,stress_projector_raw_sign
+       stress_detailed_diagnostics,stress_projector_raw_sign, &
+       stress_norm_response_sign, &
+       stress_fixed_sphere_overlap_enabled,stress_moving_band_enabled
+  USE dmft_stress, ONLY: stress_paired_assembly_enabled
   USE stress_kb, ONLY: deallocate_stress_integrals
   USE stress_pw, ONLY: get_variable_pw
+  USE stress_radial_fd, ONLY: radial_fd_enabled,init_stress_radial_fd, &
+       fini_stress_radial_fd,radial_fd_rho_hsph,radial_fd_rho_hnsp, &
+       radial_fd_rhoe_overlap,radial_fd_by_pass
   IMPLICIT NONE
   CHARACTER*5, intent(in)  :: coord
   REAL*8, intent(in)       :: sumw
@@ -99,14 +128,21 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   REAL*8     :: stress_profile_times(8),stress_profile_start, &
        sigma_diag_value
   REAL*8     :: stress_before(3,3,4)
+  REAL*8     :: stress_sigma_selected(3,3)
+  REAL*8     :: paired_sigma_kinetic_matching(3,3), &
+       paired_sigma_kinetic_complete(3,3)
   LOGICAL    :: RENORM_SIMPLE, Qforce_j, QnormWindow, &
        fuse_window_stress
   complex*16 :: wkp
   COMPLEX*16, ALLOCATABLE :: cfX(:,:,:,:), DMFTU(:,:,:,:), &
        DMFTUfull(:,:,:,:), projectorPack(:,:,:,:), STrans(:,:,:,:), &
        Aweight(:,:), Olapm0(:,:,:), SOlapm(:,:,:), dXrel(:,:,:,:), &
-       dXstress(:,:,:,:), AEweight(:,:), projectorGradient(:,:,:)
+       dXstress(:,:,:,:), AEweight(:,:), projectorGradient(:,:,:), &
+       projectorGradientDirect(:,:,:)
   COMPLEX*16, ALLOCATABLE :: sigmaMoment(:,:),sigmaVectors(:,:)
+  COMPLEX*16, ALLOCATABLE :: rhoDftDiag(:,:),rhoEDftDiag(:,:), &
+       rhoDftOffdiag(:,:),rhoEDftOffdiag(:,:)
+  COMPLEX*16, ALLOCATABLE :: rhoPairedCorr(:,:),rhoEPairedCorr(:,:)
   COMPLEX*16, ALLOCATABLE :: normalizationMoment(:,:,:), &
        normalizationAdjoint(:,:,:),savedWindowRho(:,:,:), &
        savedWindowEnergy(:,:,:)
@@ -130,8 +166,16 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   REAL*8     :: fnsp(3,natm)
   REAL*8     :: fvdrho(3,nat), fdvrho(3,nat)
   REAL*8     :: forb(3,natm), fextra(3,nat), fsur(3,nat), fkdc(3), fsur2(9), fsur_norm
+  CHARACTER(2048) :: response_density_prefix, response_export_prefix
+  LOGICAL :: response_density_mode
+  REAL*8, ALLOCATABLE :: response_frequency_weights(:)
   LOGICAL    :: Qforce2
 
+  response_density_prefix=''
+  response_export_prefix=''
+  call get_environment_variable('EDMFT_RESPONSE_DENSITY_PREFIX',response_density_prefix)
+  call get_environment_variable('EDMFT_RESPONSE_EXPORT',response_export_prefix)
+  response_density_mode=len_trim(response_density_prefix).gt.0
   Qforce2=.True.
   
   RENORM_SIMPLE = .False.
@@ -329,11 +373,13 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   CALL w_allocate(LM_MAX,nat)
 
   CALL precmp_w_atpar(cform,zz,nnlo,ISCF)
+  if (Qstress) call init_stress_radial_fd(nat)
 
   ! The historical nonspherical matrices were force-only.  The last three
   ! lines of the analytic stress Eq. (G2) use the extended V/W blocks too,
   ! so STR (without FOR) must load exactly the same file.
   if (Qforce .or. Qstress) CALL Read_nsh()
+  if (Qstress) CALL prepare_g2_matrices()
   nip=1
   if (Qforce) nip=4
 
@@ -353,6 +399,12 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
      call p_cmp_rixmat()
      call p_apply_rix_diagnostics()
   endif
+  ! The H/O radial diagnostic itself needs only the LAPW radial functions,
+  ! but its optional paired projector-5 branch also needs P_rfk and
+  ! drix_mat.  Prepare it only after p_allocate/p_cmp_rixmat have created
+  ! those arrays; doing this before projector allocation dereferences an
+  ! unallocated module array on every MPI rank.
+  if (Qstress .and. radial_fd_enabled) call prepare_stress_radial_fd
   
   !---------------------------------
   ! START LOOP OVER ALL k-POINTS
@@ -418,6 +470,29 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
           cixdim,maxdim,ncix)
   endif
 
+  if(response_density_mode)then
+     if(Qforce.or.Qstress.or.recomputeEF.ne.0.or.iso.ne.1) &
+          error stop 'response reconstruction requires TOT, recomputeEF=0, no SOC'
+     write(6,'(A)') ':RESPONSE_DENSITY_ONLY: energies and impurity observables are NOT response results'
+  endif
+  if(len_trim(response_export_prefix).gt.0)then
+     ! Metadata precedes the optional EF search, so require a final charge
+     ! replay at the saved chemical potential.  Exporting a stale mu would
+     ! make the external response differentiate a different lattice state.
+     if(recomputeEF.ne.0.or.mode.ne.'c'.or.iso.ne.1.or.nspin1.ne.1) &
+          error stop 'response export requires nonmagnetic charge mode, recomputeEF=0, no SOC'
+     if(.not.Qrenormalize.or.abs(projector).ne.5.or..not.matsubara) &
+          error stop 'response export requires normalized projector 5 on Matsubara axis'
+     allocate(response_frequency_weights(npomega))
+     response_frequency_weights=1.d0
+     response_frequency_weights(n0_om:npomega)=matsum_weight(n0_om:npomega)
+     call ExportFrozenResponseMetadata(response_export_prefix,omega, &
+          response_frequency_weights,npomega,sigma,s_oo,nomega,maxsize, &
+          DM_EF,Temperature,SOlapm,cfX,cix_orb,cixdim,iSx,iorbital, &
+          nindo,norbitals,maxdim2)
+     deallocate(response_frequency_weights)
+  endif
+
   ! The ordinary complementary-band correction treats the saved global
   ! normalization X as fixed.  Its missing chain-rule branch is present only
   ! when X is the k-global inverse square root used by projector types <=5.
@@ -425,7 +500,11 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   ! identically zero.
   QnormWindow=Qstress .and. Qrenormalize .and. abs(projector).le.5 &
        .and. recomputeEF.ge.0
-  fuse_window_stress=QnormWindow .and. .not.stress_detailed_diagnostics
+  ! The compact fused buffer stores only complement--window blocks.  The
+  ! moving-band audit additionally carries a within-window connection and
+  ! diagonal metric term, so keep its two response passes separate.
+  fuse_window_stress=QnormWindow .and. .not.stress_detailed_diagnostics &
+       .and. .not.stress_moving_band_enabled
   if (QnormWindow) then
      allocate(normalizationMoment(maxdim,maxdim,ncix), &
           normalizationAdjoint(maxdim,maxdim,ncix), &
@@ -695,7 +774,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         call walltim(t1w)
      
         nbands = DM_nemax-DM_nemin+1
-        if (Qforce .or. Qstress) then
+        if (Qforce .or. Qstress .or. len_trim(response_export_prefix).gt.0) then
            nbands_full = nemax-nemin+1
            iw0 = DM_nemin-nemin+1
            iw1 = DM_nemax-nemin+1
@@ -722,7 +801,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         ! improves the completeness of the projector derivative.  A non-force
         ! run follows the original, cheaper window-only path.
 
-        if (Qforce .or. Qstress) then
+        if (Qforce .or. Qstress .or. len_trim(response_export_prefix).gt.0) then
            CALL Build_DMFT_Projector(DMFTUfull,cfX,Rspin,iorbital, &
                 norbitals,nipc,n0,nnlo,nbands_full,cix_orb,nindo, &
                 nemin,nemax,maxdim2,lmaxp,Qstress)
@@ -829,6 +908,11 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         time_dmfw=time_dmfw+t2w-t1w
         
         wkp = (twgh/sumw)*2.0
+        if(len_trim(response_export_prefix).gt.0) &
+             call ExportFrozenResponseK(response_export_prefix,ikp,n0,iso, &
+             nmat,nume,nbands_full,nemin,nemax,DM_nemin,DM_nemax, &
+             maxdim2,norbitals,E,As,k3,k3lo,nnlo, &
+             DMFTUfull(:,:,:,1),dble(wkp))
         zw0(:)=0
         DO num=nemin,DM_nemin-1
            zw0(num) = dble(wkp) ! These bands are fully filled
@@ -843,8 +927,72 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         if (Qforce .or. Qstress) nedim=nbands
         allocate( Aweight(nbands,nbands) )
         allocate( AEweight(nedim,nedim) )
+        ! The exact rectangular projector gradient is accumulated whenever
+        ! forces or stress need it; no inversion of U^dagger U is required.
+        allocate( projectorGradientDirect(nbands,maxdim2,norbitals) )
 
-        CALL cmp_dmft_weights2(Aweight, gloc, logG, dens,  Gdloc, Gdloc0, DMFTU, dNds, Edimp0, AEweight, nedim, STrans, sigma, s_oo, wkp, omega, vnorm1, DM_EF, Temperature, wgamma, gamma, csize, nbands, DM_nemin, DM_nemax, maxsize, ncix, nomega, npomega, nume, matsubara, lgTrans, lg_deg, ntcix, nipc, ikp, maxdim2, iorbital, iSx, norbitals)
+        CALL cmp_dmft_weights2(Aweight,gloc,logG,dens,Gdloc,Gdloc0, &
+             DMFTU,dNds,Edimp0,AEweight,nedim,STrans,sigma,s_oo,wkp, &
+             omega,vnorm1,DM_EF,Temperature,wgamma,gamma,csize,nbands, &
+             DM_nemin,DM_nemax,maxsize,ncix,nomega,npomega,nume, &
+             matsubara,lgTrans,lg_deg,ntcix,nipc,ikp,maxdim2,iorbital, &
+             iSx,norbitals,projectorGradientDirect,cix_orb,cixdim, &
+             nindo,Sigind)
+
+        if (Qstress .and. stress_paired_diag_enabled) then
+           ! Direct correction beyond the on-shell diagonal KS occupations:
+           ! retain rho_offdiag and the complete energy moment left after
+           ! subtracting epsilon_n rho_nn.  This is precisely the piece for
+           ! which the ordinary DFT stress rearrangement is not guaranteed.
+           allocate(rhoPairedCorr(nbands,nbands), &
+                rhoEPairedCorr(nbands,nbands))
+           rhoPairedCorr=Aweight
+           rhoEPairedCorr=AEweight
+           do i=1,nbands
+              rhoPairedCorr(i,i)=0.d0
+              rhoEPairedCorr(i,i)=rhoEPairedCorr(i,i)- &
+                   E(DM_nemin+i-1)*Aweight(i,i)
+           enddo
+           call cmp_dmft_paired_matching_matrix(rhoPairedCorr, &
+                rhoEPairedCorr,DM_nemin,DM_nemax,n0,nnlo, &
+                stress_diag_paired_main_correction_matching, &
+                stress_diag_paired_main_correction_complete, &
+                stress_diag_paired_main_correction_kinetic_matching, &
+                stress_diag_paired_main_correction_kinetic_complete, &
+                time_bl,time_bl_w,time_lo,time_lo_w)
+           deallocate(rhoPairedCorr,rhoEPairedCorr)
+           call cmp_dmft_stress_diagonal_reference(Aweight,wkp, &
+                stress_diag_paired_diagonal_reference,nemin,nemax, &
+                DM_nemin,DM_nemax,nbands,n0,nnlo,time_bl,time_bl_w, &
+                time_lo,time_lo_w)
+        endif
+
+        if (Qstress .and. stress_matrix_decomposition_enabled) then
+           ! Preserve two complementary pieces of the un-diagonalized
+           ! interacting density matrix.  Their energy-density partners are
+           ! not the physical rhoE; they are exactly the DFT-like part
+           !
+           !             rhoE_DL = 1/2 {epsilon,rho}.
+           !
+           ! Hence diagonal+offdiagonal tests only the generalized Blaha
+           ! H_,q/O_,q contraction.  M_Sigma is already isolated by the
+           ! independent SIGMA_MOMENT_OVERLAP diagnostic.
+           allocate(rhoDftDiag(nbands,nbands),rhoEDftDiag(nbands,nbands), &
+                rhoDftOffdiag(nbands,nbands),rhoEDftOffdiag(nbands,nbands))
+           rhoDftDiag=0.d0
+           rhoEDftDiag=0.d0
+           rhoDftOffdiag=Aweight
+           do j=1,nbands
+              do i=1,nbands
+                 rhoEDftOffdiag(i,j)=0.5d0* &
+                      (E(DM_nemin+i-1)+E(DM_nemin+j-1))*Aweight(i,j)
+              enddo
+              rhoDftDiag(j,j)=Aweight(j,j)
+              rhoEDftDiag(j,j)=E(DM_nemin+j-1)*Aweight(j,j)
+              rhoDftOffdiag(j,j)=0.d0
+              rhoEDftOffdiag(j,j)=0.d0
+           enddo
+        endif
 
         if (Qstress) CALL WriteOneParticleMomentDump(ikp,n0,nnlo,iso, &
              nemin,DM_nemin,DM_nemax,nmat,nume,k3,k3lo,bk3,As, &
@@ -922,9 +1070,33 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
                 projectorGradient,DMFTUfull(:,:,:,1),Aweight,AEweight, &
                 E,nemin,nemax,DM_nemin,DM_nemax,nbands_full,nbands, &
                 maxdim2,norbitals,maxdim,ncix,cix_orb,cixdim,nindo, &
-                iSx,Sigind)
+                iSx,Sigind,projectorGradientDirect,.true.)
+           ! Default-off binary oracle for checking that the band-space
+           ! matrices sent to the LAPW stress kernels are exactly the ones
+           ! implied by the central Sternheimer/projector contraction.  It
+           ! changes no tensor and is intentionally separate from the
+           ! projector dump, which contains the ingredients rather than the
+           ! assembled Hermitian response.
+           if (Qstress) CALL WriteStressResponseMatrixDump(ikp,nemin, &
+                nemax,DM_nemin,DM_nemax,rhoResponse,eResponse, &
+                nbands_full)
            CALL WriteProjectorGradientDiagnostic(projectorGradient, &
                 E(DM_nemin:DM_nemax),ikp,nbands,maxdim2,norbitals)
+           ! Default-off central Sternheimer diagnostic.  Unlike the older
+           ! endpoint-projector snapshots, this file contains every LAPW1
+           ! band retained in case.vector together with the normalized
+           ! projector and its exact stationary conjugate gradient.  A
+           ! checker can therefore form the gauge-covariant outside-window
+           ! response from A^+(H_,q-e_n O_,q)A at the *central* structure;
+           ! no alignment of independently diagonalized endpoint bands is
+           ! involved.  The writer returns immediately unless
+           ! EDMFT_STRESS_STERNHEIMER_DUMP is explicitly set.
+           if (Qstress) CALL WriteStressSternheimerDump(ikp,n0,nnlo,iso, &
+                nemin,nemax,DM_nemin,DM_nemax,nmat,nume,k3,k3lo,bk3, &
+                As,E,DMFTUfull(:,:,:,1),projectorGradient,nbands_full, &
+                nbands,maxdim2,norbitals)
+           ! The direct-C versus pseudoinverse comparison is now made
+           ! inside BuildWindowResponseMatrices before selecting direct C.
            if (Qstress) then
               ! Explicit one-particle projector contribution to the WIEN2k
               ! stress.  projectorGradient=C=Sigma U^+G is already frequency-
@@ -932,13 +1104,9 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
               ! complete normalized derivative P_,q X+P X_,q.  Therefore
               ! 2*Re sum(C*dU) is dGamma/d(strain).
               !
-              ! Do not copy the sign used by the orbital-force term ``forb``:
-              ! a force is -dGamma/dR, whereas WIEN2k's analytic stress is
-              ! compared with +dGamma/d(strain)/Omega (this is also the
-              ! convention used by the fixed-G finite-difference regression).
-              ! The projector contribution must consequently enter here with
-              ! a plus sign.  The previous minus sign made the stress use the
-              ! force convention and reversed this entire DMFT term.
+              ! This is dGamma/depsilon, but stress_projector enters raw
+              ! STR_VAL, which mixer negates.  The physical default is -1
+              ! here; the final reported stress is +dGamma/depsilon/Omega.
               do iq=1,6
                  ia1=stress_a(iq)
                  ia2=stress_b(iq)
@@ -995,9 +1163,24 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         FTOT0 = FTOT0 + TDE1+TDE2
         !WRITE(6,'(A,f11.6,1x,A,f11.6,1x,A,f11.6,1x,A,f11.6,1x,A,f11.6,1x,A,f11.6)') 'Density=', dens, 'ETOT(band)=', ETOT2, 'trlgG+mu*N=', FTOT2+DM_EF*dens, 'logG=',logG,'TDE=', TDE1+TDE2, 'trlgG=', FTOT2
         
+        ! The optional external matrix already includes spin and k weights.
+        ! Expand only this density reconstruction to ALL stored bands; do not
+        ! redefine the impurity window or its Dyson equation.  The following
+        ! k point reads DM_nemin/DM_nemax again from the ordinary input window.
+        if(response_density_mode)then
+           deallocate(Aweight)
+           nbands=nemax-nemin+1
+           DM_nemin=nemin
+           DM_nemax=nemax
+           DM_nemaxx=nemax
+           allocate(Aweight(nbands,nbands))
+           call ReadFrozenResponseDensity(response_density_prefix,ikp, &
+                n0,iso,nmat,nume,nemin,nemax,E,As,Aweight)
+        endif
+
         allocate( zw2(nbands) )
         CALL Diagonalize_DMFT_WEIGHTS(zw2,Aweight,nbands,DM_nemin, &
-             DM_nemaxx,.True.,'physical_density',ikp)
+             DM_nemaxx,.not.response_density_mode,'physical_density',ikp)
 
         ! Weights for all bands, which are needed below
         weight=0
@@ -1087,6 +1270,27 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
 
         if (Qstress) then
            if (allocated(sigmaMoment)) then
+              ! Contract M_Sigma with the literal LAPW overlap derivative
+              ! while it is still a full matrix in the common KS-band
+              ! basis.  Passing rho=0 to the paired H/O kernel removes every
+              ! Hamiltonian, potential, and surface contribution, leaving
+              ! exactly the metric derivative required by the Klein
+              ! functional.  This avoids the numerically fragile signed
+              ! pseudo-band diagonalization used by the legacy diagnostic.
+              if (stress_paired_diag_enabled) then
+                 allocate(rhoPairedCorr(nbands,nbands))
+                 rhoPairedCorr=0.d0
+                 paired_sigma_kinetic_matching=0.d0
+                 paired_sigma_kinetic_complete=0.d0
+                 call cmp_dmft_paired_matching_matrix(rhoPairedCorr, &
+                      sigmaMoment,DM_nemin,DM_nemax,n0,nnlo, &
+                      stress_diag_paired_sigma_matching, &
+                      stress_diag_paired_sigma_complete, &
+                      paired_sigma_kinetic_matching, &
+                      paired_sigma_kinetic_complete,time_bl,time_bl_w, &
+                      time_lo,time_lo_w)
+                 deallocate(rhoPairedCorr)
+              endif
               ! Diagonalize a copy of M_Sigma so the unchanged LAPW overlap
               ! kernel can contract it as a set of signed pseudo-bands.  The
               ! result is accumulated only in the diagnostic tensor.
@@ -1097,8 +1301,12 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
                    DM_nemin,sigma_nemaxx,.False.,'sigma_moment',ikp)
               call walltim(stress_profile_start)
               CALL cmp_dmft_overlap_stress_diag(sigmaVectors,zSigma, &
-                   stress_diag_sigma_moment,nemin,nemax,DM_nemin, &
-                   DM_nemax,sigma_nemaxx,nbands, &
+                   stress_diag_sigma_moment,stress_diag_sigma_match, &
+                   stress_diag_sigma_radial,stress_diag_sigma_angular, &
+                   stress_diag_sigma_interstitial, &
+                   stress_diag_sigma_coeff_fd_mt, &
+                   stress_diag_sigma_coeff_analytic_mt, &
+                   nemin,nemax,DM_nemin,DM_nemax,sigma_nemaxx,nbands, &
                    sigma_nemaxx-DM_nemin+1,n0,nnlo,time_bl,time_bl_w, &
                    time_lo,time_lo_w)
               call walltim(t2w)
@@ -1114,7 +1322,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
            call walltim(stress_profile_start)
            CALL cmp_dmft_stress(Aweight,AEweight,weight,zwe,nemin,nemax, &
                 DM_nemin,DM_nemax,DM_nemaxx,nbands,nbandsx,n0,nnlo, &
-                time_bl,time_bl_w,time_lo,time_lo_w)
+                time_bl,time_bl_w,time_lo,time_lo_w,1)
            call walltim(t2w)
            stress_profile_times(2)=stress_profile_times(2)+ &
                 t2w-stress_profile_start
@@ -1126,6 +1334,22 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
                 stress_kin_int-stress_before(:,:,3)
            stress_diag_main(:,:,4)=stress_diag_main(:,:,4)+ &
                 stress_apw-stress_before(:,:,4)
+
+           if (stress_matrix_decomposition_enabled) then
+              ! These calls snapshot and restore all physical/global stress
+              ! tensors internally.  Only the two named diagnostic arrays
+              ! receive their kernel differences.
+              CALL cmp_dmft_stress_matrix_diagnostic(rhoDftDiag, &
+                   rhoEDftDiag,stress_diag_density_diagonal, &
+                   'dftlike_diagonal',ikp,nemin,nemax,DM_nemin,DM_nemax, &
+                   nbands,n0,nnlo,time_bl,time_bl_w,time_lo,time_lo_w)
+              CALL cmp_dmft_stress_matrix_diagnostic(rhoDftOffdiag, &
+                   rhoEDftOffdiag,stress_diag_density_offdiagonal, &
+                   'dftlike_offdiagonal',ikp,nemin,nemax,DM_nemin,DM_nemax, &
+                   nbands,n0,nnlo,time_bl,time_bl_w,time_lo,time_lo_w)
+              deallocate(rhoDftDiag,rhoEDftDiag,rhoDftOffdiag, &
+                   rhoEDftOffdiag)
+           endif
 
            ! A projector defined by fixed band indices has an additional
            ! complementary-space response.  RHOResponse and EResponse are
@@ -1142,6 +1366,14 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
            if (allocated(rhoResponse) .and. .not.fuse_window_stress) then
               if (maxval(abs(rhoResponse)).gt.1.d-14 .or. &
                    maxval(abs(eResponse)).gt.1.d-14) then
+                 if (stress_paired_diag_enabled) &
+                      call cmp_dmft_paired_matching_matrix(rhoResponse, &
+                      eResponse,nemin,nemax,n0,nnlo, &
+                      stress_diag_paired_window_matching, &
+                      stress_diag_paired_window_complete, &
+                      stress_diag_paired_window_kinetic_matching, &
+                      stress_diag_paired_window_kinetic_complete, &
+                      time_bl,time_bl_w,time_lo,time_lo_w)
                  allocate(AResponse(nbands_full,nbands_full), &
                       eResponseDiag(nbands_full,nbands_full))
                  allocate(zResponse(nbands_full),zEResponse(nbands_full), &
@@ -1161,21 +1393,24 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
                  CALL Diagonalize_DMFT_WEIGHTS(zEResponse,eResponseDiag, &
                       nbands_full,nemin,energy_response_nemaxx,.True., &
                       'fixed_window_energy_response',ikp)
-                 ! RHOResponse and EResponse explicitly contain both
-                 ! Hermitian cross-window blocks (a,n) and (n,a).  Their
-                 ! trace therefore already evaluates the 2*Re contraction
-                 ! generated by the projector variation.  The historical
-                 ! LAPW stress kernels called by cmp_dmft_stress carry their
-                 ! own factor two for the conjugate quadratic-form pair.  A
-                 ! physical density matrix needs that factor, but applying it
-                 ! unchanged to this already-Hermitian response counts the
-                 ! complementary-band contribution twice.  Scale only the
-                 ! signed response eigenvalues here; do not change Aweight,
-                 ! AEweight, the charge density, or the force-response path.
-                 zResponse(:rho_response_nemaxx-nemin+1)=0.5d0* &
-                      zResponse(:rho_response_nemaxx-nemin+1)
-                 zEResponse(:energy_response_nemaxx-nemin+1)=0.5d0* &
-                      zEResponse(:energy_response_nemaxx-nemin+1)
+                 ! RHOResponse and EResponse are ordinary Hermitian matrices
+                 ! in precisely the same storage convention as Aweight and
+                 ! AEweight.  Their two conjugate blocks are not an extra
+                 ! factor of two: they are the two matrix elements required
+                 ! for Tr[rho H_,q] and Tr[rhoE O_,q].  Diagonalizing a
+                 ! Hermitian matrix and contracting its signed eigenmodes is
+                 ! an identity, so its eigenvalues must be passed unchanged.
+                 !
+                 ! A former factor 1/2 here was exposed by the MOVING_BAND
+                 ! identity.  Inside the DMFT window one has, exactly,
+                 !
+                 !   B=rhoE-epsilon*rho,
+                 !   B_an-B_na^*=(epsilon_n-epsilon_a)rho_an,
+                 !
+                 ! and the ordered Sternheimer pairs reconstruct rho_offdiag
+                 ! and rhoE_offdiag.  Halving their eigenvalues consequently
+                 ! produced exactly one half of the tensor being replaced.
+                 ! The same algebra applies to complementary bands.
                  response_nemaxx=max(rho_response_nemaxx, &
                       energy_response_nemaxx)
                  if (rho_response_nemaxx.lt.nemax) &
@@ -1195,7 +1430,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
                  CALL cmp_dmft_stress(AResponse,eResponseDiag, &
                       weightResponse,zEResponse,nemin,nemax,nemin,nemax, &
                       response_nemaxx,nbands_full,nbands_full,n0,nnlo,time_bl, &
-                      time_bl_w,time_lo,time_lo_w)
+                      time_bl_w,time_lo,time_lo_w,2)
                  call walltim(t2w)
                  stress_profile_times(3)=stress_profile_times(3)+ &
                       t2w-stress_profile_start
@@ -1259,6 +1494,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         DEALLOCATE( zwe )
         DEALLOCATE( AEweight )
         DEALLOCATE( Aweight )
+        DEALLOCATE( projectorGradientDirect )
         
         CALL cputim(time2)
         CALL walltim(time2_w)
@@ -1286,15 +1522,15 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
      CALL Reduce_MPI0(normalizationMoment,maxdim,ncix,max_nbands)
      CALL WriteNormalizationMomentDiagnostic(normalizationMoment,cixdim, &
           maxdim,ncix)
-     ! S=sum_k P_k^+P_k is reconstructed over the complete k-star before
-     ! X=S^(-1/2) is formed.  The conjugate normalization gradient must be
-     ! projected over the same orbital rotations before the adjoint chain is
-     ! evaluated.  This call is default-off while the FeSe finite-difference
-     ! regression tests the correction; see EDMFT_STRESS_NORM_SYMMETRY.
-     CALL SymmetrizeNormalizationMoment(normalizationMoment,cfX,cix_orb, &
-          cixdim,iSx,iorbital,nindo,norbitals,maxdim2)
      CALL BuildNormalizationAdjoint(normalizationAdjoint, &
           normalizationMoment,SOlapm,Sigind,cixdim,maxdim,ncix)
+     ! Reverse the same symmetry/averaging map that constructed S before
+     ! X=S^(-1/2). Applying the map to the moment BEFORE the Sylvester
+     ! derivative assumes commutation with X and can use the wrong order of
+     ! equivalent-atom averaging. Apply its exact adjoint to Q afterwards.
+     ! This chain is required by the functional and is enabled by default.
+     CALL SymmetrizeNormalizationAdjoint(normalizationAdjoint,cfX, &
+          cix_orb,cixdim,iSx,iorbital,nindo,norbitals,maxdim2)
 
      ! This pass rereads only case.vector[so].  It does not repeat a frequency
      ! sum, chemical-potential search, or density construction.  It converts
@@ -1332,8 +1568,31 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
        stress_nsp_match,stress_nsp_radial,stress_nsp_angular, &
        stress_rela_corr,stress_rela_surf, &
        stress_diag_main,stress_diag_window,stress_diag_norm, &
-       stress_diag_sigma_moment,trace_rhoE_diag,trace_erho_diag, &
-       trace_sigma_diag,stress_profile_times)
+       stress_diag_response_overlap, &
+       stress_diag_sigma_moment,stress_diag_sigma_match, &
+       stress_diag_sigma_radial,stress_diag_sigma_angular, &
+       stress_diag_sigma_interstitial, &
+       stress_diag_sigma_coeff_fd_mt, &
+       stress_diag_sigma_coeff_analytic_mt, &
+       stress_diag_paired_window_matching, &
+       stress_diag_paired_norm_matching, &
+       stress_diag_paired_main_correction_matching, &
+       stress_diag_paired_window_complete, &
+       stress_diag_paired_norm_complete, &
+       stress_diag_paired_main_correction_complete, &
+       stress_diag_paired_window_kinetic_matching, &
+       stress_diag_paired_norm_kinetic_matching, &
+       stress_diag_paired_main_correction_kinetic_matching, &
+       stress_diag_paired_window_kinetic_complete, &
+       stress_diag_paired_norm_kinetic_complete, &
+       stress_diag_paired_main_correction_kinetic_complete, &
+       stress_diag_paired_sigma_matching, &
+       stress_diag_paired_sigma_complete, &
+       stress_diag_paired_diagonal_reference, &
+       stress_diag_density_diagonal, &
+       stress_diag_density_offdiagonal,trace_rhoE_diag,trace_erho_diag, &
+       trace_sigma_diag,radial_fd_rho_hsph,radial_fd_rho_hnsp, &
+       radial_fd_rhoe_overlap,radial_fd_by_pass,stress_profile_times)
   endif
   
   if (myrank.eq.master) then
@@ -1343,6 +1602,8 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
              stress_sigma_diag_enabled
         WRITE(6,'(A,1X,F6.1)') ':DMFT_STRESS_PROJECTOR_RAW_SIGN', &
              stress_projector_raw_sign
+        WRITE(6,'(A,1X,F6.1)') ':DMFT_STRESS_NORM_RESPONSE_SIGN', &
+             stress_norm_response_sign
         WRITE(6,'(A,6(1x,F12.4))') ':DMFT_STRESS_PROFILE_WALL_MAX_S', &
              stress_profile_times(:4),stress_profile_times(7:8)
         WRITE(6,'(A)') &
@@ -1353,10 +1614,174 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
              ':DMFT_STRESS_RESPONSE_MODE_LABELS window normalization'
         WRITE(6,'(A,1x,L1)') ':DMFT_STRESS_RESPONSES_FUSED', &
              fuse_window_stress
+        if (radial_fd_enabled) then
+           WRITE(6,'(A,1x,ES24.15)') &
+                ':DMFT_STRESS_RADIAL_FD_RHO_HSPH_RY',radial_fd_rho_hsph
+           WRITE(6,'(A,1x,ES24.15)') &
+                ':DMFT_STRESS_RADIAL_FD_RHO_HNSP_RY',radial_fd_rho_hnsp
+           WRITE(6,'(A,1x,ES24.15)') &
+                ':DMFT_STRESS_RADIAL_FD_RHOE_OVERLAP_RY', &
+                radial_fd_rhoe_overlap
+           WRITE(6,'(A,1x,ES24.15)') &
+                ':DMFT_STRESS_RADIAL_FD_DK_RY', &
+                radial_fd_rho_hsph+radial_fd_rho_hnsp- &
+                radial_fd_rhoe_overlap
+           WRITE(6,'(A,1x,F18.9)') &
+                ':DMFT_STRESS_RADIAL_FD_MEAN_DK_GPA', &
+                (radial_fd_rho_hsph+radial_fd_rho_hnsp- &
+                radial_fd_rhoe_overlap)*14710.5164057d0/(3.d0*vol)
+           do i=1,3
+              WRITE(6,'(A,I1,4(1x,ES24.15))') &
+                   ':DMFT_STRESS_RADIAL_FD_PASS_RY ',i, &
+                   radial_fd_by_pass(i,1),radial_fd_by_pass(i,2), &
+                   radial_fd_by_pass(i,3), &
+                   radial_fd_by_pass(i,1)+radial_fd_by_pass(i,2)- &
+                   radial_fd_by_pass(i,3)
+              WRITE(6,'(A,I1,1x,F18.9)') &
+                   ':DMFT_STRESS_RADIAL_FD_PASS_MEAN_DK_GPA ',i, &
+                   (radial_fd_by_pass(i,1)+radial_fd_by_pass(i,2)- &
+                   radial_fd_by_pass(i,3))*14710.5164057d0/(3.d0*vol)
+           enddo
+           WRITE(6,'(A)') &
+                ':DMFT_STRESS_RADIAL_FD_NOT_ADDED_TO_PRODUCTION T'
+        endif
         call print_dmft_stress_diagnostics(stress_diag_main, &
              stress_diag_window,stress_diag_norm, &
-             stress_diag_sigma_moment,stress_projector, &
+             stress_diag_response_overlap, &
+             stress_diag_sigma_moment,stress_diag_sigma_match, &
+             stress_diag_sigma_radial,stress_diag_sigma_angular, &
+             stress_diag_sigma_interstitial, &
+             stress_diag_sigma_coeff_fd_mt, &
+             stress_diag_sigma_coeff_analytic_mt, &
+             stress_diag_paired_window_matching, &
+             stress_diag_paired_norm_matching, &
+             stress_diag_paired_main_correction_matching, &
+             stress_diag_paired_window_complete, &
+             stress_diag_paired_norm_complete, &
+             stress_diag_paired_main_correction_complete, &
+             stress_diag_paired_window_kinetic_matching, &
+             stress_diag_paired_norm_kinetic_matching, &
+             stress_diag_paired_main_correction_kinetic_matching, &
+             stress_diag_paired_window_kinetic_complete, &
+             stress_diag_paired_norm_kinetic_complete, &
+             stress_diag_paired_main_correction_kinetic_complete, &
+             stress_diag_paired_sigma_matching, &
+             stress_diag_paired_sigma_complete, &
+             stress_diag_paired_diagonal_reference, &
+             stress_diag_density_diagonal, &
+             stress_diag_density_offdiagonal,stress_projector, &
              stress_rela_corr,stress_rela_surf,vol)
+        ! The finite-strain WIEN2k tests keep every R_MT fixed and spherical.
+        ! Blaha's CAPD object differentiates sqrt(Omega)*C and is exact in the
+        ! on-shell (H-e O) formula, where the omitted basis-parallel piece
+        ! vanishes by stationarity.  K(0)-K(1) is therefore not the literal
+        ! physical overlap derivative required by the off-shell M_Sigma
+        ! moment.  FIXED_SPHERE replaces only that isolated channel by
+        !
+        !   2 Re Tr[M_Sigma (dC)^dagger R C] + interstitial dTheta,
+        !
+        ! using the full analytic APW+LO coefficient derivative, including
+        ! -delta_ab C/2.  An independent fixed-coefficient central difference
+        ! agrees with this expression to numerical roundoff.  CURRENT remains
+        ! the bitwise-compatible default until cross-material closure is
+        ! complete.
+        stress_sigma_selected=stress_diag_sigma_moment
+        if (stress_paired_assembly_enabled) then
+           ! Minimal stationary replacement.  The DFT-like main channel is
+           ! deliberately retained exactly as WIEN assembles it: replacing
+           ! the entire valence term by a bare H/O derivative breaks the
+           ! large dV cancellation with STR_DENS.  Only the two genuinely
+           ! new eDMFT objects are replaced:
+           !
+           ! (1) The inseparable off-shell block
+           !
+           !       rho_off,
+           !       rhoE_off = 1/2{epsilon,rho_off} + M_Sigma
+           !
+           !     uses one paired H_,eps/O_,eps contraction.  Replacing only
+           !     M_Sigma*dO is incorrect because the large stationary
+           !     cancellation is shared with the DFT-like off-diagonal
+           !     density.  The ordinary diagonal/lower-band WIEN channel is
+           !     retained, including its dV cancellation with STR_DENS;
+           ! (2) the fixed-index and normalization projector responses use
+           !     the paired H_,eps/O_,eps contraction which is algebraically
+           !     identical to 2 Re Tr[C U_,eps].  Their historical signed
+           !     pseudo-band contractions are removed from all four WIEN
+           !     buckets and the paired result is inserted once.
+           !
+           ! The explicit P_,eps X+P X_,eps contraction in STRESS_PROJECTOR
+           ! is already direct.  Its raw sign is selected in
+           ! init_dmft_stress: paired assembly defaults to WIEN because
+           ! STR_VAL stores -dGamma_1p/depsilon, while ordinary production
+           ! retains the historical CURRENT sign.
+           stress_sigma_selected=stress_diag_paired_sigma_complete
+           stress_val_corr=stress_val_corr- &
+                stress_diag_density_offdiagonal(:,:,1)- &
+                stress_diag_sigma_moment+ &
+                stress_diag_paired_main_correction_complete
+           stress_kin_mt=stress_kin_mt- &
+                stress_diag_density_offdiagonal(:,:,2)
+           stress_kin_int=stress_kin_int- &
+                stress_diag_density_offdiagonal(:,:,3)
+           stress_apw=stress_apw- &
+                stress_diag_density_offdiagonal(:,:,4)
+           stress_val_corr=stress_val_corr-stress_diag_window(:,:,1)- &
+                stress_diag_norm(:,:,1)+ &
+                stress_diag_paired_window_complete+ &
+                stress_diag_paired_norm_complete
+           stress_kin_mt=stress_kin_mt-stress_diag_window(:,:,2)- &
+                stress_diag_norm(:,:,2)
+           stress_kin_int=stress_kin_int-stress_diag_window(:,:,3)- &
+                stress_diag_norm(:,:,3)
+           stress_apw=stress_apw-stress_diag_window(:,:,4)- &
+                stress_diag_norm(:,:,4)
+           WRITE(6,'(A)') ':DMFT_STRESS_PAIRED_ASSEMBLY: MINIMAL'
+        else
+           WRITE(6,'(A)') ':DMFT_STRESS_PAIRED_ASSEMBLY: F'
+        endif
+        if (stress_fixed_sphere_overlap_enabled) then
+           ! Both terms are in the same stored STR_VAL convention as the
+           ! historical SIGMA_MOMENT_OVERLAP, so replacement requires no
+           ! extra sign at this stage.
+           stress_sigma_selected=stress_diag_sigma_coeff_analytic_mt+ &
+                stress_diag_sigma_interstitial
+           stress_val_corr=stress_val_corr+stress_sigma_selected- &
+                stress_diag_sigma_moment
+           WRITE(6,'(A)') &
+                ':DMFT_STRESS_OVERLAP_MODE: FIXED_SPHERE'
+        else
+           WRITE(6,'(A)') ':DMFT_STRESS_OVERLAP_MODE: CURRENT'
+        endif
+        if (stress_moving_band_enabled) then
+           ! In the instantaneous orthonormal KS basis the stationary
+           ! one-particle derivative is a diagonal eigenvalue derivative
+           ! plus C:dU.  Remove from the fixed-H/O LAPW assembly the
+           ! DFT-like off-diagonal density.  BuildWindowResponseMatrices and
+           ! its normalization companion have, in this mode, added the
+           ! complete within-window connection to C:dU.  Lower, fully
+           ! occupied bands remain untouched.
+           !
+           ! Do *not* subtract stress_diag_sigma_moment here.  The connection
+           ! is generated by B=rhoE-epsilon*rho, but its diagonal generalized-
+           ! metric part is precisely the representation change of the
+           ! M_Sigma overlap already present in MAIN_TOTAL; it is not a second
+           ! copy of that overlap.  Subtracting M_Sigma made the default-off
+           ! MOVING_BAND audit differ from the fixed-coefficient assembly by
+           ! one complete Sigma-overlap channel (9.49 GPa in FeSe).  With the
+           ! term retained, the two representations differ only by the
+           ! explicitly truncated complementary-band tail.
+           stress_val_corr=stress_val_corr- &
+                stress_diag_density_offdiagonal(:,:,1)
+           stress_kin_mt=stress_kin_mt- &
+                stress_diag_density_offdiagonal(:,:,2)
+           stress_kin_int=stress_kin_int- &
+                stress_diag_density_offdiagonal(:,:,3)
+           stress_apw=stress_apw- &
+                stress_diag_density_offdiagonal(:,:,4)
+           WRITE(6,'(A)') ':DMFT_STRESS_MOVING_BAND: T'
+        else
+           WRITE(6,'(A)') ':DMFT_STRESS_MOVING_BAND: F'
+        endif
         ! Keep the production formula unchanged by default, but permit a
         ! controlled assembly audit after every tensor has been reduced over
         ! MPI ranks.  EDMFT_STRESS_RESPONSE_MODE=BASE removes the four
@@ -1365,10 +1790,14 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         ! switch here is important: the detailed diagnostic tensors printed
         ! above remain the unmodified FULL decomposition, while STR_VAL below
         ! contains the deliberately selected test assembly.
-        call apply_dmft_stress_response_mode(stress_val_corr, &
-             stress_kin_mt,stress_apw,stress_kin_int, &
-             stress_projector,stress_diag_window,stress_diag_norm, &
-             stress_diag_sigma_moment)
+        if (.not.stress_paired_assembly_enabled) then
+           call apply_dmft_stress_response_mode(stress_val_corr, &
+                stress_kin_mt,stress_apw,stress_kin_int, &
+                stress_projector,stress_diag_window,stress_diag_norm, &
+                stress_sigma_selected)
+        else
+           WRITE(6,'(A)') ':DMFT_STRESS_RESPONSE_MODE: PAIRED_MINIMAL'
+        endif
         ! Default-off reference closure path.  The external file contains the
         ! difference between complete matrix/projector derivatives and the
         ! corresponding pieces already present in FULL.  It is read only
@@ -1773,8 +2202,10 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   CALL fini_xa3
   if (Qstress) then
      call fini_dmft_stress
+     call fini_stress_radial_fd
      call deallocate_stress_integrals
   endif
+  if (Qstress) CALL release_g2_matrices()
   CALL w_deallocate1
 
   if (Qrenormalize .and. abs(projector).le.5) then

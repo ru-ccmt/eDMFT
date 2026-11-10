@@ -1,0 +1,13 @@
+START SrVO3 before
+DONE SrVO3 before 13.79
+START SrVO3 radial_only
+DONE SrVO3 radial_only 13.8
+START SrVO3 corrected
+DONE SrVO3 corrected 13.54
+START FeSe before
+DONE FeSe before 214.77
+START FeSe radial_only
+DONE FeSe radial_only 215.2
+START FeSe corrected
+DONE FeSe corrected 213.92
+ALL DMFT TESTS DONE

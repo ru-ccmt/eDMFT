@@ -1,0 +1,565 @@
+--- a/SRC_lapw1/atpar.F
++++ b/SRC_lapw1/atpar.F
+@@ -1,4 +1,6 @@
+       SUBROUTINE ATPAR(NT,REL,NAT,LNSMAX,ZZ,force,efermi)
++      use atspdt, only: basis_restore_spherical,basis_restore_high_l, &
++           basis_restore_lmin
+ !
+       use reallocate, only: doreallocate
+       use loabc, only : ALO, BLO, CLO, ELO, PLO, DPLO, PELO, DPELO, PEILO, &
+@@ -7,15 +9,17 @@
+                         init_radial_mgga, APE, BPE, AP1, BP1, APE1, BPE1,&
+                         AP1LO, BP1LO, VTAU, init_radial, end_radial
+       use lolog, only : nlo, loor, lapw, ilo, init_lolog
+-      use atspdt, only: INS, NL, LMMAX, LQIND, LM, LQNS, DP, DPE, E, P, PE, &
+-           PEI, VNS1, VNS2, VNS3, GFAC, init_atspdt, NGAU, &
++      use atspdt, only: INS, NL, LMMAX, LQIND, LM, LQNS, LQMM, DP, DPE, E, P, PE, &
++           PEI, VNS1, VNS2, VNS3, WNS1, WNS2, WNS3, WNS4, GFAC, init_atspdt, NGAU, &
+            INT_U___VTAU_U__,INT_U___VTAU_UD_, INT_UD__VTAU_UD_, INT_U___VTAU_UP_,& 
+            INT_U___VTAU_UPD, INT_UP__VTAU_UD_, INT_UD__VTAU_UPD,&
+            INT_UP__VTAU_UP_,INT_UP__VTAU_UPD, INT_UPD_VTAU_UPD,&
+            init_atspdt_mgga, calculate_mgga_fac, atom_gaunt,&
+            mgga_fac
+       use char, only  : LATTIC, NAME
+-      use loint, only : VNS1LO, VNS2LO, VNS3LO, init_loint, &
++      use loint, only : VNS1LO, VNS2LO, VNS3LO, WNS1LO, WNS2LO, WNS3LO, &
++           WNS4LO, WNS5LO, &
++           init_loint, &
+            init_loint_mgga,INT_Ulo__VTAU_U__,INT_Ulo__VTAU_UD_,&
+            INT_Ulo__VTAU_UP_,INT_Ulo__VTAU_UPD,INT_UloP_VTAU_U__,&
+            INT_UloP_VTAU_UD_,INT_UloP_VTAU_UP_,INT_UloP_VTAU_UPD,&
+@@ -59,6 +63,7 @@
+       DOUBLE PRECISION   AAINT, CFEIN1, CFEIN2, CROSS, DE, DE1, DELE, DELEI, DELES
+       DOUBLE PRECISION   DUV, DUVB, DUVE, DX, E1, EI, FL, OVLP, RNOT
+       DOUBLE PRECISION   TRX, TRY, UV, UVB, UVE,  RNET(NRAD)
++      DOUBLE PRECISION   AW(NRAD),BW(NRAD),AEW(NRAD),BEW(NRAD)
+ !!      COMPLEX*16         IMAG, IMAG1
+       CHARACTER*4        EMAIN
+       CHARACTER*67       ERRMSG
+@@ -67,6 +72,19 @@
+       logical, dimension(0:4) ::  logic_mgga_gaunt
+       character*80  ::   fname
+       character*80  ::   u_print_fname_format
++      character*32  ::   g2_diag_env
++      integer       ::   g2_diag_status,g2_bad_count
++      logical       ::   g2_diag_enabled,ham_gaunt_allowed
++      character*512 ::   basis_vsp_file
++      integer       ::   basis_vsp_status,basis_vsp_ios,basis_vsp_unit
++      logical       ::   basis_vsp_enabled,basis_vsp_exists
++      character(len=16) :: basis_restore_env
++      integer :: basis_restore_status
++      real*8, allocatable :: VRB(:,:)
++      real*8 :: basis_vr_solve(NRAD)
++      character(len=16) :: basis_low_l_env
++      integer :: basis_low_l_status
++      logical :: basis_low_l_only
+       real*8, parameter ::    PI = 4.D0*DATAN(1.D0)
+ !fb
+ !     variables for [yu91]-force formalism
+@@ -96,14 +114,25 @@
+ !fe
+       NGAU=2350
+       LMMIN = 1
++      basis_low_l_env=''
++      call get_environment_variable('WIEN_LAPW1_BASIS_LOW_L_ONLY', &
++           basis_low_l_env,status=basis_low_l_status)
++      basis_low_l_only=(basis_low_l_status.eq.0.and.trim(basis_low_l_env).eq.'1')
+       nloat=nloat_new
+       mgga_gaunts = -1
++      g2_diag_env=''
++      call get_environment_variable('WIEN_STRESS_G2_DIAG',g2_diag_env, &
++                                    status=g2_diag_status)
++      g2_diag_enabled=(g2_diag_status.eq.0 .and. &
++                       len_trim(g2_diag_env).gt.0 .and. &
++                       trim(g2_diag_env).ne.'0')
+       call init_loabc(LOMAX, NLOAT, NAT)
+       call init_radial(NRAD, LOMAX, NSLMAX, NLOAT, LMMX)
+       call init_radial_mgga(NRAD, LOMAX, NSLMAX, NLOAT, LMMX)
+       call init_lolog(LOMAX, NAT, LMAX)
+       call init_atspdt(NAT, LMMX, LMAX, NSLMAX)
+       call init_loint(LOMAX+1, LMMX, NSLMAX, NAT, nloat)
++      allocate(VRB(NRAD,NAT))
+ !        initialize constants
+ !        CFEIN1 and CFEIN2 are used in RINT13 to calculate the
+ !        integrals of radialfunctions and are derivates of the
+@@ -138,6 +167,104 @@
+                      MPI_COMM_WORLD, ierr)
+ #endif
+    20 CONTINUE
++
++!     Optional radial-basis response diagnostic.
++!
++!     In ordinary LAPW1 the same spherical potential generates u_l,
++!     udot_l and all local orbitals and is also the spherical part of the
++!     physical Hamiltonian.  This hides the distinction between a change of
++!     the radial trial space and a change of the operator.
++!
++!     If WIEN_LAPW1_BASIS_VSP names another VSP file, only the radial
++!     functions are solved with that potential (VRB).  The regular unit-18
++!     VSP (VR) remains the physical potential.  Farther below, VR-VRB is
++!     added back as an L=0 matrix element.  Thus the generalized eigenproblem
++!     is the center physical Hamiltonian represented in the perturbed radial
++!     basis.  Its central-difference eigenvalue derivative directly measures
++!
++!          2 Re < d_phi/d_epsilon | H-epsilon | phi >,
++!
++!     including the matching-coefficient and local-orbital response.  This
++!     path is strictly opt-in: without the environment variable VRB=VR.
++      VRB=VR
++      basis_vsp_file=''
++      call get_environment_variable('WIEN_LAPW1_BASIS_VSP', &
++           basis_vsp_file,status=basis_vsp_status)
++      basis_vsp_enabled=(basis_vsp_status.eq.0 .and. &
++           len_trim(basis_vsp_file).gt.0)
++      ! This is active only inside the optional alternate-basis probe.
++      ! Disabling high-l restoration reproduces the OLD, incomplete probe
++      ! solely for comparisons; it is never a valid fixed-H reference.
++      basis_restore_high_l=basis_vsp_enabled.and..not.basis_low_l_only
++      basis_restore_lmin=LNSMAX+1
++      basis_restore_env=''
++      call get_environment_variable('WIEN_LAPW1_BASIS_RESTORE_HIGH_L', &
++           basis_restore_env,status=basis_restore_status)
++      if (basis_restore_status.eq.0) then
++         select case(trim(basis_restore_env))
++         case('','1')
++         case('0')
++            basis_restore_high_l=.false.
++         case default
++            error stop 'WIEN_LAPW1_BASIS_RESTORE_HIGH_L must be 0 or 1'
++         end select
++      else if (basis_restore_status.eq.-1) then
++         error stop 'WIEN_LAPW1_BASIS_RESTORE_HIGH_L value too long'
++      endif
++      basis_vsp_ios=0
++      basis_vsp_unit=98
++      if (basis_vsp_enabled.and.myid.eq.0) then
++         inquire(file=trim(basis_vsp_file),exist=basis_vsp_exists)
++         if (.not.basis_vsp_exists) then
++            basis_vsp_ios=-1
++         else
++            open(unit=basis_vsp_unit,file=trim(basis_vsp_file), &
++                 status='old',form='formatted',action='read', &
++                 iostat=basis_vsp_ios)
++         endif
++         if (basis_vsp_ios.eq.0) then
++            read(basis_vsp_unit,5070,iostat=basis_vsp_ios)
++            do jat=1,nat
++               if (basis_vsp_ios.ne.0) exit
++               read(basis_vsp_unit,5010,iostat=basis_vsp_ios)
++               if (basis_vsp_ios.eq.0) &
++                    read(basis_vsp_unit,5020,iostat=basis_vsp_ios) idummy
++               if (basis_vsp_ios.eq.0) &
++                    read(basis_vsp_unit,5060,iostat=basis_vsp_ios)
++               if (basis_vsp_ios.eq.0) &
++                    read(basis_vsp_unit,5040,iostat=basis_vsp_ios) &
++                    (VRB(j,jat),j=1,jrj(jat))
++               if (basis_vsp_ios.eq.0) &
++                    read(basis_vsp_unit,5060,iostat=basis_vsp_ios)
++               if (basis_vsp_ios.eq.0) &
++                    read(basis_vsp_unit,5050,iostat=basis_vsp_ios)
++               if (basis_vsp_ios.eq.0) &
++                    VRB(1:jrj(jat),jat)=VRB(1:jrj(jat),jat)/2.0d0
++            enddo
++            close(basis_vsp_unit)
++         endif
++      endif
++#ifdef Parallel
++      call MPI_BCAST(basis_vsp_ios,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
++#endif
++      if (basis_vsp_enabled.and.basis_vsp_ios.ne.0) then
++         if (myid.eq.0) write(6,*) &
++              'ERROR reading WIEN_LAPW1_BASIS_VSP=',trim(basis_vsp_file)
++         call OUTERR('ATPAR','cannot read alternate radial-basis VSP')
++         call abort_parallel
++         stop 'ATPAR - alternate basis VSP error'
++      endif
++#ifdef Parallel
++      if (basis_vsp_enabled) then
++         do jat=1,nat
++            call MPI_BCAST(VRB(1,jat),JRJ(jat),MPI_DOUBLE_PRECISION,0, &
++                 MPI_COMM_WORLD,ierr)
++         enddo
++      endif
++#endif
++      if (basis_vsp_enabled.and.myid.eq.0) write(6,*) &
++           ':BASIS_VSP: radial basis from ',trim(basis_vsp_file), &
++           '; physical Hamiltonian remains unit-18 VSP'
+ !
+      if (mgga) then
+         if(myid.eq.0) then
+@@ -175,6 +302,13 @@
+          mgga = .false.
+          mgga_central_correction = .false.
+      end if
++     if (basis_vsp_enabled.and.mgga) then
++        if (myid.eq.0) write(6,*) &
++             'WIEN_LAPW1_BASIS_VSP is not implemented for MGGA'
++        call OUTERR('ATPAR','alternate radial-basis VSP with MGGA')
++        call abort_parallel
++        stop 'ATPAR - alternate basis VSP/MGGA error'
++     endif
+ !
+ !        start loop over atoms in unitcell
+ !
+@@ -305,7 +439,7 @@
+             endif
+             IF (DE .GT. 1.0D-9.and.(iapw.ne.2)) THEN
+                CALL SELECT(L,EI,DE,EMAIN,REL, &
+-                    VR(1,JATOM),RNOT,DX,JRI,ZZ(JATOM),jatom,efermi)
++                    VRB(1,JATOM),RNOT,DX,JRI,ZZ(JATOM),jatom,efermi)
+             ELSE
+                IF(myid.eq.0) WRITE (6,6010) l,jatom, L, EI
+                IF(myid.eq.0) WRITE (21,6010) l,jatom, L, EI
+@@ -381,13 +515,20 @@
+ 1500        CONTINUE
+             L = J - 1
+             FL = L
++            basis_vr_solve(:)=VRB(:,JATOM)
++            ! Diagnostic: the alternate-basis L=0 operator restoration is
++            ! currently in HNS, whose orbital legs end at LNSMAX.  Freeze
++            ! all higher-l basis functions to remove the uncovered leg.
++            ! This is a restricted response, not an all-l correction.
++            if (basis_low_l_only.and.L.gt.LNSMAX) &
++                 basis_vr_solve(:)=VR(:,JATOM)
+             EI = E(J,JATOM)/2.D0
+ !
+ !        calculate energy-derivative by finite difference
+ !        DELE is the up and downward energy-shift in Hartrees
+ !
+             E1 = EI - DELE
+-            CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
++            CALL OUTWINB(REL,basis_vr_solve,RNeT,DX,JRI,E1,FL,UVB,DUVB, &
+                  NODEL,ZZ(JATOM))
+             CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+             TRX = 1.0D+0/SQRT(OVLP)
+@@ -399,7 +540,7 @@
+             DUVB = TRX*DUVB
+ 
+             E1 = EI + DELE
+-            CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
++            CALL OUTWINB(REL,basis_vr_solve,RNeT,DX,JRI,E1,FL,UVE,DUVE, &
+                  NODEU,ZZ(JATOM))
+             CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+             TRX = 1.0D+0/SQRT(OVLP)
+@@ -412,7 +553,7 @@
+ !     
+ !     calculate function at EI
+ !
+-            CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
++            CALL OUTWINB(REL,basis_vr_solve,RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
+                  ,ZZ(JATOM))
+             CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+             TRX = 1.0D+0/SQRT(OVLP)
+@@ -438,6 +579,20 @@
+             PE(J,JATOM) = UVE + TRY*P(J,JATOM)
+             DPE(J,JATOM) = DUVE + TRY*DP(J,JATOM)
+             CALL RINT13(CFEIN1,CFEIN2,AE,BE,AE,BE,PEI(J,JATOM),JATOM)
++            if (basis_restore_high_l.and.L.gt.LNSMAX) then
++               ! VR is r*V in Hartree.  HAMILT is in Ry, so DeltaV is
++               ! 2*(VR-VRB)/r.  Do not multiply by sqrt(4*pi): HAMILT
++               ! already sums the normalized Y_lm products analytically.
++               ! Use the same normalized large/small components and RINT13
++               ! metric as HNS, including the scalar-relativistic factor.
++               AW(1:JRI)=A(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               BW(1:JRI)=B(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               AEW(1:JRI)=AE(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               BEW(1:JRI)=BE(1:JRI)*2.d0*(VR(1:JRI,JATOM)-VRB(1:JRI,JATOM))/RNET(1:JRI)
++               call RINT13(CFEIN1,CFEIN2,AW,BW,A,B,basis_restore_spherical(1,J,JATOM),JATOM)
++               call RINT13(CFEIN1,CFEIN2,AEW,BEW,AE,BE,basis_restore_spherical(2,J,JATOM),JATOM)
++               call RINT13(CFEIN1,CFEIN2,AW,BW,AE,BE,basis_restore_spherical(3,J,JATOM),JATOM)
++            endif
+             IF (J .LE. NSLMAX) THEN
+                A1(1:JRI,J) = A(1:JRI)
+                B1(1:JRI,J) = B(1:JRI)
+@@ -464,6 +619,15 @@
+                  NODEU
+  150     CONTINUE
+ !     
++!     The high-l path below covers plane-wave augmentation.  Existing
++!     HNS restoration includes all LOs in the tested LNSMAX>=LOMAX setup.
++!     Refuse an uncovered high-l LO rather than report an incomplete probe.
++         if (basis_vsp_enabled) then
++            do l=LNSMAX+1,LOMAX
++               if (ilo(l,JATOM).gt.0) &
++                    error stop 'alternate-basis probe needs LNSMAX to include every LO'
++            enddo
++         endif
+ !     and now for local orbitals
+ !     
+          IF(myid.eq.0) write(6,6021)
+@@ -520,7 +684,7 @@
+ !end     
+ !     calculate second derivative at EI (5 point method)
+ !begin
+-                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
++                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
+                                   ,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -532,7 +696,7 @@
+                      BPE(1:JRI) = -30.0d0*TRX*BP(1:JRI)
+ 
+                      E1 = EI - 2.0d0*DELES
+-                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
++                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
+                           NODEL,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -544,7 +708,7 @@
+                      BPE(1:JRI) = BPE(1:JRI)-TRX*BP(1:JRI)
+ 
+                      E1 = EI - DELES
+-                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
++                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
+                           NODEL,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -556,7 +720,7 @@
+                      BPE(1:JRI) = BPE(1:JRI)+16.0d0*TRX*BP(1:JRI)
+ 
+                      E1 = EI + 2.0d0*DELES
+-                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
++                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
+                           NODEU,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -568,7 +732,7 @@
+                      BPE(1:JRI) = BPE(1:JRI)-TRX*BP(1:JRI)
+ 
+                      E1 = EI + DELES
+-                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
++                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
+                           NODEU,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -596,7 +760,7 @@
+ !     
+ !     calculate function at EI
+ !     
+-                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,&
++                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,&
+                                NODES,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+ 
+@@ -697,6 +861,25 @@
+  230        CONTINUE
+             IF(myid.eq.0) THEN
+               READ (19,5050)
++            endif
++
++!           Restore the *physical* spherical Hamiltonian after generating
++!           the radial basis with VRB.  VR and VRB store r*V_00/sqrt(4*pi)
++!           in Hartree after the factor-of-two conversion above.  VLM is a
++!           physical radial potential in Rydberg; hence the conversion
++!
++!             Delta V_0(r) = 2 [VR(r)-VRB(r)] sqrt(4*pi) / r .
++!
++!           Index zero is already reserved by the MGGA central-correction
++!           implementation for exactly such a spherical matrix element.
++!           Adding it here makes H = T+VRB+(VR-VRB) while all matching
++!           functions continue to be those generated from VRB.
++            if (basis_vsp_enabled) then
++               LMMIN=0
++               LM(1,0,JATOM)=0
++               LM(2,0,JATOM)=0
++               VLM(1:JRI,0)=2.0d0*(VR(1:JRI,JATOM)- &
++                    VRB(1:JRI,JATOM))*SQRT(4.0d0*PI)/RNET(1:JRI)
+             endif
+ !
+ !        read total kinetic-energy dependent part of potential (only for mgga)
+@@ -792,9 +975,21 @@
+ !     which gaunts are not zero ?
+ !
+                      IF (MOD((L0+LP+LL),2) .EQ. 1) GOTO 280
+-                     IF ((L0+LP-LL) .LT. 0) GOTO 280
+-                     IF ((L0-LP+LL) .LT. 0) GOTO 280
+-                     IF ((LP-L0+LL) .LT. 0) GOTO 280
++
++                     ! The ordinary Hamiltonian needs only triples obeying
++                     ! the triangle rule for <Y_l0|Y_LL|Y_lp>.  The last two
++                     ! lines of stress Eq. (G2), however, insert a rank-two
++                     ! strain tensor.  They can therefore require radial
++                     ! V/W matrices for triples whose *ordinary* Gaunt is
++                     ! zero but which become allowed after coupling to
++                     ! ranks 0 or 2.  Preserve the production list exactly;
++                     ! append those auxiliary radial channels only for the
++                     ! explicit G2 diagnostic.
++                     ham_gaunt_allowed = (L0+LP-LL).GE.0 .AND. &
++                                          (L0-LP+LL).GE.0 .AND. &
++                                          (LP-L0+LL).GE.0
++                     IF (.NOT.ham_gaunt_allowed .AND. &
++                         .NOT.g2_diag_enabled) GOTO 280
+ !     
+  240                 CONTINUE
+                      DO 270 M = -L0, L0
+@@ -805,12 +1000,19 @@
+                               ngau=ngau*2
+                               call doreallocate(GFAC, NGAU, NAT)
+                               call doreallocate(LQNS,6,NGAU,NAT)
++                              call doreallocate(LQMM,NGAU,NAT)
+ !     Error: more then NGAU gaunt-factors - stop execution
+ !
+ !                              GOTO 910
+                            ENDIF
+-                           GFAC(LQIND(JATOM),JATOM) = &
+-                               atom_gaunt(L0,LLL,LP,M,MM,MP,iatnr(jatom))
++                           IF (ham_gaunt_allowed) THEN
++                              GFAC(LQIND(JATOM),JATOM) = &
++                                  atom_gaunt(L0,LLL,LP,M,MM,MP,iatnr(jatom))
++                           ELSE
++                              ! Never let an auxiliary stress channel enter
++                              ! the Hamiltonian or force contraction.
++                              GFAC(LQIND(JATOM),JATOM) = (0.d0,0.d0)
++                           ENDIF
+ !!                       GAUNT(L0,LL,LP,M,MM,MP)
+ !!                           IF (IATNR(JATOM) .GT. 0) THEN
+ !!			      IF (LL.EQ.3.OR.LL.EQ.7.OR.LL.EQ.9) THEN
+@@ -846,6 +1048,10 @@
+                            LQNS(4,LQIND(JATOM),JATOM) = LMX
+                            LQNS(5,LQIND(JATOM),JATOM) = M
+                            LQNS(6,LQIND(JATOM),JATOM) = MP
++                           ! LM(2,LMX,JATOM) contains only |M|.  The loop
++                           ! below explicitly visits the conjugate -M
++                           ! channel, whose sign must survive until FORFHS.
++                           LQMM(LQIND(JATOM),JATOM) = MM
+ !                           IF(myid.eq.0) WRITE(6,6050) L0, LL, LP, M, MM, MP,
+ !     ,                                   GFAC(LQIND(JATOM),JATOM)
+  260                    CONTINUE
+@@ -858,6 +1064,21 @@
+  280              CONTINUE
+  290           CONTINUE
+  300        CONTINUE
++              if (g2_diag_enabled.and.myid.eq.0) then
++                 g2_bad_count=0
++                 do lqx=1,lqind(jatom)
++                    if (-lqns(5,lqx,jatom)+lqmm(lqx,jatom)+ &
++                         lqns(6,lqx,jatom).ne.0) then
++                       g2_bad_count=g2_bad_count+1
++                       if (g2_bad_count.le.20) write(6,*) &
++                            ':DBG_G2_ATPAR_M:',jatom,lqx, &
++                            lqns(5,lqx,jatom),lqmm(lqx,jatom), &
++                            lqns(6,lqx,jatom)
++                    endif
++                 enddo
++                 write(6,*) ':DBG_G2_ATPAR_M_SUM:',jatom, &
++                              lqind(jatom),g2_bad_count
++              endif
+               WRITE (6,*) LQIND(JATOM),' POSSIBLE NONSPHERICAL CONTRIBUTIONS TO H'
+ !
+             IF ((IATNR(JATOM) .GT. 0) .AND. (LMMAX(JATOM) .GT. 1)) THEN
+@@ -907,6 +1128,56 @@
+                   CALL RINT13(CFEIN1,CFEIN2,A,B,AE1(1,LP+1),BE1(1,LP+1), &
+                        AAINT,JATOM)
+                   VNS3(L0+1,LM1,LP+1,JATOM) = AAINT
++
++                  ! The fifth line of stress Eq. (G2) contains
++                  !
++                  !   W_{l,L,l'} = int r^3 dr [d u_l(r)/dr] V_L(r) u_l'(r).
++                  !
++                  ! LAPW1 stores A1=r*u and AP1=r*du/dr.  RINT13 integrates
++                  ! products of these stored radial functions over dr, so the
++                  ! bra supplied to it must be r*AP1*V, not r*A1*V.  The
++                  ! leading RNET supplies the remaining power of r in the
++                  ! definition above.  This distinction is essential: W is a
++                  ! radial-derivative matrix element, not a radial moment of V.
++                  !
++                  ! The derivative is on the bra only.  Consequently W is not
++                  ! symmetric under bra/ket interchange, unlike the ordinary
++                  ! VNS matrix elements.  Store all four independent APW
++                  ! channels explicitly: u'-u, udot'-udot, u'-udot, and
++                  ! udot'-u.
++                  AW(1:JRI)  = RNET(1:JRI)*AP1(1:JRI,L0+1)*VLM(1:JRI,LM1)
++                  BW(1:JRI)  = RNET(1:JRI)*BP1(1:JRI,L0+1)*VLM(1:JRI,LM1)
++                  AEW(1:JRI) = RNET(1:JRI)*APE1(1:JRI,L0+1)*VLM(1:JRI,LM1)
++                  BEW(1:JRI) = RNET(1:JRI)*BPE1(1:JRI,L0+1)*VLM(1:JRI,LM1)
++                  CALL RINT13(CFEIN1,CFEIN2,AW,BW,A1(1,LP+1),B1(1,LP+1), &
++                       AAINT,JATOM)
++                  WNS1(L0+1,LM1,LP+1,JATOM) = AAINT
++                  CALL RINT13(CFEIN1,CFEIN2,AEW,BEW,AE1(1,LP+1), &
++                       BE1(1,LP+1),AAINT,JATOM)
++                  WNS2(L0+1,LM1,LP+1,JATOM) = AAINT
++                  CALL RINT13(CFEIN1,CFEIN2,AW,BW,AE1(1,LP+1),BE1(1,LP+1), &
++                       AAINT,JATOM)
++                  WNS3(L0+1,LM1,LP+1,JATOM) = AAINT
++                  CALL RINT13(CFEIN1,CFEIN2,AEW,BEW,A1(1,LP+1),B1(1,LP+1), &
++                       AAINT,JATOM)
++                  WNS4(L0+1,LM1,LP+1,JATOM) = AAINT
++
++                  ! These are the independent APW-bra/LO-ket W channels.
++                  ! They cannot be reconstructed by transposing the LO-bra
++                  ! integrals below because the radial derivative remains on
++                  ! the APW bra.
++                  IF (LP .LE. LOMAX) THEN
++                     do klo=1,ilo(lp,jatom)
++                        if (.not.lapw(lp,jatom).and.klo.eq.1) cycle
++                        if (.NOT. loor(lp,jatom)) cycle
++                        CALL RINT13(CFEIN1,CFEIN2,AW,BW, &
++                             A1LO(1,klo,LP),B1LO(1,klo,LP),AAINT,JATOM)
++                        WNS4LO(L0+1,LM1,LP+1,klo,JATOM) = AAINT
++                        CALL RINT13(CFEIN1,CFEIN2,AEW,BEW, &
++                             A1LO(1,klo,LP),B1LO(1,klo,LP),AAINT,JATOM)
++                        WNS5LO(L0+1,LM1,LP+1,klo,JATOM) = AAINT
++                     enddo
++                  ENDIF
+ !
+ !     integrals needed for local orbitals
+ !
+@@ -917,6 +1188,9 @@
+                         VNS1LO(L0+1,LM1,LP+1,jlo,JATOM) = 0.0D0
+                         VNS2LO(L0+1,LM1,LP+1,jlo,JATOM) = 0.0D0
+                         VNS3LO(L0+1,LM1,LP+1,jlo,:,JATOM) = 0.0d0
++                        WNS1LO(L0+1,LM1,LP+1,jlo,JATOM) = 0.0D0
++                        WNS2LO(L0+1,LM1,LP+1,jlo,JATOM) = 0.0D0
++                        WNS3LO(L0+1,LM1,LP+1,jlo,:,JATOM) = 0.0d0
+ 
+                         if (.not.lapw(l0,jatom).and.jlo.eq.1) cycle
+                         if( .NOT. loor(l0,jatom)) cycle
+@@ -928,11 +1202,21 @@
+                         VNS1LO(L0+1,LM1,LP+1,jlo,JATOM) = AAINT
+                         CALL RINT13(CFEIN1,CFEIN2,A,B,AE1(1,LP+1),BE1(1,LP+1),AAINT,JATOM)
+                         VNS2LO(L0+1,LM1,LP+1,jlo,JATOM) = AAINT
++                        ! The LO is now the bra, hence AP1LO (r*u'_LO) is the
++                        ! differentiated radial function required by W.
++                        AW(1:JRI) = RNET(1:JRI)*AP1LO(1:JRI,jlo,L0)*VLM(1:JRI,LM1)
++                        BW(1:JRI) = RNET(1:JRI)*BP1LO(1:JRI,jlo,L0)*VLM(1:JRI,LM1)
++                        CALL RINT13(CFEIN1,CFEIN2,AW,BW,A1(1,LP+1),B1(1,LP+1),AAINT,JATOM)
++                        WNS1LO(L0+1,LM1,LP+1,jlo,JATOM) = AAINT
++                        CALL RINT13(CFEIN1,CFEIN2,AW,BW,AE1(1,LP+1),BE1(1,LP+1),AAINT,JATOM)
++                        WNS2LO(L0+1,LM1,LP+1,jlo,JATOM) = AAINT
+                         IF (LP .LE. LOMAX) THEN
+                            do klo=1,ilo(lp,jatom)
+                            if (.not.lapw(lp,jatom).and.klo.eq.1) cycle
+                               CALL RINT13(CFEIN1,CFEIN2,A,B,A1LO(1,klo,LP),B1LO(1,klo,LP),AAINT,JATOM)
+                               VNS3LO(L0+1,LM1,LP+1,jlo,klo,JATOM) = AAINT
++                              CALL RINT13(CFEIN1,CFEIN2,AW,BW,A1LO(1,klo,LP),B1LO(1,klo,LP),AAINT,JATOM)
++                              WNS3LO(L0+1,LM1,LP+1,jlo,klo,JATOM) = AAINT
+                            enddo
+                         M = LQNS(5,LQX,JATOM)
+                         MP = LQNS(6,LQX,JATOM)
+@@ -969,7 +1253,9 @@
+ !               final line of [yu91]-output
+ !               final line for each atom = 6 x 0 and 8 x 0.0d0
+                 IF(myid.eq.0) write(71) &
+-                      (0, i=1,6),(0.d0,i=1,8)
++                      ! Four matrix blocks: original V, original W,
++                      ! phase-weighted bare V, and phase-weighted bare W.
++                      (0, i=1,6),(0.d0,i=1,32)
+             endif
+ !fe
+ 
+@@ -1037,6 +1323,7 @@
+                                 call doreallocate(GFAC, NGAU, NAT)
+                                 call doreallocate(MGGA_FAC, 4, NGAU, NAT)
+                                 call doreallocate(LQNS,6,NGAU,NAT)
++                                call doreallocate(LQMM,NGAU,NAT)
+                              ENDIF
+                              
+                              LQNS(1,LQIND(JATOM),JATOM) = L0 + 1
+@@ -1045,6 +1332,7 @@
+                              LQNS(4,LQIND(JATOM),JATOM) = LMX
+                              LQNS(5,LQIND(JATOM),JATOM) = M
+                              LQNS(6,LQIND(JATOM),JATOM) = MP
++                             LQMM(LQIND(JATOM),JATOM) = MM
+ !                              Calculate Gaunt and mgga_fac for this combination
+                               call calculate_mgga_fac(logic_mgga_gaunt,&
+                                    IATNR(JATOM),                       &

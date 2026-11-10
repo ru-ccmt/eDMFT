@@ -417,7 +417,7 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
   USE structure, ONLY: rotij, tauij, BR1, POS, RMT, VOL, rotloc !, mult
   USE p_project, ONLY: phi_jl, dphi_jl, al_ucase, dri, rix_mat, &
        drix_mat!, rix, max_lcase
-  USE mod_lo, ONLY: lomain,lomain_strain
+  USE mod_lo, ONLY: lomain,lomain_strain,ProjectorGlobalAxes
   !USE w_atpar, ONLY: ri_mat
   USE Forces, ONLY: forcea!, Qforce
   USE dmft_stress, ONLY: projector_strain
@@ -435,6 +435,7 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
        i, nind, icix, num1, nm1, m1, iorb1, nind1, nind2, iorb2, &
        i_h_k, iq, ia, ib, igamma, iv, it, nchan, strain0
   REAL*8    :: BKROT2(3), BKROT3(3), BKRLOC(3), sm1, sm2, akg
+  REAL*8    :: strain_axes(3,3),strain_k(3)
   REAL*8    :: ARG1, ARG2, ARGT2, rmt2, h_al(iblock), h_bl(iblock), &
        dff, TWOPI, jprime, jsecond, dal, dbl, radial, dq
   COMPLEX*16:: FAC, PHSHEL, CFAC, cc, dd(3), sm2c, dy
@@ -532,6 +533,8 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
      rotloc_x_BR1 = matmul(rotloc(:,:,jatom), BR1)
      rotloc_x_BR1_x_rotij = matmul( rotloc_x_BR1, rotij(:,:,latom) )
      crotloc_x_BR1 = matmul(crotloc(:,:,icase), BR1)
+     if (CalcStrain) call ProjectorGlobalAxes(strain_axes, &
+          crotloc(:,:,icase),BR1,rotij(:,:,latom))
      nonzero_shft = sum(abs(shft(latom,:))) .GT. 1e-10
      DO is=1,iso  !--- over both spins
         alm(:,:) = 0.0         !------  ALM(m,band,nrf,is) will hold product of eigenvectors and a/b expansion coefficients --!
@@ -559,7 +562,7 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
            h_yl=0
            if (CalcStrain) dh_yl=0
 
-           !$OMP PARALLEL DO PRIVATE(bkrot2,bkrot3,bkrloc,akg,yl,arg1,arg2,argt2,phshel,lcase,l,m,index,index1,ca_st_lm,dy,iq,ia,ib,igamma,iv,it)&
+           !$OMP PARALLEL DO PRIVATE(bkrot2,bkrot3,bkrloc,strain_k,akg,yl,arg1,arg2,argt2,phshel,lcase,l,m,index,index1,ca_st_lm,dy,iq,ia,ib,igamma,iv,it)&
            !$OMP& SHARED(h_yl,h_k,dh_yl)&
            !$OMP& SCHEDULE(STATIC)
            do i=ii,min(ii+iblock-1,n0-nnlo)  
@@ -568,6 +571,7 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
               ! BKROT2 = R_n.R_a.(k+K), transformation from the first atom to an equivalent atom 
               BKROT2 = matmul(rotij(:,:,latom), bk3(:,I))  ! apply one of the symmetry operations to BKROT=R.(k+K)
               BKROT3 = matmul(BR1,BKROT2)
+              strain_k=matmul(BR1,bk3(:,i))
               akg=sqrt(dot_product(BKROT3,BKROT3))
               ! !!---- BR1 transforms integer reciprocal lattice vectors, as given in the VECTORLIST of LAPW1, into cartesian system ----!
               ! !! BKROT3 = R_n.R_a.(k+K), but in cartesian coordinate system
@@ -613,23 +617,18 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
                                       if (m-l-1+it.lt.-(l+iv) .or. &
                                            m-l-1+it.gt.(l+iv)) cycle
                                       index1=(l+iv)*(l+iv+1)+(m-l-1+it)+1
-                                      ! Fixed Cartesian correlated axes.  Under
-                                      ! a symmetric homogeneous strain,
-                                      ! dK=-eps*K and q=C*K, hence
-                                      ! dq_gamma=-1/2(C_gamma,a K_b+
-                                      ! C_gamma,b K_a).  c_factor supplies the
-                                      ! angular part |K| grad_K Y_lm.  The
-                                      ! division by |K| is essential because a
-                                      ! spherical harmonic depends on K-hat,
-                                      ! not on the magnitude of K.  This is the
-                                      ! same 1/sqrt(KPLUSG) factor used by the
-                                      ! WIEN2k stress kernels.
+                                      ! The projector tensor is GLOBAL; unlike the
+                                      ! DFT G2 block it is not rotated after its
+                                      ! orbital contraction. With L=C R_cart,
+                                      ! q=L K and dq=-L epsilon K. Use global K
+                                      ! and the complete axes L consistently.
+                                      ! c_factor is |K| grad_q Y, hence /akg.
                                       dy=dy-0.5d0* &
                                            conjg(ca_st_lm(igamma,iv,it))* &
-                                           (crotloc(igamma,ia,icase)* &
-                                            BKROT3(ib)+ &
-                                            crotloc(igamma,ib,icase)* &
-                                            BKROT3(ia))* &
+                                           (strain_axes(igamma,ia)* &
+                                            strain_k(ib)+ &
+                                            strain_axes(igamma,ib)* &
+                                            strain_k(ia))* &
                                            conjg(yl(index1))*phshel/akg
                                    enddo
                                 enddo
@@ -681,7 +680,8 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
                     i3=i-ii+1
                     BKROT2=matmul(rotij(:,:,latom),bk3(:,i))
                     BKROT3=matmul(BR1,BKROT2)
-                    akg=sqrt(dot_product(BKROT3,BKROT3))
+                    strain_k=matmul(BR1,bk3(:,i))
+                    akg=sqrt(dot_product(strain_k,strain_k))
                     if (akg.gt.1.d-14) then
                        jprime=dfj(l,i,jatom)/akg
                        jsecond=((dble(l*(l+1))/(akg*rmt(jatom))**2)-1.d0)* &
@@ -706,7 +706,7 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
                        ia=strain_a(iq); ib=strain_b(iq)
                        radial=0.d0
                        if (akg.gt.1.d-14) &
-                            radial=BKROT3(ia)*BKROT3(ib)/akg
+                            radial=strain_k(ia)*strain_k(ib)/akg
                        do m=1,2*l+1
                           index=l*l+m
                           dh_alyl(m,i3,iq)=dh_yl(index,i3,iq)*h_al(i3)+ &
@@ -727,12 +727,13 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
                     if (CalcStrain) then
                        BKROT2=matmul(rotij(:,:,latom),bk3(:,i))
                        BKROT3=matmul(BR1,BKROT2)
-                       akg=sqrt(dot_product(BKROT3,BKROT3))
+                       strain_k=matmul(BR1,bk3(:,i))
+                       akg=sqrt(dot_product(strain_k,strain_k))
                        do iq=1,6
                           ia=strain_a(iq); ib=strain_b(iq)
                           radial=0.d0
-                          if (akg.gt.1.d-14) radial=-BKROT3(ia)* &
-                               BKROT3(ib)/akg*dphi_jl(i,iind)
+                          if (akg.gt.1.d-14) radial=-strain_k(ia)* &
+                               strain_k(ib)/akg*dphi_jl(i,iind)
                           do m=1,2*l+1
                              index=l*l+m
                              sh_interstitial(m,i-ii+1,iq)= &
@@ -854,7 +855,7 @@ SUBROUTINE Build_DMFT_Projector(DMFTU, cfX, Rspin, iorbital, &
                 latom,n0,jatom,alm,blm,clm,Qforce_j,aalm,bblm,cclm,lmaxp)
            if (CalcStrain) call lomain_strain(crotloc(:,:,icase),is, &
                 DM_nemin,DM_nemax,lfirst,latom,jatom,salm,sblm,sclm, &
-                lmaxp)
+                lmaxp,global_strain=.true.)
         endif
 
         !-------------- Multiplying with a constant all coefficients ------!
@@ -1143,11 +1144,12 @@ END SUBROUTINE Build_DMFT_Projector
 SUBROUTINE CheckProjectorStrainFiniteDifference(P0,dP,cfX,Rspin, &
      iorbital,norbitals,n0,nnlo,nbands,cix_orb,nindo,nemin,nemax, &
      maxdim2,lmaxp)
-  USE dmfts,ONLY: iso,projector,natom
+  USE dmfts,ONLY: iso,projector,natom,crotloc,iatom
   USE param,ONLY: nmat,lmax2
   USE com,ONLY: nat
   USE com_mpi,ONLY: myrank
-  USE structure,ONLY: BR1,VOL,RMT
+  USE structure,ONLY: BR1,VOL,RMT,rotij
+  USE mod_lo,ONLY: ProjectorGlobalAxes
   USE xa,ONLY: fj,dfj
   USE xa3,ONLY: bk3,aK
   USE p_project,ONLY: phi_jl,P_rfi,rix,kNri,n_al_ucase,dri, &
@@ -1168,6 +1170,8 @@ SUBROUTINE CheckProjectorStrainFiniteDifference(P0,dP,cfX,Rspin, &
   INTEGER :: iq,i,isize,jatom,Nri,iind,l,ir,fh
   REAL*8 :: BR10(3,3),VOL0,Kn(3),rx,nA,nFD,nerr,scale,ncurve
   REAL*8,allocatable :: aKR(:),jlr(:),jlp(:)
+  REAL*8 :: axes0(3,3,natom),crotloc0(3,3,natom)
+  INTEGER :: icase
   COMPLEX*16,allocatable :: Pplus(:,:,:,:),Pminus(:,:,:,:),fdP(:,:,:)
 
   INQUIRE(file='projector_strain_fd.in',exist=enabled)
@@ -1176,6 +1180,11 @@ SUBROUTINE CheckProjectorStrainFiniteDifference(P0,dP,cfX,Rspin, &
   isize=n0-nnlo
   BR10=BR1
   VOL0=VOL
+  crotloc0=crotloc
+  do icase=1,natom
+     call ProjectorGlobalAxes(axes0(:,:,icase),crotloc(:,:,icase), &
+          BR10,rotij(:,:,iatom(icase)))
+  enddo
   allocate(Pplus(nbands,maxdim2,norbitals,1), &
        Pminus(nbands,maxdim2,norbitals,1), &
        fdP(nbands,maxdim2,norbitals))
@@ -1184,7 +1193,7 @@ SUBROUTINE CheckProjectorStrainFiniteDifference(P0,dP,cfX,Rspin, &
 
   fh=998
   open(fh,file='projector_strain_fd.dat',status='replace',action='write')
-  write(fh,'(A)') '# Explicit raw-projector strain finite difference'
+  write(fh,'(A)') '# Explicit raw-projector strain finite difference; fixed physical Cartesian axes'
   write(fh,'(A,ES24.15)') '# h = ',h
   write(fh,'(A)') &
        '# q  ||analytic||  ||finite-difference||  ||difference||  relative  curvature'
@@ -1224,7 +1233,8 @@ CONTAINS
   SUBROUTINE SetGeometry(delta,iq_local)
     REAL*8,intent(in) :: delta
     INTEGER,intent(in) :: iq_local
-    INTEGER :: ia,ib
+    INTEGER :: ia,ib,ic
+    REAL*8 :: brinv(3,3),rcart(3,3),rinv(3,3)
     REAL*8 :: Romb
 
     ia=strain_a(iq_local)
@@ -1239,6 +1249,24 @@ CONTAINS
        BR1(ib,:)=BR10(ib,:)-0.5d0*delta*BR10(ia,:)
        VOL=VOL0
     endif
+    ! A fixed fractional ROTIJ is not a Cartesian isometry at a geometry
+    ! that breaks the reference symmetry. Keeping CROTLOC numerically fixed
+    ! there would change the physical local axes CROTLOC*B*ROTIJ*B^{-1}.
+    ! Hold those axes fixed instead, by updating only this internal map.
+    ! Phases keep their original fractional atom mapping; co-moving atom
+    ! positions and fractional k make them invariant. This is a basis
+    ! derivative oracle, not an assertion of symmetry at the strained cell.
+    if (delta.eq.0.d0) then
+       crotloc=crotloc0
+    else
+       call inv_3x3(BR1,brinv)
+       do ic=1,natom
+          rcart=matmul(BR1,matmul(rotij(:,:,iatom(ic)),brinv))
+          call inv_3x3(rcart,rinv)
+          crotloc(:,:,ic)=matmul(axes0(:,:,ic),rinv)
+       enddo
+    endif
+
 
     do i=1,isize
        Kn=matmul(BR1,bk3(:,i))
@@ -2294,11 +2322,11 @@ END SUBROUTINE AddProjectorStressNormalization
 ! ---------------------------------------------
 ! Combining (4) and (6), define for a outside W and n inside W
 !
-!       rhoResponse_{a n} = K_{a n}/(eps_n-eps_a),
-!       rhoResponse_{n a} = rhoResponse_{a n}^*,                     (7)
+!       rhoResponse_{n a} = K_{a n}/(eps_n-eps_a),
+!       rhoResponse_{a n} = rhoResponse_{n a}^*,                     (7)
 !
-!       eResponse_{a n}   = eps_n rhoResponse_{a n},
-!       eResponse_{n a}   = eResponse_{a n}^*.                       (8)
+!       eResponse_{n a}   = eps_n rhoResponse_{n a},
+!       eResponse_{a n}   = eResponse_{n a}^*.                       (8)
 !
 ! The omitted contribution to the stationary-functional derivative is then
 !
@@ -2328,7 +2356,7 @@ END SUBROUTINE AddProjectorStressNormalization
 SUBROUTINE BuildWindowResponseMatrices(rhoResponse,eResponse, &
      projectorGradient,DMFTUfull,Aweight,AEweight,E,nemin,nemax, &
      DM_nemin,DM_nemax,nbands_full,nbands,maxdim2,norbitals,maxdim, &
-     ncix,cix_orb,cixdim,nindo,iSx,Sigind)
+     ncix,cix_orb,cixdim,nindo,iSx,Sigind,gradientDirect,useDirectC)
   USE com_mpi, ONLY: Qprint
   IMPLICIT NONE
   INTEGER, intent(in) :: nemin, nemax, DM_nemin, DM_nemax
@@ -2341,13 +2369,19 @@ SUBROUTINE BuildWindowResponseMatrices(rhoResponse,eResponse, &
   COMPLEX*16, intent(out) :: rhoResponse(nbands_full,nbands_full)
   COMPLEX*16, intent(out) :: eResponse(nbands_full,nbands_full)
   COMPLEX*16, intent(out) :: projectorGradient(nbands,maxdim2,norbitals)
-  INTEGER :: icix, ip, iq, iorb, ind, ia, iw, in, iw0, iw1
+  ! Direct C retains components in ker(U) which cannot be reconstructed
+  ! from B=U*C.  The pseudoinverse below is retained as a diagnostic/fallback
+  ! for full-rank test callers, not as a definition of the gradient.
+  LOGICAL,intent(in) :: useDirectC
+  COMPLEX*16,intent(in) :: gradientDirect(nbands,maxdim2,norbitals)
+  INTEGER :: icix, ip, iq, iorb, ind, ia, iw, in, iw0, iw1, ja
   INTEGER :: nactive, icolumn, info, lwork, lrwork, liwork, nsmall, ndegenerate
   INTEGER, allocatable :: activeColumn(:,:), iwork(:)
   REAL*8 :: eigmax, cutoff, denominator, epsn, responseNorm
   REAL*8 :: sourceNorm, reconstructionResidual, smallestKept
   REAL*8, allocatable :: seig(:), rwork(:)
   LOGICAL :: projectorDiagnostic
+  LOGICAL :: includeWithinWindow
   CHARACTER(LEN=64) :: diagnosticEnvironment
   INTEGER :: diagnosticStatus
   COMPLEX*16 :: response
@@ -2363,6 +2397,12 @@ SUBROUTINE BuildWindowResponseMatrices(rhoResponse,eResponse, &
   CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_PROJECTOR_DIAG', &
        diagnosticEnvironment,STATUS=diagnosticStatus)
   projectorDiagnostic=diagnosticStatus.eq.0 .and. &
+       len_trim(diagnosticEnvironment).gt.0 .and. &
+       trim(diagnosticEnvironment).ne.'0'
+  diagnosticEnvironment=''
+  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_MOVING_BAND', &
+       diagnosticEnvironment,STATUS=diagnosticStatus)
+  includeWithinWindow=diagnosticStatus.eq.0 .and. &
        len_trim(diagnosticEnvironment).gt.0 .and. &
        trim(diagnosticEnvironment).ne.'0'
   iw0=DM_nemin-nemin+1
@@ -2460,11 +2500,42 @@ SUBROUTINE BuildWindowResponseMatrices(rhoResponse,eResponse, &
           sourceNorm,reconstructionResidual,eigmax,smallestKept,nsmall
      deallocate(reconstructedB)
   endif
+  if (useDirectC) then
+     if (projectorDiagnostic .and. Qprint) then
+        sourceNorm=0.d0
+        reconstructionResidual=0.d0
+        do iorb=1,norbitals
+           icix=cix_orb(iorb)
+           if (icix.le.0) cycle
+           do ind=1,nindo(iorb)
+              icolumn=activeColumn(iSx(ind,iorb),icix)
+              if (icolumn.le.0) cycle
+              sourceNorm=sourceNorm+sum(abs(gradientDirect(:,ind,iorb))**2)
+              reconstructionResidual=reconstructionResidual+sum(abs( &
+                   gradientDirect(:,ind,iorb)-localPart(icolumn,:))**2)
+           enddo
+        enddo
+        WRITE(6,'(A,2ES22.12,I6)') ':DMFT_C_DIRECT_VS_PINV: ', &
+             sqrt(sourceNorm),sqrt(reconstructionResidual/max(sourceNorm,tiny(1.d0))),nsmall
+     endif
+     do iorb=1,norbitals
+        icix=cix_orb(iorb)
+        if (icix.le.0) cycle
+        do ind=1,nindo(iorb)
+           icolumn=activeColumn(iSx(ind,iorb),icix)
+           if (icolumn.gt.0) localPart(icolumn,:)=gradientDirect(:,ind,iorb)
+        enddo
+     enddo
+  else if (nsmall.gt.0) then
+     WRITE(6,*) 'ERROR: rank-deficient projector requires the direct functional gradient C.'
+     STOP 'A pseudoinverse cannot recover the null-space part of C'
+  endif
+
   ! localPart(m,n)=sum_omega [Sigma U^+ G]_{m n}, including the
   ! irreducible-k weight.  It is the one-particle gradient conjugate to the
   ! explicit projector derivative: dGamma_proj=2 Re sum_mn C_mn dU_nm.
-  ! This is an energy derivative.  WIEN2k's analytic stress uses the
-  ! +dGamma/d(strain)/Omega convention, so l2main.f90 adds this contraction.
+  ! This is an energy derivative. l2main converts it to raw STR_VAL
+  ! with a minus sign; mixer reports +dGamma/d(strain)/Omega.
   ! (The corresponding atomic force has the opposite sign.)
   do iorb=1,norbitals
      icix=cix_orb(iorb)
@@ -2491,12 +2562,52 @@ SUBROUTINE BuildWindowResponseMatrices(rhoResponse,eResponse, &
            cycle
         endif
         response=Kfull(ia,iw)/denominator
+        ! U_nl=<psi_n|phi_l>; if |psi_n>'=sum_a |psi_a> R_an,
+        ! then U'_nl=sum_a conjg(R_an)*U_al.  Thus K_an multiplies
+        ! conjg(H'_an-e_n O'_an), and belongs in the (a,n) block.
+        ! Reversing these two entries violates arbitrary KS-phase invariance.
         rhoResponse(ia,in)=response
         rhoResponse(in,ia)=conjg(response)
         eResponse(ia,in)=epsn*response
         eResponse(in,ia)=conjg(eResponse(ia,in))
      enddo
   enddo
+
+  if (includeWithinWindow) then
+     ! Complete the band connection inside the fixed-index window without
+     ! dividing two individually large terms by a small band splitting.
+     ! Since B=rhoE-epsilon*rho and rhoE is Hermitian, every pair obeys
+     !
+     !   B_an-B_na^*=(epsilon_n-epsilon_a) rho_an,
+     !
+     ! while the energy-weighted ordered-pair sum is exactly rhoE_an.  The
+     ! former implementation reconstructed these identities from two
+     ! Kfull/denominator terms.  That is algebraically correct away from a
+     ! degeneracy but catastrophically ill conditioned in FeSe: each term
+     ! reached hundreds of GPa before cancellation.  Aweight and AEweight
+     ! are the same already frequency-summed Hermitian matrices, so insert
+     ! their off-diagonal blocks directly.  This is gauge covariant inside a
+     ! degenerate block and makes the MOVING_BAND representation an exact
+     ! diagnostic identity rather than a near-degenerate perturbation solve.
+     do iw=1,nbands
+        in=iw0+iw-1
+        do ja=1,nbands
+           if (ja.eq.iw) cycle
+           ia=iw0+ja-1
+           rhoResponse(ia,in)=rhoResponse(ia,in)+Aweight(ja,iw)
+           eResponse(ia,in)=eResponse(ia,in)+AEweight(ja,iw)
+        enddo
+        ! Generalized parallel transport has
+        ! A_n^+ O A_{n,q}=-O_{q,nn}/2, so the direct Klein derivative is
+        ! -Re(K_nn) O_{q,nn}.  CMP_DMFT_STRESS, however, accumulates WIEN's
+        ! intermediate STR_VAL, whose sign is the negative of that direct
+        ! derivative because mixer finally forms -STR_VAL.  Insert
+        ! +Herm(K_nn), not -Herm(K_nn), in the energy-response matrix.
+        ! K_nn should be real at stationarity; taking its real part prevents
+        ! insignificant Matsubara roundoff from entering a real stress.
+        eResponse(in,in)=eResponse(in,in)+dble(Kfull(in,iw))
+     enddo
+  endif
 
   responseNorm=sqrt(sum(abs(rhoResponse)**2))
   if (Qprint .and. (nsmall.gt.0 .or. ndegenerate.gt.0)) then
@@ -2507,6 +2618,138 @@ SUBROUTINE BuildWindowResponseMatrices(rhoResponse,eResponse, &
   deallocate(activeColumn,Uall,Uwindow,Svec,Sinv,seig,work,rwork,iwork)
   deallocate(B,localPart,Kfull)
 END SUBROUTINE BuildWindowResponseMatrices
+
+
+! Write the complete fixed-window response matrices before any pseudo-band
+! diagonalization.  This diagnostic is gated by
+! EDMFT_STRESS_RESPONSE_DUMP=PREFIX; ordinary calculations return before
+! opening a file.  The compact stream format is
+!
+!   magic[8]='EDMFTRS1', int32 endian marker, int32[7] header,
+!   complex128 rho(n,n), complex128 rhoE(n,n),
+!
+! with Fortran column-major storage.  A direct comparison with the matrices
+! reconstructed by check_projector_sternheimer_fd.py distinguishes a response
+! assembly error from an error in the subsequent analytic LAPW kernel.
+SUBROUTINE WriteStressResponseMatrixDump(ikp,nemin,nemax,DM_nemin, &
+     DM_nemax,rhoResponse,eResponse,nstored)
+  USE, INTRINSIC :: ISO_FORTRAN_ENV, ONLY: INT32, REAL64
+  IMPLICIT NONE
+  INTEGER,intent(in) :: ikp,nemin,nemax,DM_nemin,DM_nemax,nstored
+  COMPLEX*16,intent(in) :: rhoResponse(nstored,nstored), &
+       eResponse(nstored,nstored)
+  CHARACTER(len=1024) :: env,prefix,filename
+  CHARACTER(len=8),parameter :: magic='EDMFTRS1'
+  INTEGER :: status,length,unit,ios
+  INTEGER(INT32) :: marker,header(7)
+  COMPLEX(REAL64),allocatable :: rho64(:,:),e64(:,:)
+
+  env=''; prefix=''
+  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_RESPONSE_DUMP',env, &
+       LENGTH=length,STATUS=status)
+  if (status.ne.0 .or. length.le.0) return
+  env=adjustl(env)
+  select case(trim(env))
+  case('0','OFF','off','FALSE','false','NO','no')
+     return
+  case('1','ON','on','TRUE','true','YES','yes')
+     prefix='stress_response'
+  case default
+     prefix=trim(env)
+  end select
+
+  marker=INT(Z'01020304',INT32)
+  header=(/INT(1,INT32),INT(ikp,INT32),INT(nstored,INT32), &
+       INT(nemin,INT32),INT(nemax,INT32),INT(DM_nemin,INT32), &
+       INT(DM_nemax,INT32)/)
+  WRITE(filename,'(A,".k",I8.8,".bin")') trim(prefix),ikp
+  OPEN(NEWUNIT=unit,FILE=trim(filename),ACCESS='STREAM', &
+       FORM='UNFORMATTED',STATUS='REPLACE',ACTION='WRITE',IOSTAT=ios)
+  if (ios.ne.0) STOP 'cannot open stress response dump'
+  allocate(rho64(nstored,nstored),e64(nstored,nstored))
+  rho64=CMPLX(DBLE(rhoResponse),AIMAG(rhoResponse),KIND=REAL64)
+  e64=CMPLX(DBLE(eResponse),AIMAG(eResponse),KIND=REAL64)
+  WRITE(unit,IOSTAT=ios) magic,marker,header,rho64,e64
+  CLOSE(unit)
+  deallocate(rho64,e64)
+  if (ios.ne.0) STOP 'cannot write stress response dump'
+END SUBROUTINE WriteStressResponseMatrixDump
+
+
+! Compare two independent constructions of the rectangular one-particle
+! gradient C which is conjugate to the normalized DMFT projector:
+!
+!   C_direct = T sum_n Sigma_local(iw_n) U^+ G(iw_n),
+!   C_MP     = (U^+ U)^+ U^+ [rhoE-epsilon*rho].
+!
+! The first is accumulated in cmp_dmft_weights2 before any pseudoinverse;
+! the second is the existing production result.  This routine is controlled
+! by EDMFT_STRESS_C_DIAG and never replaces C_MP or changes the stress.  It
+! reports both U*C residuals and the six raw changes which would result from
+! using C_direct in the explicit-projector contraction.
+SUBROUTINE CompareDirectProjectorGradientDiagnostic(Cmp,Cdirect,U,dU, &
+     Aweight,AEweight,E,DM_nemin,nbands,maxdim2,norbitals,nindo,ikp)
+  IMPLICIT NONE
+  INTEGER,intent(in) :: DM_nemin,nbands,maxdim2,norbitals,ikp
+  INTEGER,intent(in) :: nindo(norbitals)
+  REAL*8,intent(in) :: E(*)
+  COMPLEX*16,intent(in) :: Cmp(nbands,maxdim2,norbitals), &
+       Cdirect(nbands,maxdim2,norbitals), &
+       U(nbands,maxdim2,norbitals), &
+       dU(nbands,maxdim2,norbitals,6), &
+       Aweight(nbands,nbands),AEweight(nbands,nbands)
+  CHARACTER(len=64) :: environment
+  INTEGER :: status,i,j,iorb,ind,iq
+  REAL*8 :: normDirect,normMP,normDifference,normB,residualDirect, &
+       residualMP,scaleC,scaleB,stressDelta(6)
+  COMPLEX*16,allocatable :: Btarget(:,:),Bdirect(:,:),Bmp(:,:)
+
+  environment=''
+  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_C_DIAG',environment, &
+       STATUS=status)
+  if (status.ne.0 .or. len_trim(environment).eq.0 .or. &
+       trim(environment).eq.'0') return
+
+  allocate(Btarget(nbands,nbands),Bdirect(nbands,nbands), &
+       Bmp(nbands,nbands))
+  Btarget=AEweight
+  do i=1,nbands
+     Btarget(i,:)=Btarget(i,:)-E(DM_nemin+i-1)*Aweight(i,:)
+  enddo
+  Bdirect=0.d0
+  Bmp=0.d0
+  do iorb=1,norbitals
+     do ind=1,nindo(iorb)
+        do j=1,nbands
+           do i=1,nbands
+              Bdirect(i,j)=Bdirect(i,j)+ &
+                   U(i,ind,iorb)*Cdirect(j,ind,iorb)
+              Bmp(i,j)=Bmp(i,j)+U(i,ind,iorb)*Cmp(j,ind,iorb)
+           enddo
+        enddo
+     enddo
+  enddo
+
+  normDirect=sqrt(sum(abs(Cdirect)**2))
+  normMP=sqrt(sum(abs(Cmp)**2))
+  normDifference=sqrt(sum(abs(Cdirect-Cmp)**2))
+  scaleC=max(normDirect,normMP,tiny(1.d0))
+  normB=sqrt(sum(abs(Btarget)**2))
+  scaleB=max(normB,tiny(1.d0))
+  residualDirect=sqrt(sum(abs(Btarget-Bdirect)**2))/scaleB
+  residualMP=sqrt(sum(abs(Btarget-Bmp)**2))/scaleB
+  do iq=1,6
+     stressDelta(iq)=2.d0*dble(sum((Cdirect-Cmp)*dU(:,:,:,iq)))
+  enddo
+
+  WRITE(6,'(A,I6,6(1X,ES18.9))') ':DMFT_C_DIRECT:',ikp, &
+       normDirect,normMP,normDifference/scaleC,normB, &
+       residualDirect,residualMP
+  WRITE(6,'(A,I6,6(1X,ES18.9))') ':DMFT_C_STRESS_DELTA:',ikp, &
+       stressDelta
+
+  deallocate(Btarget,Bdirect,Bmp)
+END SUBROUTINE CompareDirectProjectorGradientDiagnostic
 
 
 ! Save the one-particle gradient conjugate to the normalized DMFT projector.
@@ -2555,6 +2798,167 @@ SUBROUTINE WriteProjectorGradientDiagnostic(gradient,bandEnergy,ikp, &
   if (myrank.eq.master .and. ikp.eq.1) WRITE(6,'(A,1X,ES22.13)') &
        ':DMFT_PROJECTOR_GRADIENT_DUMP:',sqrt(sum(abs(gradient)**2))
 END SUBROUTINE WriteProjectorGradientDiagnostic
+
+
+! Save all information needed for a central, gauge-covariant test of the
+! moving fixed-index DMFT band window.  The corresponding Python checker
+! combines this file with finite-difference H and O matrices and evaluates
+!
+!   dU_n^outside = sum_{a outside W} U_a
+!       <a|H_,q-e_n O_,q|n>/(e_n-e_a),
+!
+! followed by 2 Re sum_n C_n dU_n.  C already includes the irreducible-k,
+! spin, and Matsubara weights.  This object is deliberately separate from
+! the production response matrices: it is an oracle for replacing their
+! fragile pseudo-band contraction only after the identity has passed in all
+! reference materials.
+!
+! Binary stream layout (native complex128, with an explicit endian marker):
+!   magic='EDMFTST1', int32 marker, int32 header(13), real64 kfrac(3),
+!   int32 labels(3,nbasis), real64 energies(nstored),
+!   complex128 coefficients(nbasis,nstored,ncomponents),
+!   complex128 normalized_projector(nstored,maxdim2,norbitals),
+!   complex128 gradient(nwindow,maxdim2,norbitals).
+SUBROUTINE WriteStressSternheimerDump(ikp,n0,nnlo,iso,nemin,nemax, &
+     DM_nemin,DM_nemax,nmat,nume,k3,k3lo,bk3,As,bandEnergy, &
+     normalizedProjector,gradient,nbandsFull,nbands,maxdim2,norbitals)
+  USE, INTRINSIC :: ISO_FORTRAN_ENV, ONLY: INT32,REAL64
+  USE com_mpi,ONLY: myrank,master,stop_MPI
+  IMPLICIT NONE
+  INTEGER,intent(in) :: ikp,n0,nnlo,iso,nemin,nemax,DM_nemin,DM_nemax
+  INTEGER,intent(in) :: nmat,nume,nbandsFull,nbands,maxdim2,norbitals
+  INTEGER,intent(in) :: k3(3,nmat),k3lo(3,nnlo)
+  REAL*8,intent(in) :: bk3(3,nmat),bandEnergy(nume)
+  COMPLEX*16,intent(in) :: As(nmat,nume,iso)
+  COMPLEX*16,intent(in) :: normalizedProjector(nbandsFull,maxdim2,norbitals)
+  COMPLEX*16,intent(in) :: gradient(nbands,maxdim2,norbitals)
+
+  CHARACTER(len=8),parameter :: magic='EDMFTST1'
+  CHARACTER(len=1024) :: environment,prefix
+  CHARACTER(len=1200) :: filename
+  INTEGER :: status,length,unit,ios,isize,nstored
+  INTEGER(INT32) :: marker,header(13)
+  INTEGER(INT32),allocatable :: labels(:,:)
+  REAL(REAL64) :: kfrac(3)
+
+  environment=''; prefix=''; length=0; status=1
+  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_STERNHEIMER_DUMP', &
+       environment,LENGTH=length,STATUS=status)
+  if (status.ne.0 .or. length.le.0) return
+  environment=adjustl(environment)
+  select case(trim(environment))
+  case('0','OFF','off','FALSE','false','NO','no')
+     return
+  case('1','ON','on','TRUE','true','YES','yes')
+     prefix='dmft_sternheimer'
+  case default
+     prefix=trim(environment)
+  end select
+
+  isize=n0-nnlo
+  nstored=nemax-nemin+1
+  if (isize.le.0 .or. nstored.ne.nbandsFull .or. &
+       nbands.ne.DM_nemax-DM_nemin+1 .or. &
+       DM_nemin.lt.nemin .or. DM_nemax.gt.nemax) then
+     if (myrank.eq.master) WRITE(6,'(A,8I10)') &
+          ':DMFT_STERNHEIMER_DUMP_BAD_DIMENSIONS:',n0,nnlo,nstored, &
+          nbandsFull,nbands,nemin,DM_nemin,DM_nemax
+     CALL stop_MPI
+     STOP 'invalid Sternheimer diagnostic dimensions'
+  endif
+
+  allocate(labels(3,n0))
+  labels(:,1:isize)=INT(k3(:,1:isize),INT32)
+  if (nnlo.gt.0) labels(:,isize+1:n0)=INT(k3lo(:,1:nnlo),INT32)
+  kfrac=REAL(bk3(:,1)-DBLE(k3(:,1)),REAL64)
+  marker=INT(Z'01020304',INT32)
+  header=(/ INT(1,INT32),INT(ikp,INT32),INT(myrank,INT32), &
+       INT(n0,INT32),INT(nnlo,INT32),INT(nstored,INT32), &
+       INT(iso,INT32),INT(nemin,INT32),INT(nemax,INT32), &
+       INT(DM_nemin,INT32),INT(DM_nemax,INT32), &
+       INT(maxdim2,INT32),INT(norbitals,INT32) /)
+  WRITE(filename,'(A,".k",I8.8,".bin")') trim(prefix),ikp
+  OPEN(NEWUNIT=unit,FILE=trim(filename),ACCESS='STREAM', &
+       FORM='UNFORMATTED',STATUS='REPLACE',ACTION='WRITE',IOSTAT=ios)
+  if (ios.eq.0) WRITE(unit,IOSTAT=ios) magic
+  if (ios.eq.0) WRITE(unit,IOSTAT=ios) marker
+  if (ios.eq.0) WRITE(unit,IOSTAT=ios) header
+  if (ios.eq.0) WRITE(unit,IOSTAT=ios) kfrac
+  if (ios.eq.0) WRITE(unit,IOSTAT=ios) labels
+  if (ios.eq.0) WRITE(unit,IOSTAT=ios) &
+       REAL(bandEnergy(nemin:nemax),REAL64)
+  if (ios.eq.0) WRITE(unit,IOSTAT=ios) As(1:n0,nemin:nemax,1:iso)
+  if (ios.eq.0) WRITE(unit,IOSTAT=ios) normalizedProjector
+  if (ios.eq.0) WRITE(unit,IOSTAT=ios) gradient
+  CLOSE(unit)
+  deallocate(labels)
+  if (ios.ne.0) then
+     WRITE(6,'(A,I6,2A,I8)') 'ERROR: rank ',myrank, &
+          ' cannot write Sternheimer diagnostic ',trim(filename),ios
+     CALL stop_MPI
+     STOP 'Sternheimer diagnostic write failed'
+  endif
+  if (myrank.eq.master .and. ikp.eq.1) WRITE(6,'(A,1X,A)') &
+       ':DMFT_STERNHEIMER_DUMP:',trim(filename)
+END SUBROUTINE WriteStressSternheimerDump
+
+
+! Companion to WriteStressSternheimerDump for the response of the global
+! projector normalization X=(sum_k w_k P_k^+P_k)^(-1/2).  P is deliberately
+! raw here.  NORMALIZATIONGRADIENT is the adjoint derivative already formed
+! by BuildNormalizationAdjoint and includes the normalization k weight.  A
+! central Sternheimer checker can therefore use the same band-rotation
+! coefficients as for U and evaluate this chain-rule branch directly.
+SUBROUTINE WriteNormalizationSternheimerDump(ikp,nemin,nemax,DM_nemin, &
+     DM_nemax,bandEnergy,rawProjector,normalizationGradient, &
+     nbandsFull,nbands,maxdim2,norbitals)
+  USE com_mpi,ONLY: myrank,master,stop_MPI
+  IMPLICIT NONE
+  INTEGER,intent(in) :: ikp,nemin,nemax,DM_nemin,DM_nemax
+  INTEGER,intent(in) :: nbandsFull,nbands,maxdim2,norbitals
+  REAL*8,intent(in) :: bandEnergy(*)
+  COMPLEX*16,intent(in) :: rawProjector(nbandsFull,maxdim2,norbitals)
+  COMPLEX*16,intent(in) :: normalizationGradient(nbands,maxdim2,norbitals)
+  INTEGER,parameter :: normalizationMagic=20261107, &
+       normalizationVersion=1
+  CHARACTER(len=1024) :: environment,prefix
+  CHARACTER(len=1200) :: filename
+  INTEGER :: status,length,fh,ios
+
+  environment=''; prefix=''; length=0; status=1
+  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_STERNHEIMER_DUMP', &
+       environment,LENGTH=length,STATUS=status)
+  if (status.ne.0 .or. length.le.0) return
+  environment=adjustl(environment)
+  select case(trim(environment))
+  case('0','OFF','off','FALSE','false','NO','no')
+     return
+  case('1','ON','on','TRUE','true','YES','yes')
+     prefix='dmft_sternheimer_norm'
+  case default
+     prefix=trim(environment)//'_norm'
+  end select
+  WRITE(filename,'(A,".k",I8.8,".bin")') trim(prefix),ikp
+  fh=974
+  open(fh,file=trim(filename),status='replace',form='unformatted', &
+       access='stream',action='write',iostat=ios)
+  if (ios.eq.0) write(fh,iostat=ios) normalizationMagic, &
+       normalizationVersion,ikp,nbandsFull,nbands,maxdim2,norbitals, &
+       nemin,nemax,DM_nemin,DM_nemax
+  if (ios.eq.0) write(fh,iostat=ios) bandEnergy(nemin:nemax)
+  if (ios.eq.0) write(fh,iostat=ios) rawProjector
+  if (ios.eq.0) write(fh,iostat=ios) normalizationGradient
+  close(fh)
+  if (ios.ne.0) then
+     WRITE(6,'(A,I6,2A,I8)') 'ERROR: rank ',myrank, &
+          ' cannot write normalization Sternheimer diagnostic ', &
+          trim(filename),ios
+     CALL stop_MPI
+     STOP 'normalization Sternheimer diagnostic write failed'
+  endif
+  if (myrank.eq.master .and. ikp.eq.1) WRITE(6,'(A,1X,A)') &
+       ':DMFT_STERNHEIMER_NORMALIZATION_DUMP:',trim(filename)
+END SUBROUTINE WriteNormalizationSternheimerDump
 
 
 ! Save the central LAPW coefficients and the un-diagonalized embedded
@@ -3035,9 +3439,10 @@ END SUBROUTINE BuildNormalizationAdjoint
 
 
 SUBROUTINE BuildNormalizationWindowResponseMatrices(rhoResponse,eResponse, &
-     Pfull,Qbar,wg,E,nemin,nemax,DM_nemin,DM_nemax,nbands_full,nbands, &
+     normalizationGradient,Pfull,Qbar,wg,E,nemin,nemax,DM_nemin,DM_nemax,nbands_full,nbands, &
      maxdim2,norbitals,maxdim,ncix,cix_orb,cixdim,nindo,iSx)
   USE com_mpi,ONLY: Qprint
+  USE dmft_stress,ONLY: stress_norm_response_sign
   IMPLICIT NONE
   INTEGER,intent(in) :: nemin,nemax,DM_nemin,DM_nemax,nbands_full,nbands
   INTEGER,intent(in) :: maxdim2,norbitals,maxdim,ncix
@@ -3047,19 +3452,80 @@ SUBROUTINE BuildNormalizationWindowResponseMatrices(rhoResponse,eResponse, &
   COMPLEX*16,intent(in) :: Pfull(nbands_full,maxdim2,norbitals), &
        Qbar(maxdim,maxdim,ncix)
   COMPLEX*16,intent(out) :: rhoResponse(nbands_full,nbands_full), &
-       eResponse(nbands_full,nbands_full)
-  INTEGER :: iw0,iw1,icix,cixdm,iorb,ind,ia,iw,in,ndegenerate
+       eResponse(nbands_full,nbands_full), &
+       normalizationGradient(nbands,maxdim2,norbitals)
+  INTEGER :: iw0,iw1,icix,cixdm,iorb,ind,ia,iw,in,ndegenerate, &
+       metricStatus
   REAL*8 :: denominator,epsn,responseNorm
   COMPLEX*16 :: response
   COMPLEX*16,allocatable :: Pall(:,:),Pwin(:,:),Gbar(:,:),Kfull(:,:)
+  CHARACTER(len=64) :: metricEnvironment
+  LOGICAL :: includeWindowMetric,includeWithinWindow
 
-  rhoResponse=0.d0; eResponse=0.d0
+  rhoResponse=0.d0; eResponse=0.d0; normalizationGradient=0.d0
   iw0=DM_nemin-nemin+1
   iw1=DM_nemax-nemin+1
   if (iw0.lt.1 .or. iw1.gt.nbands_full .or. iw1-iw0+1.ne.nbands) &
        STOP 'BuildNormalizationWindowResponseMatrices: band bounds'
   allocate(Kfull(nbands_full,nbands))
   Kfull=0.d0
+
+  ! Metric contribution omitted by the original
+  ! complementary-band construction.  The generalized LAPW eigenvectors
+  ! obey A_W^+ O A_W=1.  In parallel-transport gauge their within-window
+  ! response consequently contains
+  !
+  !       A_W^+ O A_{W,q} = -1/2 O_{q,WW}.
+  !
+  ! For P=A_W^+ Q this produces the gauge-invariant contribution
+  !
+  !       S_q(metric) = - sum_k w_k P_k^+ O_{q,WW} P_k
+  !
+  ! to S=sum_k w_k P_k^+P_k and hence to X=S^(-1/2).  The historical
+  ! routine below explicitly skips every row inside W, so it cannot create
+  ! this term.  Kfull is the adjoint band-space kernel for the normalization
+  ! response.  Notice the sign: the generalized
+  ! eigenvectors satisfy
+  !
+  !       delta P_W = -1/2 O_{q,WW} P_W
+  !
+  ! in parallel-transport gauge.  Hence
+  !
+  !       2 Re sum(Gbar delta P_W)
+  !         = -Tr[Herm(P_W Gbar^T) O_{q,WW}].
+  !
+  ! CMP_DMFT_STRESS writes the WIEN intermediate STR_VAL, not the final
+  ! physical stress.  Its energy-response argument contributes
+  ! +Tr[eResponse O_q] to STR_VAL, and mixer subsequently negates STR_VAL.
+  ! Therefore the direct Klein contribution
+  ! -Tr[Herm(K_WW) O_q] requires eResponse=+Herm(K_WW) here.  Using the
+  ! opposite sign confuses the direct-functional convention with WIEN's
+  ! stored valence convention and applies the mixer sign twice.
+  !
+  ! Include this connection in the fixed-coefficient derivative by default.
+  ! Independent generalized-eigenproblem and basis-change tests verify its
+  ! sign. It would be double-counted only if P' already included the moving
+  ! orthonormal-frame metric response; cmp_overlap does not include it.
+  metricEnvironment=''
+  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_NORM_WINDOW_METRIC', &
+       metricEnvironment,STATUS=metricStatus)
+  ! P' is constructed at fixed LAPW coefficients.  Its nonorthogonal
+  ! window metric must be differentiated as well: -P^dagger O'_WW P.
+  ! Set the diagnostic explicitly to 0 only to reproduce the old omission.
+  includeWindowMetric=.true.
+  if (metricStatus.eq.0 .and. trim(metricEnvironment).eq.'0') &
+       includeWindowMetric=.false.
+  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_MOVING_BAND', &
+       metricEnvironment,STATUS=metricStatus)
+  ! A unitary rotation inside W cancels identically from
+  ! S=sum_k P_k^+P_k.  The normalization derivative therefore needs the
+  ! generalized-metric connection, but no separate within-W Sternheimer
+  ! rotation.  (The fixed-X projector branch handles its own band
+  ! connection.)  Keeping these notions separate prevents counting the
+  ! same within-window rotation twice in MOVING_BAND diagnostics.
+  includeWithinWindow=.false.
+  if (metricStatus.eq.0 .and. len_trim(metricEnvironment).gt.0 .and. &
+       trim(metricEnvironment).ne.'0') includeWindowMetric=.true.
 
   do icix=1,ncix
      cixdm=cixdim(icix)
@@ -3077,9 +3543,32 @@ SUBROUTINE BuildNormalizationWindowResponseMatrices(rhoResponse,eResponse, &
      ! The factor two follows from differentiating both factors in P^+P;
      ! wg is exactly the normalization weight used in cmp_overlap.
      Gbar=2.d0*wg*matmul(conjg(Pwin),Qbar(1:cixdm,1:cixdm,icix))
+     ! Store the conjugated gradient in the same sparse orbital layout used
+     ! by the main projector gradient.  Its direct contraction is
+     !
+     !   2 Re sum(normalizationGradient * delta P),
+     !
+     ! where delta P is the raw-projector response.  This provides a central
+     ! Sternheimer oracle which does not pass the normalization response
+     ! through Blaha's rearranged DFT kernels.
+     do iorb=1,norbitals
+        if (cix_orb(iorb).ne.icix) cycle
+        do ind=1,nindo(iorb)
+           normalizationGradient(:,ind,iorb)=Gbar(:,iSx(ind,iorb))
+        enddo
+     enddo
      Kfull=Kfull+matmul(Pall,transpose(Gbar))
      deallocate(Pall,Pwin,Gbar)
   enddo
+
+  if (includeWindowMetric) then
+     eResponse(iw0:iw1,iw0:iw1)=eResponse(iw0:iw1,iw0:iw1)+ &
+          0.5d0*(Kfull(iw0:iw1,:)+ &
+          conjg(transpose(Kfull(iw0:iw1,:))))
+     if (Qprint) WRITE(6,'(A,ES22.12)') &
+          ':DMFT_NORM_WINDOW_METRIC_KERNEL: ', &
+          sqrt(sum(abs(eResponse(iw0:iw1,iw0:iw1))**2))
+  endif
 
   ndegenerate=0
   do ia=1,nbands_full
@@ -3093,12 +3582,40 @@ SUBROUTINE BuildNormalizationWindowResponseMatrices(rhoResponse,eResponse, &
            cycle
         endif
         response=Kfull(ia,iw)/denominator
+        ! Same covariant (a,n) orientation as the direct-projector response;
+        ! the derivative of the projector bra conjugates R_an.
         rhoResponse(ia,in)=response
         rhoResponse(in,ia)=conjg(response)
         eResponse(ia,in)=epsn*response
         eResponse(in,ia)=conjg(eResponse(ia,in))
      enddo
   enddo
+  if (includeWithinWindow) then
+     do iw=1,nbands
+        in=iw0+iw-1
+        epsn=E(DM_nemin+iw-1)
+        do ia=iw0,iw1
+           if (ia.eq.in) cycle
+           denominator=epsn-E(nemin+ia-1)
+           if (abs(denominator).le.1.d-10) then
+              ndegenerate=ndegenerate+1
+              cycle
+           endif
+           response=Kfull(ia,iw)/denominator
+           rhoResponse(ia,in)=rhoResponse(ia,in)+response
+           rhoResponse(in,ia)=rhoResponse(in,ia)+conjg(response)
+           eResponse(ia,in)=eResponse(ia,in)+epsn*response
+           eResponse(in,ia)=eResponse(in,ia)+conjg(epsn*response)
+        enddo
+     enddo
+  endif
+
+  ! These are physical H'/O' response matrices. CMP_DMFT_STRESS already
+  ! supplies the WIEN intermediate minus sign and mixer reverses it once.
+  ! Consequently the physical response needs no further sign reversal.
+  ! The multiplier is retained only for explicit legacy diagnostics.
+  rhoResponse=stress_norm_response_sign*rhoResponse
+  eResponse=stress_norm_response_sign*eResponse
   responseNorm=sqrt(sum(abs(rhoResponse)**2))
   if (Qprint .and. ndegenerate.gt.0) WRITE(6,'(A,I6,A,ES12.4)') &
        'Normalization-window response: degenerate=',ndegenerate, &
@@ -3121,7 +3638,11 @@ SUBROUTINE cmp_normalization_window_stress(Qbar,cfX,Rspin,iorbital, &
   USE p_project,ONLY: phi_jl,dphi_jl,rix,P_rfi,kNri,n_al_ucase, &
        dri,l_al_ucase,j_al_ucase
   USE dmft_stress,ONLY: stress_val_corr,stress_kin_mt,stress_apw, &
-       stress_kin_int,stress_norm_window,stress_diag_norm
+       stress_kin_int,stress_norm_window,stress_diag_norm, &
+       stress_paired_diag_enabled,stress_diag_paired_norm_matching, &
+       stress_diag_paired_norm_complete, &
+       stress_diag_paired_norm_kinetic_matching, &
+       stress_diag_paired_norm_kinetic_complete
   IMPLICIT NONE
   INTEGER,intent(in) :: nnlo,norbitals,natom,maxdim2,lmaxp,max_nbands
   INTEGER,intent(out) :: max_response_modes
@@ -3151,7 +3672,8 @@ SUBROUTINE cmp_normalization_window_stress(Qbar,cfX,Rspin,iorbital, &
   REAL*8,allocatable :: aKR(:),jlr(:),jlrp(:),jlp(:),zResponse(:), &
        zEResponse(:),weightResponse(:)
   COMPLEX*16,allocatable :: Pfull(:,:,:,:),rhoResponse(:,:), &
-       eResponse(:,:),AResponse(:,:),eResponseDiag(:,:)
+       eResponse(:,:),AResponse(:,:),eResponseDiag(:,:), &
+       normalizationGradient(:,:,:)
 
   ! Snapshot every linear LAPW kernel separately.  In particular this exposes
   ! whether the signed normalization-response pseudo-bands are accidentally
@@ -3233,12 +3755,16 @@ SUBROUTINE cmp_normalization_window_stress(Qbar,cfX,Rspin,iorbital, &
         if (abs(projector).ge.5) deallocate(phi_jl,dphi_jl)
 
         allocate(rhoResponse(nbands_full,nbands_full), &
-             eResponse(nbands_full,nbands_full))
+             eResponse(nbands_full,nbands_full), &
+             normalizationGradient(nbands,maxdim2,norbitals))
         wg=wgh0/sumw
         CALL BuildNormalizationWindowResponseMatrices(rhoResponse, &
-             eResponse,Pfull(:,:,:,1),Qbar,wg,E,nemin,nemax,DM_nemin, &
+             eResponse,normalizationGradient,Pfull(:,:,:,1),Qbar,wg,E,nemin,nemax,DM_nemin, &
              DM_nemax,nbands_full,nbands,maxdim2,norbitals,maxdim,ncix, &
              cix_orb,cixdim,nindo,iSx)
+        CALL WriteNormalizationSternheimerDump(ikp,nemin,nemax, &
+             DM_nemin,DM_nemax,E,Pfull(:,:,:,1), &
+             normalizationGradient,nbands_full,nbands,maxdim2,norbitals)
         deallocate(Pfull)
 
         if (fuse_window_response) then
@@ -3266,6 +3792,13 @@ SUBROUTINE cmp_normalization_window_stress(Qbar,cfX,Rspin,iorbital, &
 
         if (maxval(abs(rhoResponse)).gt.1.d-14 .or. &
              maxval(abs(eResponse)).gt.1.d-14) then
+           if (stress_paired_diag_enabled) &
+                call cmp_dmft_paired_matching_matrix(rhoResponse,eResponse, &
+                nemin,nemax,n0,nnlo,stress_diag_paired_norm_matching, &
+                stress_diag_paired_norm_complete, &
+                stress_diag_paired_norm_kinetic_matching, &
+                stress_diag_paired_norm_kinetic_complete, &
+                time_bl,time_bl_w,time_lo,time_lo_w)
            allocate(AResponse(nbands_full,nbands_full), &
                 eResponseDiag(nbands_full,nbands_full), &
                 zResponse(nbands_full),zEResponse(nbands_full), &
@@ -3279,18 +3812,14 @@ SUBROUTINE cmp_normalization_window_stress(Qbar,cfX,Rspin,iorbital, &
            CALL Diagonalize_DMFT_WEIGHTS(zEResponse,eResponseDiag, &
                 nbands_full,nemin,energy_response_nemaxx,.true., &
                 'normalization_window_energy_response',ikp)
-           ! The response matrices contain the two conjugate cross-window
-           ! blocks explicitly, so their trace has already formed the 2*Re
-           ! projector contraction.  CMP_DMFT_STRESS subsequently uses LAPW
-           ! quadratic-form kernels with another factor two.  Halve only the
-           ! signed pseudo-band weights to avoid double counting.  This is
-           ! also correct when FUSE_WINDOW_RESPONSE is active, because both
-           ! fixed-X and normalization responses are combined before this
-           ! single diagonalization.
-           zResponse(:rho_response_nemaxx-nemin+1)=0.5d0* &
-                zResponse(:rho_response_nemaxx-nemin+1)
-           zEResponse(:energy_response_nemaxx-nemin+1)=0.5d0* &
-                zEResponse(:energy_response_nemaxx-nemin+1)
+           ! These are ordinary Hermitian response matrices in the same
+           ! convention as the physical rho and rhoE passed to
+           ! CMP_DMFT_STRESS.  The conjugate cross-window block is required
+           ! to represent the trace; it is not an additional factor of two.
+           ! Therefore the signed pseudo-band eigenvalues must remain
+           ! unchanged.  This is equally true for the fused fixed-X plus
+           ! normalization response.  See the exact within-window identity
+           ! documented at the corresponding main response pass.
            response_nemaxx=max(rho_response_nemaxx,energy_response_nemaxx)
            if (rho_response_nemaxx.lt.nemax) &
                 zResponse(rho_response_nemaxx-nemin+2:)=0.d0
@@ -3303,11 +3832,11 @@ SUBROUTINE cmp_normalization_window_stress(Qbar,cfX,Rspin,iorbital, &
            CALL cmp_dmft_stress(AResponse,eResponseDiag,weightResponse, &
                 zEResponse,nemin,nemax,nemin,nemax,response_nemaxx, &
                 nbands_full,nbands_full,n0,nnlo,time_bl,time_bl_w, &
-                time_lo,time_lo_w)
+                time_lo,time_lo_w,3)
            deallocate(AResponse,eResponseDiag,zResponse,zEResponse, &
                 weightResponse)
         endif
-        deallocate(rhoResponse,eResponse)
+        deallocate(rhoResponse,eResponse,normalizationGradient)
         if (Qprint) WRITE(6,'(A,I5)') &
              ' Finished normalization-window stress k-point ',ikp
      enddo

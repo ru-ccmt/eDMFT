@@ -1,0 +1,192 @@
+"""Collect the completed radial tests; archive data, never change source."""
+from pathlib import Path
+import json,re,hashlib,shutil
+
+ROOT=Path(__file__).resolve().parent
+OUT=ROOT/'deliverables'
+OUT.mkdir(exist_ok=True)
+summary={}
+def number(path,tag):
+    text=path.read_text()
+    return float(re.findall(r'^'+re.escape(tag)+r'\s+([-+0-9.Ee]+)',text,re.M)[-1])
+for case in ['SrVO3','FeSe']:
+    d=ROOT/(case+'_DFT');m=ROOT/(case+'_DMFT')
+    fresh=json.loads((d/'fresh_dft_stress.json').read_text())
+    eref=json.loads((d/'energy_reference_test.json').read_text())
+    ds=json.loads((d/'step_check.json').read_text());ms=json.loads((m/'step_check.json').read_text())
+    mc=json.loads((m/'closure.json').read_text())
+    b=fresh['mean_GPa'];num=fresh['numeric_GPa'];rad=eref['results'][-1]['fixed_weights_GPa']
+    old=2.690161085247642 if case=='SrVO3' else -1.118667459278174
+    mn=2.933836407 if case=='SrVO3' else -1.0491512951
+    mr=ms['half_step_GPa']
+    rawdelta=number(m/'radial_projector.out',':DMFT_STRESS_DIAG_EXPLICIT_PROJECTOR_MEAN_GPA')-number(m/'radial_contraction.out',':DMFT_STRESS_DIAG_EXPLICIT_PROJECTOR_MEAN_GPA')
+    legacy=number(m/'radial_contraction.out',':DMFT_STRESS_RADIAL_FD_MEAN_DK_GPA')-rawdelta
+    summary[case]={
+      'DFT':{'analytic_fresh_GPa':b,'numeric_saved_GPa':num,'before_residual_GPa':b-num,
+             'radial_fixed_Eref_GPa':ds['half_fixed_weights_GPa'],
+             'radial_with_Eref_GPa':rad,'radial_with_Eref_fullstep_GPa':eref['results'][0]['fixed_weights_GPa'],
+             'diagnostic_sum_GPa':b+rad,'diagnostic_sum_minus_numeric_GPa':b+rad-num,
+             'legacy_radial_fixed_Eref_GPa':number(d/'small_diag'/(case+'.outputdmf2'),':DMFT_STRESS_RADIAL_FD_MEAN_DK_GPA')},
+      'eDMFT':{'analytic_with_previous_potential_response_GPa':old,'numeric_saved_GPa':mn,
+               'before_residual_GPa':old-mn,'radial_fullstep_GPa':mc['basis_free_energy_fd_GPa'],
+               'radial_halfstep_GPa':mr,'diagnostic_sum_GPa':old+mr,'diagnostic_sum_minus_numeric_GPa':old+mr-mn,
+               'legacy_HO_plus_projector_GPa':legacy,'legacy_minus_free_energy_GPa':legacy-mr},
+      'zero_DFT_energy_error_Ry':ds['zero_max_energy_error_Ry'],
+      'zero_DMFT_VSUM_error_Ry':ms['zero_vsum_error_Ry']}
+(OUT/'SUMMARY.json').write_text(json.dumps(summary,indent=2)+'\n')
+
+lines=['RADIAL-BASIS STRESS TESTS — 8 NOVEMBER 2026','',
+'All stresses here are mean tensile stress Tr(sigma)/3 in GPa. Pressure has',
+'the opposite sign. There is no further division by three.', '',
+'RESULT',
+'The DFT radial-basis contribution is significant, especially when the',
+'linearization-energy reference follows the actual DFT input convention.',
+'The eDMFT radial contribution is smaller and does not explain its remaining',
+'stress mismatch. The preexisting default-off radial H/O diagnostic fails',
+'independent closure tests and is not ready for production use.', '',
+'No production source, executable, default switch, or original material',
+'calculation was changed. All computations used new /private/tmp copies.',
+'The 14 files in the prior response-installation manifest are unchanged.', '',
+'1. MATHEMATICAL TEST',
+'At the central cell, hold the physical KS Hamiltonian H0 fixed and vary only',
+'the radial trial functions, their matching coefficients, and local orbitals.',
+'Use the measured spherical potential response at fixed physical radius.',
+'The muffin-tin radii, fractional atom positions, reciprocal-vector labels,',
+'band counts, and k-point weights are fixed during this artificial test.', '',
+'Let chi_a(t) be this radial-dependent basis. The basis-only matrices are',
+'  dH_ab = <d chi_a|H0|chi_b> + <chi_a|H0|d chi_b>',
+'  dO_ab = <d chi_a|chi_b> + <chi_a|d chi_b>.',
+'The desired stationary contraction is',
+'  D_B = Re Tr[rho dH - rho_E dO] + D_projector,B.',
+'The normalized projector must include both its raw-overlap derivative and',
+'the derivative of X=(sum_k w_k P_k^dagger P_k)^(-1/2), with the selected',
+'KS window and KS metric treated consistently.', '',
+'An independent DFT reference is sum_kn f_kn d epsilon_kn with CENTRAL',
+'tetrahedron occupations f_kn. This avoids numerical changes in occupation',
+'weights while testing exactly the first derivative.', '',
+'For frozen Sigma, linearizing Phi_imp-Phi_DC cancels the first-order change',
+'of Tr[(Sigma-Vdc)Gloc]. At fixed physical H0 the remaining lattice derivative',
+'is that of L_B(t) = -T sum_kn w_k log det[-G_k(t)^(-1)] + mu(t) N,',
+'evaluated with the same regularization as dmft2. The saved :VSUM is this',
+'quantity. In the orthonormal endpoint KS basis,',
+'  G_k^(-1)=(i omega+mu) I-diag(epsilon_k)-U_k(Sigma-Vdc)U_k^dagger.',
+'Only the chosen window is correlated. Each endpoint recomputes normalized',
+'U and adjusts mu to keep N fixed; Sigma is unchanged. The basis-only test',
+'therefore retains cancellations among H, O, window motion, and projector',
+'normalization without trying to subtract their large pieces numerically.', '',
+'These are diagnostic directional derivatives, not a newly installed fully',
+'analytic stress implementation. Adding them to a saved baseline is shown',
+'below as an estimate of their importance; the actual production correction',
+'still needs a validated analytic contraction.', '',
+'2. INPUTS AND CONVENTIONS',
+'SrVO3 is NREL, RKMAX=8, 75 k points, 43 stored bands, W=12..31.',
+'FeSe is RELA, RKMAX=8, 140 k points, 66 stored bands, W=21..44.',
+'For eDMFT the physical radial-potential endpoints are the saved screened',
+'response potentials from frozen_sigma_response_20261108, h=0.00025.',
+'Half-step tests interpolate the perturbation by 1/2, h=0.000125.',
+'For DFT the potential direction comes from the converged +/-0.001 triplets;',
+'both h=0.001 and the half-sized perturbation were tested.', '',
+'The DFT IN1 EF reference changes with strain; the eDMFT IN1 references are',
+'identical across each triplet. The first DFT control kept that reference',
+'fixed, to isolate the potential-induced response. A second control also',
+'varied it according to the actual endpoint inputs, while retaining central',
+'geometry, RKMAX, G vectors, and band counts. All other meaningful IN1',
+'differences were checked: endpoint RKMAX changes compensate geometric',
+'strain and must not be copied into this fixed-cell radial test.', '',
+'3. RESULTS',
+'The DFT baseline below is a fresh WIEN lapw2 valence stress combined with',
+'the same saved lapw0 density and lcore stress from the prior DFT audit.',
+'The eDMFT baseline includes the previously validated screened-potential',
+'projector response. Numerical total stresses are SAVED prior comparisons;',
+'no new fully converged strained total-energy calculation was performed.', '']
+for case,s in summary.items():
+    d=s['DFT'];m=s['eDMFT']
+    lines += [case,
+      f"  DFT analytic baseline              {d['analytic_fresh_GPa']:+.9f}",
+      f"  DFT saved numerical                {d['numeric_saved_GPa']:+.9f}",
+      f"  DFT radial, fixed IN1 reference     {d['radial_fixed_Eref_GPa']:+.9f}",
+      f"  DFT radial, actual IN1 response     {d['radial_with_Eref_GPa']:+.9f}",
+      f"  DFT baseline + radial              {d['diagnostic_sum_GPa']:+.9f}",
+      f"  DFT residual before -> after       {d['before_residual_GPa']:+.9f} -> {d['diagnostic_sum_minus_numeric_GPa']:+.9f}",
+      f"  eDMFT baseline incl. potential     {m['analytic_with_previous_potential_response_GPa']:+.9f}",
+      f"  eDMFT saved numerical              {m['numeric_saved_GPa']:+.9f}",
+      f"  eDMFT radial full -> half step     {m['radial_fullstep_GPa']:+.9f} -> {m['radial_halfstep_GPa']:+.9f}",
+      f"  eDMFT baseline + radial            {m['diagnostic_sum_GPa']:+.9f}",
+      f"  eDMFT residual before -> after     {m['before_residual_GPa']:+.9f} -> {m['diagnostic_sum_minus_numeric_GPa']:+.9f}",'']
+lines += ['4. VALIDATION AND FAILED CONTROLS',
+'PASS: all sampled cases retain identical k/G sets and stored band counts.',
+'PASS: fixed-index DMFT windows remain isolated at their boundaries.',
+'PASS: zero basis perturbation reproduces DFT eigenvalues exactly and eDMFT',
+'      :VSUM to its printed precision (zero discrepancy in both materials).',
+'PASS: halving the perturbation changes the relevant radial stresses by',
+'      at most about 3e-5 GPa.',
+'PASS: an independent DFT band-sum check agrees with the fixed-occupation',
+'      derivative to about 2e-5 GPa after subtracting mu0*(Nplus-Nminus).',
+'      This is relevant in FeSe: tetrahedron integration leaves N errors',
+'      of order 1e-7, enough to contaminate a small uncorrected derivative.', '',
+'FAIL: the old optional radial H/O contraction does not reproduce the DFT',
+'      eigenvalue test. This persists at 100x smaller radial probe step:',
+'          SrVO3: old +0.107648 GPa vs eigenvalue about +0.00818 GPa;',
+'          FeSe:  old -0.007953 GPa vs eigenvalue about -0.07386 GPa.',
+'      This comparison holds the IN1 reference fixed on both sides.',
+'      Consequently its eDMFT result must not be promoted to production.', '']
+for case,s in summary.items():
+    m=s['eDMFT'];lines += [f"  {case} old radial H/O plus explicit normalized-projector branch:",
+      f"      {m['legacy_HO_plus_projector_GPa']:+.9f} GPa; independent lattice result {m['radial_halfstep_GPa']:+.9f} GPa."]
+lines += ['',
+'For this comparison the printed explicit-projector diagnostic uses the',
+'raw WIEN stress sign. Its change must be NEGATED before adding it to the',
+'physical H-O radial derivative. No sign was selected by fitting results.', '',
+'Complete-eigensystem reconstruction was also tested:',
+'  O=C^(-dagger) C^(-1), H=C^(-dagger) diag(epsilon) C^(-1).',
+'At h=0.001 its separate H/O finite difference is badly affected by',
+'cancellation and nonlinear changes of the coefficient representation.',
+'At h=1e-5 it approaches the eigenvalue control (differences about 0.00065',
+'and 0.00131 GPa for SrVO3 and FeSe). This is not the precision reference.',
+'The robust reference is the combined eigenvalue/free-energy derivative.', '',
+'5. WHAT THESE TESTS ESTABLISH',
+'The full radial dependence, including the chosen linearization energies,',
+'can account for much of the remaining DFT mismatch. In FeSe the estimated',
+'residual becomes very small; SrVO3 still has a roughly 0.06 GPa residual.',
+'For the fixed-reference eDMFT inputs, the measured radial term moves the',
+'stress away from the saved numerical target. It does not solve the eDMFT',
+'mismatch, and the larger DFT SrVO3 correction must not be transferred to',
+'eDMFT because its IN1 reference follows a different path.', '',
+'The old radial diagnostic has a reproducible implementation/formulation',
+'inconsistency already in DFT. Its exact source is not identified here.',
+'A candidate must not be inferred from the total-stress mismatch alone.',
+'No new production-force or charge-self-consistency bug is established.', '',
+'6. NEXT IMPLEMENTATION WORK',
+'First differentiate the actual assembled LAPW radial matrices and matching',
+'coefficients together, including local orbitals, finite-energy construction',
+'of udot, and RELA conventions. Require agreement with the DFT reference',
+'above before introducing the eDMFT moments or projector normalization.',
+'Then require the full rho*dH-rho_E*dO plus normalized-projector derivative',
+'to reproduce the stable lattice-free-energy reference in both materials.',
+'Treat the IN1 linearization-energy convention as an explicit input to this',
+'derivative, not as an accidental property of a particular test directory.',
+'Only after these controls pass should an opt-in production correction be',
+'added. Source changes require asking the user first under their instruction.', '',
+'Full scratch runs and executable test drivers:',str(ROOT),
+'Prior screened-potential response archive:',
+'/Users/haule/projects/eDMFT_new/src/doc/stress/frozen_sigma_response_20261108/', '']
+(OUT/'REPORT.txt').write_text('\n'.join(lines))
+for name in ['basis_checks.json','installation_check.json','dft_occupation_check.json']:
+    shutil.copy2(ROOT/name,OUT/name)
+for case in ['SrVO3','FeSe']:
+    for kind in ['DFT','DMFT']:
+        src=ROOT/(case+'_'+kind);dest=OUT/src.name;dest.mkdir(exist_ok=True)
+        for pattern in ['*.json','radial_contraction.out','radial_projector.out','*_free.scf2']:
+            for p in src.glob(pattern):shutil.copy2(p,dest/p.name)
+        if kind=='DFT':
+            shutil.copy2(src/'small_diag'/(case+'.outputdmf2'),dest/'small_radial_contraction.out')
+        for child in ['center','minus','plus','half_minus','half_plus','half_zero']:
+            q=dest/child;q.mkdir(exist_ok=True)
+            for suf in ['struct','in1','in1c','indmf2','indmfl']:
+                p=src/child/(case+'.'+suf)
+                if p.exists():shutil.copy2(p,q/p.name)
+drivers=OUT/'test_drivers';drivers.mkdir(exist_ok=True)
+for p in ROOT.glob('*.py'):shutil.copy2(p,drivers/(p.name+'.txt'))
+manifest={str(p.relative_to(OUT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in OUT.rglob('*') if p.is_file() and p.name!='SHA256.json'}
+(OUT/'SHA256.json').write_text(json.dumps(manifest,indent=2)+'\n')
+print(json.dumps(summary,indent=2))

@@ -1,0 +1,37 @@
+{
+  "case": "FeSe",
+  "setup_seconds": 7.140345999971032,
+  "central_density_relative": 1.0156873771288896e-12,
+  "normalization_offset_norm": 3.319885368615717e-15,
+  "coupled_transpose": 1.260078712436551e-15,
+  "bands_transpose": 1.2875877887561e-18,
+  "steps": [
+    {
+      "step": 0.002,
+      "density_relative": 0.18344800002145714,
+      "density_maximum": 0.4616436475195178,
+      "H_relative": 2.5943354110780937e-07,
+      "O_relative": 1.0185447036004504e-06,
+      "FD_norm": 10.149768146980897,
+      "analytic_norm": 10.081430591471335
+    },
+    {
+      "step": 0.001,
+      "density_relative": 0.1834479545041986,
+      "density_maximum": 0.46164380704024777,
+      "H_relative": 1.2950836563742114e-07,
+      "O_relative": 2.6046639614524985e-07,
+      "FD_norm": 10.149774076943155,
+      "analytic_norm": 10.081430591471335
+    },
+    {
+      "step": 0.0005,
+      "density_relative": 0.18344794113236387,
+      "density_maximum": 0.461643846034389,
+      "H_relative": 1.145384184166333e-07,
+      "O_relative": 7.522137035808127e-08,
+      "FD_norm": 10.149775497265734,
+      "analytic_norm": 10.081430591471335
+    }
+  ]
+}

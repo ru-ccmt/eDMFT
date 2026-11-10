@@ -1,0 +1,168 @@
+RADIAL-BASIS STRESS TESTS — 8 NOVEMBER 2026
+
+All stresses here are mean tensile stress Tr(sigma)/3 in GPa. Pressure has
+the opposite sign. There is no further division by three.
+
+RESULT
+The DFT radial-basis contribution is significant, especially when the
+linearization-energy reference follows the actual DFT input convention.
+The eDMFT radial contribution is smaller and does not explain its remaining
+stress mismatch. The preexisting default-off radial H/O diagnostic fails
+independent closure tests and is not ready for production use.
+
+No production source, executable, default switch, or original material
+calculation was changed. All computations used new /private/tmp copies.
+The 14 files in the prior response-installation manifest are unchanged.
+
+1. MATHEMATICAL TEST
+At the central cell, hold the physical KS Hamiltonian H0 fixed and vary only
+the radial trial functions, their matching coefficients, and local orbitals.
+Use the measured spherical potential response at fixed physical radius.
+The muffin-tin radii, fractional atom positions, reciprocal-vector labels,
+band counts, and k-point weights are fixed during this artificial test.
+
+Let chi_a(t) be this radial-dependent basis. The basis-only matrices are
+  dH_ab = <d chi_a|H0|chi_b> + <chi_a|H0|d chi_b>
+  dO_ab = <d chi_a|chi_b> + <chi_a|d chi_b>.
+The desired stationary contraction is
+  D_B = Re Tr[rho dH - rho_E dO] + D_projector,B.
+The normalized projector must include both its raw-overlap derivative and
+the derivative of X=(sum_k w_k P_k^dagger P_k)^(-1/2), with the selected
+KS window and KS metric treated consistently.
+
+An independent DFT reference is sum_kn f_kn d epsilon_kn with CENTRAL
+tetrahedron occupations f_kn. This avoids numerical changes in occupation
+weights while testing exactly the first derivative.
+
+For frozen Sigma, linearizing Phi_imp-Phi_DC cancels the first-order change
+of Tr[(Sigma-Vdc)Gloc]. At fixed physical H0 the remaining lattice derivative
+is that of L_B(t) = -T sum_kn w_k log det[-G_k(t)^(-1)] + mu(t) N,
+evaluated with the same regularization as dmft2. The saved :VSUM is this
+quantity. In the orthonormal endpoint KS basis,
+  G_k^(-1)=(i omega+mu) I-diag(epsilon_k)-U_k(Sigma-Vdc)U_k^dagger.
+Only the chosen window is correlated. Each endpoint recomputes normalized
+U and adjusts mu to keep N fixed; Sigma is unchanged. The basis-only test
+therefore retains cancellations among H, O, window motion, and projector
+normalization without trying to subtract their large pieces numerically.
+
+These are diagnostic directional derivatives, not a newly installed fully
+analytic stress implementation. Adding them to a saved baseline is shown
+below as an estimate of their importance; the actual production correction
+still needs a validated analytic contraction.
+
+2. INPUTS AND CONVENTIONS
+SrVO3 is NREL, RKMAX=8, 75 k points, 43 stored bands, W=12..31.
+FeSe is RELA, RKMAX=8, 140 k points, 66 stored bands, W=21..44.
+For eDMFT the physical radial-potential endpoints are the saved screened
+response potentials from frozen_sigma_response_20261108, h=0.00025.
+Half-step tests interpolate the perturbation by 1/2, h=0.000125.
+For DFT the potential direction comes from the converged +/-0.001 triplets;
+both h=0.001 and the half-sized perturbation were tested.
+
+The DFT IN1 EF reference changes with strain; the eDMFT IN1 references are
+identical across each triplet. The first DFT control kept that reference
+fixed, to isolate the potential-induced response. A second control also
+varied it according to the actual endpoint inputs, while retaining central
+geometry, RKMAX, G vectors, and band counts. All other meaningful IN1
+differences were checked: endpoint RKMAX changes compensate geometric
+strain and must not be copied into this fixed-cell radial test.
+
+3. RESULTS
+The DFT baseline below is a fresh WIEN lapw2 valence stress combined with
+the same saved lapw0 density and lcore stress from the prior DFT audit.
+The eDMFT baseline includes the previously validated screened-potential
+projector response. Numerical total stresses are SAVED prior comparisons;
+no new fully converged strained total-energy calculation was performed.
+
+SrVO3
+  DFT analytic baseline              +8.627203676
+  DFT saved numerical                +8.403541158
+  DFT radial, fixed IN1 reference     +0.008170312
+  DFT radial, actual IN1 response     -0.283768497
+  DFT baseline + radial              +8.343435178
+  DFT residual before -> after       +0.223662517 -> -0.060105980
+  eDMFT baseline incl. potential     +2.690161085
+  eDMFT saved numerical              +2.933836407
+  eDMFT radial full -> half step     -0.052352333 -> -0.052377959
+  eDMFT baseline + radial            +2.637783127
+  eDMFT residual before -> after     -0.243675322 -> -0.296053280
+
+FeSe
+  DFT analytic baseline              +12.234726021
+  DFT saved numerical                +12.138890192
+  DFT radial, fixed IN1 reference     -0.074033229
+  DFT radial, actual IN1 response     -0.088318684
+  DFT baseline + radial              +12.146407337
+  DFT residual before -> after       +0.095835829 -> +0.007517145
+  eDMFT baseline incl. potential     -1.118667459
+  eDMFT saved numerical              -1.049151295
+  eDMFT radial full -> half step     -0.069117403 -> -0.069117403
+  eDMFT baseline + radial            -1.187784863
+  eDMFT residual before -> after     -0.069516164 -> -0.138633568
+
+4. VALIDATION AND FAILED CONTROLS
+PASS: all sampled cases retain identical k/G sets and stored band counts.
+PASS: fixed-index DMFT windows remain isolated at their boundaries.
+PASS: zero basis perturbation reproduces DFT eigenvalues exactly and eDMFT
+      :VSUM to its printed precision (zero discrepancy in both materials).
+PASS: halving the perturbation changes the relevant radial stresses by
+      at most about 3e-5 GPa.
+PASS: an independent DFT band-sum check agrees with the fixed-occupation
+      derivative to about 2e-5 GPa after subtracting mu0*(Nplus-Nminus).
+      This is relevant in FeSe: tetrahedron integration leaves N errors
+      of order 1e-7, enough to contaminate a small uncorrected derivative.
+
+FAIL: the old optional radial H/O contraction does not reproduce the DFT
+      eigenvalue test. This persists at 100x smaller radial probe step:
+          SrVO3: old +0.107648 GPa vs eigenvalue about +0.00818 GPa;
+          FeSe:  old -0.007953 GPa vs eigenvalue about -0.07386 GPa.
+      This comparison holds the IN1 reference fixed on both sides.
+      Consequently its eDMFT result must not be promoted to production.
+
+  SrVO3 old radial H/O plus explicit normalized-projector branch:
+      +0.470271557 GPa; independent lattice result -0.052377959 GPa.
+  FeSe old radial H/O plus explicit normalized-projector branch:
+      +0.042717027 GPa; independent lattice result -0.069117403 GPa.
+
+For this comparison the printed explicit-projector diagnostic uses the
+raw WIEN stress sign. Its change must be NEGATED before adding it to the
+physical H-O radial derivative. No sign was selected by fitting results.
+
+Complete-eigensystem reconstruction was also tested:
+  O=C^(-dagger) C^(-1), H=C^(-dagger) diag(epsilon) C^(-1).
+At h=0.001 its separate H/O finite difference is badly affected by
+cancellation and nonlinear changes of the coefficient representation.
+At h=1e-5 it approaches the eigenvalue control (differences about 0.00065
+and 0.00131 GPa for SrVO3 and FeSe). This is not the precision reference.
+The robust reference is the combined eigenvalue/free-energy derivative.
+
+5. WHAT THESE TESTS ESTABLISH
+The full radial dependence, including the chosen linearization energies,
+can account for much of the remaining DFT mismatch. In FeSe the estimated
+residual becomes very small; SrVO3 still has a roughly 0.06 GPa residual.
+For the fixed-reference eDMFT inputs, the measured radial term moves the
+stress away from the saved numerical target. It does not solve the eDMFT
+mismatch, and the larger DFT SrVO3 correction must not be transferred to
+eDMFT because its IN1 reference follows a different path.
+
+The old radial diagnostic has a reproducible implementation/formulation
+inconsistency already in DFT. Its exact source is not identified here.
+A candidate must not be inferred from the total-stress mismatch alone.
+No new production-force or charge-self-consistency bug is established.
+
+6. NEXT IMPLEMENTATION WORK
+First differentiate the actual assembled LAPW radial matrices and matching
+coefficients together, including local orbitals, finite-energy construction
+of udot, and RELA conventions. Require agreement with the DFT reference
+above before introducing the eDMFT moments or projector normalization.
+Then require the full rho*dH-rho_E*dO plus normalized-projector derivative
+to reproduce the stable lattice-free-energy reference in both materials.
+Treat the IN1 linearization-energy convention as an explicit input to this
+derivative, not as an accidental property of a particular test directory.
+Only after these controls pass should an opt-in production correction be
+added. Source changes require asking the user first under their instruction.
+
+Full scratch runs and executable test drivers:
+/private/tmp/radial_stress_response_20261108
+Prior screened-potential response archive:
+/Users/haule/projects/eDMFT_new/src/doc/stress/frozen_sigma_response_20261108/

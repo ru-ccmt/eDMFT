@@ -1,0 +1,341 @@
+--- a/src/python/frozen_sigma_response.py
++++ b/src/python/frozen_sigma_response.py
+@@ -10,7 +10,10 @@
+ The physical embedding is Pi_W phi X, not the untruncated overlap phi X.
+ Both dPi_W and dX are included.  The actual Fortran overlap-symmetry map is
+ exported on matrix units rather than inferred from a diagonal self-energy.
+-Fixed-index windows cutting a degeneracy are rejected, never regularized.
++At a fixed-index window degeneracy, the default response omits only singular
++cross-window band pairs (gap <= 1e-10 Ry), warns and records the omission.
++This is the same numerical prescription as the native window derivative;
++it does not assert that a sharp spectral cutoff is uniquely differentiable.
+ 
+ This initial diagnostic uses the saved LAPW basis and stored complement.
+ It is an action of the charge-map Jacobian, not a full DMFT susceptibility.
+@@ -21,11 +24,16 @@
+ import sys
+ import json
+ import time
++import warnings
+ import numpy as np
+ from scipy.linalg import eigh
+ from scipy.special import expit
+ from types import SimpleNamespace
+ from response_parallel import SERIAL
++
++# Match the native DMFT2 window-response denominator threshold and the MnO /
++# MnTe cutoff tests. Do not drop entire k points or change the central window.
++WINDOW_GAP_CUTOFF_RY = 1e-10
+ 
+ 
+ def herm(a):
+@@ -297,32 +305,66 @@
+             else float("inf")
+         )
+         self.minimum_gap = parallel.reduce(self.minimum_gap, "min")
+-        # Strict production behavior is unchanged. This opt-in only measures
+-        # the sensitivity of the existing hard window to omitting small-gap
+-        # cross-window response blocks. It neither smooths the projector nor
+-        # defines a unique derivative of a degenerate spectral cutoff.
++        # A hard window can split an exactly degenerate multiplet. Its formal
++        # spectral-projector derivative is then nonunique. The tested numerical
++        # prescription sets ONLY those singular reciprocal gaps to zero, using
++        # the same mask in the forward derivative and its adjoint, including X'.
++        # Keep the central U, all regular pairs, k weights and density terms.
++        # Default runs are usable with a recorded warning; an explicit cutoff
++        # override is still a sensitivity diagnostic, not a production result.
+         if diagnostic_gap_cutoff is not None and (
+             not np.isfinite(diagnostic_gap_cutoff) or diagnostic_gap_cutoff <= 0
+         ):
+             raise ValueError("diagnostic gap cutoff must be finite and positive")
+         self.diagnostic_gap_cutoff = diagnostic_gap_cutoff
+         self.diagnostic_only = diagnostic_gap_cutoff is not None
+-        if self.minimum_gap < 1e-8 and not self.diagnostic_only:
+-            raise ValueError(f"window cuts degeneracy: {self.minimum_gap} Ry")
++        self.window_gap_cutoff = (WINDOW_GAP_CUTOFF_RY if diagnostic_gap_cutoff is None
++                                  else float(diagnostic_gap_cutoff))
++        omitted = np.abs(self.eps[:, self.W, None] - self.eps[:, None, self.Q]) <= self.window_gap_cutoff
++        affected = np.any(omitted, axis=(1, 2))
++        # Count each in/out band pair once and reduce GLOBAL weights without
++        # renormalizing them on each MPI rank. Replicated reports must agree.
++        counts = parallel.sum(np.array([np.count_nonzero(omitted),
++                                        np.count_nonzero(affected),
++                                        self.kw[affected].sum()], dtype=float))
++        self.omitted_window_pairs = int(counts[0])
++        self.affected_window_kpoints = int(counts[1])
++        self.affected_window_weight = float(counts[2])
++        if self.omitted_window_pairs and parallel.root and not self.diagnostic_only:
++            warnings.warn(self.window_gap_warning(), RuntimeWarning, stacklevel=2)
++
++    def window_gap_report(self):
++        """Global provenance for the band-pair approximation, not an error bound."""
++        return dict(policy="omit_singular_pairs", cutoff_Ry=self.window_gap_cutoff,
++                    minimum_gap_Ry=self.minimum_gap if np.isfinite(self.minimum_gap) else None,
++                    omitted_pairs=self.omitted_window_pairs,
++                    affected_kpoints=self.affected_window_kpoints,
++                    affected_kpoint_weight=self.affected_window_weight,
++                    approximation_used=bool(self.omitted_window_pairs),
++                    diagnostic_only=self.diagnostic_only)
++
++    def window_gap_warning(self):
++        if not self.omitted_window_pairs:
++            return None
++        return (f"Window cutoff: omitted {self.omitted_window_pairs} singular cross-window "
++                f"band pairs on {self.affected_window_kpoints} k points "
++                f"(total k weight {self.affected_window_weight:.8g}); "
++                f"|energy gap| <= {self.window_gap_cutoff:g} Ry. "
++                "Continuing with the band-pair omission approximation; "
++                "all regular pairs, k points and central projectors are retained.")
+ 
+     def window_denominators(self):
+         """One reciprocal-gap policy shared by forward and transpose actions.
+ 
+         Infinite denominators implement a zero inverse on the selected blocks.
+         Central U, Matsubara weights, k weights and direct density terms remain
+-        unchanged. A diagnostic result must never be published as validated
+-        stress, even if the threshold happens not to omit any blocks.
++        unchanged. The default threshold is an acknowledged approximation;
++        an explicit diagnostic threshold remains separately marked in reports.
+         """
+         result = []
+         for e in self.eps:
+             d = e[self.W][None, :] - e[self.Q][:, None]
+-            if self.diagnostic_only:
+-                d = np.where(abs(d) <= self.diagnostic_gap_cutoff, np.inf, d)
++            d = np.where(abs(d) <= self.window_gap_cutoff, np.inf, d)
+             result.append(d)
+         return result
+ 
+--- a/src/python/lapw_total_stress.py
++++ b/src/python/lapw_total_stress.py
+@@ -143,6 +143,10 @@
+         if omitted and not diagnostic:
+             raise NotImplementedError("window-omission diagnostic cannot publish total stress")
+         self.diagnostic_only = bool(diagnostic or omitted)
++        self.window_gap_treatment = [
++            dict(spin_channel=getattr(v, "spin_channel", ""), **v.model.window_gap_report())
++            for v in branches if hasattr(v.model, "window_gap_report")
++        ]
+         residual = state.metadata["central_fixed_point_residual_norm"]
+         if not np.isfinite(fixed_point_tolerance) or fixed_point_tolerance <= 0:
+             raise ValueError("positive fixed-point tolerance required")
+@@ -282,6 +286,7 @@
+             full_tensor_within_symmetry=True,
+             diagnostic_only=self.diagnostic_only,
+             stress_ready=not self.diagnostic_only,
++            window_gap_treatment=self.window_gap_treatment,
+             sigma_symmetry_relative_error=self.sigma_symmetry_error,
+             tensor_is_symmetry_projection=self.sigma_symmetry_error > 1e-10,
+             unrestricted_tensor_validated=False,
+--- a/src/python/lapw_total_stress_driver.py
++++ b/src/python/lapw_total_stress_driver.py
+@@ -100,6 +100,11 @@
+             cache_mb=cache_mb, basis_cache_mb=basis_cache_mb, spin_channel=channel,
+             diagnostic_gap_cutoff=diagnostic_gap_cutoff,
+         )) for channel in policy.channels]
++        for branch in branches:
++            warning = branch.model.window_gap_warning()
++            if warning:
++                channel = getattr(branch, "spin_channel", "") or "primary"
++                progress(f"WARNING [{channel}]: {warning}")
+         v = combine_valence(*branches) if policy.magnetic else branches[0]
+         timings["prepare_valence_seconds"] = v.preparation_seconds
+         state = NativeScreenedState(
+--- a/src/python/stress_response_summary.py
++++ b/src/python/stress_response_summary.py
+@@ -163,6 +163,15 @@
+                   "D_nu = Omega*sum_ij(sigma_ij*e_nu,ij). For hydrostatic strain,\n",
+                   "mean tensile stress = D_hydro/(3*Omega), with conversion to GPa.\n"]
+ 
++    for gap in report.get("window_gap_treatment", []):
++        if gap.get("omitted_pairs", 0):
++            channel = gap.get("spin_channel") or "primary"
++            lines += [f"\nWARNING [{channel}]: Window cutoff uses band-pair omission.\n",
++                      f"Omitted {gap['omitted_pairs']} singular cross-window band pairs on "
++                      f"{gap['affected_kpoints']} k points; total k weight "
++                      f"{gap['affected_kpoint_weight']:.8g}.\n",
++                      f"Threshold: |energy gap| <= {gap['cutoff_Ry']:g} Ry. "
++                      "All regular pairs, k points and central projectors are retained.\n"]
+     central = report.get("central", {})
+     adjoint = report.get("adjoint", {})
+     timing = report.get("timings", {})
+--- a/src/python/tests/test_window_omission_diagnostic.py
++++ b/src/python/tests/test_window_omission_diagnostic.py
+@@ -1,24 +1,80 @@
+-"""The optional singular-pair diagnostic preserves the default strict policy."""
++"""Default singular-pair omission, adjoints and optional cutoff diagnostics."""
+ import unittest
++import warnings
+ import numpy as np
+-from frozen_sigma_tangent import CachedFrozenSigmaResponse,real_inner
++from frozen_sigma_tangent import CachedFrozenSigmaResponse, real_inner
+ from test_frozen_sigma_tangent import complex_model
+ 
++
+ class WindowDiagnosticTests(unittest.TestCase):
+-    def make(self,cutoff):
+-        m=complex_model();e=m.eps.copy();e[0,4]=e[0,3]
+-        return CachedFrozenSigmaResponse(m.meta,e,m.raw,m.apply_x(m.raw,m.X),m.kw,m.W,
+-                                         diagnostic_gap_cutoff=cutoff,cache_mb=2)
+-    def test_strict_default(self):
+-        with self.assertRaises(ValueError):self.make(None)
+-    def test_cutoff_action_transpose_and_plateau(self):
+-        a=self.make(1e-12);b=self.make(1e-8)
+-        rng=np.random.default_rng(377);h=rng.normal(size=(2,5,5))+1j*rng.normal(size=(2,5,5));h=(h+h.swapaxes(1,2).conj())/2
+-        y=rng.normal(size=h.shape)+1j*rng.normal(size=h.shape);y=(y+y.swapaxes(1,2).conj())/2
+-        aa,_=a.response(h,fixed_number=False);bb,_=b.response(h,fixed_number=False)
+-        np.testing.assert_allclose(aa,bb,atol=1e-14)
+-        self.assertTrue(a.diagnostic_only)
+-        self.assertAlmostEqual(real_inner(y,aa),real_inner(a.adjoint(y,fixed_number=False),h),places=11)
+-        np.testing.assert_allclose(a.central_density(),b.central_density(),atol=1e-14)
++    def make(self, cutoff=None, gap=0.0):
++        m = complex_model()
++        e = m.eps.copy()
++        e[0, 4] = e[0, 3] + gap
++        return CachedFrozenSigmaResponse(
++            m.meta, e, m.raw, m.apply_x(m.raw, m.X), m.kw, m.W,
++            diagnostic_gap_cutoff=cutoff, cache_mb=2,
++        )
+ 
+-if __name__=='__main__':unittest.main()
++    def test_default_warns_and_retains_regular_pairs(self):
++        with self.assertWarnsRegex(RuntimeWarning, 'omitted 1 singular.*1 k points'):
++            model = self.make()
++        self.assertFalse(model.diagnostic_only)
++        report = model.window_gap_report()
++        self.assertEqual(report['omitted_pairs'], 1)
++        self.assertEqual(report['affected_kpoints'], 1)
++        self.assertAlmostEqual(report['affected_kpoint_weight'], .3)
++        for k, denominator in enumerate(model.window_denominators()):
++            exact = model.eps[k, model.W][None, :] - model.eps[k, model.Q][:, None]
++            regular = abs(exact) > 1e-10
++            np.testing.assert_array_equal(denominator[regular], exact[regular])
++            np.testing.assert_array_equal(1/denominator[~regular], 0)
++
++    def test_default_matches_tested_diagnostic_and_transpose(self):
++        with self.assertWarns(RuntimeWarning):
++            default = self.make()
++        diagnostic = self.make(1e-10)
++        rng = np.random.default_rng(377)
++        shape = (2, 5, 5)
++        h = rng.normal(size=shape) + 1j*rng.normal(size=shape)
++        h = (h+h.swapaxes(1, 2).conj())/2
++        y = rng.normal(size=shape) + 1j*rng.normal(size=shape)
++        y = (y+y.swapaxes(1, 2).conj())/2
++        for fixed_n in (False, True):
++            actual, _ = default.response(h, fixed_number=fixed_n)
++            expected, _ = diagnostic.response(h, fixed_number=fixed_n)
++            np.testing.assert_allclose(actual, expected, atol=1e-14)
++            np.testing.assert_allclose(default.adjoint(y, fixed_number=fixed_n),
++                                       diagnostic.adjoint(y, fixed_number=fixed_n), atol=1e-14)
++            self.assertAlmostEqual(real_inner(y, actual),
++                real_inner(default.adjoint(y, fixed_number=fixed_n), h), places=11)
++        np.testing.assert_array_equal(default.central_density(), diagnostic.central_density())
++        np.testing.assert_array_equal(default.u, diagnostic.u)
++        np.testing.assert_array_equal(default.X, diagnostic.X)
++        np.testing.assert_array_equal(default.kw, diagnostic.kw)
++        self.assertTrue(diagnostic.diagnostic_only)
++
++    def test_regular_gap_is_unchanged_and_silent(self):
++        with warnings.catch_warnings(record=True) as emitted:
++            warnings.simplefilter('always')
++            regular = self.make(gap=1e-6)
++        self.assertFalse(emitted)
++        self.assertEqual(regular.window_gap_report()['omitted_pairs'], 0)
++        self.assertIsNone(regular.window_gap_warning())
++        for k, denominator in enumerate(regular.window_denominators()):
++            np.testing.assert_array_equal(denominator,
++                regular.eps[k, regular.W][None, :] - regular.eps[k, regular.Q][:, None])
++
++    def test_threshold_and_diagnostic_plateau(self):
++        with self.assertWarns(RuntimeWarning):
++            self.make(gap=5e-11)
++        a, b = self.make(1e-12), self.make(1e-8)
++        for x, y in zip(a.window_denominators(), b.window_denominators()):
++            np.testing.assert_array_equal(x, y)
++        for cutoff in (0, -1e-10, float('nan'), float('inf')):
++            with self.assertRaisesRegex(ValueError, 'finite and positive'):
++                self.make(cutoff)
++
++
++if __name__ == '__main__':
++    unittest.main()
+--- a/src/python/tests/test_stress_response_publish.py
++++ b/src/python/tests/test_stress_response_publish.py
+@@ -99,6 +99,27 @@
+             with self.assertRaisesRegex(ValueError, "report changed"):
+                 response_rows("sample", fixture(), directory=d)
+ 
++    def test_default_omission_can_be_published_with_valid_report(self):
++        # The tested production prescription is not an explicit sensitivity
++        # diagnostic. Publication still requires valid fingerprints/convergence.
++        with tempfile.TemporaryDirectory() as folder:
++            d = Path(folder)
++            report = d / 'tensor.json'
++            sigma = np.eye(3)*.001
++            report.write_text(json.dumps(dict(
++                converged=True, full_tensor_within_symmetry=True,
++                diagnostic_only=False, stress_ready=True,
++                window_gap_treatment=[dict(policy='omit_singular_pairs',
++                    cutoff_Ry=1e-10, omitted_pairs=9, affected_kpoints=8)],
++                stress_Ry_Bohr3=sigma.tolist())))
++            status = dict(backend='analytic', stress_ready=True,
++                status='complete', converged=True, reference_id='default-omission',
++                report=str(report), parent_fingerprints={},
++                report_sha256=hashlib.sha256(report.read_bytes()).hexdigest())
++            (d / 'sample.stress_response.status.json').write_text(json.dumps(status))
++            rows = response_rows('sample', fixture(), directory=d)
++            np.testing.assert_allclose(-mixer_accumulator(fixture()+rows), sigma, atol=1e-14)
++
+     def test_window_omission_report_cannot_reach_mixer(self):
+         # Even a converged diagnostic carrying a full tensor and a valid hash
+         # must not bypass the explicit window-regularity publication policy.
+--- a/src/python/tests/test_stress_response_summary.py
++++ b/src/python/tests/test_stress_response_summary.py
+@@ -108,6 +108,17 @@
+             self.assertIn('NOT the old-stress/net-correction split',text)
+             self.assertIn('Compression-positive pressure: -',text)
+ 
++    def test_window_omission_warning_is_in_readable_summary(self):
++        with case() as (root, status, report):
++            report['window_gap_treatment'] = [dict(spin_channel='',
++                omitted_pairs=9, affected_kpoints=8,
++                affected_kpoint_weight=.029513888888888888, cutoff_Ry=1e-10)]
++            text = summary._report_text(report)
++            self.assertIn('WARNING [primary]: Window cutoff', text)
++            self.assertIn('9 singular cross-window band pairs on 8 k points', text)
++            self.assertIn('1e-10 Ry', text)
++            self.assertIn('0.029513889', text)
++
+     def test_shear_values_are_printed_when_present(self):
+         tensor=np.array([[1.,2.,3.],[2.,4.,5.],[3.,5.,6.]])
+         text=summary._stress_table([('Complete stress',tensor)])
+--- a/src/python/tests/mpi_response_check.py
++++ b/src/python/tests/mpi_response_check.py
+@@ -6,6 +6,8 @@
+ """
+ 
+ import json
++import os
++import warnings
+ import numpy as np
+ from response_parallel import ResponseParallel
+ from frozen_sigma_tangent import CachedFrozenSigmaResponse, real_inner
+@@ -18,6 +20,9 @@
+     central = complex_model()
+     copies = 4
+     eps = np.tile(central.eps, (copies, 1))
++    if os.environ.get("EDMFT_TEST_WINDOW_DEGENERACY"):
++        eps[0, 4] = eps[0, 3]
++        warnings.filterwarnings("ignore", message="Window cutoff:", category=RuntimeWarning)
+     raw = np.tile(central.raw, (copies, 1, 1, 1))
+     weights = np.tile(central.kw, copies) / copies
+     normalized = central.apply_x(raw, central.X)
+@@ -51,6 +56,7 @@
+             parallel=p,
+             cache_mb=cache,
+         )
++        assert local.window_gap_report() == allmodel.window_gap_report()
+         for fixed in (False, True):
+             full, fm = allmodel.generalized_response(h, o, r, fixed_number=fixed)
+             part, pm = local.generalized_response(

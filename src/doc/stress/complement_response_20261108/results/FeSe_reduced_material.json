@@ -1,0 +1,13 @@
+{
+  "case": "FeSe",
+  "retained_bands": 66,
+  "complete_coefficient_dimension": 509,
+  "setup_and_forward_seconds": 9.111646959092468,
+  "central_density_relative": 9.50357308954652e-13,
+  "full_spectral_relative": 1.758810129950485e-13,
+  "native_fd_relative": 1.1936282499178122e-07,
+  "transpose": 1.460744219304567e-15,
+  "independent_assembly": true,
+  "coupled_forward_seconds": 5.684212249936536,
+  "coupled_reverse_seconds": 2.795222165994346
+}

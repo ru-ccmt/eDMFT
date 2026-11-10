@@ -1,0 +1,77 @@
+{
+  "status": "installed-and-synchronized",
+  "local": {
+    "timestamp": 1794273228.665375,
+    "backup": "/private/tmp/edmft_charge_warning_20261109/installation_backup",
+    "files": [
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_total_stress.py",
+        "sha256": "96eea797ab5eb3851808ef6ea7622b831a0ffd3a5bf6bf9f21ef5d9313a8e9ce"
+      },
+      {
+        "path": "/Users/haule/dbin/lapw_total_stress.py",
+        "sha256": "96eea797ab5eb3851808ef6ea7622b831a0ffd3a5bf6bf9f21ef5d9313a8e9ce"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/python/lapw_total_stress_driver.py",
+        "sha256": "03dec00dc28a7b4221f9eece7fb8fc5b8fd43810f3804cdcfe2fadf586cb0d57"
+      },
+      {
+        "path": "/Users/haule/dbin/lapw_total_stress_driver.py",
+        "sha256": "03dec00dc28a7b4221f9eece7fb8fc5b8fd43810f3804cdcfe2fadf586cb0d57"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/python/stress_response_summary.py",
+        "sha256": "27686b8e1217586016a641beff76b7715ff76887cb55586e91fc491cbd8d5724"
+      },
+      {
+        "path": "/Users/haule/dbin/stress_response_summary.py",
+        "sha256": "27686b8e1217586016a641beff76b7715ff76887cb55586e91fc491cbd8d5724"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_total_stress.py",
+        "sha256": "c4b1c2392117c0ad4cfc2db5469fc3d91e6eb31252f28b2a9ad43173c0994a1d"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_stress_response_summary.py",
+        "sha256": "a8ed42c8eed71aa771e72df4318afab64425f483f38dca058a1cdb440e3cb754"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/python/tests/test_stress_response_publish.py",
+        "sha256": "0be74651f77b6ed387a991ed6e4f91731d92e62c5e7a3f8485ed0d66cf3b2973"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_residual_warning_20261109/MnTe_report.json",
+        "sha256": "29576d8936ecfc2e19485f852fdde7a749a9c0e4843c995d01f59917f52b8a72"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_residual_warning_20261109/REPORT.txt",
+        "sha256": "b732fb15c68d1c1e10eead5c6d35956b8cb29fca9c7873c0e33e3c89704b03a8"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_residual_warning_20261109/charge_residual_warning.patch",
+        "sha256": "6fbcd9c84e670a4f4580049df8bfa301ced39539879a7293bd404cd6178e3249"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_residual_warning_20261109/publication_validation.json",
+        "sha256": "76d6367375a90e60fe58f9a7d40b7ba51fc4bf38045d39980e63c4bb55463622"
+      },
+      {
+        "path": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_residual_warning_20261109/tests.log",
+        "sha256": "4e13241061d007ff8c9640a61d2fa8f48ffc3e8323f4b913e3a3a0bfff559348"
+      }
+    ]
+  },
+  "remote": {
+    "status": "verified",
+    "root": "/mnt/home/haule/dmftf_w2k/3EDMFTF",
+    "backup": "/mnt/home/haule/dmftf_w2k/charge_warning_20261109_201451/backup",
+    "files_copied": 11,
+    "updated": 6,
+    "added": 5,
+    "bytes": 169296,
+    "retired_to_history": [],
+    "timestamp": 1794273293.3679287
+  },
+  "remote_runtime_installation": "Repository source updated; remote dbin unchanged"
+}

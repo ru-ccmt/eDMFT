@@ -1,0 +1,157 @@
+{
+  "before": {
+    "diagonal_GPa": [
+      13.192537688169708,
+      13.192537688169708,
+      9.601821980649614
+    ],
+    "mean_GPa": 11.995632452329678,
+    "density_RyBohr3": [
+      [
+        18.850387836228,
+        -0.0,
+        -0.0
+      ],
+      [
+        -0.0,
+        18.850387836228,
+        0.0
+      ],
+      [
+        -0.0,
+        0.0,
+        18.853083787536
+      ]
+    ],
+    "core_RyBohr3": [
+      [
+        17.097282365,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        17.097282365,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        17.0975715736
+      ]
+    ]
+  },
+  "after": {
+    "diagonal_GPa": [
+      13.504903985734233,
+      13.504903985734233,
+      9.72451986777825
+    ],
+    "mean_GPa": 12.244775946415572,
+    "density_RyBohr3": [
+      [
+        18.850409070445,
+        -0.0,
+        -0.0
+      ],
+      [
+        -0.0,
+        18.850409070445,
+        0.0
+      ],
+      [
+        -0.0,
+        0.0,
+        18.853092128364
+      ]
+    ],
+    "core_RyBohr3": [
+      [
+        17.097282365,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        17.097282365,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        17.0975715736
+      ]
+    ]
+  },
+  "case": "FeSe",
+  "source": "/Users/haule/projects/materials/FeSe_again/FeSe_stress/DFT_RELA",
+  "input_hashes": {
+    "FeSe.struct": "7503825334944f3d0e646b10a60d22f4f1924768ddb27499700f64682e59be16",
+    "FeSe.clmsum": "e0097b896696c3f309d3868de13dcf4db796611309247e2d567d1763b0bba19c",
+    "FeSe.clmup": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "FeSe.clmdn": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "FeSe.in0": "1bb921ceb142731037ffe64f093784d432fa3482b6326bfed591d9590cac6dc0",
+    "FeSe.in1": "39058e05b1d10915102828cdd815adf4ba9b5ca3d7c87a964537f2a6d45cb13d",
+    "FeSe.in2": "c85783b1ed2633c0e42480f823d3e2f1c1ef2ef75449b812685c221d3035ef2a",
+    "FeSe.inc": "0ac3ab457ee4eec66d89db0f174d778051428cac83f955b3e97932ae9364fed7",
+    "FeSe.inm": "cbba28dc54651799133bfe9794bb9ba0a9ab48dc9d2d100a4757714068d609ba",
+    "FeSe.klist": "fdbbfa4febf7e879ec4b386ea778c72fee43d8949806482a5c393c9602b183b1",
+    "FeSe.kgen": "59e613fe8ff1cf9777e7b47304f7eda16905f29902e642acd23ed594d8f9c75e",
+    "FeSe.rotlm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "FeSe.vsp": "6fd231f71462a68c830957901993ff404e2f17a4cf8c01d62da55c0185a7e059",
+    "FeSe.vns": "aa73dfd0fe36f7b945f0134a460930d0fcd8baac4295afadd234461881abe91e",
+    "FeSe.clmcor": "e459d0bf3711d87efacf6b40d77b6badec1c836815cdb8892da27114d2352d19",
+    "FeSe.r2v": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "reference_dirs": [
+    "/Users/haule/projects/materials/FeSe_again/FeSe_stress/DFT_RELA_m001",
+    "/Users/haule/projects/materials/FeSe_again/FeSe_stress/DFT_RELA",
+    "/Users/haule/projects/materials/FeSe_again/FeSe_stress/DFT_RELA_p001"
+  ],
+  "energies_Ry": [
+    -14811.71733719,
+    -14811.7160405,
+    -14811.71471824
+  ],
+  "charge_distances": [
+    4e-07,
+    1e-07,
+    3e-07
+  ],
+  "Eorb_hashes": [
+    "e7739fd4cbc13d3697094c500e47547cd17460fe8a8c01f2df708202b3f74ade",
+    "e7739fd4cbc13d3697094c500e47547cd17460fe8a8c01f2df708202b3f74ade",
+    "e7739fd4cbc13d3697094c500e47547cd17460fe8a8c01f2df708202b3f74ade"
+  ],
+  "volume": 528.96251,
+  "numerical_GPa": 12.138890191714445,
+  "after_minus_numeric_GPa": 0.10588575470112715,
+  "ordinary_outputs_identical": {
+    "vsp": true,
+    "vns": true,
+    "clmcor": true
+  },
+  "reference_input_hashes": [
+    {
+      "struct": "314f3d2808715e9e6e220ec7a5b3e52d9b57b763d64b85e4eff9a84ba4e39565",
+      "in0": "1bb921ceb142731037ffe64f093784d432fa3482b6326bfed591d9590cac6dc0",
+      "in1": "1cc5080c9daaec44e602c5ebb01add0cc43e998d9b73195787b7fd2f5a0e41cb",
+      "in2": "3a2553bd25d773c11fb8b7e2aa5647164b7158f734423c443859f4ff029a4ab0",
+      "klist": "fdbbfa4febf7e879ec4b386ea778c72fee43d8949806482a5c393c9602b183b1"
+    },
+    {
+      "struct": "7503825334944f3d0e646b10a60d22f4f1924768ddb27499700f64682e59be16",
+      "in0": "1bb921ceb142731037ffe64f093784d432fa3482b6326bfed591d9590cac6dc0",
+      "in1": "39058e05b1d10915102828cdd815adf4ba9b5ca3d7c87a964537f2a6d45cb13d",
+      "in2": "c85783b1ed2633c0e42480f823d3e2f1c1ef2ef75449b812685c221d3035ef2a",
+      "klist": "fdbbfa4febf7e879ec4b386ea778c72fee43d8949806482a5c393c9602b183b1"
+    },
+    {
+      "struct": "adffb7c1382bf50458538f0b01334d83c639235b2f275c914d99985aea6cc5e7",
+      "in0": "1bb921ceb142731037ffe64f093784d432fa3482b6326bfed591d9590cac6dc0",
+      "in1": "659f2b92878595a3fbd3807d903ba9e9abdf4c75c542537b7dc5ef930308644e",
+      "in2": "72a3039d19ed4d3a53f06182e6f74fbcb1134d077437641a43dd7d9d6901cd4b",
+      "klist": "fdbbfa4febf7e879ec4b386ea778c72fee43d8949806482a5c393c9602b183b1"
+    }
+  ]
+}

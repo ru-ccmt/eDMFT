@@ -1,0 +1,3359 @@
+{
+  "minus": {
+    "core_eigenvalue_sum_Ry": -4955.15066165,
+    "density_energy_Ry": -3609.20944456,
+    "VSUM_Ry": -27.856000077,
+    "independent_K_Ry": -8592.216106287,
+    "mixer_based_K_Ry": -8592.216106291966,
+    "difference_Ry": 4.965841071680188e-09,
+    "core_electron_count": 44.0
+  },
+  "center": {
+    "core_eigenvalue_sum_Ry": -4955.3008764040005,
+    "density_energy_Ry": -3608.95768352,
+    "VSUM_Ry": -27.957338691,
+    "independent_K_Ry": -8592.215898615,
+    "mixer_based_K_Ry": -8592.215898619967,
+    "difference_Ry": 4.965841071680188e-09,
+    "core_electron_count": 44.0
+  },
+  "plus": {
+    "core_eigenvalue_sum_Ry": -4955.450580581999,
+    "density_energy_Ry": -3608.70671015,
+    "VSUM_Ry": -28.058357703,
+    "independent_K_Ry": -8592.215648434998,
+    "mixer_based_K_Ry": -8592.215648437967,
+    "difference_Ry": 2.9685907065868378e-09,
+    "core_electron_count": 44.0
+  },
+  "independent_mean_GPa": 2.933140092497021,
+  "components_mean_GPa": {
+    "core_eigenvalue_sum_Ry": -1921.372496137205,
+    "density_energy_Ry": 3220.670538527306,
+    "VSUM_Ry": -1296.3649023042722
+  },
+  "fresh_vector_consistency": {
+    "k": true,
+    "weight": true,
+    "basis": true,
+    "bands": true,
+    "pw_hash": true
+  },
+  "fresh_vectors": {
+    "minus": [
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "47af3c8323594b030cc4361b8ac4fa1860b29d14ffe95350eaf793e93a66d010"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 709,
+        "bands": 43,
+        "pw_hash": "a78995dc2416e6a4b944d7d8e64845a992125bcb32e6aa462699f24e166facbf"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "9b181305391a2fdc947081ff78bc9d2b8518c038a9dc7dbf708a8b77500884e5"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "a55e1cc8b01cb17607e767f18dca7ba9321fd73531192ec93bcd3b820a940cb1"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "219890b98c026d0aa654588debf468730f3bc5a4f98a9dcea9ad2cbe1c81cdee"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 709,
+        "bands": 43,
+        "pw_hash": "c0b0e6735b5a96778b89bf95fba32fe33ed07eeaf96c5e83d5a42ccd006dcd12"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 713,
+        "bands": 43,
+        "pw_hash": "b6f24104fcb8973204fab6d12ec7e82feec3d04c4d1c69f4caf4d7c469d2257b"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "19a5c6caac37b77e9138f53907f4c495875ba1c90880bf413d1849c18652581a"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "d6fde037a3fba85d59b7c87099e5be2b8dee11db3901ce258b622f09d259df43"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "da45cbb9a510938e1bbe9fed444f39639d0499fe1f6197208129fa856561cad4"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "2c1f0d7f68a6c313a8a41abad523729e8b676d51611c7242af68530463103711"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "32e40b2b4ac05889c43d6dde4bc4bcf34184277d0dd649c15743a3525282a28d"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "cbb0d78507c9419e5142ff4eca1c75dbabff54d42bf373a99ee7b41137117bdc"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "ef0eb90a83bd197f21e861d9cf4b6d7b82e717dcced627dc5c3a1f0ad61b8a16"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "0366553aa3bc8cdbadb0008fb95ba9b534b9d486a5c1a838f887dbf25c5a971c"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "57cb4d6805f46871d742877125b66b273471886112f7842173638cfe916077e9"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "58c2fa583d7fcdde5f32c45922c991c37790a747b7ce9b96ad75069043a93ba5"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "f8ed5bad872a2c239a56769eeda002a32d4f9638ffc14d47302dd4d3a19d6054"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "16a27186d6292877a57f811d7a69d3c9f8bdd24d47f4b29f3ba522580cf7b40f"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "188c1527e1f92625be39c2eb294e5eba52e4cdf2041032bf581bfd31ced8ba6c"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "3c708865b02c1cfe164ac9e7ba2a127230c3a93c2adf4668408fd534a757967b"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "d9ae5a958b3ba32b90437de4f7959bb5f79329ba573abc2952a9b7c374d28c42"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "7c56bbb308435b94589e77912bd121afd4206e32da1dc9397845e72dea30943d"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "69b7724dd40d83b534f219a0c801a39208661b4ceac466b79d49d9ef50395af3"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "0cd2799cd616889f114bcaf31655ba7eaab19627a0133c9739cc0073e859cc71"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 713,
+        "bands": 43,
+        "pw_hash": "663173c5b775e10c4c975e98a1104a4b107bb500455ac32aad64691356a52af6"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 708,
+        "bands": 43,
+        "pw_hash": "66e947f089b71062aa073b9d640829cccedb158f5728fb961aa1be272bd18e4b"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "38871196186c43fefb4bea237502cc495ec1a2f8b45518b87e837dfae947414f"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "83bb63fbe48a2456b9765b7291d13daeabe7c00ef714d6fc013a1e7daa13d1a3"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "cd82cc15324f7419a805f144629b3d8ab1d33abfe8f877f42f7994c025ffdbb3"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "671f4beec9f5d29ebac46837af7aa1027e1276325cc4842cd3581dc1cb977bae"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "dab7afde196f046fdf66423898efdbaf7c69009c7b81a7beb0620258d34c6e56"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 702,
+        "bands": 43,
+        "pw_hash": "e0a020b9aece3baddcf4c9f841eda4f5770179badeef5b8c647f21043063eff4"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "2ef706c66ff5b05e2134a5e05b88dd7bed8fc4271171bcd37248dd73c1574d20"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "e92bc09196deed1c9cd02885a8f18a883092ec66c39477b81abc65ee8e4f8fa5"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "c11021f78664040641573db9333da9080a40a3beb860a49650bd41127125c4fe"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "0740d42b905a79904788140a8227cadfa1bc4f081585696bdd1cf3ae5302c4a8"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "8efc1eb9da1bb47ed5af412aabfe7d740bda93092c8ebc674bc83c744e39728f"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "6af6c011f5444a5045a3586e85c49c5726b11c1aeb56d8dba1eb1630417f3a6c"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "f05f7cd6fb518647ac88f7d4fae9e22fc57a1a2cbff6f47f5b369be1253bc68e"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "249a5e8bdbf3eb6161125efc392f3e9656b8cfb45d633852db5ae44e418fe6e7"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "0ddc07d17adb0cbac57f162f79a24dec96a1a32c8f2629b261960fb248a93566"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "6efead22a0e1a879860afdced7c8c508003b86aeac809bb56d0883411d52f4b9"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "01af7dbce584ac10381eea18e9655ff4c77fa8c6dd1c855478da9571a55a204b"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "3a4ab82a8a607ad704b7e4bf013b1ca18d985ca7336b2e4a1cb5f6928ad3a37f"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "bdbadc22207d7c83694dd4692eb06fa33b5f7ff91f4e6d8230ff721bf48606f3"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 702,
+        "bands": 43,
+        "pw_hash": "a51840d53e8ba3ea5772c67e32959c154be6999b35308f128ba27243455e68d9"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 711,
+        "bands": 43,
+        "pw_hash": "b7b3bbb99ccf4bd65c6f640cececfc100deef62a7f88da8ae10e48fc6b7489c4"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 690,
+        "bands": 43,
+        "pw_hash": "545dfd8677421d0772d17c1146e0da52a13b72ca12c489116e29cacedc85db28"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "3c2ab3e6c77e87106cc7f8217268eaa95d6017cbc615088b2c3cf5468cc0618e"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "47ca5538c3d3222967ecefb16f69a0960685db667485164dc5d2af07ca5b4c3c"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "3b0912346dd93da82c5b90cd16e180362b797cb2210d029e3c43e7dd54a555c3"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 690,
+        "bands": 43,
+        "pw_hash": "21c26d57ca4625354b3fe87aed7164dd4ff1f491c016cf9755b2d44e50b59b1d"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "aa0c0303d887c16cb2b2d13780056c2162047cde887b23eaae3796abfcd908ab"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "4be8fe16df624a5b471c42fbc1180b2942ae84f61f7c5b64d87208a70f10b0ae"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "90af96d8a0117f26b2d03537baea8a5d1ae48f6b568c9412210d3806beed6244"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "eb3a390fceac858ff1561f2e224a9071eae700fbf34b2282f33c00e39c960cab"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "37ca7b65618e82e25b2b4144ccb97ca8c4115689f383f8d50f53c61eaac9b385"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "d9f3d5074a8b449775f19734f950cc231220c1d1c86f405debae9522663de139"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "52515639a62d1883fdb02948ff6f61e273886288b0bd30afeae2ec6b1558c2c3"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "e438cd8227c63a0c4c2f6eeb7cf9ac2fb3eda157d99cabe62e49f73e6d0ac55d"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "4bcbdd8c3ee62cdbc37ec5c1bb14d9afae49accf870fa513ca12a1e6c402e3d1"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "31b475e4afff697b0795eccecd9e95cb4e77be12c4ef0b941f57bd6154bc4c53"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "0c9769c9c04241445cb025ccc5d16f0221cafb28c8203dc3b1aa9bc0e540e797"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 694,
+        "bands": 43,
+        "pw_hash": "2421c93abda58024d55d3bfc2f24dc628e4736aca5f66429c96b2fd3fa707700"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "bb543144e4b7da78fcf43001721ca55f8ed69aaca0a12bf2705f85f1bcdc3e89"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "b41f85df10e8e54675f9ae654f5659998dfcba9d5dca46e8101ef6e9b26b9b6f"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "c4693f53f364212986f1ce0bdb7f270d2c8dfe56f28b880a00b63c39b75453f3"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 694,
+        "bands": 43,
+        "pw_hash": "f3ec71722fd8ea7c1c9b048eddd085f5631b2b9c848005a85a2aeaf8582d27aa"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "035ac7fdc337728e67012716859632a6647ddf117459d011673b2fcc6eed1a89"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "7122da82c2d7d01c3e4ef6e637e2db64894c5a30cae8fb43b1cace337e485b85"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "2481bc8589085cc4a7f349f7022fe49ed70419f129d09c17f6528e1bf14ffaf2"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "2cedee7c21343292f46da162db88f188d3ab729f0b8e2e2a4ed1496744a9474d"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "6e3825ccca956cf2fdd3b7ddc1baa344058c210a3e155c99916abb143c5a0f2c"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "b19c5f1174aa66c4eec1fb265e0ca871e943b1693d182e9b93a018334a50eaeb"
+      }
+    ],
+    "plus": [
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "47af3c8323594b030cc4361b8ac4fa1860b29d14ffe95350eaf793e93a66d010"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 709,
+        "bands": 43,
+        "pw_hash": "a78995dc2416e6a4b944d7d8e64845a992125bcb32e6aa462699f24e166facbf"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "9b181305391a2fdc947081ff78bc9d2b8518c038a9dc7dbf708a8b77500884e5"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "a55e1cc8b01cb17607e767f18dca7ba9321fd73531192ec93bcd3b820a940cb1"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "219890b98c026d0aa654588debf468730f3bc5a4f98a9dcea9ad2cbe1c81cdee"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 709,
+        "bands": 43,
+        "pw_hash": "c0b0e6735b5a96778b89bf95fba32fe33ed07eeaf96c5e83d5a42ccd006dcd12"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 713,
+        "bands": 43,
+        "pw_hash": "b6f24104fcb8973204fab6d12ec7e82feec3d04c4d1c69f4caf4d7c469d2257b"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "19a5c6caac37b77e9138f53907f4c495875ba1c90880bf413d1849c18652581a"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "d6fde037a3fba85d59b7c87099e5be2b8dee11db3901ce258b622f09d259df43"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "da45cbb9a510938e1bbe9fed444f39639d0499fe1f6197208129fa856561cad4"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "2c1f0d7f68a6c313a8a41abad523729e8b676d51611c7242af68530463103711"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "32e40b2b4ac05889c43d6dde4bc4bcf34184277d0dd649c15743a3525282a28d"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "cbb0d78507c9419e5142ff4eca1c75dbabff54d42bf373a99ee7b41137117bdc"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "ef0eb90a83bd197f21e861d9cf4b6d7b82e717dcced627dc5c3a1f0ad61b8a16"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "0366553aa3bc8cdbadb0008fb95ba9b534b9d486a5c1a838f887dbf25c5a971c"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "57cb4d6805f46871d742877125b66b273471886112f7842173638cfe916077e9"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "58c2fa583d7fcdde5f32c45922c991c37790a747b7ce9b96ad75069043a93ba5"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "f8ed5bad872a2c239a56769eeda002a32d4f9638ffc14d47302dd4d3a19d6054"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "16a27186d6292877a57f811d7a69d3c9f8bdd24d47f4b29f3ba522580cf7b40f"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "188c1527e1f92625be39c2eb294e5eba52e4cdf2041032bf581bfd31ced8ba6c"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "3c708865b02c1cfe164ac9e7ba2a127230c3a93c2adf4668408fd534a757967b"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "d9ae5a958b3ba32b90437de4f7959bb5f79329ba573abc2952a9b7c374d28c42"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "7c56bbb308435b94589e77912bd121afd4206e32da1dc9397845e72dea30943d"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "69b7724dd40d83b534f219a0c801a39208661b4ceac466b79d49d9ef50395af3"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "0cd2799cd616889f114bcaf31655ba7eaab19627a0133c9739cc0073e859cc71"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 713,
+        "bands": 43,
+        "pw_hash": "663173c5b775e10c4c975e98a1104a4b107bb500455ac32aad64691356a52af6"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 708,
+        "bands": 43,
+        "pw_hash": "66e947f089b71062aa073b9d640829cccedb158f5728fb961aa1be272bd18e4b"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "38871196186c43fefb4bea237502cc495ec1a2f8b45518b87e837dfae947414f"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "83bb63fbe48a2456b9765b7291d13daeabe7c00ef714d6fc013a1e7daa13d1a3"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "cd82cc15324f7419a805f144629b3d8ab1d33abfe8f877f42f7994c025ffdbb3"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "671f4beec9f5d29ebac46837af7aa1027e1276325cc4842cd3581dc1cb977bae"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "dab7afde196f046fdf66423898efdbaf7c69009c7b81a7beb0620258d34c6e56"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 702,
+        "bands": 43,
+        "pw_hash": "e0a020b9aece3baddcf4c9f841eda4f5770179badeef5b8c647f21043063eff4"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "2ef706c66ff5b05e2134a5e05b88dd7bed8fc4271171bcd37248dd73c1574d20"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "e92bc09196deed1c9cd02885a8f18a883092ec66c39477b81abc65ee8e4f8fa5"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "c11021f78664040641573db9333da9080a40a3beb860a49650bd41127125c4fe"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "0740d42b905a79904788140a8227cadfa1bc4f081585696bdd1cf3ae5302c4a8"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "8efc1eb9da1bb47ed5af412aabfe7d740bda93092c8ebc674bc83c744e39728f"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "6af6c011f5444a5045a3586e85c49c5726b11c1aeb56d8dba1eb1630417f3a6c"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "f05f7cd6fb518647ac88f7d4fae9e22fc57a1a2cbff6f47f5b369be1253bc68e"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "249a5e8bdbf3eb6161125efc392f3e9656b8cfb45d633852db5ae44e418fe6e7"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "0ddc07d17adb0cbac57f162f79a24dec96a1a32c8f2629b261960fb248a93566"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "6efead22a0e1a879860afdced7c8c508003b86aeac809bb56d0883411d52f4b9"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "01af7dbce584ac10381eea18e9655ff4c77fa8c6dd1c855478da9571a55a204b"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "3a4ab82a8a607ad704b7e4bf013b1ca18d985ca7336b2e4a1cb5f6928ad3a37f"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "bdbadc22207d7c83694dd4692eb06fa33b5f7ff91f4e6d8230ff721bf48606f3"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 702,
+        "bands": 43,
+        "pw_hash": "a51840d53e8ba3ea5772c67e32959c154be6999b35308f128ba27243455e68d9"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 711,
+        "bands": 43,
+        "pw_hash": "b7b3bbb99ccf4bd65c6f640cececfc100deef62a7f88da8ae10e48fc6b7489c4"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 690,
+        "bands": 43,
+        "pw_hash": "545dfd8677421d0772d17c1146e0da52a13b72ca12c489116e29cacedc85db28"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "3c2ab3e6c77e87106cc7f8217268eaa95d6017cbc615088b2c3cf5468cc0618e"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "47ca5538c3d3222967ecefb16f69a0960685db667485164dc5d2af07ca5b4c3c"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "3b0912346dd93da82c5b90cd16e180362b797cb2210d029e3c43e7dd54a555c3"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 690,
+        "bands": 43,
+        "pw_hash": "21c26d57ca4625354b3fe87aed7164dd4ff1f491c016cf9755b2d44e50b59b1d"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "aa0c0303d887c16cb2b2d13780056c2162047cde887b23eaae3796abfcd908ab"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "4be8fe16df624a5b471c42fbc1180b2942ae84f61f7c5b64d87208a70f10b0ae"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "90af96d8a0117f26b2d03537baea8a5d1ae48f6b568c9412210d3806beed6244"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "eb3a390fceac858ff1561f2e224a9071eae700fbf34b2282f33c00e39c960cab"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "37ca7b65618e82e25b2b4144ccb97ca8c4115689f383f8d50f53c61eaac9b385"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "d9f3d5074a8b449775f19734f950cc231220c1d1c86f405debae9522663de139"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "52515639a62d1883fdb02948ff6f61e273886288b0bd30afeae2ec6b1558c2c3"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "e438cd8227c63a0c4c2f6eeb7cf9ac2fb3eda157d99cabe62e49f73e6d0ac55d"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "4bcbdd8c3ee62cdbc37ec5c1bb14d9afae49accf870fa513ca12a1e6c402e3d1"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "31b475e4afff697b0795eccecd9e95cb4e77be12c4ef0b941f57bd6154bc4c53"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "0c9769c9c04241445cb025ccc5d16f0221cafb28c8203dc3b1aa9bc0e540e797"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 694,
+        "bands": 43,
+        "pw_hash": "2421c93abda58024d55d3bfc2f24dc628e4736aca5f66429c96b2fd3fa707700"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "bb543144e4b7da78fcf43001721ca55f8ed69aaca0a12bf2705f85f1bcdc3e89"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "b41f85df10e8e54675f9ae654f5659998dfcba9d5dca46e8101ef6e9b26b9b6f"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "c4693f53f364212986f1ce0bdb7f270d2c8dfe56f28b880a00b63c39b75453f3"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 694,
+        "bands": 43,
+        "pw_hash": "f3ec71722fd8ea7c1c9b048eddd085f5631b2b9c848005a85a2aeaf8582d27aa"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "035ac7fdc337728e67012716859632a6647ddf117459d011673b2fcc6eed1a89"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "7122da82c2d7d01c3e4ef6e637e2db64894c5a30cae8fb43b1cace337e485b85"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "2481bc8589085cc4a7f349f7022fe49ed70419f129d09c17f6528e1bf14ffaf2"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "2cedee7c21343292f46da162db88f188d3ab729f0b8e2e2a4ed1496744a9474d"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "6e3825ccca956cf2fdd3b7ddc1baa344058c210a3e155c99916abb143c5a0f2c"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "b19c5f1174aa66c4eec1fb265e0ca871e943b1693d182e9b93a018334a50eaeb"
+      }
+    ],
+    "half_minus": [
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "47af3c8323594b030cc4361b8ac4fa1860b29d14ffe95350eaf793e93a66d010"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 709,
+        "bands": 43,
+        "pw_hash": "a78995dc2416e6a4b944d7d8e64845a992125bcb32e6aa462699f24e166facbf"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "9b181305391a2fdc947081ff78bc9d2b8518c038a9dc7dbf708a8b77500884e5"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "a55e1cc8b01cb17607e767f18dca7ba9321fd73531192ec93bcd3b820a940cb1"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "219890b98c026d0aa654588debf468730f3bc5a4f98a9dcea9ad2cbe1c81cdee"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 709,
+        "bands": 43,
+        "pw_hash": "c0b0e6735b5a96778b89bf95fba32fe33ed07eeaf96c5e83d5a42ccd006dcd12"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 713,
+        "bands": 43,
+        "pw_hash": "b6f24104fcb8973204fab6d12ec7e82feec3d04c4d1c69f4caf4d7c469d2257b"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "19a5c6caac37b77e9138f53907f4c495875ba1c90880bf413d1849c18652581a"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "d6fde037a3fba85d59b7c87099e5be2b8dee11db3901ce258b622f09d259df43"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "da45cbb9a510938e1bbe9fed444f39639d0499fe1f6197208129fa856561cad4"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "2c1f0d7f68a6c313a8a41abad523729e8b676d51611c7242af68530463103711"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "32e40b2b4ac05889c43d6dde4bc4bcf34184277d0dd649c15743a3525282a28d"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "cbb0d78507c9419e5142ff4eca1c75dbabff54d42bf373a99ee7b41137117bdc"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "ef0eb90a83bd197f21e861d9cf4b6d7b82e717dcced627dc5c3a1f0ad61b8a16"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "0366553aa3bc8cdbadb0008fb95ba9b534b9d486a5c1a838f887dbf25c5a971c"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "57cb4d6805f46871d742877125b66b273471886112f7842173638cfe916077e9"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "58c2fa583d7fcdde5f32c45922c991c37790a747b7ce9b96ad75069043a93ba5"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "f8ed5bad872a2c239a56769eeda002a32d4f9638ffc14d47302dd4d3a19d6054"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "16a27186d6292877a57f811d7a69d3c9f8bdd24d47f4b29f3ba522580cf7b40f"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "188c1527e1f92625be39c2eb294e5eba52e4cdf2041032bf581bfd31ced8ba6c"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "3c708865b02c1cfe164ac9e7ba2a127230c3a93c2adf4668408fd534a757967b"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "d9ae5a958b3ba32b90437de4f7959bb5f79329ba573abc2952a9b7c374d28c42"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "7c56bbb308435b94589e77912bd121afd4206e32da1dc9397845e72dea30943d"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "69b7724dd40d83b534f219a0c801a39208661b4ceac466b79d49d9ef50395af3"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "0cd2799cd616889f114bcaf31655ba7eaab19627a0133c9739cc0073e859cc71"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 713,
+        "bands": 43,
+        "pw_hash": "663173c5b775e10c4c975e98a1104a4b107bb500455ac32aad64691356a52af6"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 708,
+        "bands": 43,
+        "pw_hash": "66e947f089b71062aa073b9d640829cccedb158f5728fb961aa1be272bd18e4b"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "38871196186c43fefb4bea237502cc495ec1a2f8b45518b87e837dfae947414f"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "83bb63fbe48a2456b9765b7291d13daeabe7c00ef714d6fc013a1e7daa13d1a3"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "cd82cc15324f7419a805f144629b3d8ab1d33abfe8f877f42f7994c025ffdbb3"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "671f4beec9f5d29ebac46837af7aa1027e1276325cc4842cd3581dc1cb977bae"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "dab7afde196f046fdf66423898efdbaf7c69009c7b81a7beb0620258d34c6e56"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 702,
+        "bands": 43,
+        "pw_hash": "e0a020b9aece3baddcf4c9f841eda4f5770179badeef5b8c647f21043063eff4"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "2ef706c66ff5b05e2134a5e05b88dd7bed8fc4271171bcd37248dd73c1574d20"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "e92bc09196deed1c9cd02885a8f18a883092ec66c39477b81abc65ee8e4f8fa5"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "c11021f78664040641573db9333da9080a40a3beb860a49650bd41127125c4fe"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "0740d42b905a79904788140a8227cadfa1bc4f081585696bdd1cf3ae5302c4a8"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "8efc1eb9da1bb47ed5af412aabfe7d740bda93092c8ebc674bc83c744e39728f"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "6af6c011f5444a5045a3586e85c49c5726b11c1aeb56d8dba1eb1630417f3a6c"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "f05f7cd6fb518647ac88f7d4fae9e22fc57a1a2cbff6f47f5b369be1253bc68e"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "249a5e8bdbf3eb6161125efc392f3e9656b8cfb45d633852db5ae44e418fe6e7"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "0ddc07d17adb0cbac57f162f79a24dec96a1a32c8f2629b261960fb248a93566"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "6efead22a0e1a879860afdced7c8c508003b86aeac809bb56d0883411d52f4b9"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "01af7dbce584ac10381eea18e9655ff4c77fa8c6dd1c855478da9571a55a204b"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "3a4ab82a8a607ad704b7e4bf013b1ca18d985ca7336b2e4a1cb5f6928ad3a37f"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "bdbadc22207d7c83694dd4692eb06fa33b5f7ff91f4e6d8230ff721bf48606f3"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 702,
+        "bands": 43,
+        "pw_hash": "a51840d53e8ba3ea5772c67e32959c154be6999b35308f128ba27243455e68d9"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 711,
+        "bands": 43,
+        "pw_hash": "b7b3bbb99ccf4bd65c6f640cececfc100deef62a7f88da8ae10e48fc6b7489c4"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 690,
+        "bands": 43,
+        "pw_hash": "545dfd8677421d0772d17c1146e0da52a13b72ca12c489116e29cacedc85db28"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "3c2ab3e6c77e87106cc7f8217268eaa95d6017cbc615088b2c3cf5468cc0618e"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "47ca5538c3d3222967ecefb16f69a0960685db667485164dc5d2af07ca5b4c3c"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "3b0912346dd93da82c5b90cd16e180362b797cb2210d029e3c43e7dd54a555c3"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 690,
+        "bands": 43,
+        "pw_hash": "21c26d57ca4625354b3fe87aed7164dd4ff1f491c016cf9755b2d44e50b59b1d"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "aa0c0303d887c16cb2b2d13780056c2162047cde887b23eaae3796abfcd908ab"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "4be8fe16df624a5b471c42fbc1180b2942ae84f61f7c5b64d87208a70f10b0ae"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "90af96d8a0117f26b2d03537baea8a5d1ae48f6b568c9412210d3806beed6244"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "eb3a390fceac858ff1561f2e224a9071eae700fbf34b2282f33c00e39c960cab"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "37ca7b65618e82e25b2b4144ccb97ca8c4115689f383f8d50f53c61eaac9b385"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "d9f3d5074a8b449775f19734f950cc231220c1d1c86f405debae9522663de139"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "52515639a62d1883fdb02948ff6f61e273886288b0bd30afeae2ec6b1558c2c3"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "e438cd8227c63a0c4c2f6eeb7cf9ac2fb3eda157d99cabe62e49f73e6d0ac55d"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "4bcbdd8c3ee62cdbc37ec5c1bb14d9afae49accf870fa513ca12a1e6c402e3d1"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "31b475e4afff697b0795eccecd9e95cb4e77be12c4ef0b941f57bd6154bc4c53"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "0c9769c9c04241445cb025ccc5d16f0221cafb28c8203dc3b1aa9bc0e540e797"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 694,
+        "bands": 43,
+        "pw_hash": "2421c93abda58024d55d3bfc2f24dc628e4736aca5f66429c96b2fd3fa707700"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "bb543144e4b7da78fcf43001721ca55f8ed69aaca0a12bf2705f85f1bcdc3e89"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "b41f85df10e8e54675f9ae654f5659998dfcba9d5dca46e8101ef6e9b26b9b6f"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "c4693f53f364212986f1ce0bdb7f270d2c8dfe56f28b880a00b63c39b75453f3"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 694,
+        "bands": 43,
+        "pw_hash": "f3ec71722fd8ea7c1c9b048eddd085f5631b2b9c848005a85a2aeaf8582d27aa"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "035ac7fdc337728e67012716859632a6647ddf117459d011673b2fcc6eed1a89"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "7122da82c2d7d01c3e4ef6e637e2db64894c5a30cae8fb43b1cace337e485b85"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "2481bc8589085cc4a7f349f7022fe49ed70419f129d09c17f6528e1bf14ffaf2"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "2cedee7c21343292f46da162db88f188d3ab729f0b8e2e2a4ed1496744a9474d"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "6e3825ccca956cf2fdd3b7ddc1baa344058c210a3e155c99916abb143c5a0f2c"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "b19c5f1174aa66c4eec1fb265e0ca871e943b1693d182e9b93a018334a50eaeb"
+      }
+    ],
+    "half_plus": [
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "47af3c8323594b030cc4361b8ac4fa1860b29d14ffe95350eaf793e93a66d010"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 709,
+        "bands": 43,
+        "pw_hash": "a78995dc2416e6a4b944d7d8e64845a992125bcb32e6aa462699f24e166facbf"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "9b181305391a2fdc947081ff78bc9d2b8518c038a9dc7dbf708a8b77500884e5"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "a55e1cc8b01cb17607e767f18dca7ba9321fd73531192ec93bcd3b820a940cb1"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "219890b98c026d0aa654588debf468730f3bc5a4f98a9dcea9ad2cbe1c81cdee"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 709,
+        "bands": 43,
+        "pw_hash": "c0b0e6735b5a96778b89bf95fba32fe33ed07eeaf96c5e83d5a42ccd006dcd12"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 713,
+        "bands": 43,
+        "pw_hash": "b6f24104fcb8973204fab6d12ec7e82feec3d04c4d1c69f4caf4d7c469d2257b"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "19a5c6caac37b77e9138f53907f4c495875ba1c90880bf413d1849c18652581a"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "d6fde037a3fba85d59b7c87099e5be2b8dee11db3901ce258b622f09d259df43"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "da45cbb9a510938e1bbe9fed444f39639d0499fe1f6197208129fa856561cad4"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "2c1f0d7f68a6c313a8a41abad523729e8b676d51611c7242af68530463103711"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "32e40b2b4ac05889c43d6dde4bc4bcf34184277d0dd649c15743a3525282a28d"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "cbb0d78507c9419e5142ff4eca1c75dbabff54d42bf373a99ee7b41137117bdc"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "ef0eb90a83bd197f21e861d9cf4b6d7b82e717dcced627dc5c3a1f0ad61b8a16"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "0366553aa3bc8cdbadb0008fb95ba9b534b9d486a5c1a838f887dbf25c5a971c"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "57cb4d6805f46871d742877125b66b273471886112f7842173638cfe916077e9"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "58c2fa583d7fcdde5f32c45922c991c37790a747b7ce9b96ad75069043a93ba5"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "f8ed5bad872a2c239a56769eeda002a32d4f9638ffc14d47302dd4d3a19d6054"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "16a27186d6292877a57f811d7a69d3c9f8bdd24d47f4b29f3ba522580cf7b40f"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "188c1527e1f92625be39c2eb294e5eba52e4cdf2041032bf581bfd31ced8ba6c"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "3c708865b02c1cfe164ac9e7ba2a127230c3a93c2adf4668408fd534a757967b"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "d9ae5a958b3ba32b90437de4f7959bb5f79329ba573abc2952a9b7c374d28c42"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "7c56bbb308435b94589e77912bd121afd4206e32da1dc9397845e72dea30943d"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "69b7724dd40d83b534f219a0c801a39208661b4ceac466b79d49d9ef50395af3"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "0cd2799cd616889f114bcaf31655ba7eaab19627a0133c9739cc0073e859cc71"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 713,
+        "bands": 43,
+        "pw_hash": "663173c5b775e10c4c975e98a1104a4b107bb500455ac32aad64691356a52af6"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 708,
+        "bands": 43,
+        "pw_hash": "66e947f089b71062aa073b9d640829cccedb158f5728fb961aa1be272bd18e4b"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "38871196186c43fefb4bea237502cc495ec1a2f8b45518b87e837dfae947414f"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "83bb63fbe48a2456b9765b7291d13daeabe7c00ef714d6fc013a1e7daa13d1a3"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "cd82cc15324f7419a805f144629b3d8ab1d33abfe8f877f42f7994c025ffdbb3"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 707,
+        "bands": 43,
+        "pw_hash": "671f4beec9f5d29ebac46837af7aa1027e1276325cc4842cd3581dc1cb977bae"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "dab7afde196f046fdf66423898efdbaf7c69009c7b81a7beb0620258d34c6e56"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 702,
+        "bands": 43,
+        "pw_hash": "e0a020b9aece3baddcf4c9f841eda4f5770179badeef5b8c647f21043063eff4"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "2ef706c66ff5b05e2134a5e05b88dd7bed8fc4271171bcd37248dd73c1574d20"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "e92bc09196deed1c9cd02885a8f18a883092ec66c39477b81abc65ee8e4f8fa5"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "c11021f78664040641573db9333da9080a40a3beb860a49650bd41127125c4fe"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "0740d42b905a79904788140a8227cadfa1bc4f081585696bdd1cf3ae5302c4a8"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "8efc1eb9da1bb47ed5af412aabfe7d740bda93092c8ebc674bc83c744e39728f"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "6af6c011f5444a5045a3586e85c49c5726b11c1aeb56d8dba1eb1630417f3a6c"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "f05f7cd6fb518647ac88f7d4fae9e22fc57a1a2cbff6f47f5b369be1253bc68e"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "249a5e8bdbf3eb6161125efc392f3e9656b8cfb45d633852db5ae44e418fe6e7"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "0ddc07d17adb0cbac57f162f79a24dec96a1a32c8f2629b261960fb248a93566"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "6efead22a0e1a879860afdced7c8c508003b86aeac809bb56d0883411d52f4b9"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "01af7dbce584ac10381eea18e9655ff4c77fa8c6dd1c855478da9571a55a204b"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "3a4ab82a8a607ad704b7e4bf013b1ca18d985ca7336b2e4a1cb5f6928ad3a37f"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 703,
+        "bands": 43,
+        "pw_hash": "bdbadc22207d7c83694dd4692eb06fa33b5f7ff91f4e6d8230ff721bf48606f3"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 702,
+        "bands": 43,
+        "pw_hash": "a51840d53e8ba3ea5772c67e32959c154be6999b35308f128ba27243455e68d9"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 711,
+        "bands": 43,
+        "pw_hash": "b7b3bbb99ccf4bd65c6f640cececfc100deef62a7f88da8ae10e48fc6b7489c4"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 690,
+        "bands": 43,
+        "pw_hash": "545dfd8677421d0772d17c1146e0da52a13b72ca12c489116e29cacedc85db28"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "3c2ab3e6c77e87106cc7f8217268eaa95d6017cbc615088b2c3cf5468cc0618e"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 701,
+        "bands": 43,
+        "pw_hash": "47ca5538c3d3222967ecefb16f69a0960685db667485164dc5d2af07ca5b4c3c"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 697,
+        "bands": 43,
+        "pw_hash": "3b0912346dd93da82c5b90cd16e180362b797cb2210d029e3c43e7dd54a555c3"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 690,
+        "bands": 43,
+        "pw_hash": "21c26d57ca4625354b3fe87aed7164dd4ff1f491c016cf9755b2d44e50b59b1d"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "aa0c0303d887c16cb2b2d13780056c2162047cde887b23eaae3796abfcd908ab"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "4be8fe16df624a5b471c42fbc1180b2942ae84f61f7c5b64d87208a70f10b0ae"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "90af96d8a0117f26b2d03537baea8a5d1ae48f6b568c9412210d3806beed6244"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "eb3a390fceac858ff1561f2e224a9071eae700fbf34b2282f33c00e39c960cab"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "37ca7b65618e82e25b2b4144ccb97ca8c4115689f383f8d50f53c61eaac9b385"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "d9f3d5074a8b449775f19734f950cc231220c1d1c86f405debae9522663de139"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "52515639a62d1883fdb02948ff6f61e273886288b0bd30afeae2ec6b1558c2c3"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 698,
+        "bands": 43,
+        "pw_hash": "e438cd8227c63a0c4c2f6eeb7cf9ac2fb3eda157d99cabe62e49f73e6d0ac55d"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "4bcbdd8c3ee62cdbc37ec5c1bb14d9afae49accf870fa513ca12a1e6c402e3d1"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 691,
+        "bands": 43,
+        "pw_hash": "31b475e4afff697b0795eccecd9e95cb4e77be12c4ef0b941f57bd6154bc4c53"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 699,
+        "bands": 43,
+        "pw_hash": "0c9769c9c04241445cb025ccc5d16f0221cafb28c8203dc3b1aa9bc0e540e797"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 694,
+        "bands": 43,
+        "pw_hash": "2421c93abda58024d55d3bfc2f24dc628e4736aca5f66429c96b2fd3fa707700"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.05
+        ],
+        "weight": 16.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "bb543144e4b7da78fcf43001721ca55f8ed69aaca0a12bf2705f85f1bcdc3e89"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.15
+        ],
+        "weight": 16.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "b41f85df10e8e54675f9ae654f5659998dfcba9d5dca46e8101ef6e9b26b9b6f"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.25
+        ],
+        "weight": 16.0,
+        "basis": 692,
+        "bands": 43,
+        "pw_hash": "c4693f53f364212986f1ce0bdb7f270d2c8dfe56f28b880a00b63c39b75453f3"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.35
+        ],
+        "weight": 16.0,
+        "basis": 694,
+        "bands": 43,
+        "pw_hash": "f3ec71722fd8ea7c1c9b048eddd085f5631b2b9c848005a85a2aeaf8582d27aa"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.45
+        ],
+        "weight": 16.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "035ac7fdc337728e67012716859632a6647ddf117459d011673b2fcc6eed1a89"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.05
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "7122da82c2d7d01c3e4ef6e637e2db64894c5a30cae8fb43b1cace337e485b85"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.15
+        ],
+        "weight": 8.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "2481bc8589085cc4a7f349f7022fe49ed70419f129d09c17f6528e1bf14ffaf2"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.25
+        ],
+        "weight": 8.0,
+        "basis": 693,
+        "bands": 43,
+        "pw_hash": "2cedee7c21343292f46da162db88f188d3ab729f0b8e2e2a4ed1496744a9474d"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.35
+        ],
+        "weight": 8.0,
+        "basis": 695,
+        "bands": 43,
+        "pw_hash": "6e3825ccca956cf2fdd3b7ddc1baa344058c210a3e155c99916abb143c5a0f2c"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.45
+        ],
+        "weight": 8.0,
+        "basis": 696,
+        "bands": 43,
+        "pw_hash": "b19c5f1174aa66c4eec1fb265e0ca871e943b1693d182e9b93a018334a50eaeb"
+      }
+    ]
+  },
+  "all_four_strained_vectors_match": {
+    "k": true,
+    "weight": true,
+    "basis": true,
+    "bands": true,
+    "pw_hash": true
+  }
+}

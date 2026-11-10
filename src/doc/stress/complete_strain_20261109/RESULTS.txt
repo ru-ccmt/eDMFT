@@ -1,0 +1,95 @@
+UPDATED STRESS RESULTS AND SPEED — 9 NOVEMBER 2026
+
+Status: approved package INSTALLED; see POST_INSTALLATION.txt for verification.
+Material inputs and ordinary production WIEN executables remain unchanged.
+Scratch native convergence and mixer tests used copied inputs only.
+
+All values below are mean tensile stress in GPa, tr(sigma)/3.
+For hydrostatic eta, this is (dK/deta)/(3 Omega), not (dK/deta)/Omega.
+The native :PRESSURE: label in these runs uses this same sign convention.
+Thermodynamic compression-positive pressure is the negative.
+
+Material          RKMAX  Model      Analytic        Numeric       Delta      h
+SrVO3              8     NREL/LDA    2.933955150  2.933152904  0.000802246 0.001
+FeSe               8     RELA/PBE   -1.048592646 -1.048711378  0.000118732 0.0005
+
+FeSe original relaxed +/-0.001: -1.049104105 GPa.
+FeSe new tightened +/-0.0005:   -1.048711378 GPa.
+New central FeSe reconvergence changes the analytic result by ~0.00024 GPa.
+The remaining ~0.00012 GPa is below the measured step-size shift. It is not
+a proof of exact agreement or a bound for other materials/strain components.
+
+SrVO3 fresh native replay of the original endpoints: +2.933054994 GPa.
+The original recorded-energy finite difference above is +2.933152904 GPa.
+Historical independent Nov7 smaller-step/Richardson values were +2.933836/
++2.934020 GPa; these support step convergence but were not rerun this turn.
+
+Full diagonal tensors within imposed charge symmetry:
+SrVO3: sigma_xx=2.942121284, sigma_yy=2.942121284, sigma_zz=2.917622882 GPa
+FeSe: sigma_xx=-0.623695001, sigma_yy=-0.623695001, sigma_zz=-1.898387936 GPa
+Off-diagonal entries vanish in this constrained symmetry space. Axial charge
+sources pass native tests, but independently relaxed axial stress endpoints
+have not yet validated these anisotropic components. Small frozen-Sigma
+symmetry defects are reported; these are not unrestricted-tensor results.
+
+What changed:
+- Completed the native density/core/trace-log functional and its shared adjoint.
+- Included analytic motion of automatically searched radial energy parameters.
+  Fixed-energy FeSe was -1.91246 GPa; searched-energy response brought it to
+  -1.03709 GPa before central refinement and the final coordinate correction.
+- Removed the second, artificial central-coordinate normalization after
+  inverse density transport. This fixes -0.01174451 GPa in refined FeSe and
+  -0.00061209 GPa in SrVO3. See COORDINATE_CORRECTION.txt.
+- Connected isolated native preparation, the generic analytic driver and SCF
+  publication with native mixer signs and stale-input/report checks.
+
+Independent validation:
+- 256 regression tests pass, no skips, including native radial/Hartree and
+  normalization reference libraries.
+- Native C_DEN scalar agrees at central states to ~3e-12 Ry or better.
+- Native SELECT roots agree with vector energies to a few 1e-8 Ry.
+- Physical axial FeSe source agrees with native differences to ~1e-6 relative.
+- Independent nonlinear trace-log vs native VSUM derivative agrees within
+  2.6e-6 Ry per unit strain.
+- The complete functional on the ACTUAL relaxed physical density tangent
+  gives FeSe -1.048603087 GPa, within 0.00001044 GPa of the analytic response.
+- Forward and adjoint full readouts agreed within 1e-6 GPa before the final
+  explicit-source-only correction; its changed-source identity is exact.
+- Native SCF/mixer publication tested separately in disposable copied inputs.
+
+Timing and memory (serial response on this laptop):
+- SrVO3: 605.1 s (10.08 min), peak RSS 13.77 GB.
+- FeSe: 964.9 s (16.08 min), peak RSS 17.12 GB.
+The timings start from prepared central native exports, include building the
+response contexts, both independent sources and one adjoint, and exclude the
+ordinary production dmft2 pass. Native export preparation adds tens of seconds.
+The FeSe timing is the full optimized driver run before the last source-only
+fix; the final result reuses its unchanged J/c/adjoint and recontracts the
+corrected sources. SrVO3 is a fresh full run with that fix. Development jobs
+overlapped portions of these runs; do not interpret these as clean scaling
+benchmarks or promise the same wall time under load.
+
+Controlled warm ABBA benchmark of a complete FeSe adjoint action:
+  original matrix contractions: 43.5727 s
+  optimized contractions:        30.6833 s
+  speedup:                       1.4201x
+  relative output difference:    1.42e-13
+The alias-free FFT layout/length test separately gave 1.081x in FeSe and
+1.022x in SrVO3 for the density FFT suboperation, with roundoff agreement.
+These gains are not multiplicative claims for total runtime.
+
+Remaining scope and next work:
+- General shear/non-orthogonal lattices, magnetic MnTe, fixed-mu MnO and SOC
+  are rejected by this integrated driver and have no updated numbers here.
+- The local Sigma and DC are frozen; no impurity two-particle vertex is added.
+- Fixed RMT and local frames; ordinary radial searches only, not HDLO/p1/2.
+- MPI over k points and reuse of production central exports should reduce
+  preparation and contraction time; response is still too expensive to run
+  at every inner charge iteration. It remains final-only in run_dmft.py.
+- Force-window/normalization response is explicitly saved as the next audit,
+  after strain validation. No force code was changed in this checkpoint.
+
+See IMPLEMENTATION.txt for equations/workflow, COORDINATE_CORRECTION.txt for
+the last missing source term, and evidence/ for numerical reports.
+complete_strain.patch and manifest.json are ready for review. The installer
+checked all original hashes and made backups; installation is verified.

@@ -1,0 +1,258 @@
+[
+  {
+    "name": "FeSe/0.125/FeSe.struct",
+    "sha256": "7503825334944f3d0e646b10a60d22f4f1924768ddb27499700f64682e59be16"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.in1",
+    "sha256": "9c5e4711a33f58151f3befad7fe5b8f84dcddcb6625c0ce652642234fcbb124d"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.in1c",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.in2",
+    "sha256": "438acbb01164492004a00be73ebf6c0f557c0a2f0607860430221dcc727056c2"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.indmf2",
+    "sha256": "e725b4ce74b6a5c3ed55b3d2a742d7eb4bb67a4b537512ceba56a1a5b91e23c0"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.indmfl",
+    "sha256": "115434d74ef65410b8f05d45e66fdc559cef155ccadbf6ac5bc9df1b76dbe244"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.klist",
+    "sha256": "8699fc48071d9fab2ee047703e00f07edbce4debdf282b77e032345af0d9c046"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.vsp",
+    "sha256": "6cc7fd2579cd110d54bd2f902d6e6438ab189863aa5c99b612c14655c13aadc0"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.vns",
+    "sha256": "b75d42566487a3b331825d70362a21e8711ede2683dd5a8d2a5aa6a32e16f215"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.clmval",
+    "sha256": "883c0251adb24861ece5b27df73599f9c5e642809da71ad92867258931ba8dd1"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.scf1",
+    "sha256": "28df1adcb0bc85603e0986e5b2cc8215f91b524f105f39862caf8e77c576f699"
+  },
+  {
+    "name": "FeSe/0.125/FeSe.scf2",
+    "sha256": "48bb26d9c73362cf03e0a5d657fd84fde7da074ccccc93b92c9e2a1e0ca22fcc"
+  },
+  {
+    "name": "FeSe/0.125/EF.dat",
+    "sha256": "c2b29f9abb0685649350f7cf20787d3079732ff66239602206956efdec3c5a11"
+  },
+  {
+    "name": "FeSe/0.125/lapw1.def",
+    "sha256": "6eea04cb1db2e1ef6bcb9fc580a31f830d5ad6f0038b5650cd5b890838b3dbf0"
+  },
+  {
+    "name": "FeSe/0.125/dmft2.def",
+    "sha256": "1ca5734815b2e325f80db942b141f1ce4df482699ec6b6c18a7b471275bd5e75"
+  },
+  {
+    "name": "FeSe/0.125/lapw1.log",
+    "sha256": "992c5791a326389751413ae4e1d79ef5241baf6fec506b780e0f0fe61ecefebb"
+  },
+  {
+    "name": "FeSe/0.125/dmft2.log",
+    "sha256": "9119297f7650882ee30c7da0d1ab360a88b8c8258d8ecc450fec5f7dfaa48f28"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.struct",
+    "sha256": "7503825334944f3d0e646b10a60d22f4f1924768ddb27499700f64682e59be16"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.in1",
+    "sha256": "cfef3e31baa231ddbbf5a263de05dc40a9cd7374037dee8b8288c54d96e9b64a"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.in1c",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.in2",
+    "sha256": "438acbb01164492004a00be73ebf6c0f557c0a2f0607860430221dcc727056c2"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.indmf2",
+    "sha256": "e7bf79928532672bb4616366acb9d1acb0b68d2681c95a187fd02d38d688f27c"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.indmfl",
+    "sha256": "115434d74ef65410b8f05d45e66fdc559cef155ccadbf6ac5bc9df1b76dbe244"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.klist",
+    "sha256": "8699fc48071d9fab2ee047703e00f07edbce4debdf282b77e032345af0d9c046"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.vsp",
+    "sha256": "58714a36ed527e3c60f8f9863dc314c4badba9e48edc245518c6b158d08574a6"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.vns",
+    "sha256": "5112d1567ead8ece9951ac16b45b882b06d62cc3aa590545a4c5c797db9b307e"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.clmval",
+    "sha256": "499ed721b4e94146645469c5a71684ae00124f9e8fe9b01244587bff42223457"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.scf1",
+    "sha256": "51a743705e9f1b2494a7717a4b70c33f32ccb9876776c14b17d1171a2a936482"
+  },
+  {
+    "name": "FeSe/-0.125/FeSe.scf2",
+    "sha256": "4ef424301fa9c429042c5dd7a55dceb4d3348b816fac8bef970c9d5edb3befac"
+  },
+  {
+    "name": "FeSe/-0.125/EF.dat",
+    "sha256": "eda07fda874df7757c21beb63c3afe3188b2ec7c8b5e3d9ba792f863604936d9"
+  },
+  {
+    "name": "FeSe/-0.125/lapw1.def",
+    "sha256": "6eea04cb1db2e1ef6bcb9fc580a31f830d5ad6f0038b5650cd5b890838b3dbf0"
+  },
+  {
+    "name": "FeSe/-0.125/dmft2.def",
+    "sha256": "1ca5734815b2e325f80db942b141f1ce4df482699ec6b6c18a7b471275bd5e75"
+  },
+  {
+    "name": "FeSe/-0.125/lapw1.log",
+    "sha256": "992c5791a326389751413ae4e1d79ef5241baf6fec506b780e0f0fe61ecefebb"
+  },
+  {
+    "name": "FeSe/-0.125/dmft2.log",
+    "sha256": "679eeeb3258024e25b2ee869a65c64aeefe2d02c272faa8f73a68d0dd782dd74"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.struct",
+    "sha256": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.in1c",
+    "sha256": "de140c0a827ee06078a7b63451e847a52c8ce262a9dd0d61567470635d598814"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.indmf2",
+    "sha256": "53e8767cd99a6a54aa20a20e45213c8d82da521b6eb09459b3d106cb0061dfdf"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.indmfl",
+    "sha256": "89211f1f20bda818963cb700a933b4105100bcf9ab9553c1e86423f3a0d344c4"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.klist",
+    "sha256": "a0a7ff520ee8a61f1bc6139db79abbc43eda1a896301bc7350bdafc7f2d396ca"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.vsp",
+    "sha256": "8a22ff77bb2dd762071c34ade0440d4a6537e19e90abe8d58b9bd3a761b08c1e"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.vns",
+    "sha256": "1d9c987fe89dc2b90a670e2c9731a91a2c0c878febe947758d9d899dc3028777"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.clmval",
+    "sha256": "857a048abda3397cef5f4ae9a8762c469cd07adacd4c59a33037189d8eac724b"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.scf1",
+    "sha256": "4b54aa2a23720a6d67708a6160ca9db9db8ea06dcc6de84a802819daa759669e"
+  },
+  {
+    "name": "SrVO3/0.125/SrVO3.scf2",
+    "sha256": "4723e2398dae8114fb974c4dd33f7fdf8b000d438a9fea7adf8c5f4243c328e2"
+  },
+  {
+    "name": "SrVO3/0.125/EF.dat",
+    "sha256": "d1ae4ba602e4e52c631b2b68eacb3cace6ebd121516c34c702e86a2269250a10"
+  },
+  {
+    "name": "SrVO3/0.125/lapw1.def",
+    "sha256": "0c33f1ca8e5685d076f757c396e446ac5d25996c1f565808b134b978b154c4ca"
+  },
+  {
+    "name": "SrVO3/0.125/dmft2.def",
+    "sha256": "5a42ae6571495cf253df42eb5509071e266e206a184afab6755cc49979236ce2"
+  },
+  {
+    "name": "SrVO3/0.125/lapw1.log",
+    "sha256": "992c5791a326389751413ae4e1d79ef5241baf6fec506b780e0f0fe61ecefebb"
+  },
+  {
+    "name": "SrVO3/0.125/dmft2.log",
+    "sha256": "bc28c4f65c26d1d63a2113dbc606adfbad03216ec60977eb2d5980884da91d70"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.struct",
+    "sha256": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.in1c",
+    "sha256": "62cff79f9cbdcab538b975da57727b31c2849beedb9148b3cc6f37cac0d16601"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.indmf2",
+    "sha256": "dc59120bfe36ce32f463fdb4a05c3ee578b4f96258fce248b63f2d2aee195825"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.indmfl",
+    "sha256": "89211f1f20bda818963cb700a933b4105100bcf9ab9553c1e86423f3a0d344c4"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.klist",
+    "sha256": "a0a7ff520ee8a61f1bc6139db79abbc43eda1a896301bc7350bdafc7f2d396ca"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.vsp",
+    "sha256": "776864425205d4bd2b8a94a6a9b196ff0643950a68c379dae2f3401bd2eb7901"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.vns",
+    "sha256": "9963da55ce9bcfff23afead83d0da7005cc08b996db300feb276cbc109936869"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.clmval",
+    "sha256": "f6c6a627bc51919f42eb019449a02b926ce832632af90cca12e56811a5d786b1"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.scf1",
+    "sha256": "e955daa17ca76aa7c89c49c6eb3a1692a7a6705ea27390362fcd18355c7b627b"
+  },
+  {
+    "name": "SrVO3/-0.125/SrVO3.scf2",
+    "sha256": "754d40c5cbe27cc62c5276ff91d071aae06ce9845ba056fc51e86c03cc6dd028"
+  },
+  {
+    "name": "SrVO3/-0.125/EF.dat",
+    "sha256": "1a07883c324d910c6428b76a03bc152aebb633207aa6710857c1262695454237"
+  },
+  {
+    "name": "SrVO3/-0.125/lapw1.def",
+    "sha256": "0c33f1ca8e5685d076f757c396e446ac5d25996c1f565808b134b978b154c4ca"
+  },
+  {
+    "name": "SrVO3/-0.125/dmft2.def",
+    "sha256": "5a42ae6571495cf253df42eb5509071e266e206a184afab6755cc49979236ce2"
+  },
+  {
+    "name": "SrVO3/-0.125/lapw1.log",
+    "sha256": "992c5791a326389751413ae4e1d79ef5241baf6fec506b780e0f0fe61ecefebb"
+  },
+  {
+    "name": "SrVO3/-0.125/dmft2.log",
+    "sha256": "5312d9757740a70806755cab6e78067f2a579afa164401b312ddbe6bba7a0269"
+  }
+]

@@ -1,0 +1,294 @@
+{
+  "rows": {
+    "DFT_SrVO3": {
+      "analytic_mean_gpa": 8.516854659005823,
+      "numerical_mean_gpa": 10.115114980694276,
+      "difference_gpa": -1.5982603216884534,
+      "status": "previous second-pass row; unchanged"
+    },
+    "DFT_FeSe": {
+      "analytic_mean_gpa": 11.99509569501644,
+      "numerical_mean_gpa": 12.138194933159218,
+      "difference_gpa": -0.1430992381427778,
+      "status": "previous second-pass row; unchanged"
+    },
+    "DMFT_SrVO3": {
+      "analytic_mean_gpa": 5.223963398436392,
+      "numerical_mean_gpa": 4.61739640331625,
+      "difference_gpa": 0.6065669951201418,
+      "status": "previous second-pass row; unchanged"
+    },
+    "DMFT_FeSe": {
+      "analytic_mean_gpa": -0.48887043352957765,
+      "numerical_mean_gpa": -1.0491040994290655,
+      "difference_gpa": 0.5602336658994878,
+      "status": "previous second-pass row; unchanged"
+    },
+    "DFT_MnO": {
+      "analytic_mean_gpa": 35.08513258055409,
+      "numerical_mean_gpa": 34.01714893723895,
+      "difference_gpa": 1.067983643315138,
+      "status": "one current full DFT evaluation of all three saved densities; see convergence/basis checks"
+    },
+    "DFT_MnTe": {
+      "analytic_mean_gpa": 15.884272167738422,
+      "numerical_mean_gpa": 17.199374314017984,
+      "difference_gpa": -1.3151021462795622,
+      "status": "one current full DFT evaluation of all three saved densities; see convergence/basis checks",
+      "caveats": [
+        "Different basis sizes, band counts, and PW G sets across endpoints",
+        "Charge distances up to 8.454e-4",
+        "Numerical column uses full Mermin TEMPS energy, not original TEMP half-entropy ENE"
+      ],
+      "TEMP_numerical_mean_gpa": 17.544477599244193,
+      "TEMP_difference_gpa": -1.660205431505771
+    },
+    "DMFT_MnO": {
+      "analytic_mean_gpa": -16.40595468761755,
+      "numerical_mean_gpa": -72.34743266800561,
+      "difference_gpa": 55.94147798038806,
+      "status": "current binary; matched prior controlled inputs; fixed-mu FD caveat",
+      "caveats": [
+        "Fixed-mu endpoint valence charges differ",
+        "Window [6,16] cuts degenerate multiplets",
+        "Comparison uses matched 601-row fixed-mu inputs, unlike the user sparse recomputed-mu run"
+      ]
+    },
+    "DMFT_MnTe": {
+      "analytic_mean_gpa": -5.701083444169385,
+      "numerical_mean_gpa": -0.6672374747520785,
+      "difference_gpa": -5.033845969417307,
+      "status": "current binary; both magnetic mappings averaged once; endpoint convergence/window caveat",
+      "caveats": [
+        "Window [21,51] cuts some degeneracies",
+        "No new endpoint charge reconvergence in this pass"
+      ]
+    }
+  },
+  "details": {
+    "MnO": {
+      "directories": [
+        "/private/tmp/edmft_four_material_table_20261107/DFT_runs/MnO_DFT_m_0.001",
+        "/private/tmp/edmft_four_material_table_20261107/DFT_runs/MnO_DFT_center",
+        "/private/tmp/edmft_four_material_table_20261107/DFT_runs/MnO_DFT_p_0.001"
+      ],
+      "energies_Ry": [
+        -2467.69644479,
+        -2467.6954221,
+        -2467.69438972
+      ],
+      "TEMP_energies_Ry": [
+        -2467.69644479,
+        -2467.6954221,
+        -2467.69438972
+      ],
+      "energy_convention": "ENE",
+      "volume_bohr3": 148.11716,
+      "basis_consistency": {
+        "k": true,
+        "weight": true,
+        "basis": true,
+        "bands": true,
+        "pw_hash": true
+      },
+      "nk": 72,
+      "bands": [
+        23
+      ],
+      "charge_distances": [
+        1e-06,
+        1.2e-06,
+        1.2e-06
+      ],
+      "diagonal_gpa": [
+        35.08513258055409,
+        35.08513258055409,
+        35.08513258055409
+      ],
+      "in2_integration": "TETRA    0.000      (GAUSS,ROOT,TEMP,TETRA,ALL      eval)"
+    },
+    "MnTe": {
+      "directories": [
+        "/private/tmp/edmft_four_material_table_20261107/DFT_runs/0_800_MnTe_MnTe_m_0.001",
+        "/private/tmp/edmft_four_material_table_20261107/DFT_runs/0_800_MnTe_0_800_MnTe",
+        "/private/tmp/edmft_four_material_table_20261107/DFT_runs/0_800_MnTe_MnTe_p_0.001"
+      ],
+      "energies_Ry": [
+        -31821.96303139,
+        -31821.96069245,
+        -31821.95829924
+      ],
+      "TEMP_energies_Ry": [
+        -31821.95439688,
+        -31821.95200994,
+        -31821.94956978
+      ],
+      "energy_convention": "full Mermin TEMPS",
+      "volume_bohr3": 674.56301,
+      "basis_consistency": {
+        "k": true,
+        "weight": true,
+        "basis": false,
+        "bands": false,
+        "pw_hash": false
+      },
+      "nk": 100,
+      "bands": [
+        58,
+        60,
+        61,
+        62,
+        63,
+        64,
+        66
+      ],
+      "charge_distances": [
+        0.0003916,
+        5.31e-05,
+        0.0008454
+      ],
+      "diagonal_gpa": [
+        13.043954014280997,
+        13.043954014280997,
+        21.564908474653265
+      ],
+      "in2_integration": "TEMP     0.005      (GAUSS,ROOT,TEMP,TETRA,ALL      eval)"
+    },
+    "DMFT_MnO": {
+      "directories": [
+        "/private/tmp/edmft_four_material_table_20261107/DMFT_MnO"
+      ],
+      "spin_mapping_count": 1,
+      "diagonal_gpa": [
+        -16.40595468761755,
+        -16.40595468761755,
+        -16.40595468761755
+      ],
+      "individual_mapping_means_gpa": [
+        -16.40595468761755
+      ],
+      "frozen_input_checks": [
+        {
+          "file": "sig.inp",
+          "identical": true,
+          "records": [
+            {
+              "directory": "/Users/haule/projects/materials/MnO/MnO_center",
+              "exists": true,
+              "sha256": "c4bbebc72fb8969265667ef09ca06b967cc835686b6c64ea1e22d71d4bb0f2df"
+            },
+            {
+              "directory": "/Users/haule/projects/materials/MnO/MnO_m_0.001",
+              "exists": true,
+              "sha256": "c4bbebc72fb8969265667ef09ca06b967cc835686b6c64ea1e22d71d4bb0f2df"
+            },
+            {
+              "directory": "/Users/haule/projects/materials/MnO/MnO_p_0.001",
+              "exists": true,
+              "sha256": "c4bbebc72fb8969265667ef09ca06b967cc835686b6c64ea1e22d71d4bb0f2df"
+            }
+          ]
+        },
+        {
+          "file": "Eorb_imp.dat",
+          "identical": true,
+          "records": [
+            {
+              "directory": "/Users/haule/projects/materials/MnO/MnO_center",
+              "exists": true,
+              "sha256": "6cd4c23ec5b6875bd5084ace5e0c7b0d42382aa012024e59089ef6360fa90b3a"
+            },
+            {
+              "directory": "/Users/haule/projects/materials/MnO/MnO_m_0.001",
+              "exists": true,
+              "sha256": "6cd4c23ec5b6875bd5084ace5e0c7b0d42382aa012024e59089ef6360fa90b3a"
+            },
+            {
+              "directory": "/Users/haule/projects/materials/MnO/MnO_p_0.001",
+              "exists": true,
+              "sha256": "6cd4c23ec5b6875bd5084ace5e0c7b0d42382aa012024e59089ef6360fa90b3a"
+            }
+          ]
+        }
+      ],
+      "endpoint_charges": [
+        [
+          "TOTAL CHARGE INSIDE UNIT CELL =      20.992718"
+        ],
+        [
+          "TOTAL CHARGE INSIDE UNIT CELL =      21.008041"
+        ]
+      ]
+    },
+    "DMFT_MnTe": {
+      "directories": [
+        "/private/tmp/edmft_four_material_table_20261107/DMFT_MnTe_up",
+        "/private/tmp/edmft_four_material_table_20261107/DMFT_MnTe_dn"
+      ],
+      "spin_mapping_count": 2,
+      "diagonal_gpa": [
+        -5.860244359423148,
+        -5.860244359423148,
+        -5.38276161366186
+      ],
+      "individual_mapping_means_gpa": [
+        -5.6845752192989885,
+        -5.717591669038693
+      ],
+      "frozen_input_checks": [
+        {
+          "file": "sig.inp",
+          "identical": true,
+          "records": [
+            {
+              "directory": "/Users/haule/projects/materials/MnTe/dmft",
+              "exists": true,
+              "sha256": "9af8b22fdd197a07e53a2f5fe438a66963d47665fb5d1b6ba24933e6b06e673a"
+            },
+            {
+              "directory": "/Users/haule/projects/materials/MnTe/dmft_m_0.001",
+              "exists": true,
+              "sha256": "9af8b22fdd197a07e53a2f5fe438a66963d47665fb5d1b6ba24933e6b06e673a"
+            },
+            {
+              "directory": "/Users/haule/projects/materials/MnTe/dmft_p_0.001",
+              "exists": true,
+              "sha256": "9af8b22fdd197a07e53a2f5fe438a66963d47665fb5d1b6ba24933e6b06e673a"
+            }
+          ]
+        },
+        {
+          "file": "Eorb_imp.dat",
+          "identical": true,
+          "records": [
+            {
+              "directory": "/Users/haule/projects/materials/MnTe/dmft",
+              "exists": true,
+              "sha256": "f455366707d3fc7ab23b48cf01e9bf603896f88eb81962a69aecaadc360ff9fe"
+            },
+            {
+              "directory": "/Users/haule/projects/materials/MnTe/dmft_m_0.001",
+              "exists": true,
+              "sha256": "f455366707d3fc7ab23b48cf01e9bf603896f88eb81962a69aecaadc360ff9fe"
+            },
+            {
+              "directory": "/Users/haule/projects/materials/MnTe/dmft_p_0.001",
+              "exists": true,
+              "sha256": "f455366707d3fc7ab23b48cf01e9bf603896f88eb81962a69aecaadc360ff9fe"
+            }
+          ]
+        }
+      ],
+      "endpoint_charges": [
+        [
+          "TOTAL CHARGE INSIDE UNIT CELL =      62.000000",
+          "TOTAL CHARGE INSIDE UNIT CELL =      62.000024"
+        ],
+        [
+          "TOTAL CHARGE INSIDE UNIT CELL =      62.000000",
+          "TOTAL CHARGE INSIDE UNIT CELL =      62.000021"
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,2 @@
+FeSe 0.001 {'mu_eV': np.float64(5.76400828330622), 'number_residual': -4.263256414560601e-14}
+FeSe -0.001 {'mu_eV': np.float64(5.769779905751772), 'number_residual': -1.4210854715202004e-14}

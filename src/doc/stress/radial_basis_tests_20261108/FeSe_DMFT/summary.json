@@ -1,0 +1,12 @@
+{
+  "case": "FeSe",
+  "kind": "DMFT",
+  "step": 0.00025,
+  "volume": 528.9625108786889,
+  "sums": {
+    "minus": -126.995495355,
+    "plus": -126.995498928
+  },
+  "band_fd_GPa": -0.06624369116490955,
+  "sums_note": "LAPW2 band sums; central value omitted when only the later DMFT SCF2 was retained."
+}

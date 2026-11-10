@@ -11,6 +11,7 @@
 #endif
 
 PROGRAM LAPW1
+  use response_run, only: response_matrices_only,initialize_response_run
   use lapw_timer, only : init_all_timer, start_timer, time_total, stop_timer, time_g1, read_wall_time, read_cpu_time, time_setwar, time_pkp, READ_CPU_TIME, time_hamilt, time_hns, time_diag, time_horb,START_TIMER, STOP_TIMER
   use cut1, only  : CUT
   use kpts, only    : K3
@@ -36,7 +37,7 @@ PROGRAM LAPW1
   !        Local Scalars
   logical            nmat_only
   INTEGER            NUMKPT, INFO, KPOINT, numemin, nmatmax1, first_kp, pr_proc, pr_procr, ikp, i
-  CHARACTER*80       DEFFN, ERRFN
+  CHARACTER*80       DEFFN, ERRFN, response_error
   CHARACTER*1024     overlap_dump_env, overlap_dump_prefix
   INTEGER            overlap_dump_length, overlap_dump_status
   LOGICAL            dump_generalized_overlap
@@ -46,6 +47,14 @@ PROGRAM LAPW1
   Ttype,   allocatable  :: taup(:)
   
   CALL start_MPI()
+  CALL initialize_response_run(INFO,response_error)
+  if (INFO.ne.0) then
+     if (myrank.eq.master) write(6,'(A)') trim(response_error)
+     ! Finalize collectively before leaving: ERROR STOP inside the option
+     ! parser can abort ranks while the MPI runtime is still initialized.
+     call stop_MPI()
+     stop 1
+  endif
 
   ! Default-off diagnostic used to finite-difference the generalized LAPW
   ! overlap independently of the analytic stress kernels.  When enabled,
@@ -80,6 +89,12 @@ PROGRAM LAPW1
   if (dump_generalized_overlap .and. myrank.eq.master) then
      WRITE(6,'(A,1X,A)') ':DFTKS_OVERLAP_DUMP_PREFIX:', &
           trim(overlap_dump_prefix)
+  endif
+  if (response_matrices_only .and. .not.dump_generalized_overlap) then
+     if (myrank.eq.master) write(6,'(A)') &
+          'DFTKS_MATRICES_ONLY requires DFTKS_OVERLAP_DUMP output prefix'
+     call stop_MPI()
+     stop 1
   endif
 
   cut=.false.
@@ -195,7 +210,18 @@ PROGRAM LAPW1
         numemin=min(nume,(nv+nlo))
         if(dokorig) numemin=nv+nlo     ! fix for NMR
         call INIT_MATRICES(nv+nlo, numemin,Qprint)
-        if (nlo.GT.0) CALL LOPW(nat)
+        if (nlo.GT.0) then
+           CALL LOPW(nat)
+           ! A finite-difference operator derivative requires one fixed
+           ! coefficient basis at -h, 0, and +h.  LOPW normally chooses the
+           ! plane-wave anchors of the local orbitals by a floating-point
+           ! Gram--Schmidt test.  At a high-symmetry metric (notably cubic
+           ! cells) symmetry-equivalent anchors can consequently switch
+           ! between strain points although the physical LO subspace is the
+           ! same.  The default-off helper below lets diagnostics reuse the
+           ! exact central anchor labels and removes that pure basis gauge.
+           CALL ApplyFixedLocalOrbitalLabels(kpoint,nlo)
+        endif
         NVAA = NV
         !  construct secular equation
         CALL HAMILTON(NT,NAT,NV,P,PE,DP,DPE,MULT,POS,V,Vol,PEI,E)
@@ -222,12 +248,19 @@ PROGRAM LAPW1
            CALL DumpGeneralizedOverlap(overlap_dump_prefix,kpoint,myrank, &
                 K3(:,kpoint),KZZ,HS,HSDIAG,HSROWS,nlo)
         endif
-        !.....full diagonalization
-        CALL START_TIMER(time_diag)
-        CALL Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, nume2, Qprint)
-        CALL STOP_TIMER(time_diag)
-        if (Qprint) call print_times()
-        CALL PRTKPT(kpoint, KZZ, Eigval, Z, HSrows, NE, Qprint)
+        ! The response worker needs the assembled operator, not a new set of
+        ! KS eigenvectors.  Bypassing diagonalization removes the cubic-cost
+        ! step and avoids endpoint eigenvector gauges entirely.  Each rank
+        ! still constructs its usual k points and writes one H/O pair per k.
+        if (response_matrices_only) then
+           NE=0
+        else
+           CALL START_TIMER(time_diag)
+           CALL Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, nume2, Qprint)
+           CALL STOP_TIMER(time_diag)
+           if (Qprint) call print_times()
+           CALL PRTKPT(kpoint, KZZ, Eigval, Z, HSrows, NE, Qprint)
+        endif
      else
         NE=0
         HSrows=0
@@ -238,12 +271,16 @@ PROGRAM LAPW1
      ! If the output is not parallel (each processor does not produce its own vector/energy file), we always need to
      ! send data to the master node, and the master node needs to print
 
-     if (.not. vector_para) call mpi_SendReceive(kpoint,NE,HSrows,Eigval,KZZ,Z,numkpt)
+     if (.not.vector_para .and. .not.response_matrices_only) &
+          call mpi_SendReceive(kpoint,NE,HSrows,Eigval,KZZ,Z,numkpt)
      if (kpoint .le. numkpt) CALL END_MATRICES
   ENDDO
 
 
-  if (vector_para) call WriteProcesses(pr_procr,first_kp,filename_vector,filename_energy)
+  if (vector_para .and. .not.response_matrices_only) &
+       call WriteProcesses(pr_procr,first_kp,filename_vector,filename_energy)
+  if (response_matrices_only .and. myrank.eq.master) write(6,'(A,I8)') &
+       ':DFTKS_MATRICES_ONLY_COMPLETE: k points = ',numkpt
   
   deallocate( kpoints )
   call DeallocateStructure()
@@ -296,6 +333,82 @@ PROGRAM LAPW1
   STOP 'LAPW1 - Error'
   
 END PROGRAM LAPW1
+
+
+! Diagnostic-only fixed gauge for the local-orbital coefficient rows.
+!
+! DFTKS_FIXED_LO_LABELS names a plain-text file containing
+!
+!     global_k_point   local_orbital_slot   G1   G2   G3
+!
+! for every local-orbital row.  The labels should be extracted from the
+! central (zero-strain) LAPW1 basis.  For each requested label we copy both
+! the integer reciprocal label and its strained Cartesian K+G vector from
+! the plane-wave part of the *current* calculation.  Thus only the arbitrary
+! LOPW anchor choice is frozen; all physical metric dependence of K+G is
+! retained.  The path is completely inert unless the environment variable is
+! set, and is intended for term-by-term finite-difference validation rather
+! than normal production runs.
+SUBROUTINE ApplyFixedLocalOrbitalLabels(kpoint,nlo)
+  USE matrices, ONLY: KZZ,Kn
+  USE lstapw, ONLY: NV
+  USE mpi, ONLY: myrank,master,stop_MPI
+  IMPLICIT NONE
+  INTEGER,intent(in) :: kpoint,nlo
+  CHARACTER(len=1024) :: filename
+  INTEGER :: status,length,unit,ios,krecord,slot,j
+  INTEGER :: label(3)
+  LOGICAL,allocatable :: found(:)
+
+  filename=''; length=0; status=1
+  CALL GET_ENVIRONMENT_VARIABLE('DFTKS_FIXED_LO_LABELS',filename, &
+       LENGTH=length,STATUS=status)
+  if (status.ne.0 .or. length.le.0) return
+
+  allocate(found(nlo)); found=.false.
+  open(newunit=unit,file=trim(filename),status='old',action='read', &
+       form='formatted',iostat=ios)
+  if (ios.ne.0) then
+     if (myrank.eq.master) WRITE(6,'(A,1X,A)') &
+          ':DFTKS_FIXED_LO_LABELS_OPEN_ERROR:',trim(filename)
+     call stop_MPI
+     stop 'cannot open DFTKS_FIXED_LO_LABELS'
+  endif
+  do
+     read(unit,*,iostat=ios) krecord,slot,label
+     if (ios.ne.0) exit
+     if (krecord.ne.kpoint) cycle
+     if (slot.lt.1 .or. slot.gt.nlo) then
+        close(unit)
+        call stop_MPI
+        stop 'invalid local-orbital slot in DFTKS_FIXED_LO_LABELS'
+     endif
+     do j=1,NV
+        if (all(KZZ(:,j).eq.label)) exit
+     enddo
+     if (j.gt.NV) then
+        if (myrank.eq.master) WRITE(6,'(A,5I8)') &
+             ':DFTKS_FIXED_LO_LABEL_NOT_IN_PW_SET:',kpoint,slot,label
+        close(unit)
+        call stop_MPI
+        stop 'fixed local-orbital label is absent from current PW set'
+     endif
+     KZZ(:,NV+slot)=KZZ(:,j)
+     Kn(:,NV+slot)=Kn(:,j)
+     found(slot)=.true.
+  enddo
+  close(unit)
+  if (.not.all(found)) then
+     if (myrank.eq.master) WRITE(6,'(A,3I8)') &
+          ':DFTKS_FIXED_LO_LABELS_INCOMPLETE:',kpoint,count(found),nlo
+     deallocate(found)
+     call stop_MPI
+     stop 'incomplete DFTKS_FIXED_LO_LABELS records'
+  endif
+  deallocate(found)
+  if (myrank.eq.master .and. kpoint.eq.1) WRITE(6,'(A,1X,A)') &
+       ':DFTKS_FIXED_LO_LABELS:',trim(filename)
+END SUBROUTINE ApplyFixedLocalOrbitalLabels
 
 
 ! Diagnostic-only strain-stable ordering of the reciprocal basis.  The key

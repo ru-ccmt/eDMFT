@@ -1,0 +1,13 @@
+{
+  "material": "FeSe",
+  "channels": 18,
+  "reference_relative": 7.411444878441909e-16,
+  "physical_direction_transpose_relative": 7.424616477180734e-16,
+  "random_transpose_relative": 6.794625897947646e-17,
+  "timing": {
+    "setup_seconds": 0.021971957990899682,
+    "forward_seconds": 0.05008929199539125,
+    "reverse_seconds": 0.05165191600099206
+  },
+  "scope": "in-memory radial/basis density at 3 k points; fixed E, RMT, C and geometry; not full stress"
+}

@@ -1,0 +1,1 @@
+These preserve the exact diagnostic runs and original temporary-path dependencies. For portable charge-response runs use the installed wien_frozen_sigma_response.py and the JSON templates in the parent directory. The research potential projection needs a complete central LAPW eigensystem; the saved final NPZ contractions below are self-contained.

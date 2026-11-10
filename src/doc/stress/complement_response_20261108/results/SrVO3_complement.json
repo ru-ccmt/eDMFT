@@ -1,0 +1,50 @@
+{
+  "case": "SrVO3",
+  "retained_bands": 43,
+  "checks": [
+    {
+      "orthonormality_error": 4.9193751223903656e-14,
+      "eigenpair_relative_error": 1.5125355321211789e-12,
+      "complement_size": 660,
+      "retained_size": 43,
+      "minimum_gap_Ry": 2.9238392009744985e-06,
+      "omitted_charge_bound": 0.0,
+      "omitted_fermi_slope_bound_per_Ry": 0.0,
+      "reduction_relative_error": 1.4906485238920377e-15,
+      "preparation_seconds": 0.17148312483914196,
+      "stored_bytes": 14619632
+    }
+  ],
+  "preparation_seconds": 0.6321450001560152,
+  "coefficient_response_relative": 7.454282330062735e-12,
+  "spatial_response_relative_to_full": 1.4213068710464792e-11,
+  "spatial_response_relative_to_native_fd": 1.7754944519168369e-07,
+  "transpose_error": 2.5292122667700657e-15,
+  "solve_relative_residuals": [
+    4.2427530589482e-15
+  ],
+  "forward_seconds": 0.009666540892794728,
+  "reverse_seconds": 0.009891457855701447,
+  "full_forward_seconds": 0.3940402918960899,
+  "full_reverse_seconds": 0.37893195799551904,
+  "full_cache": {
+    "resolvent_bytes": 0,
+    "resolvent_limit_bytes": 268435456,
+    "contraction_bytes": 7384000,
+    "total_cache_bytes": 7384000,
+    "precontracted_kpoints": 1,
+    "dense_window_inversions": 500,
+    "preparation_seconds": 0.598334708949551,
+    "approximation": "fixed central LAPW basis; stored complement"
+  },
+  "retained_cache": {
+    "resolvent_bytes": 0,
+    "resolvent_limit_bytes": 268435456,
+    "contraction_bytes": 2104000,
+    "total_cache_bytes": 2104000,
+    "precontracted_kpoints": 1,
+    "dense_window_inversions": 500,
+    "preparation_seconds": 0.07969454186968505,
+    "approximation": "fixed central LAPW basis; stored complement"
+  }
+}

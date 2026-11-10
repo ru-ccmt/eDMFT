@@ -1,0 +1,743 @@
+{
+  "makefiles": [
+    {
+      "anchor": "stress_gga.o",
+      "object": "gga_metric_tensor.o",
+      "path": "SRC_lapw0/Makefile",
+      "variable": "OBJS"
+    },
+    {
+      "anchor": "val_kinstrmt.o",
+      "object": "val_rela_kinstrmt.o",
+      "path": "SRC_lapw2/Makefile",
+      "variable": "OBJS"
+    }
+  ],
+  "release": "20261109",
+  "schema": 1,
+  "sources": {
+    "SRC_3ddens/3ddens.F": {
+      "optional": true,
+      "target_sha256": "c9fe09dc1aa8164095dd162b4e16feede8ca77559e889c91c79726721c0f30f0",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_3ddens/3ddens.F/cd517ea840c55ebd.patch",
+          "sha256": "cd517ea840c55ebdccd791989b5591001f694c71081a20ee723eb6f7ea1a33d7"
+        }
+      ]
+    },
+    "SRC_hf/hf.F": {
+      "optional": true,
+      "target_sha256": "de53a3c26b054db95d664645373b035e28ca7ef57c84b8a17a1a9182c317ac88",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_hf/hf.F/29816f4f47c78445.patch",
+          "sha256": "29816f4f47c784456eb0f5f0c392f0e56a64f546b15cf02df43d110efaa34ca4"
+        }
+      ]
+    },
+    "SRC_lapw0/energy.F": {
+      "optional": false,
+      "target_sha256": "61885de799d3c0200583876e39ba0903ab2d1650c6b338cd7856a371af74fc06",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw0/energy.F/324ff3ae13676df5.patch",
+          "sha256": "324ff3ae13676df51c1deb84407a8ee3013fdc7eb8ce3bcd6f38f2fd3f340439"
+        }
+      ]
+    },
+    "SRC_lapw0/fft_modules.F": {
+      "optional": false,
+      "target_sha256": "26689742c6a3e98ed1d583197b3c36a39e15fe09ce8a0a0f6a2589cbfcff726a",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw0/fft_modules.F/7ec4e5839ed999e5.patch",
+          "sha256": "7ec4e5839ed999e5f0d0696c30cd93945ff553e824c7f12d622fcad8cb368d21"
+        }
+      ]
+    },
+    "SRC_lapw0/finl_elect_str.F": {
+      "optional": false,
+      "target_sha256": "2e1dceca5fd58dd23afd1130ae4fbebd3456c8acc5e2098d23990579c809e38c",
+      "variants": [
+        {
+          "labels": [
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw0/finl_elect_str.F/b1c4f55a83350de0.patch",
+          "sha256": "b1c4f55a83350de0b7514a7c00a2fa438f364b622984c32e9220b95cfae66d11"
+        },
+        {
+          "labels": [
+            "legacy-required"
+          ],
+          "patch": "patches/files/SRC_lapw0/finl_elect_str.F/751ddb56a870ecb8.patch",
+          "sha256": "751ddb56a870ecb8e41296ee9cfcb5e31c0b52451b30a0bfb3e297a8fccfa708"
+        },
+        {
+          "labels": [
+            "legacy-full"
+          ],
+          "patch": "patches/files/SRC_lapw0/finl_elect_str.F/68eaf3177fb467e3.patch",
+          "sha256": "68eaf3177fb467e3fcc80d7c96ea0f81a50e5bc38b2f4b06ebb6bb6d75fc2b65"
+        },
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "remaining_terms_20261107-before"
+          ],
+          "patch": "patches/files/SRC_lapw0/finl_elect_str.F/c06851109d63a765.patch",
+          "sha256": "c06851109d63a765ce2ff89a107d9637a01cd2db323f4a90e4d4fc897b750f10"
+        }
+      ]
+    },
+    "SRC_lapw0/gga_metric_tensor.f": {
+      "optional": false,
+      "target_sha256": "d6a06a290b8d192554995d9782d23dc9d7b572995073640daf70778a3ab499f9",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine",
+            "remaining_terms_20261107-before"
+          ],
+          "patch": "patches/files/SRC_lapw0/gga_metric_tensor.f/absent.patch",
+          "sha256": null
+        }
+      ]
+    },
+    "SRC_lapw0/lapw0.F": {
+      "optional": false,
+      "target_sha256": "f7ed79e0ece28bc8c1a4cec1651547f3433e7777687f057185c1db3b6e784b32",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw0/lapw0.F/732282cac99548c1.patch",
+          "sha256": "732282cac99548c14ce20e8a44ade3b2f547fcf331b5bca34a5dd18a11b7d8e9"
+        },
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "remaining_terms_20261107-before"
+          ],
+          "patch": "patches/files/SRC_lapw0/lapw0.F/3b0873bd69a47ff6.patch",
+          "sha256": "3b0873bd69a47ff6eec2c9378892d5e97cdaec5eaecbcec6a1925cf867e2285b"
+        }
+      ]
+    },
+    "SRC_lapw0/modules.F": {
+      "optional": false,
+      "target_sha256": "1008fd7e08c2e42f49dfb57a8efe9a5b17a48784f24ba46dc12d504fa84e9b60",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine",
+            "remaining_terms_20261107-before"
+          ],
+          "patch": "patches/files/SRC_lapw0/modules.F/a561e40b69f3a143.patch",
+          "sha256": "a561e40b69f3a14342ce6a52f297cacf7cd4e1ef2e88de441cb03c1bcab2a6f3"
+        }
+      ]
+    },
+    "SRC_lapw0/pwxad5.f": {
+      "optional": false,
+      "target_sha256": "4245f6524a8a96130decdec2c9d916545f7136eb2301d119c7b5693121dcfba1",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine",
+            "remaining_terms_20261107-before"
+          ],
+          "patch": "patches/files/SRC_lapw0/pwxad5.f/0b6f1c9d463c7043.patch",
+          "sha256": "0b6f1c9d463c70433c9bfad30ba00d363e4e620a9515f1ea87f02b92991fb839"
+        }
+      ]
+    },
+    "SRC_lapw0/stress_gga.F": {
+      "optional": false,
+      "target_sha256": "cda4862df9e7cc9b3d20675c80b35e84d3a8256a0129d0d32057ed4759a88a30",
+      "variants": [
+        {
+          "labels": [
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw0/stress_gga.F/bb0577eb6da7dcd5.patch",
+          "sha256": "bb0577eb6da7dcd53840b5e96dfbad8bf804ae1a89aee7be792d022bf383c58e"
+        },
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "remaining_terms_20261107-before"
+          ],
+          "patch": "patches/files/SRC_lapw0/stress_gga.F/7a784e2291673237.patch",
+          "sha256": "7a784e2291673237a5fd0cb6a50aed31b0e25ea34c57603eca8e84fa85923a94"
+        }
+      ]
+    },
+    "SRC_lapw0/suml.f": {
+      "optional": false,
+      "target_sha256": "07f3a312ae60009544445925303005379af36ba28dc17836dd447126bd0c0fa3",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw0/suml.f/3ed69f2de585c50b.patch",
+          "sha256": "3ed69f2de585c50bde7e542071911a5ec26f6a113f7ad6a8dfd917b8300db25e"
+        }
+      ]
+    },
+    "SRC_lapw0/vxclm2.F": {
+      "optional": false,
+      "target_sha256": "a37eb3a93abd8cb45cb0c5aba4a7f8b3c918f5882dab52e7a9978e0672bbe1c1",
+      "variants": [
+        {
+          "labels": [
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw0/vxclm2.F/f28f10da99a1a575.patch",
+          "sha256": "f28f10da99a1a5755059611f9a36b69d3d1ff0aff2e32b0ed15d447b2b9a6c58"
+        }
+      ]
+    },
+    "SRC_lapw0/xcpot1.f": {
+      "optional": false,
+      "target_sha256": "e36779b1d1921f5c0f05b4105a66d97f723b14f165aba4a46eda1300f75131bb",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw0/xcpot1.f/9cbd4aa07001e55d.patch",
+          "sha256": "9cbd4aa07001e55defcc084c51148b60b70d22b2fc7762500bd646dce3443417"
+        },
+        {
+          "labels": [
+            "remaining_terms_20261107-before"
+          ],
+          "patch": "patches/files/SRC_lapw0/xcpot1.f/7061fba6d14e90be.patch",
+          "sha256": "7061fba6d14e90be93273ef88db19a423c03506f139803a1a86d1862ea3e641e"
+        }
+      ]
+    },
+    "SRC_lapw0/xcpot3.F": {
+      "optional": false,
+      "target_sha256": "47bb608c8e7997fbe5d9f57d6312792253406379450ceab22f5b9e269744cf22",
+      "variants": [
+        {
+          "labels": [
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw0/xcpot3.F/cd24563c0a6a423f.patch",
+          "sha256": "cd24563c0a6a423f27daf31c20c80ee721d475582629036db6ab26fae27604b6"
+        }
+      ]
+    },
+    "SRC_lapw1/atpar.F": {
+      "optional": false,
+      "target_sha256": "d15a6ab7b419bd973c6318ee013f4746a78deea07754a0815bc7790016277174",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw1/atpar.F/e40f440c9af23c54.patch",
+          "sha256": "e40f440c9af23c54c42b5f214cfabd4bb2f3987f4c65c62e9ca331695d24f296"
+        },
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "response_probes_20261108-before"
+          ],
+          "patch": "patches/files/SRC_lapw1/atpar.F/19959272c21a22e2.patch",
+          "sha256": "19959272c21a22e2bc8133c71c0c2c5e47588171cbfc29a6e56d795f9393da9d"
+        }
+      ]
+    },
+    "SRC_lapw1/calkpt.F": {
+      "optional": false,
+      "target_sha256": "9b16ef1ff09438b83481dacaf78655068889d91fae3ffc58d3e5da12eeccab4e",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine",
+            "response_probes_20261108-before"
+          ],
+          "patch": "patches/files/SRC_lapw1/calkpt.F/6fad2f27083e4ca1.patch",
+          "sha256": "6fad2f27083e4ca17da1ef55eb5af4d3b869654825036ce5e6f821e9fb1708d1"
+        }
+      ]
+    },
+    "SRC_lapw1/coors.f": {
+      "optional": false,
+      "target_sha256": "3ff60638610aa8576879bf091eaab84e39bd47b44de902295fabdad7b10253c6",
+      "variants": [
+        {
+          "labels": [
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw1/coors.f/79bc8a5f7c1de6e0.patch",
+          "sha256": "79bc8a5f7c1de6e0489a0e61b61dc3a3a0ffaeaa0e4e59062caf607f41fbe4f7"
+        }
+      ]
+    },
+    "SRC_lapw1/forfhs.f": {
+      "optional": false,
+      "target_sha256": "72d35dd693468ad201a8a7443085b5098132643307d308e17de74c514b3495ee",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw1/forfhs.f/7aa43ac9a8d0c939.patch",
+          "sha256": "7aa43ac9a8d0c9390db398b423326ed47cd86c27f599994ac81e7b0ca8319cac"
+        }
+      ]
+    },
+    "SRC_lapw1/hamilt.F": {
+      "optional": false,
+      "target_sha256": "c609892451fdc91b199409a605e43dea5ed78c224435711b026cd4327d05d698",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine",
+            "response_probes_20261108-before"
+          ],
+          "patch": "patches/files/SRC_lapw1/hamilt.F/36a5a236aaead2d0.patch",
+          "sha256": "36a5a236aaead2d0890831596720ddc3935d072fbfc920b8c37756df6339efb7"
+        }
+      ]
+    },
+    "SRC_lapw1/inilpw.f": {
+      "optional": false,
+      "target_sha256": "174a1f5a9f714808a8ac47f3872553a09d1526402911a6dd1f8e7e5af20659e0",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw1/inilpw.f/692e729ba83593d3.patch",
+          "sha256": "692e729ba83593d3aee0fb8b02ec16907edc17737374a08362a3f6e424942dab"
+        }
+      ]
+    },
+    "SRC_lapw1/modules.F": {
+      "optional": false,
+      "target_sha256": "8c953ce5736e129dade19e6e9d3eb8e26c82766ec886ced0a1ce55e58459bac2",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw1/modules.F/9e2731661ca58b71.patch",
+          "sha256": "9e2731661ca58b713f07dcc076f508e2f613123e4669da9e9d5c9ab8f5401e6f"
+        },
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache"
+          ],
+          "patch": "patches/files/SRC_lapw1/modules.F/20e431ce5ca7a084.patch",
+          "sha256": "20e431ce5ca7a084b60b5d3a53045668572af65a6e6c912513571655d1c69e22"
+        },
+        {
+          "labels": [
+            "response_probes_20261108-before"
+          ],
+          "patch": "patches/files/SRC_lapw1/modules.F/c3171392c823b2fc.patch",
+          "sha256": "c3171392c823b2fc43c1c41acb102a11fe607d80807ffafeed729929bbca4055"
+        }
+      ]
+    },
+    "SRC_lapw1/seclr4.F": {
+      "optional": false,
+      "target_sha256": "40a088897e23231026afae3e6879cb9afd8c7a513d8cfb9bdc104d4b42100d4e",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw1/seclr4.F/44087c99c3721d41.patch",
+          "sha256": "44087c99c3721d4169fe96c6653dd08182b104d20bcde440d404c074111d68fe"
+        }
+      ]
+    },
+    "SRC_lapw1/seclr5.F": {
+      "optional": false,
+      "target_sha256": "60922ebce5ebecd17cf94faa0063f792a0266105f8bc5e4dab287844aae604bf",
+      "variants": [
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw1/seclr5.F/51479f9d0a836085.patch",
+          "sha256": "51479f9d0a8360859474e2c8acd705d09816ac69beae011fb54e40027f7c7a4b"
+        }
+      ]
+    },
+    "SRC_lapw2/atpar.F": {
+      "optional": false,
+      "target_sha256": "1d00e4923eb67405cba6dae87dd262e962633328b6315209648881e4cfe6c170",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/atpar.F/71777b8641554cb0.patch",
+          "sha256": "71777b8641554cb073cf63e4fd1b8f0f9f07088c2601326ea73b9d1da4d9139e"
+        },
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache"
+          ],
+          "patch": "patches/files/SRC_lapw2/atpar.F/033a2b202a8ad43b.patch",
+          "sha256": "033a2b202a8ad43bd1eae8b37d953c6ecafdfa167aeab15041e11f69678aa1fc"
+        }
+      ]
+    },
+    "SRC_lapw2/kin_str_integrals.F": {
+      "optional": false,
+      "target_sha256": "01dad803312e4f9be614e7aca8c04f61fa699df36e281b10280531bc62bacfaa",
+      "variants": [
+        {
+          "labels": [
+            "archived-audit:src/doc/stress/g1_audit_20261107/before/lapw2/kin_str_integrals.F",
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/kin_str_integrals.F/af5f1ed97dd4c561.patch",
+          "sha256": "af5f1ed97dd4c5611d63621dfd230f0c235e6a2adaa5e2d6f8623a6f411a0535"
+        }
+      ]
+    },
+    "SRC_lapw2/l2main.F": {
+      "optional": false,
+      "target_sha256": "dd840caef5b65c4d568e5ea69597f8da3531d5bcf37b1167936426d00dc334fb",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/l2main.F/4029a4239cf47e54.patch",
+          "sha256": "4029a4239cf47e54eed854a3372ce7928fcbde56075deb92fad5203631c9f85e"
+        }
+      ]
+    },
+    "SRC_lapw2/lapw2.F": {
+      "optional": false,
+      "target_sha256": "c88688d59ea7a1b7583c0350088dbf287e343a29d620fe80da19ddd7fae66614",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/lapw2.F/7b5618753f8ada8e.patch",
+          "sha256": "7b5618753f8ada8ef2775d6065e3f702f344c4b6ce313ba5716b1e14e226d6cb"
+        }
+      ]
+    },
+    "SRC_lapw2/stress_APW_surface.f": {
+      "optional": false,
+      "target_sha256": "597b099378961db05d17e1a2e3ba0007464d34a7304b24c430637b964b17fa7b",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/stress_APW_surface.f/5a8f4b074d7197bd.patch",
+          "sha256": "5a8f4b074d7197bd217a0056234b28c5958fa46f80607271cb118cbd07312f43"
+        }
+      ]
+    },
+    "SRC_lapw2/symmetrization_stress.f": {
+      "optional": false,
+      "target_sha256": "ac42a65b07275315a6b760e4108bea46ff2295482c0486b263705523397bdb5f",
+      "variants": [
+        {
+          "labels": [
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/symmetrization_stress.f/314b29c393a4069b.patch",
+          "sha256": "314b29c393a4069b806a9db7ee2422d0e713707f5fa1d9d234c526314e41d0cb"
+        },
+        {
+          "labels": [
+            "legacy-full"
+          ],
+          "patch": "patches/files/SRC_lapw2/symmetrization_stress.f/f77917541efd9d59.patch",
+          "sha256": "f77917541efd9d59e2a6b1d7a16b5724ab2ea253e015cd701fa9e2f7466f0434"
+        }
+      ]
+    },
+    "SRC_lapw2/val_corr_integrals.F": {
+      "optional": false,
+      "target_sha256": "66f0a9659892d2d602707c4eeb110af97cd7a25af9020628b74c087e35f42503",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/val_corr_integrals.F/a6ae854bfb6356f9.patch",
+          "sha256": "a6ae854bfb6356f99918c1c6abace87575cd997d477baefc7d5e8c9d84b6ab74"
+        }
+      ]
+    },
+    "SRC_lapw2/val_corr_stress.F": {
+      "optional": false,
+      "target_sha256": "1f5064f917dc479c7e7e243d2baa12f704dc7a7e7858e1023c3989cbe7127688",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/val_corr_stress.F/56a47468e803b709.patch",
+          "sha256": "56a47468e803b709505381c45c2c832e78d506f88724cfeccf5fc306e1d64ae7"
+        },
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache"
+          ],
+          "patch": "patches/files/SRC_lapw2/val_corr_stress.F/8c0a45f7db6f05b3.patch",
+          "sha256": "8c0a45f7db6f05b3fec920ff1c26e6690698d01469917371c308768a064a838f"
+        }
+      ]
+    },
+    "SRC_lapw2/val_kin_interstitial.F": {
+      "optional": false,
+      "target_sha256": "9cd573584b755fab618f8ffc8b0a1701dccc4188a0d4c97baf44431e3428d95b",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/val_kin_interstitial.F/c1b7e352065051ed.patch",
+          "sha256": "c1b7e352065051edbd3512159f6dbb25853f86432127095ba21b42883db51af7"
+        }
+      ]
+    },
+    "SRC_lapw2/val_kinstrmt.F": {
+      "optional": false,
+      "target_sha256": "bab5e87420c71ecb15a101615aa84731e163153917906a000e93874a79c53c1d",
+      "variants": [
+        {
+          "labels": [
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/val_kinstrmt.F/a203c9d85724758c.patch",
+          "sha256": "a203c9d85724758c79a26589e5a48b1c5a2622ec4bb30345bf9a4557a6e936c6"
+        },
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required"
+          ],
+          "patch": "patches/files/SRC_lapw2/val_kinstrmt.F/439eb22d9b54d2ab.patch",
+          "sha256": "439eb22d9b54d2ab765423c8aff6248f87dabcbc285faed7889c846e41cb3529"
+        },
+        {
+          "labels": [
+            "archived-audit:src/doc/stress/g1_audit_20261107/before/lapw2/val_kinstrmt.F",
+            "complete-20261105",
+            "complete-pre-cache"
+          ],
+          "patch": "patches/files/SRC_lapw2/val_kinstrmt.F/0e837b9c4bce8d2f.patch",
+          "sha256": "0e837b9c4bce8d2f4bb374a41c3884cc0712cfb368793a783ffaf0557a7135e9"
+        }
+      ]
+    },
+    "SRC_lapw2/val_rela_kinstrmt.F": {
+      "optional": false,
+      "target_sha256": "b77330c1e5ef772e71b6d84bf2cf14eeab3bb237287ca22adf3256338ba14c36",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lapw2/val_rela_kinstrmt.F/absent.patch",
+          "sha256": null
+        },
+        {
+          "labels": [
+            "complete-pre-cache"
+          ],
+          "patch": "patches/files/SRC_lapw2/val_rela_kinstrmt.F/02eb6c1734c93f68.patch",
+          "sha256": "02eb6c1734c93f6836dc50c58baa6ac265eaa094df4a8101d4c4ef012758db78"
+        }
+      ]
+    },
+    "SRC_lcore/core_corr_stress.f": {
+      "optional": false,
+      "target_sha256": "5579ba136ac11ae600fb0e7dbefaaa55db2f6bc9c2c8bdbf6d4f054d7e5f7d44",
+      "variants": [
+        {
+          "labels": [
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lcore/core_corr_stress.f/d34dce7a29104324.patch",
+          "sha256": "d34dce7a29104324a8c5b4a6d0dd8a257a476e1696830c407804a8528a150f51"
+        },
+        {
+          "labels": [
+            "legacy-required"
+          ],
+          "patch": "patches/files/SRC_lcore/core_corr_stress.f/6ed359fc3aaf882c.patch",
+          "sha256": "6ed359fc3aaf882cbdef7caa846f00b1da86a2118236572b353f74b044d6f4a3"
+        },
+        {
+          "labels": [
+            "complete-20261105",
+            "complete-pre-cache",
+            "legacy-full",
+            "remaining_terms_20261107-before"
+          ],
+          "patch": "patches/files/SRC_lcore/core_corr_stress.f/ad35cfd02517b2b7.patch",
+          "sha256": "ad35cfd02517b2b7be5db0a471b4455f132ab60f87b7606355d7b93d9b39e515"
+        }
+      ]
+    },
+    "SRC_lcore/hfsd.f": {
+      "optional": false,
+      "target_sha256": "942d83d09777b4dcb69626d67883fc91604b3f1bddd59ac05188f9ff70755bde",
+      "variants": [
+        {
+          "labels": [
+            "legacy-full",
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_lcore/hfsd.f/1cf0f7754025a4e0.patch",
+          "sha256": "1cf0f7754025a4e05e511dcba3f1523c71d48800604053112a0e96686233af9e"
+        }
+      ]
+    },
+    "SRC_mixer/mixer.F": {
+      "optional": false,
+      "target_sha256": "71ab8ee082902bf6498305cd35039a9c0d4644a6478e181c3d9c7d7413383b70",
+      "variants": [
+        {
+          "labels": [
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_mixer/mixer.F/a6bcff06e2f2e43d.patch",
+          "sha256": "a6bcff06e2f2e43d3f3dd9135d3a8865ce486e1c9dbfffa21b43b86dcc1e1495"
+        }
+      ]
+    },
+    "SRC_mixer/scfana.f": {
+      "optional": false,
+      "target_sha256": "dddcba2aab2d5cf2aa0ecb491b5028a26f23b5586ec43a9073d71f44daad4371",
+      "variants": [
+        {
+          "labels": [
+            "legacy-required",
+            "pristine"
+          ],
+          "patch": "patches/files/SRC_mixer/scfana.f/487a60f6f97b7d15.patch",
+          "sha256": "487a60f6f97b7d15d280c48c79ebfacfe5712ac80deff7b714c0ea252f3fdc50"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "analytic_Ry": -0.10811341569773733,
+  "finite_differences": {
+    "1e-05": {
+      "derivative_Ry": -0.10811343095686737,
+      "difference_Ry": -1.5259130042855062e-08
+    },
+    "5e-06": {
+      "derivative_Ry": -0.10811341949147277,
+      "difference_Ry": -3.7937354369077525e-09
+    }
+  }
+}

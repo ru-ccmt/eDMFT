@@ -1,0 +1,18 @@
+{
+  "case": "0_800_MnTe",
+  "reference": "/private/tmp/edmft_shear_magnetic_20261109/ferro_reference",
+  "workspace": "/private/tmp/edmft_shear_magnetic_20261109/native_Ferro",
+  "wien_root": "/Users/haule/wien2k_24",
+  "lapw0_worker": "/Users/haule/dbin/lapw0_response",
+  "lapw1_worker": "/Users/haule/dbin/lapw1_response",
+  "lcore_worker": "/Users/haule/dbin/lcore_response",
+  "dmft2": "/Users/haule/dbin/dmft2_response",
+  "lapw1_definition": "/private/tmp/edmft_shear_magnetic_20261109/ferro_reference/lapw1.def",
+  "dmft2_definition": "/private/tmp/edmft_shear_magnetic_20261109/ferro_reference/dmft2.def",
+  "dmft2dn_definition": "/private/tmp/edmft_shear_magnetic_20261109/ferro_reference/dmft2dn.def",
+  "native_mpi": [
+    "/opt/homebrew/bin/mpirun",
+    "-np",
+    "4"
+  ]
+}

@@ -39,6 +39,7 @@ SUBROUTINE HAMILTON(LMX,NAT,NV,U,UP,DU,DUP,MULT,POS,V,Vol,pei,E)
   use albl, ONLY: init_albl, end_albl, Al_c, Al_r, Bl_c, Bl_r
   use param, ONLY: lmax, lomax, nloat, blocksize
   use mpi, ONLY: Qprint
+  use potnlc, only: basis_potential_enabled,basis_restore_spherical,basis_restore_lmin
   IMPLICIT NONE
   !        Arguments
   INTEGER, intent(in) :: LMX, NAT, NV  ! max-l, n-sorts, N-plane waves
@@ -263,6 +264,20 @@ SUBROUTINE HAMILTON(LMX,NAT,NV,U,UP,DU,DUP,MULT,POS,V,Vol,pei,E)
                     tmp1(j) = tmp1(j) + (wtmpa*Al_r(j,l) + wtmpb*Bl_r(j,l))*tmp3
                  end do
 		 !  !$OMP END PARALLEL DO
+              endif
+              if (basis_potential_enabled.and.l.ge.basis_restore_lmin) then
+                 ! Spherical DeltaV is diagonal in (l,m).  The angular sum
+                 ! gives (2*l+1)*P_l.  VIFPR4 and the atom phases are applied
+                 ! below exactly as for the ordinary spherical Hamiltonian.
+                 ! Both u-udot orientations are needed for a Hermitian form.
+                 do j=1,i_g
+                    tmp3=(2*l+1)*Pl(j,l,ihelp)
+                    tmp1(j)=tmp1(j)+tmp3*( &
+                         basis_restore_spherical(1,l+1,jatom)*Al_c(ihelp,l)*Al_r(j,l) &
+                        +basis_restore_spherical(2,l+1,jatom)*Bl_c(ihelp,l)*Bl_r(j,l) &
+                        +basis_restore_spherical(3,l+1,jatom)*( &
+                             Al_c(ihelp,l)*Bl_r(j,l)+Bl_c(ihelp,l)*Al_r(j,l)))
+                 enddo
               endif
            enddo
 	   !	   !$OMP PARALLEL DO PRIVATE(phs)

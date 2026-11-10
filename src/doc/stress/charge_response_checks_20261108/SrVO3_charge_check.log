@@ -1,0 +1,67 @@
+SrVO3 prepared atom 0
+SrVO3 prepared atom 1
+SrVO3 prepared atom 2
+SrVO3 prepared atom 3
+{
+  "case": "SrVO3",
+  "central_band_number": 41.13459318723834,
+  "central_spline_charge": 41.134570832823435,
+  "central_native_radial_charge": 41.1345710751873,
+  "central_full_fourier_charge": 41.1345710751873,
+  "directions": {
+    "nonspherical": [
+      {
+        "fixed_number": false,
+        "full_fourier_number_derivative": -0.015504002984368362,
+        "band_number_derivative": -0.015503734702173099,
+        "spline_number_derivative": -0.015504003306279773,
+        "native_radial_number_derivative": -0.01550400298436836,
+        "density_norm": 0.08590888400369678
+      },
+      {
+        "fixed_number": true,
+        "full_fourier_number_derivative": -2.7669114254630627e-07,
+        "band_number_derivative": -4.87890977618477e-19,
+        "spline_number_derivative": -2.7711416827647463e-07,
+        "native_radial_number_derivative": -2.7669114255096887e-07,
+        "density_norm": 0.030088700016870622
+      }
+    ],
+    "interstitial": [
+      {
+        "fixed_number": false,
+        "full_fourier_number_derivative": 0.6562733672356168,
+        "band_number_derivative": 0.6562731427659143,
+        "spline_number_derivative": 0.6562733618882939,
+        "native_radial_number_derivative": 0.6562733672356167,
+        "density_norm": 3.355197585874408
+      },
+      {
+        "fixed_number": true,
+        "full_fourier_number_derivative": 5.804204696625848e-07,
+        "band_number_derivative": 7.546047120499111e-17,
+        "spline_number_derivative": 5.793533166559798e-07,
+        "native_radial_number_derivative": 5.804204699210406e-07,
+        "density_norm": 0.14634465992178483
+      }
+    ],
+    "joint": [
+      {
+        "fixed_number": false,
+        "full_fourier_number_derivative": -4.343998127463202,
+        "band_number_derivative": -4.344001891513064,
+        "spline_number_derivative": -4.343998107752907,
+        "native_radial_number_derivative": -4.343998127463204,
+        "density_norm": 22.35138295806683
+      },
+      {
+        "fixed_number": true,
+        "full_fourier_number_derivative": 1.4079412468392949e-06,
+        "band_number_derivative": -8.881784197001252e-16,
+        "spline_number_derivative": 1.3993202521000768e-06,
+        "native_radial_number_derivative": 1.4079412468653617e-06,
+        "density_norm": 0.980967144058042
+      }
+    ]
+  }
+}

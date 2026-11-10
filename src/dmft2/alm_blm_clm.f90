@@ -303,4 +303,241 @@ contains
     time_lo_w=time_lo_w+time2_w-time1_w
 
   END SUBROUTINE cmp_alm_blm_clm
+
+
+  !===========================================================================
+  ! Analytic fixed-coefficient strain derivative of LAPW matching coefficients
+  !===========================================================================
+  !
+  ! Build the *physical* derivatives of ALM/BLM/CLM in the same pseudo-band
+  ! basis as CMP_ALM_BLM_CLM.  Unlike Blaha's volume-compensated CAPD object,
+  ! these arrays include
+  !
+  !   (i)  angular and radial APW matching response,
+  !   (ii) angular response of explicit local-orbital coefficients, and
+  !   (iii) -delta_ab C/2 from the common 1/sqrt(Omega) normalization.
+  !
+  ! They are therefore suitable for a literal fixed-sphere derivative of the
+  ! muffin-tin overlap, 2 Re[(dC/deps)^dagger R C].  They must not be added on
+  ! top of the ordinary on-shell CAPD stress kernel, where the matching part
+  ! is already present in a volume-compensated representation.
+  SUBROUTINE cmp_alm_blm_clm_strain(salm,sblm,sclm,alm,blm,clm, &
+       Aweight,latom,lfirst,jatom,n0,nnlo,is,DM_nemin,DM_nemax, &
+       DM_nemaxx,nbands,nbandsx,first_band)
+    USE defs,ONLY: pi,imag
+    USE param,ONLY: lmax2,lomax,nume,nloat,iblock,nmat
+    USE xa,ONLY: fj,dfj
+    USE xa3,ONLY: bk3,As
+    USE structure,ONLY: rmt,vol,rotij,br1,pos,tauij,rotloc
+    USE atspdt,ONLY: p,dp,pe,dpe
+    USE lo,ONLY: nlo,lapw,ilo
+    USE dmfts,ONLY: shft
+    USE mod_lo,ONLY: lomain_strain
+    IMPLICIT NONE
+    COMPLEX*16,intent(out) :: salm((lmax2+1)*(lmax2+1),nume,6), &
+         sblm((lmax2+1)*(lmax2+1),nume,6), &
+         sclm((lomax+1)*(lomax+1),nume,nloat,6)
+    COMPLEX*16,intent(in) :: alm((lmax2+1)*(lmax2+1),nume), &
+         blm((lmax2+1)*(lmax2+1),nume), &
+         clm((lomax+1)*(lomax+1),nume,nloat), &
+         Aweight(nbands,nbands)
+    INTEGER,intent(in) :: latom,lfirst,jatom,n0,nnlo,is,DM_nemin, &
+         DM_nemax,DM_nemaxx,nbands,nbandsx
+
+    ! Optional extension for occupied bands below the DMFT window.  They
+    ! use identity pseudo-band vectors but need the same physical derivative.
+    INTEGER,optional,intent(in) :: first_band
+    INTEGER :: base_band,base_count,offset
+    INTEGER,parameter :: strain_a(6)=(/1,2,3,2,1,1/), &
+         strain_b(6)=(/1,2,3,3,3,2/)
+    INTEGER :: lmfull,lmlo,ii,ibb,i,i3,l,m,index,index1,iq,ia,ib, &
+         igamma,iv,it,jlo
+    REAL*8 :: twopi,fac,arg1,arg2,argt2,bkrot2(3),bkrot3(3), &
+         bkrloc(3),akg,rmt2,h_al,h_bl,jprime,jsecond,dal,dbl,radial
+    COMPLEX*16 :: phshel,cfac,dy,cone,czero
+    COMPLEX*16 :: ca_st_lm(3,-1:1,-1:1)
+    COMPLEX*16,allocatable :: yl(:),h_yl(:,:),dh_yl(:,:,:), &
+         dh_alyl(:,:,:),dh_blyl(:,:,:),salm0(:,:,:),sblm0(:,:,:), &
+         sclm0(:,:,:,:),tmp(:,:)
+    LOGICAL :: nonzero_shft
+
+    lmfull=(lmax2+1)*(lmax2+1)
+    lmlo=(lomax+1)*(lomax+1)
+    twopi=2.d0*pi
+    fac=4.d0*pi*rmt(jatom)**2/sqrt(vol)
+    rmt2=1.d0/rmt(jatom)**2
+    cone=cmplx(1.d0,0.d0,8)
+    czero=cmplx(0.d0,0.d0,8)
+    nonzero_shft=sum(abs(shft(latom,:))).gt.1.d-10
+
+    base_band=DM_nemin
+    if(present(first_band)) base_band=first_band
+    if(base_band>DM_nemin.or.base_band<1) error stop 'Invalid strain coefficient range'
+    base_count=DM_nemax-base_band+1
+    offset=DM_nemin-base_band
+    salm=0.d0; sblm=0.d0; sclm=0.d0
+    allocate(yl((lmax2+2)*(lmax2+2)))
+    allocate(h_yl(lmfull,iblock),dh_yl(lmfull,iblock,6), &
+         dh_alyl(lmfull,iblock,6),dh_blyl(lmfull,iblock,6))
+    allocate(salm0(lmfull,base_count,6),sblm0(lmfull,base_count,6), &
+         sclm0(lmlo,base_count,nloat,6))
+    salm0=0.d0; sblm0=0.d0; sclm0=0.d0
+
+    do ii=1,n0-nnlo,iblock
+       ibb=min(iblock,n0-nnlo-ii+1)
+       h_yl=0.d0; dh_yl=0.d0
+
+       do i=ii,ii+ibb-1
+          i3=i-ii+1
+          bkrot2=matmul(rotij(:,:,latom),bk3(:,i))
+          bkrot3=matmul(br1,bkrot2)
+          bkrloc=matmul(rotloc(:,:,jatom),bkrot3)
+          akg=sqrt(dot_product(bkrot3,bkrot3))
+          call YLM(bkrloc,lmax2+1,yl,(lmax2+2)*(lmax2+2))
+          arg1=dot_product(bkrot2,pos(:,lfirst))*twopi
+          argt2=dot_product(bk3(:,i),tauij(:,latom))*twopi
+          arg2=0.d0
+          if (nonzero_shft) arg2=dot_product(bk3(:,i),shft(latom,:))*twopi
+          phshel=exp(imag*(arg1+arg2+argt2))
+
+          do l=0,lmax2
+             do m=-l,l
+                index=l*(l+1)+m+1
+                h_yl(index,i3)=conjg(yl(index))*phshel
+                call c_factor(l,m,ca_st_lm)
+                do iq=1,6
+                   ia=strain_a(iq); ib=strain_b(iq)
+                   dy=czero
+                   if (akg.gt.1.d-14) then
+                      do igamma=1,3
+                         do iv=-1,1,2
+                            if (l+iv.lt.0) cycle
+                            do it=-1,1
+                               if (m+it.lt.-(l+iv) .or. &
+                                    m+it.gt.(l+iv)) cycle
+                               index1=(l+iv)*(l+iv+1)+m+it+1
+                               dy=dy-0.5d0* &
+                                    conjg(ca_st_lm(igamma,iv,it))* &
+                                    (rotloc(igamma,ia,jatom)*bkrot3(ib)+ &
+                                     rotloc(igamma,ib,jatom)*bkrot3(ia))* &
+                                    conjg(yl(index1))*phshel/akg
+                            enddo
+                         enddo
+                      enddo
+                   endif
+                   dh_yl(index,i3,iq)=dy
+                enddo
+             enddo
+          enddo
+       enddo
+
+       dh_alyl=0.d0; dh_blyl=0.d0
+       do i=ii,ii+ibb-1
+          i3=i-ii+1
+          bkrot2=matmul(rotij(:,:,latom),bk3(:,i))
+          bkrot3=matmul(br1,bkrot2)
+          akg=sqrt(dot_product(bkrot3,bkrot3))
+          do l=0,lmax2
+             if (lapw(l)) then
+                h_al=dfj(l,i,jatom)*pe(l)-fj(l,i,jatom)*dpe(l)
+                h_bl=fj(l,i,jatom)*dp(l)-dfj(l,i,jatom)*p(l)
+             else
+                h_al=rmt2*fj(l,i,jatom)/p(l)
+                h_bl=0.d0
+             endif
+             if (akg.gt.1.d-14) then
+                jprime=dfj(l,i,jatom)/akg
+                jsecond=((dble(l*(l+1))/(akg*rmt(jatom))**2)-1.d0)* &
+                     fj(l,i,jatom)-2.d0*jprime/(akg*rmt(jatom))
+             else
+                jprime=0.d0; jsecond=0.d0
+             endif
+             if (lapw(l)) then
+                dal=rmt(jatom)*dpe(l)*jprime-pe(l)*jprime- &
+                     pe(l)*akg*rmt(jatom)*jsecond
+                dbl=-rmt(jatom)*dp(l)*jprime+p(l)*jprime+ &
+                     p(l)*akg*rmt(jatom)*jsecond
+             else
+                dal=0.d0; dbl=0.d0
+                if (akg.gt.1.d-14) dal=-jprime/(rmt(jatom)*p(l))
+             endif
+             do iq=1,6
+                ia=strain_a(iq); ib=strain_b(iq)
+                radial=0.d0
+                if (akg.gt.1.d-14) &
+                     radial=bkrot3(ia)*bkrot3(ib)/akg
+                do m=-l,l
+                   index=l*(l+1)+m+1
+                   dh_alyl(index,i3,iq)=dh_yl(index,i3,iq)*h_al+ &
+                        h_yl(index,i3)*radial*dal
+                   dh_blyl(index,i3,iq)=dh_yl(index,i3,iq)*h_bl+ &
+                        h_yl(index,i3)*radial*dbl
+                enddo
+             enddo
+          enddo
+       enddo
+
+       do iq=1,6
+          call zgemm('N','N',lmfull,base_count,ibb,cone, &
+               dh_alyl(:,:,iq),lmfull,As(ii,base_band,is),nmat,cone, &
+               salm0(:,:,iq),lmfull)
+          call zgemm('N','N',lmfull,base_count,ibb,cone, &
+               dh_blyl(:,:,iq),lmfull,As(ii,base_band,is),nmat,cone, &
+               sblm0(:,:,iq),lmfull)
+       enddo
+    enddo
+
+    if (nlo.ne.0) call lomain_strain(rotloc(:,:,jatom),is,base_band, &
+         DM_nemax,lfirst,latom,jatom,salm0,sblm0,sclm0,lmax2)
+
+    do l=0,lmax2
+       cfac=fac*imag**l
+       salm0(l*l+1:(l+1)**2,:,:)=salm0(l*l+1:(l+1)**2,:,:)*cfac
+       sblm0(l*l+1:(l+1)**2,:,:)=sblm0(l*l+1:(l+1)**2,:,:)*cfac
+       if (l.le.lomax) sclm0(l*l+1:(l+1)**2,:,1:ilo(l),:)= &
+            sclm0(l*l+1:(l+1)**2,:,1:ilo(l),:)*cfac
+    enddo
+
+    if(offset>0) then
+       salm(:,base_band:DM_nemin-1,:)=salm0(:,:offset,:)
+       sblm(:,base_band:DM_nemin-1,:)=sblm0(:,:offset,:)
+       sclm(:,base_band:DM_nemin-1,:,:)=sclm0(:,:offset,:,:)
+    endif
+    allocate(tmp(lmfull,nbandsx))
+    do iq=1,6
+       call zgemm('N','N',lmfull,nbandsx,nbands,cone,salm0(:,offset+1:base_count,iq), &
+            lmfull,Aweight,nbands,czero,tmp,lmfull)
+       salm(:,DM_nemin:DM_nemaxx,iq)=tmp
+       call zgemm('N','N',lmfull,nbandsx,nbands,cone,sblm0(:,offset+1:base_count,iq), &
+            lmfull,Aweight,nbands,czero,tmp,lmfull)
+       sblm(:,DM_nemin:DM_nemaxx,iq)=tmp
+    enddo
+    deallocate(tmp)
+
+    allocate(tmp(lmlo,nbandsx))
+    do iq=1,6
+       do jlo=1,nloat
+          call zgemm('N','N',lmlo,nbandsx,nbands,cone, &
+               sclm0(:,offset+1:base_count,jlo,iq),lmlo,Aweight,nbands,czero,tmp,lmlo)
+          sclm(:,DM_nemin:DM_nemaxx,jlo,iq)=tmp
+       enddo
+    enddo
+    deallocate(tmp)
+
+    ! Convert the volume-compensated derivative assembled above into the
+    ! derivative of the physical 1/sqrt(Omega)-normalized coefficients.
+    do iq=1,3
+       salm(:,base_band:DM_nemaxx,iq)= &
+            salm(:,base_band:DM_nemaxx,iq)-0.5d0* &
+            alm(:,base_band:DM_nemaxx)
+       sblm(:,base_band:DM_nemaxx,iq)= &
+            sblm(:,base_band:DM_nemaxx,iq)-0.5d0* &
+            blm(:,base_band:DM_nemaxx)
+       sclm(:,base_band:DM_nemaxx,:,iq)= &
+            sclm(:,base_band:DM_nemaxx,:,iq)-0.5d0* &
+            clm(:,base_band:DM_nemaxx,:)
+    enddo
+
+    deallocate(yl,h_yl,dh_yl,dh_alyl,dh_blyl,salm0,sblm0,sclm0)
+  END SUBROUTINE cmp_alm_blm_clm_strain
 END module alm_blm_clm

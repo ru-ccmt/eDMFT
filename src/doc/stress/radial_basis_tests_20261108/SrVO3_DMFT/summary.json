@@ -1,0 +1,12 @@
+{
+  "case": "SrVO3",
+  "kind": "DMFT",
+  "step": 0.00025,
+  "volume": 382.70904262161486,
+  "sums": {
+    "minus": -27.991000682,
+    "plus": -27.991001649
+  },
+  "band_fd_GPa": -0.02477959203454151,
+  "sums_note": "LAPW2 band sums; central value omitted when only the later DMFT SCF2 was retained."
+}

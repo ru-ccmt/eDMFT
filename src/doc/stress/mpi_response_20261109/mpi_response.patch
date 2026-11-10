@@ -1,0 +1,2389 @@
+--- a/src/python/dmft2_step.py
++++ b/src/python/dmft2_step.py
+@@ -39,6 +39,9 @@
+     "tolerance",
+     "max_iterations",
+     "mpi",
++    "native_mpi",
++    "cache_mb",
++    "basis_cache_mb",
+     "dmft2",
+     "wien_root",
+ }
+@@ -300,8 +303,9 @@
+         .expanduser()
+         .resolve()
+     )
+-    # Production dmft2 may use MPI independently. Native analytic export and
+-    # the prepared Python response currently run serially in their workspace.
++    # The Python response and native workers may use different MPI builds.
++    # Keep explicit launch lists: for example MPICH mpi4py and Open MPI Fortran.
++    # MPI settings never change the caller's ordinary dmft2 launch.
+     launch = solver.get("mpi", [] if backend == "analytic" else shlex.split(mpi))
+     if not isinstance(launch, list) or any(not isinstance(x, str) for x in launch):
+         raise ValueError("solver.mpi must be an argument list")
+@@ -316,10 +320,28 @@
+         if not Path(name).is_file():
+             raise ValueError(f"missing response input: {name}")
+     if backend == "analytic":
+-        if launch:
+-            raise NotImplementedError(
+-                "analytic preparation currently requires solver.mpi=[]"
++        cache_mb = solver.get("cache_mb", 256.0)
++        if (
++            not isinstance(cache_mb, (float, int))
++            or not np.isfinite(cache_mb)
++            or cache_mb < 0
++        ):
++            raise ValueError("solver.cache_mb must be a nonnegative per-rank budget")
++        basis_cache_mb = solver.get("basis_cache_mb", 128.0)
++        if (
++            not isinstance(basis_cache_mb, (float, int))
++            or not np.isfinite(basis_cache_mb)
++            or basis_cache_mb < 0
++        ):
++            raise ValueError(
++                "solver.basis_cache_mb must be a nonnegative per-rank budget"
+             )
++        native_launch = solver.get("native_mpi", [])
++        if not isinstance(native_launch, list) or any(
++            not isinstance(x, str) or any(c in x for c in "$;|><")
++            for x in native_launch
++        ):
++            raise ValueError("solver.native_mpi must be an explicit argument list")
+         legacy = set(solver) & {"strain", "probe_step", "tolerance", "max_iterations"}
+         if legacy:
+             raise ValueError(
+@@ -424,6 +446,15 @@
+             identities[solver[key]] = sha256(Path(solver[key]))
+     scripts = {}
+     for module in [
++        "response_parallel",
++        "frozen_sigma_tangent",
++        "frozen_sigma_response",
++        "lapw_valence_state",
++        "lapw_screened_state",
++        "lapw_geometry_response",
++        "lapw_strain_charge",
++        "lapw_strain_functional",
++        "lapw_response_kpool",
+         "lapw_response_prepare",
+         "lapw_total_stress_driver",
+         "lapw_total_stress",
+@@ -462,6 +493,8 @@
+             "workspace": str(work / "central"),
+             "wien_root": solver["wien_root"],
+             "dmft2": solver["dmft2"],
++            "native_mpi": solver.get("native_mpi", []),
++            "lapw1_mpi": solver.get("mpi", []),
+             "lapw1_definition": str(snapshot / "lapw1.def"),
+             "dmft2_definition": str(snapshot / "dmft2.def"),
+             **{k: solver[k] for k in ["lapw0_worker", "lapw1_worker", "lcore_worker"]},
+@@ -488,13 +521,17 @@
+                 str(work / "total_stress"),
+             ],
+         ]
++        commands[1] += ["--cache-mb", str(solver.get("cache_mb", 256.0))]
++        commands[1] += ["--basis-cache-mb", str(solver.get("basis_cache_mb", 128.0))]
++        if solver.get("mpi"):
++            commands[1] = solver["mpi"] + commands[1] + ["--mpi"]
+         for i, command in enumerate(commands):
+             print(
+                 "RESPONSE ..... running:", shlex.join(command), file=output, flush=True
+             )
+             log = work / ("prepare.log" if i == 0 else "response.log")
+             with log.open("w") as stream:
+-                # This prepared backend is serial. Avoid oversubscribed BLAS
++                # Each response rank owns k points. Avoid oversubscribed BLAS
+                 # inside thousands of small angular/band products. Production
+                 # dmft2 retains the caller's MPI/OpenMP launch unchanged.
+                 child_env = os.environ | {
+--- a/src/python/frozen_sigma_response.py
++++ b/src/python/frozen_sigma_response.py
+@@ -25,6 +25,7 @@
+ from scipy.linalg import eigh
+ from scipy.special import expit
+ from types import SimpleNamespace
++from response_parallel import SERIAL
+ 
+ 
+ def herm(a):
+@@ -145,13 +146,39 @@
+ 
+ class FrozenSigmaResponse:
+     @classmethod
+-    def from_export(cls, prefix, **context_options):
++    def from_export(cls, prefix, *, parallel=SERIAL, **context_options):
+         """Read a standalone EDMFT_RESPONSE_EXPORT from a central TOT run."""
+         prefix = Path(prefix)
+-        m = Metadata.read(str(prefix) + ".meta")
++        m = parallel.root_call(lambda: Metadata.read(str(prefix) + ".meta"))
++
++        def inventory():
++            files = sorted(prefix.parent.glob(prefix.name + ".k????????.bin"))
++            headers = []
++            for path in files:
++                with path.open("rb") as fh:
++                    if fh.read(8) != b"EDMRPK01":
++                        raise ValueError("bad k export magic")
++                    header = np.fromfile(fh, "<i4", 12)
++                    if len(header) != 12:
++                        raise ValueError("truncated k export header")
++                    headers.append(header)
++            if not headers or [int(h[1]) for h in headers] != list(
++                range(1, len(files) + 1)
++            ):
++                raise ValueError("missing or out-of-order k-point exports")
++            signature = lambda h: tuple(h[[4, 5, 6, 7, 8]])
++            if any(signature(h) != signature(headers[0]) for h in headers):
++                raise ValueError(
++                    "response requires a fixed band count and fixed-index window"
++                )
++            return files, [float(h[2]) ** 3 for h in headers]
++
++        paths, costs = parallel.root_call(inventory)
++        ownership = parallel.partition(costs)
+         records = []
+         kw = []
+-        for path in sorted(prefix.parent.glob(prefix.name + ".k????????.bin")):
++        for index in ownership:
++            path = paths[index]
+             with path.open("rb") as fh:
+                 if fh.read(8) != b"EDMRPK01":
+                     raise ValueError("bad k export magic")
+@@ -196,7 +223,7 @@
+             kw.append(weight / 2)
+         if not records:
+             raise ValueError("no k exports")
+-        if [r.kpoint for r in records] != list(range(1, len(records) + 1)):
++        if [r.kpoint for r in records] != (ownership + 1).tolist():
+             raise ValueError("missing or out-of-order k-point exports")
+ 
+         def signature(r):
+@@ -206,7 +233,7 @@
+             raise ValueError(
+                 "response requires a fixed band count and fixed-index window"
+             )
+-        if abs(sum(kw) - 1) > 1e-10:
++        if abs(parallel.sum(sum(kw)) - 1) > 1e-10:
+             raise ValueError(
+                 "k-point weights do not sum to one: incomplete or magnetic export"
+             )
+@@ -231,11 +258,15 @@
+             normalized,
+             np.array(kw),
+             np.arange(d.dm_nemin - d.nemin, d.dm_nemax - d.nemin + 1),
++            parallel=parallel,
+             **context_options,
+         )
+         return obj, records
+ 
+-    def __init__(self, metadata, energies, raw, normalized, kw, window):
++    def __init__(
++        self, metadata, energies, raw, normalized, kw, window, *, parallel=SERIAL
++    ):
++        self.parallel = parallel
+         self.meta = metadata
+         self.eps = np.asarray(energies)
+         self.kw = np.asarray(kw)
+@@ -264,6 +295,7 @@
+             if len(self.Q)
+             else float("inf")
+         )
++        self.minimum_gap = parallel.reduce(self.minimum_gap, "min")
+         if self.minimum_gap < 1e-8:
+             raise ValueError(f"window cuts degeneracy: {self.minimum_gap} Ry")
+ 
+@@ -272,7 +304,9 @@
+ 
+     def overlap(self, q):
+         return self.meta.sym(
+-            np.einsum("k,knic,knjc->ijc", self.kw, q.conj(), q, optimize=True)
++            self.parallel.sum(
++                np.einsum("k,knic,knjc->ijc", self.kw, q.conj(), q, optimize=True)
++            )
+         )
+ 
+     def embedding_response(self, dh):
+@@ -283,19 +317,21 @@
+             dq[k, Q] = np.einsum("an,nic->aic", a, self.raw[k, W])
+             dq[k, W] = np.einsum("na,aic->nic", a.conj().T, self.raw[k, Q])
+         ds = self.meta.sym(
+-            np.einsum(
+-                "k,knic,knjc->ijc",
+-                self.kw,
+-                self.raw[:, W].conj(),
+-                dq[:, W],
+-                optimize=True,
+-            )
+-            + np.einsum(
+-                "k,knic,knjc->ijc",
+-                self.kw,
+-                dq[:, W].conj(),
+-                self.raw[:, W],
+-                optimize=True,
++            self.parallel.sum(
++                np.einsum(
++                    "k,knic,knjc->ijc",
++                    self.kw,
++                    self.raw[:, W].conj(),
++                    dq[:, W],
++                    optimize=True,
++                )
++                + np.einsum(
++                    "k,knic,knjc->ijc",
++                    self.kw,
++                    dq[:, W].conj(),
++                    self.raw[:, W],
++                    optimize=True,
++                )
+             )
+         )
+         dx = np.zeros_like(self.X)
+@@ -440,8 +476,10 @@
+             mu_answer.append(2 * self.kw[k] * herm(dm))
+         answer = np.array(answer)
+         mu_answer = np.array(mu_answer)
+-        dn = float(np.trace(answer, axis1=1, axis2=2).real.sum())
+-        compress = float(np.trace(mu_answer, axis1=1, axis2=2).real.sum())
++        dn = float(self.parallel.sum(np.trace(answer, axis1=1, axis2=2).real.sum()))
++        compress = float(
++            self.parallel.sum(np.trace(mu_answer, axis1=1, axis2=2).real.sum())
++        )
+         mu1 = 0.0
+         if fixed_number:
+             if abs(compress) < 1e-8:
+@@ -455,14 +493,17 @@
+             "dN_fixed_mu": dn,
+             "dN_dmu": compress,
+             "dmu": mu1,
+-            "dN": float(np.trace(answer, axis1=1, axis2=2).real.sum()),
++            "dN": float(
++                self.parallel.sum(np.trace(answer, axis1=1, axis2=2).real.sum())
++            ),
+             "minimum_window_gap_Ry": self.minimum_gap,
+             "normalization_derivative_norm": float(np.linalg.norm(dx)),
+         }
+         return answer, info
+ 
+     def write_density(self, prefix, rho, dumps):
+-        for k, (r, d) in enumerate(zip(rho, dumps), 1):
++        for r, d in zip(rho, dumps):
++            k = d.kpoint
+             p = Path(f"{prefix}.k{k:08d}.bin")
+             p.parent.mkdir(parents=True, exist_ok=True)
+             with p.open("wb") as f:
+--- a/src/python/frozen_sigma_tangent.py
++++ b/src/python/frozen_sigma_tangent.py
+@@ -19,6 +19,7 @@
+ 
+ import argparse
+ import copy
++from response_parallel import SERIAL
+ import json
+ import time
+ from pathlib import Path
+@@ -108,11 +109,19 @@
+     """
+ 
+     def __init__(
+-        self, *args, cache_mb=256.0, frequency_chunk=32, precontract=True, **kwargs
++        self,
++        *args,
++        cache_mb=256.0,
++        frequency_chunk=32,
++        precontract=True,
++        parallel=SERIAL,
++        **kwargs,
+     ):
+         # Isolate the context from caller-owned arrays before caching. Updating
+         # an input self-energy or chemical potential requires a NEW context.
+-        super().__init__(*copy.deepcopy(args), **copy.deepcopy(kwargs))
++        super().__init__(
++            *copy.deepcopy(args), parallel=parallel, **copy.deepcopy(kwargs)
++        )
+         if not np.isfinite(cache_mb) or cache_mb < 0 or frequency_chunk < 1:
+             raise ValueError("invalid response cache limits")
+         self.cache_limit = int(cache_mb * 1024**2)
+@@ -191,8 +200,12 @@
+         if raw_derivative is not None:
+             dq[:, W] += self._raw_direction(raw_derivative)[:, W]
+         ds = self.meta.sym(
+-            np.einsum("k,knic,knjc->ijc", self.kw, self.raw[:, W].conj(), dq[:, W])
+-            + np.einsum("k,knic,knjc->ijc", self.kw, dq[:, W].conj(), self.raw[:, W])
++            self.parallel.sum(
++                np.einsum("k,knic,knjc->ijc", self.kw, self.raw[:, W].conj(), dq[:, W])
++                + np.einsum(
++                    "k,knic,knjc->ijc", self.kw, dq[:, W].conj(), self.raw[:, W]
++                )
++            )
+         )
+         dx = self.normalization_action(ds)
+         du = self.apply_x(dq, self.X)
+@@ -216,7 +229,9 @@
+             start += n
+         dq_bar = self.apply_x(local, self.X.swapaxes(0, 1).conj())
+         dx_bar = np.einsum("knic,knjc->ijc", self.raw[:, W].conj(), local[:, W])
+-        ds_bar = self.symmetry_adjoint(self.normalization_action(dx_bar))
++        ds_bar = self.symmetry_adjoint(
++            self.normalization_action(self.parallel.sum(dx_bar))
++        )
+         ds_bar = ds_bar + ds_bar.swapaxes(0, 1).conj()
+         dq_bar[:, W] += self.kw[:, None, None, None] * self.apply_x(
+             self.raw[:, W], ds_bar
+@@ -303,7 +318,7 @@
+         self.mu_response = np.asarray(mu)
+         self.mu_response.flags.writeable = False
+         self.compressibility = float(
+-            np.trace(self.mu_response, axis1=1, axis2=2).real.sum()
++            self.parallel.sum(np.trace(self.mu_response, axis1=1, axis2=2).real.sum())
+         )
+         self._central_density = np.asarray(density)
+         self._central_density.flags.writeable = False
+@@ -345,6 +360,8 @@
+ 
+     def cache_info(self):
+         return dict(
++            basis_product_bytes=getattr(self, "basis_cache_bytes", 0),
++            basis_product_limit_bytes=getattr(self, "basis_cache_limit", 0),
+             resolvent_bytes=self._cache_bytes,
+             resolvent_limit_bytes=self.cache_limit,
+             contraction_bytes=self._kernel_bytes,
+@@ -534,7 +551,7 @@
+                 )
+             result.append(2 * self.kw[k] * herm(dr))
+         result = np.asarray(result)
+-        dn = float(np.trace(result, axis1=1, axis2=2).real.sum())
++        dn = float(self.parallel.sum(np.trace(result, axis1=1, axis2=2).real.sum()))
+         mu1 = 0.0
+         if fixed_number:
+             self._check_fixed_number()
+@@ -545,7 +562,7 @@
+             dN_fixed_mu=dn,
+             dN_dmu=self.compressibility,
+             dmu=mu1,
+-            dN=float(np.trace(result, axis1=1, axis2=2).real.sum()),
++            dN=float(self.parallel.sum(np.trace(result, axis1=1, axis2=2).real.sum())),
+             minimum_window_gap_Ry=self.minimum_gap,
+             normalization_derivative_norm=float(np.linalg.norm(dx)),
+             cache=self.cache_info(),
+@@ -565,9 +582,10 @@
+         self.prepare()
+         if fixed_number:
+             self._check_fixed_number()
+-            y -= (real_inner(self.mu_response, y) / self.compressibility) * np.eye(
+-                self.eps.shape[1]
+-            )
++            y -= (
++                self.parallel.sum(real_inner(self.mu_response, y))
++                / self.compressibility
++            ) * np.eye(self.eps.shape[1])
+         answer = np.zeros_like(y)
+         du_bar = np.zeros_like(self.uc)
+         for k, u in enumerate(self.uc):
+@@ -762,7 +780,7 @@
+                     )
+                 )
+             total += 2 * self.kw[k] * value
+-        return float(total)
++        return float(self.parallel.sum(total))
+ 
+ 
+ def main(argv=None):
+--- a/src/python/lapw_energy_response.py
++++ b/src/python/lapw_energy_response.py
+@@ -9,6 +9,7 @@
+ """
+ 
+ import numpy as np
++from response_parallel import parallel_of
+ from lapw_density_response import checked
+ from lapw_radial_energy_policy import searched_energy_derivatives
+ from stress_response_adjoint import PairedOperator, ScreenedResponse
+@@ -111,6 +112,7 @@
+         library,
+         progress=None
+     ):
++        parallel = parallel_of(state)
+         maps, details = searched_energy_derivatives(
+             directory, case, complex_vectors=complex_vectors, library=library
+         )
+@@ -139,10 +141,11 @@
+             ch = state.chain
+             columns.append(
+                 ch.normalization.matvec(
+-                    ch.density.matvec(ch.electronic.matvec(band)) + density
++                    ch.density.matvec(ch.electronic.matvec(band))
++                    + parallel.sum(density)
+                 )
+             )
+-            direct.append(observable.lattice.joint_gradient @ band)
++            direct.append(parallel.sum(observable.lattice.joint_gradient @ band))
+             if progress is not None:
+                 progress(i, item)
+         self.P = (
+--- a/src/python/lapw_geometry_response.py
++++ b/src/python/lapw_geometry_response.py
+@@ -161,7 +161,7 @@
+ 
+ 
+ def interstitial_geometry(
+-    q, labels, coefficients, positions, radii, volume, strain, retained
++    q, labels, coefficients, positions, radii, volume, strain, retained, *, central=True
+ ):
+     """Exact analytic PW overlap and kinetic derivative, no potential derivative.
+ 
+@@ -198,7 +198,79 @@
+     kinetic = q @ q.T
+     dt = -2 * (q @ strain @ q.T) * theta + kinetic * dtheta
+     project = lambda a: hermitian_columns(c.conj().T @ (a @ c[:, :retained]))
+-    return project(dt), project(dtheta), project(kinetic * theta), project(theta)
++    return (
++        project(dt),
++        project(dtheta),
++        project(kinetic * theta) if central else None,
++        project(theta) if central else None,
++    )
++
++
++def prepared_geometry_inputs(state, directory, case):
++    """Small immutable central geometry shared by all strain/density sources.
++
++    H/O exports were already read and fingerprinted during valence preparation.
++    Keep their three-component k coordinates instead of rereading dense N^2
++    files for every strain. Matrices stay distributed with their owning rank.
++    This cache belongs to one prepared state, never to a mutable material run.
++    """
++    if hasattr(state, "_strain_geometry"):
++        return state._strain_geometry
++    from types import SimpleNamespace
++    from response_parallel import parallel_of
++
++    parallel = parallel_of(state.model)
++    directory = Path(directory)
++    s = state.structure
++
++    def validate():
++        for name in [case + ".indmfl", case + ".vns", case + ".struct"]:
++            if (
++                hashlib.sha256((directory / name).read_bytes()).hexdigest()
++                != state.fingerprints[name]
++            ):
++                raise ValueError("changed geometry-source input: " + name)
++
++    parallel.root_call(validate)
++    inl = Indmfl(str(directory / case))
++    inl.read()
++    first = np.r_[0, np.cumsum(s.mult)[:-1]]
++    axes, locations = [], []
++    for site, a in enumerate(np.repeat(np.arange(s.nat), s.mult)):
++        for rot, tau in zip(s.timat, s.tau):
++            delta = rot @ s.pos[first[a]] + tau - s.pos[site]
++            delta -= np.rint(delta)
++            if max(abs(delta)) < 2e-7:
++                break
++        else:
++            raise ValueError("missing equivalent-site rotation")
++        axes.append(rot.T)
++        locations.append(rot @ s.pos[first[a]] + tau)
++    lo, offset = {}, 0
++    for a in range(s.nat):
++        for l in range(4):
++            for j in range(state.projector_contexts[a][l].nlo):
++                n = s.mult[a] * (2 * l + 1)
++                lo[a, l, j] = np.arange(offset, offset + n)
++                offset += n
++    if any(r.nlo != offset for r in state.records):
++        raise ValueError("native LO rows differ")
++    kcoords = [r.reciprocal_k for r in state.records]
++    fractional = [r.labels.T + k for r, k in zip(state.records, kcoords)]
++    momenta = [2 * np.pi * g / np.array([s.a, s.b, s.c]) for g in fractional]
++    state._strain_geometry = SimpleNamespace(
++        inl=inl,
++        first=first,
++        axes=axes,
++        locations=locations,
++        lo=lo,
++        fractional=fractional,
++        momenta=momenta,
++        lengths=[np.linalg.norm(q, axis=1) for q in momenta],
++        vns=read_potential_file(directory / (case + ".vns"), s.jrj),
++        central_report=None,
++    )
++    return state._strain_geometry
+ 
+ 
+ def native_band_geometry_source(state, directory, case, strain):
+@@ -221,65 +293,33 @@
+             raise NotImplementedError(
+                 "expand symmetry/equivalent-site layouts before this strain"
+             )
+-    directory = Path(directory)
+-    # These are the files reread here; all other native inputs have already
+-    # been materialized and fingerprinted by load_native_valence_state. In
+-    # particular a replacement matrix export must not silently change k.
+-    names = [case + ".indmfl", case + ".vns", case + ".struct"]
+-    names += [f"native.k{k+1:08d}.bin" for k in range(len(state.records))]
+-    for name in names:
+-        if (
+-            hashlib.sha256((directory / name).read_bytes()).hexdigest()
+-            != state.fingerprints[name]
+-        ):
+-            raise ValueError("changed geometry-source input: " + name)
+-    inl = Indmfl(str(directory / case))
+-    inl.read()
++    from response_parallel import parallel_of
++
++    parallel = parallel_of(state.model)
++    prepared = prepared_geometry_inputs(state, directory, case)
++    inl = prepared.inl
++    first, axes, locations, lo_indices = (
++        prepared.first,
++        prepared.axes,
++        prepared.locations,
++        prepared.lo,
++    )
+     nr = state.model.eps.shape[1]
+     nk = len(state.records)
+     trace = np.trace(e)
+     volume = s.a * s.b * s.c
+-    first = np.r_[0, np.cumsum(s.mult)[:-1]]
+-    site_atoms = np.repeat(np.arange(s.nat), s.mult)
+-    axes = []
+-    locations = []
+-    for site, a in enumerate(site_atoms):
+-        for rot, tau in zip(s.timat, s.tau):
+-            delta = rot @ s.pos[first[a]] + tau - s.pos[site]
+-            delta -= np.rint(delta)
+-            if max(abs(delta)) < 2e-7:
+-                break
+-        else:
+-            raise ValueError("missing equivalent-site rotation")
+-        axes.append(rot.T)
+-        locations.append(rot @ s.pos[first[a]] + tau)
+-    lo_indices = {}
+-    offset = 0
+-    for a in range(s.nat):
+-        for l in range(4):
+-            for j in range(state.projector_contexts[a][l].nlo):
+-                n = s.mult[a] * (2 * l + 1)
+-                lo_indices[a, l, j] = np.arange(offset, offset + n)
+-                offset += n
+-    if any(r.nlo != offset for r in state.records):
+-        raise ValueError("native LO rows differ")
+-    kcoords = [
+-        read_basis_matrix(
+-            directory / f"native.k{k+1:08d}.bin", b"EDMFTOV1"
+-        ).reciprocal_k
+-        for k in range(nk)
+-    ]
+-
+-    @lru_cache(maxsize=1)
++    check_central = prepared.central_report is None
++
++    @lru_cache(maxsize=None)
+     def geometry(k):
+         rec = state.records[k]
+         base = state.bases[k]
+         c = np.column_stack((base.retained, base.complement))
+         npw = rec.nbasis - rec.nlo
+-        frac = rec.labels.T + kcoords[k]
+-        q = 2 * np.pi * frac / np.array([s.a, s.b, s.c])
++        frac = prepared.fractional[k]
++        q = prepared.momenta[k]
+         dq = -q @ e
+-        length = np.linalg.norm(q, axis=1)
++        length = prepared.lengths[k]
+         dl = np.divide(
+             np.sum(q * dq, axis=1), length, out=np.zeros_like(length), where=length != 0
+         )
+@@ -327,9 +367,10 @@
+         dh, do = spherical_geometry_direction(op, dot, tri)
+         h[k] += dh
+         o[k] += do
+-        hv, ov = op.value()
+-        hc[k] += hv
+-        oc[k] += ov
++        if check_central:
++            hv, ov = op.value()
++            hc[k] += hv
++            oc[k] += ov
+     for a, op, ks in bands.nonspherical:
+         for index, (k, entry) in enumerate(zip(ks, op.entries)):
+             z, channels, lo, lapw, kz = entry
+@@ -346,7 +387,8 @@
+             h[k] += hermitian_columns(
+                 dz.conj().T @ kz[:, :nr] + kz.conj().T @ dz[:, :nr]
+             )
+-            hc[k] += hermitian_columns(z.conj().T @ kz[:, :nr])
++            if check_central:
++                hc[k] += hermitian_columns(z.conj().T @ kz[:, :nr])
+     for a, l, k, ic, cols, op in bands.projectors:
+         orbs = inl.cix[ic + 1]
+         if len(orbs) != 1:
+@@ -363,7 +405,7 @@
+         raw[k, :, cols, ic] += np.einsum("min,i,ma->na", dz.conj(), op.q, op.transform)[
+             :nr
+         ]
+-    vns = read_potential_file(directory / (case + ".vns"), s.jrj)
++    vns = prepared.vns
+     for k in range(nk):
+         c, npw, frac, q, dq, length, dl = geometry(k)
+         dh, do, t0, o0 = interstitial_geometry(
+@@ -375,17 +417,19 @@
+             volume,
+             e,
+             nr,
++            central=check_central,
+         )
+         h[k] += dh
+         o[k] += do
+-        hc[k] += t0
+-        oc[k] += o0
+-        ir = state.bands.ir[k]
+-        pw = np.array([vns.interstitial[tuple(g)] for g in ir.representatives])
+-        if not ir.complex_values:
+-            pw = pw.real
+-        rr, qr = ir.action(pw, retained=nr)
+-        hc[k] += np.concatenate((rr, qr))
++        if check_central:
++            hc[k] += t0
++            oc[k] += o0
++            ir = state.bands.ir[k]
++            pw = np.array([vns.interstitial[tuple(g)] for g in ir.representatives])
++            if not ir.complex_values:
++                pw = pw.real
++            rr, qr = ir.action(pw, retained=nr)
++            hc[k] += np.concatenate((rr, qr))
+     expected_h = [
+         np.concatenate((np.diag(ev), np.zeros((len(hh) - nr, nr))))
+         for ev, hh in zip(state.model.eps, h)
+@@ -398,19 +442,29 @@
+         scope="explicit H/O/raw geometry at fixed native potential coefficients",
+         central_H_relative=float(
+             np.sqrt(
+-                sum(np.linalg.norm(a - b) ** 2 for a, b in zip(hc, expected_h))
+-                / sum(np.linalg.norm(b) ** 2 for b in expected_h)
++                parallel.sum(
++                    sum(np.linalg.norm(a - b) ** 2 for a, b in zip(hc, expected_h))
++                )
++                / parallel.sum(sum(np.linalg.norm(b) ** 2 for b in expected_h))
+             )
+         ),
+         central_O_relative=float(
+             np.sqrt(
+-                sum(np.linalg.norm(a - b) ** 2 for a, b in zip(oc, expected_o))
+-                / (nk * nr)
++                parallel.sum(
++                    sum(np.linalg.norm(a - b) ** 2 for a, b in zip(oc, expected_o))
++                )
++                / parallel.sum(nk * nr)
+             )
+         ),
+         includes_window_normalization=False,
+         stress_applied=False,
+     )
++    if check_central:
++        prepared.central_report = {
++            k: report[k] for k in ("central_H_relative", "central_O_relative")
++        }
++    else:
++        report.update(prepared.central_report)
+     joint = state.bands.output.pack(
+         np.array([a[:nr] for a in h]),
+         np.array([a[:nr] for a in o]),
+--- a/src/python/lapw_response_chain.py
++++ b/src/python/lapw_response_chain.py
+@@ -10,6 +10,7 @@
+ """
+ 
+ from dataclasses import dataclass
++from response_parallel import SERIAL
+ import numpy as np
+ 
+ from stress_response_adjoint import (
+@@ -104,6 +105,7 @@
+     basis_density: PairedOperator
+     core: PairedOperator
+     normalization: PairedOperator
++    parallel: object = SERIAL
+ 
+     def __post_init__(self):
+         if self.normalization.input_size != self.normalization.output_size:
+@@ -225,4 +227,12 @@
+             "normalization",
+             "jacobian",
+         )
+-        return {name: getattr(self, name).check_transpose(**controls) for name in names}
++        return {
++            name: self.parallel.check_transpose(
++                getattr(self, name),
++                input_local=name in ("electronic", "density"),
++                output_local=name in ("basis", "electronic"),
++                **controls,
++            )
++            for name in names
++        }
+--- a/src/python/lapw_response_kpool.py
++++ b/src/python/lapw_response_kpool.py
+@@ -0,0 +1,260 @@
++#!/usr/bin/env python3
++"""Distribute an isolated WIEN LAPW1 export over independent k-point pools.
++
++The unchanged serial WIEN worker assembles/diagonalizes each pool. Radial
++searches and potential inputs are identical in all pools. Only the k list is
++partitioned; original integration weights, names and global IDs are retained.
++
++Each MPI rank owns a private directory. After successful workers, root merges
++vector/energy streams after checking their radial headers and the shared NSH
++file. Native H/O files have independent global names; only their integer IDs
++are remapped. This avoids a serial eigensolve bottleneck without changing any
++LAPW physics or requiring a distributed dense eigensolver for small matrices.
++This adapter is for the response workspace, never the live material directory.
++"""
++from pathlib import Path
++import argparse
++import hashlib
++import os
++import shutil
++import struct
++import subprocess
++import sys
++import time
++import json
++from response_parallel import ResponseParallel
++from dmft2_step import entries, local_definition
++from wstruct import Struct
++
++
++def klist_records(path):
++    lines = Path(path).read_text().splitlines()
++    end = next((i for i, line in enumerate(lines) if line[:10].strip() == "END"), None)
++    if end is None or end == 0 or any(line.strip() for line in lines[end + 1 :]):
++        raise ValueError("incomplete or unsupported k list")
++    lines = lines[:end]
++    # Match INILPW's new-format probe, then its legacy four-I5 fallback.
++    width = None
++    for n in (10, 5):
++        try:
++            [int(lines[0][10 + j * n : 10 + (j + 1) * n]) for j in range(4)]
++            float(lines[0][10 + 4 * n : 15 + 4 * n])
++            width = n
++            break
++        except ValueError:
++            pass
++    if width is None or any(line.startswith(" kp ") for line in lines):
++        raise ValueError("unsupported k-list layout")
++    weight_end = 15 + 4 * width
++    # Energy limits are read from the FIRST point only by INILPW. Preserve
++    # these same limits when another original point starts a worker's list.
++    suffix = lines[0][weight_end:]
++    return lines, weight_end, suffix
++
++
++def read_record(stream, endian="<"):
++    """Bounded header reader for the native four-byte sequential record format."""
++    marker = stream.read(4)
++    if len(marker) != 4:
++        raise ValueError("truncated vector radial header")
++    size = struct.unpack(endian + "i", marker)[0]
++    if not 0 <= size <= 1024**2:
++        raise ValueError("unsupported vector radial record length")
++    payload = stream.read(size)
++    trailer = stream.read(4)
++    if len(payload) != size or trailer != marker:
++        raise ValueError("incomplete vector radial record")
++    return marker + payload + trailer
++
++
++def vector_header(stream, nat):
++    marker = stream.read(4)
++    stream.seek(0)
++    if len(marker) != 4:
++        raise ValueError("empty vector file")
++    endian = "<" if 0 < struct.unpack("<i", marker)[0] <= 1024**2 else ">"
++    return b"".join(read_record(stream, endian) for unused in range(2 * nat))
++
++
++def merge_streams(paths, output, nat, *, binary):
++    """Retain identical radial headers once; append ordered k records exactly."""
++    header = None
++    temporary = Path(str(output) + ".merging")
++    try:
++        with temporary.open("wb") as out:
++            for path in paths:
++                with Path(path).open("rb") as stream:
++                    current = (
++                        vector_header(stream, nat)
++                        if binary
++                        else b"".join(stream.readline() for unused in range(2 * nat))
++                    )
++                    if not current or (not binary and current.count(b"\n") != 2 * nat):
++                        raise ValueError("missing native energy header")
++                    if header is None:
++                        header = current
++                        out.write(header)
++                    elif current != header:
++                        raise ValueError("k pools have different radial energies")
++                    if not stream.peek(1):
++                        raise ValueError("empty native k-point payload")
++                    shutil.copyfileobj(stream, out, 4 * 1024**2)
++        temporary.replace(output)
++    except BaseException:
++        temporary.unlink(missing_ok=True)
++        raise
++
++
++def remap_matrix(path, output, global_k, rank):
++    """Preserve matrix payload exactly; update the export's integer provenance."""
++    with Path(path).open("r+b") as stream:
++        magic = stream.read(8)
++        marker = stream.read(4)
++        if magic not in (b"EDMFTHV1", b"EDMFTOV1"):
++            raise ValueError("bad LAPW1 matrix export")
++        endian = next(
++            (
++                sign
++                for sign, order in [("<", "little"), (">", "big")]
++                if int.from_bytes(marker, order) == 0x01020304
++            ),
++            None,
++        )
++        if endian is None:
++            raise ValueError("bad matrix byte order")
++        header = stream.read(32)
++        if len(header) != 32:
++            raise ValueError("truncated matrix header")
++        version, kpoint, owner, n, nlo, storage, triangle, convention = struct.unpack(
++            endian + "8i", header
++        )
++        if (
++            (version, storage, triangle, convention) != (1, 2, 1, 1)
++            or not 0 <= nlo <= n
++            or n < 1
++        ):
++            raise ValueError("unsupported matrix header")
++        stream.seek(16)
++        stream.write(struct.pack(endian + "ii", global_k, rank))
++    Path(path).replace(output)
++
++
++def run(workspace, case, worker, parallel):
++    start = time.perf_counter()
++    folder = Path(workspace).resolve()
++    worker = Path(worker).resolve()
++    definition = local_definition((folder / "lapw1.def").read_text())
++    defs = entries(definition)
++    for unit in (4, 5, 6, 10, 11, 18, 19, 20, 21, 71):
++        if unit not in defs:
++            raise ValueError(f"missing LAPW1 unit {unit}")
++    s = Struct()
++    s.ReadStruct(str(folder / defs[20]))
++    lines, width, suffix = parallel.root_call(lambda: klist_records(folder / defs[4]))
++    if parallel.size > len(lines):
++        raise ValueError("LAPW1 MPI ranks must not exceed k points")
++    # Contiguous pools make vector concatenation preserve the global k order.
++    first = len(lines) * parallel.rank // parallel.size
++    last = len(lines) * (parallel.rank + 1) // parallel.size
++    poolroot = folder / "lapw1_pools"
++    parallel.root_call(lambda: poolroot.mkdir(exist_ok=False))
++    local = poolroot / f"rank{parallel.rank:05d}"
++    local.mkdir()
++    for unit in (5, 18, 19, 20):
++        shutil.copy2(folder / defs[unit], local / defs[unit])
++    (local / "lapw1.def").write_text(definition)
++    subset = list(lines[first:last])
++    subset[0] = subset[0][:width].ljust(width) + suffix
++    (local / defs[4]).write_text("\n".join(subset) + "\nEND\n")
++    env = os.environ | {
++        "WIEN_LAPW1_MATRIX_DUMP": str(local / "native"),
++        "OMP_NUM_THREADS": "1",
++        "OPENBLAS_NUM_THREADS": "1",
++        "MKL_NUM_THREADS": "1",
++        "VECLIB_MAXIMUM_THREADS": "1",
++    }
++    before = time.perf_counter()
++    log = local / "worker.log"
++    with log.open("w") as stream:
++        result = subprocess.run(
++            [str(worker), "lapw1.def"],
++            cwd=local,
++            env=env,
++            stdout=stream,
++            stderr=subprocess.STDOUT,
++        )
++    text = log.read_text(errors="replace")
++    if (
++        result.returncode
++        or "LAPW1 END" not in text
++        or any(
++            word in text
++            for word in ["Fortran runtime error", "ERROR STOP", "Error termination"]
++        )
++    ):
++        raise RuntimeError(f"LAPW1 pool {parallel.rank} failed; see {log}")
++    nsh = hashlib.sha256((local / defs[71]).read_bytes()).hexdigest()
++    for prefix in ("native.k", "native.ham.k"):
++        if len(list(local.glob(prefix + "????????.bin"))) != last - first:
++            raise ValueError("incomplete LAPW1 pool exports")
++        for j, k in enumerate(range(first, last), 1):
++            remap_matrix(
++                local / f"{prefix}{j:08d}.bin",
++                folder / f"{prefix}{k+1:08d}.bin",
++                k + 1,
++                parallel.rank,
++            )
++    stats = parallel.gather(
++        dict(
++            rank=parallel.rank,
++            first=first + 1,
++            last=last,
++            seconds=time.perf_counter() - before,
++            nsh_sha256=nsh,
++        )
++    )
++
++    def merge():
++        if len({x["nsh_sha256"] for x in stats}) != 1:
++            raise ValueError("k pools have different nonspherical radial matrices")
++        pools = [poolroot / f"rank{i:05d}" for i in range(parallel.size)]
++        merge_streams(
++            [p / defs[10] for p in pools], folder / defs[10], s.nat, binary=True
++        )
++        merge_streams(
++            [p / defs[11] for p in pools], folder / defs[11], s.nat, binary=False
++        )
++        # Radial searches/NSH are k independent. Full individual output logs
++        # remain in the pools; never concatenate duplicate :E radial searches.
++        for unit in (6, 21, 71):
++            shutil.copy2(pools[0] / defs[unit], folder / defs[unit])
++        report = dict(
++            ranks=parallel.size,
++            kpoints=len(lines),
++            pools=stats,
++            seconds=time.perf_counter() - start,
++            scope="isolated WIEN LAPW1 k pools",
++        )
++        (folder / "lapw1_pools.json").write_text(json.dumps(report, indent=2) + "\n")
++        return report
++
++    report = parallel.root_call(merge)
++    if parallel.root:
++        print("LAPW1 END: verified and merged MPI k pools", flush=True)
++    return report
++
++
++if __name__ == "__main__":
++    p = argparse.ArgumentParser(description=__doc__)
++    p.add_argument("--workspace", required=True)
++    p.add_argument("--case", required=True)
++    p.add_argument("--worker", required=True)
++    args = p.parse_args()
++    parallel = ResponseParallel.world()
++    try:
++        run(args.workspace, args.case, args.worker, parallel)
++    except BaseException:
++        import traceback
++
++        traceback.print_exc()
++        parallel.comm.Abort(1)
+--- a/src/python/lapw_response_prepare.py
++++ b/src/python/lapw_response_prepare.py
+@@ -10,10 +10,12 @@
+ must support the native response exports; dmft2 is the response-enabled worker.
+ Stock executables without these exports fail validation. The native workers
+ are separate from ordinary production executables, and all their scratch
+-outputs live under the new workspace. MPI preparation is not supported yet.
++outputs live under the new workspace. native_mpi distributes the two DMFT2
++passes. lapw1_mpi runs the unchanged serial WIEN worker in independent k-point
++pools and merges validated streams. Only LAPW0/LCORE remain replicated setup.
+ """
+ from pathlib import Path
+-import argparse, json, os, re, shutil, subprocess, time
++import argparse, json, os, re, shutil, subprocess, time, sys
+ from dmft2_step import local_definition, entries
+ from lapw_native_potential_export import prepare_native_potential_core
+ from lapw_potential_core_state import fingerprint_files
+@@ -32,8 +34,18 @@
+         "lapw1_definition",
+         "dmft2_definition",
+     }
+-    if set(config) != required:
++    if set(config) - {"native_mpi", "lapw1_mpi"} != required:
+         raise ValueError("preparation config keys must be " + str(sorted(required)))
++    native_mpi = config.get("native_mpi", [])
++    if not isinstance(native_mpi, list) or any(
++        not isinstance(x, str) or any(c in x for c in "$;|><") for x in native_mpi
++    ):
++        raise ValueError("native_mpi must be an explicit argument list")
++    lapw1_mpi = config.get("lapw1_mpi", [])
++    if not isinstance(lapw1_mpi, list) or any(
++        not isinstance(x, str) or any(c in x for c in "$;|><") for x in lapw1_mpi
++    ):
++        raise ValueError("lapw1_mpi must be an explicit argument list")
+     case = config["case"]
+     reference = Path(config["reference"]).resolve()
+     work = Path(config["workspace"]).resolve()
+@@ -106,7 +118,7 @@
+         log = work / (label + ".log")
+         with log.open("w") as stream:
+             result = subprocess.run(
+-                [str(exe), *args],
++                (native_mpi if label.startswith("dmft2") else []) + [str(exe), *args],
+                 cwd=work,
+                 env=env | (extra or {}),
+                 stdout=stream,
+@@ -126,13 +138,31 @@
+     for program in ["lapw0", "lcore"]:
+         run(program + "_definition", x, [program, "-f", case, "-d"])
+     run("lapw0", config["lapw0_worker"], ["lapw0.def"])
+-    run(
+-        "lapw1",
+-        config["lapw1_worker"],
+-        ["lapw1.def"],
+-        {"WIEN_LAPW1_MATRIX_DUMP": str(work / "native")},
+-        "LAPW1",
+-    )
++    if lapw1_mpi:
++        run(
++            "lapw1",
++            lapw1_mpi[0],
++            lapw1_mpi[1:]
++            + [
++                sys.executable,
++                str(Path(__file__).with_name("lapw_response_kpool.py")),
++                "--workspace",
++                str(work),
++                "--case",
++                case,
++                "--worker",
++                config["lapw1_worker"],
++            ],
++            marker="LAPW1",
++        )
++    else:
++        run(
++            "lapw1",
++            config["lapw1_worker"],
++            ["lapw1.def"],
++            {"WIEN_LAPW1_MATRIX_DUMP": str(work / "native")},
++            "LAPW1",
++        )
+     run("dmft2_number", config["dmft2"], ["dmft2.def"], marker="DMFT2")
+     words[1] = (work / "EF.dat").read_text().split()[0]
+     words[2] = "0"
+--- a/src/python/lapw_screened_state.py
++++ b/src/python/lapw_screened_state.py
+@@ -12,6 +12,7 @@
+ """
+ 
+ from dataclasses import dataclass
++from response_parallel import parallel_of
+ import numpy as np
+ from lapw_complement_response import complement_electronic_operator
+ from lapw_density_response import checked
+@@ -115,6 +116,7 @@
+             )
+         ):
+             raise ValueError("central core density layout differs")
++        parallel = self.parallel = parallel_of(valence.model)
+         self.valence = valence
+         self.potential_core = potential_core
+         self.fixed_number = bool(fixed_number)
+@@ -160,7 +162,7 @@
+             np.linalg.norm(expected_core), 1.0
+         )
+         valence_error = np.linalg.norm(
+-            valence.spatial.value() - valence.reference.vector()
++            parallel.sum(valence.spatial.value()) - valence.reference.vector()
+         ) / max(np.linalg.norm(valence.reference.vector()), 1.0)
+         if max(core_error, valence_error) > closure_tolerance:
+             raise ValueError(
+@@ -179,14 +181,15 @@
+             raise ValueError("compact electronic coordinate mismatch")
+         self.chain = ChargeResponseChain(
+             potential=potential_core.potential_operator,
+-            basis=valence.bands.operator @ select,
++            basis=parallel.global_to_local(valence.bands.operator @ select),
+             electronic=electronic,
+-            density=valence.spatial.operator,
+-            basis_density=valence.direct.operator
+-            @ valence.bands.spherical_selector
+-            @ select,
++            density=parallel.local_to_global(valence.spatial.operator),
++            basis_density=parallel.sum_operator(
++                valence.direct.operator @ valence.bands.spherical_selector @ select
++            ),
+             core=potential_core.core.operator,
+             normalization=self.normalization.operator,
++            parallel=parallel,
+         )
+         self.jacobian = self.chain.jacobian
+         self.screened = self.chain.screened
+@@ -202,7 +205,8 @@
+                     self.normalization.central - potential_core.input_density.vector()
+                 )
+             ),
+-            kpoints=len(valence.records),
++            kpoints=int(parallel.sum(len(valence.records))),
++            mpi_ranks=parallel.size,
+             retained_bands=valence.model.eps.shape[1],
+             matrix_quadrature=valence.matrix_quadrature,
+             stress_applied=False,
+--- a/src/python/lapw_strain_charge.py
++++ b/src/python/lapw_strain_charge.py
+@@ -12,10 +12,12 @@
+ import hashlib
+ from pathlib import Path
+ import numpy as np
++from response_parallel import parallel_of
+ from scipy.special import spherical_jn
+ from lapw_density_response import checked
+ from lapw_geometry_response import (
+     augmentation_geometry_direction,
++    prepared_geometry_inputs,
+     native_band_geometry_source,
+ )
+ from lapw_native_snapshot import read_basis_matrix
+@@ -98,41 +100,12 @@
+         raise NotImplementedError("expand symmetry layout before this strain")
+     directory = Path(directory)
+     direct = valence.direct
+-    first = np.r_[0, np.cumsum(s.mult)[:-1]]
+-    axes = []
+-    for site, a in enumerate(np.repeat(np.arange(s.nat), s.mult)):
+-        for rot, tau in zip(s.timat, s.tau):
+-            delta = rot @ s.pos[first[a]] + tau - s.pos[site]
+-            delta -= np.rint(delta)
+-            if max(abs(delta)) < 2e-7:
+-                break
+-        else:
+-            raise ValueError("missing equivalent-site frame")
+-        axes.append(rot.T)
+-    lo = {}
+-    offset = 0
+-    for a in range(s.nat):
+-        for l in range(4):
+-            for j in range(valence.projector_contexts[a][l].nlo):
+-                count = s.mult[a] * (2 * l + 1)
+-                lo[a, l, j] = np.arange(offset, offset + count)
+-                offset += count
++    prepared = prepared_geometry_inputs(valence, directory, case)
++    first, axes, lo = prepared.first, prepared.axes, prepared.lo
+     nk = len(valence.records)
+     geom = []
+     for k, (record, base) in enumerate(zip(valence.records, valence.bases)):
+-        path = directory / f"native.k{k+1:08d}.bin"
+-        if (
+-            hashlib.sha256(path.read_bytes()).hexdigest()
+-            != valence.fingerprints[path.name]
+-        ):
+-            raise ValueError("changed native snapshot")
+-        snapshot = read_basis_matrix(path, b"EDMFTOV1")
+-        q = (
+-            2
+-            * np.pi
+-            * (record.labels.T + snapshot.reciprocal_k)
+-            / np.array([s.a, s.b, s.c])
+-        )
++        q = prepared.momenta[k]
+         dq = -q @ e
+         length = np.linalg.norm(q, axis=1)
+         dl = np.divide(
+@@ -258,6 +231,7 @@
+     spatial = ch.density.matvec(electronic)
+     radial = ch.basis_density.matvec(potential_source)
+     core = ch.core.matvec(potential_source)
++    geometry = parallel_of(state.valence.model).sum(geometry)
+     raw = spatial + radial + core + geometry
+     source, parts = material_source_from_raw(
+         state,
+@@ -287,3 +261,48 @@
+         includes_post_transport_normalization=bool(normalize_coordinates),
+     )
+     return source, parts, report
++
++
++class PreparedChargeSourceContraction:
++    """Contract lambda.s without applying the electronic response per strain.
++
++    For s=N[RE b_geo+(REB+D+C)v_exp+g_geo]+g_norm-tau,
++    prepare eta=N^T lambda and b_bar=E^T R^T eta ONCE. Then
++      lambda.s = <b_bar,b_geo> + <v_bar,v_exp> + <eta,g_geo>
++                 + <lambda,g_norm-tau>,
++      v_bar=B^T b_bar+D^T eta+C^T eta.
++    Global/local pairings follow the identical chain used by the full source.
++    The searched-energy completion P A v_exp is added by PreparedTotalStress.
++    No approximation or new screened solve is introduced by this rearrangement.
++    """
++
++    def __init__(self, state, adjoint):
++        self.state = state
++        self.parallel = parallel_of(state)
++        self.adjoint = checked(
++            adjoint, (state.jacobian.input_size,), "source adjoint", real=True
++        )
++        chain = state.chain
++        self.raw_covector = chain.normalization.rmatvec(self.adjoint)
++        self.band_covector = chain.electronic.rmatvec(
++            chain.density.rmatvec(self.raw_covector)
++        )
++        self.potential_covector = (
++            chain.basis.rmatvec(self.band_covector)
++            + chain.basis_density.rmatvec(self.raw_covector)
++            + chain.core.rmatvec(self.raw_covector)
++        )
++
++    def contraction(self, band, spatial_geometry, potential, strain):
++        coordinate_source, _ = material_source_from_raw(
++            self.state,
++            np.zeros_like(self.adjoint),
++            strain,
++            transport_rate=float(np.trace(strain) / 3),
++        )
++        local = self.band_covector @ band + self.raw_covector @ spatial_geometry
++        return float(
++            self.parallel.sum(local)
++            + self.potential_covector @ potential
++            + self.adjoint @ coordinate_source
++        )
+--- a/src/python/lapw_strain_functional.py
++++ b/src/python/lapw_strain_functional.py
+@@ -13,6 +13,7 @@
+ from __future__ import annotations
+ 
+ import numpy as np
++from response_parallel import parallel_of
+ 
+ from lapw_density_response import checked
+ from lapw_projector_functional import projector_functional_gradient
+@@ -105,7 +106,10 @@
+             "explicit potential sources",
+             real=True,
+         )
+-        return self.joint_gradient @ geometry, self.potential_gradient @ potentials
++        return (
++            parallel_of(self.state).sum(self.joint_gradient @ geometry),
++            self.potential_gradient @ potentials,
++        )
+ 
+     def _report(self, geometry, potential, induced):
+         return dict(
+--- a/src/python/lapw_total_stress.py
++++ b/src/python/lapw_total_stress.py
+@@ -17,7 +17,12 @@
+ from scipy.linalg import null_space
+ from lapw_density_response import checked
+ from lapw_strain_field import diagonal_strain_potential
+-from lapw_strain_charge import hydrostatic_charge_source
++from lapw_strain_charge import (
++    hydrostatic_charge_source,
++    PreparedChargeSourceContraction,
++    native_spatial_geometry_source,
++)
++from lapw_geometry_response import native_band_geometry_source
+ from lapw_klein_functional import PreparedKleinFunctional
+ from lapw_energy_response import SearchedEnergyResponse
+ from stress_response_adjoint import RY_BOHR3_TO_GPA
+@@ -94,6 +99,7 @@
+     geometry: np.ndarray
+     potential: np.ndarray
+     report: dict
++    induced: float | None = None
+ 
+ 
+ class PreparedTotalStress:
+@@ -160,10 +166,28 @@
+             progress=progress,
+         )
+ 
+-    def prepare_source(self, strain):
++    def prepare_source(self, strain, *, readout=None):
+         """Build one explicit source, including radial-search geometry input."""
+         e = checked(strain, (3, 3), "strain direction", real=True)
+         potential, _ = diagonal_strain_potential(self.state.potential_core, e)
++        if readout is not None:
++            if readout.state is not self.state:
++                raise ValueError("source contraction belongs to a different state")
++            band, report = native_band_geometry_source(
++                self.state.valence, self.directory, self.case, e
++            )
++            geometry = native_spatial_geometry_source(
++                self.state.valence, self.directory, self.case, e
++            )
++            induced = readout.contraction(band, geometry, potential, e)
++            induced += readout.adjoint @ (self.energy.P @ (self.energy.A @ potential))
++            report.update(
++                source_contracted_by_adjoint=True,
++                radial_energy_policy="differentiated native searches",
++            )
++            return PreparedStrainSource(
++                e, np.empty(0), band, potential, report, float(induced)
++            )
+         source, parts, report = hydrostatic_charge_source(
+             self.state, self.directory, self.case, strain=e, potential_source=potential
+         )
+@@ -177,7 +201,15 @@
+         )
+ 
+     def contract(
+-        self, sources, *, initial=None, rtol=2e-12, atol=1e-11, restart=30, max_cycles=8
++        self,
++        sources,
++        *,
++        solved_adjoint=None,
++        initial=None,
++        rtol=2e-12,
++        atol=1e-11,
++        restart=30,
++        max_cycles=8,
+     ):
+         """Compute the complete tensor with one adjoint and true-residual check."""
+         if len(sources) != len(self.strains) or not np.allclose(
+@@ -190,16 +222,29 @@
+         charge = np.column_stack([x.source for x in sources])
+         explicit, pieces = self.functional.explicit(geometry, potential, self.strains)
+         explicit += self.energy.explicit_addition(potential)
+-        values, lam, solver = self.energy.screened.contractions(
+-            self.energy.charge_gradient,
+-            charge,
+-            explicit=explicit,
+-            initial=initial,
+-            rtol=rtol,
+-            atol=atol,
+-            restart=restart,
+-            max_cycles=max_cycles,
+-        )
++        contracted = [x.induced is not None for x in sources]
++        if any(contracted) and (not all(contracted) or solved_adjoint is None):
++            raise ValueError("contracted sources require their common solved adjoint")
++        if solved_adjoint is None:
++            values, lam, solver = self.energy.screened.contractions(
++                self.energy.charge_gradient,
++                charge,
++                explicit=explicit,
++                initial=initial,
++                rtol=rtol,
++                atol=atol,
++                restart=restart,
++                max_cycles=max_cycles,
++            )
++        else:
++            lam, solver = solved_adjoint
++            if not solver.get("converged"):
++                raise ValueError("unconverged source adjoint")
++            values = explicit + (
++                np.array([x.induced for x in sources])
++                if all(contracted)
++                else lam @ charge
++            )
+         sigma = stress_from_contractions(
+             self.strains, values, self.state.potential_core.hartree.volume
+         )
+@@ -212,7 +257,8 @@
+             derivatives_Ry=values.tolist(),
+             strains=self.strains.tolist(),
+             explicit_Ry=explicit.tolist(),
+-            induced_Ry=(lam @ charge).tolist(),
++            induced_Ry=(values - explicit).tolist(),
++            sources_contracted_by_adjoint=all(contracted),
+             fixed_energy_explicit_parts=pieces,
+             adjoint=solver,
+             central=self.state.metadata,
+--- a/src/python/lapw_total_stress_driver.py
++++ b/src/python/lapw_total_stress_driver.py
+@@ -13,18 +13,21 @@
+ executor after its native preparation pass.
+ """
+ from pathlib import Path
++from response_parallel import SERIAL, ResponseParallel, limit_blas_threads
+ import argparse
+ import hashlib
+ import json
+ import os
+ import time
+ import resource
++import sys
+ import numpy as np
+ from lapw_valence_state import load_native_valence_state
+ from lapw_potential_core_state import load_potential_core_state, fingerprint_files
+ from lapw_native_potential_export import prepare_native_potential_core
+ from lapw_screened_state import NativeScreenedState
+ from lapw_total_stress import PreparedTotalStress
++from lapw_strain_charge import PreparedChargeSourceContraction
+ from wien_response_density import Density
+ 
+ 
+@@ -37,12 +40,20 @@
+     library=None,
+     fixed_point_tolerance=1e-3,
+     progress=print,
++    parallel=SERIAL,
++    cache_mb=256.0,
++    basis_cache_mb=128.0,
++    full_sources=False,
++    save_geometry=False,
+ ):
+     """Prepare once, form invariant sources, solve one adjoint, save evidence."""
++    thread_policy = limit_blas_threads()
+     start = time.perf_counter()
+     snapshot = Path(snapshot).resolve()
+     output = Path(output).resolve()
+-    output.mkdir(parents=True, exist_ok=False)
++    parallel.root_call(lambda: output.mkdir(parents=True, exist_ok=False))
++    if not parallel.root:
++        progress = lambda message: None
+     library = Path(library or Path(__file__).with_name("liblapw_response.so")).resolve()
+     if not library.is_file():
+         raise ValueError("native radial library missing")
+@@ -54,10 +65,12 @@
+         name: snapshot / (case + "." + name)
+         for name in ["struct", "clmsum", "in0", "vsp", "inc"]
+     }
+-    expected = fingerprint_files(files)
++    expected = parallel.root_call(lambda: fingerprint_files(files))
+     if potential_core is None:
+         potential_core = output / "potential_core.npz"
+-        prepare_native_potential_core(snapshot, case, potential_core)
++        parallel.root_call(
++            lambda: prepare_native_potential_core(snapshot, case, potential_core)
++        )
+     pc = load_potential_core_state(potential_core, expected_fingerprints=expected)
+     mixer = (snapshot / (case + ".inm")).read_text().splitlines()[0].split()
+     if len(mixer) < 3 or float(mixer[1]) != 0 or mixer[2].upper() != "YES":
+@@ -80,6 +93,9 @@
+         energy_policy="fixed",
+         matrix_quadrature="wien2k24",
+         library=library,
++        parallel=parallel,
++        cache_mb=cache_mb,
++        basis_cache_mb=basis_cache_mb,
+     ) as v:
+         timings["prepare_valence_seconds"] = v.preparation_seconds
+         state = NativeScreenedState(
+@@ -98,21 +114,6 @@
+             ),
+         )
+         timings["prepare_functional_search_seconds"] = time.perf_counter() - t
+-        sources = []
+-        timings["source_seconds"] = []
+-        for i, e in enumerate(total.strains):
+-            t = time.perf_counter()
+-            x = total.prepare_source(e)
+-            sources.append(x)
+-            timings["source_seconds"].append(time.perf_counter() - t)
+-            np.savez_compressed(
+-                output / f"source{i}.npz",
+-                strain=e,
+-                source=x.source,
+-                geometry=x.geometry,
+-                potential=x.potential,
+-            )
+-            progress(f"Prepared strain source {i+1}/{len(total.strains)}")
+         # Profiling is development-only and default-off. It measures a warm
+         # action, not context construction or six repeated adjoint solves.
+         from stress_response_adjoint import PairedOperator
+@@ -127,7 +128,16 @@
+ 
+                 profile = cProfile.Profile()
+                 answer = profile.runcall(operator.rmatvec, x)
+-                profile.dump_stats(str(output / "adjoint_action.prof"))
++                profile.dump_stats(
++                    str(
++                        output
++                        / (
++                            "adjoint_action.prof"
++                            if parallel.size == 1
++                            else f"adjoint_action.rank{parallel.rank}.prof"
++                        )
++                    )
++                )
+             else:
+                 answer = operator.rmatvec(x)
+             action_times.append(time.perf_counter() - before)
+@@ -141,15 +151,65 @@
+             transpose,
+             "timed total adjoint",
+         )
+-        sigma, lam, report = total.contract(sources)
++        solved = None
++        readout = None
++        if not full_sources:
++            t = time.perf_counter()
++            solved = total.energy.screened.solve(
++                total.energy.charge_gradient,
++                adjoint=True,
++                rtol=2e-12,
++                atol=1e-11,
++                restart=30,
++                max_cycles=8,
++            )
++            timings["adjoint_solve_seconds"] = time.perf_counter() - t
++            t = time.perf_counter()
++            readout = PreparedChargeSourceContraction(state, solved[0])
++            timings["source_readout_seconds"] = time.perf_counter() - t
++        sources = []
++        timings["source_seconds"] = []
++        for i, e in enumerate(total.strains):
++            t = time.perf_counter()
++            x = total.prepare_source(e, readout=readout)
++            sources.append(x)
++            timings["source_seconds"].append(time.perf_counter() - t)
++            parallel.root_call(
++                lambda: np.savez_compressed(
++                    output / f"source{i}.npz",
++                    strain=e,
++                    source=x.source,
++                    induced_Ry=np.empty(0) if x.induced is None else x.induced,
++                    geometry=(
++                        x.geometry
++                        if save_geometry and parallel.size == 1
++                        else np.empty(0)
++                    ),
++                    geometry_saved=save_geometry,
++                    potential=x.potential,
++                    geometry_is_rank_local=parallel.size > 1,
++                )
++            )
++            if save_geometry and parallel.size > 1:
++                np.savez_compressed(
++                    output / f"geometry{i}.rank{parallel.rank:05d}.npz",
++                    kpoints=[r.kpoint for r in v.records],
++                    geometry=x.geometry,
++                )
++            progress(f"Prepared strain source {i+1}/{len(total.strains)}")
++        sigma, lam, report = total.contract(sources, solved_adjoint=solved)
+         timings["adjoint_action_seconds"] = action_times
+-        np.savez_compressed(
+-            output / "adjoint.npz",
+-            adjoint=lam,
+-            charge_gradient=total.energy.charge_gradient,
+-        )
+-        if fingerprint_files(files) != expected:
++        parallel.root_call(
++            lambda: np.savez_compressed(
++                output / "adjoint.npz",
++                adjoint=lam,
++                charge_gradient=total.energy.charge_gradient,
++            )
++        )
++        if parallel.root_call(lambda: fingerprint_files(files)) != expected:
+             raise RuntimeError("central snapshot changed during response")
++        if parallel.fingerprints(v.fingerprint_paths) != v.fingerprints:
++            raise RuntimeError("native valence snapshot changed during response")
+         report.update(
+             converged=True,
+             case=case,
+@@ -158,10 +218,34 @@
+             valence_fingerprints=v.fingerprints,
+             radial_library_sha256=hashlib.sha256(library.read_bytes()).hexdigest(),
+             timings=timings | dict(total_seconds=time.perf_counter() - start),
+-            peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+-        )
+-    (output / "report.json").write_text(
+-        json.dumps(report, indent=2, allow_nan=False) + "\n"
++            peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
++            * (1 if sys.platform == "darwin" else 1024),
++            band_geometry_saved=save_geometry,
++        )
++    rank_statistics = parallel.gather(
++        dict(
++            rank=parallel.rank,
++            kpoints=[int(r.kpoint) for r in v.records],
++            peak_rss_bytes=report["peak_rss_bytes"],
++            timings=report["timings"],
++            electronic_cache=v.model.cache_info(),
++        )
++    )
++    report["parallel"] = dict(
++        ranks=parallel.size,
++        distribution="k points",
++        replicated_coordinates="real-space charge and potential; no MPI inner-product sum",
++        rank_statistics=rank_statistics,
++        blas_thread_policy=thread_policy,
++    )
++    report["peak_rss_bytes"] = max(r["peak_rss_bytes"] for r in rank_statistics)
++    report["timings"]["total_seconds"] = max(
++        r["timings"]["total_seconds"] for r in rank_statistics
++    )
++    parallel.root_call(
++        lambda: (output / "report.json").write_text(
++            json.dumps(report, indent=2, allow_nan=False) + "\n"
++        )
+     )
+     progress("Mean tensile stress: %.9f GPa" % report["mean_tensile_stress_GPa"])
+     return report
+@@ -175,7 +259,30 @@
+     p.add_argument("--potential-core", type=Path)
+     p.add_argument("--library", type=Path)
+     p.add_argument("--fixed-point-tolerance", type=float, default=1e-3)
++    p.add_argument(
++        "--mpi", action="store_true", help="distribute k points over MPI ranks"
++    )
++    p.add_argument(
++        "--cache-mb", type=float, default=256.0, help="electronic cache budget per rank"
++    )
++    p.add_argument(
++        "--basis-cache-mb",
++        type=float,
++        default=128.0,
++        help="central spherical product cache budget per rank",
++    )
++    p.add_argument(
++        "--full-sources",
++        action="store_true",
++        help="diagnostic: build every charge source instead of its adjoint contraction",
++    )
++    p.add_argument(
++        "--save-geometry",
++        action="store_true",
++        help="diagnostic: retain local band-geometry arrays (large)",
++    )
+     a = p.parse_args()
++    parallel = ResponseParallel.world() if a.mpi else SERIAL
+     run_prepared(
+         a.snapshot,
+         a.case,
+@@ -184,8 +291,25 @@
+         library=a.library,
+         fixed_point_tolerance=a.fixed_point_tolerance,
+         progress=lambda x: print(x, flush=True),
++        parallel=parallel,
++        cache_mb=a.cache_mb,
++        basis_cache_mb=a.basis_cache_mb,
++        full_sources=a.full_sources,
++        save_geometry=a.save_geometry,
+     )
+ 
+ 
+ if __name__ == "__main__":
+-    main()
++    try:
++        main()
++    except BaseException:
++        # Fail all ranks rather than hanging in another rank's next reduction.
++        # Library users retain ordinary Python exceptions; the CLI owns MPI.
++        import sys, traceback
++
++        traceback.print_exc()
++        if "--mpi" in sys.argv:
++            from mpi4py import MPI
++
++            MPI.COMM_WORLD.Abort(1)
++        raise SystemExit(1)
+--- a/src/python/lapw_valence_state.py
++++ b/src/python/lapw_valence_state.py
+@@ -21,6 +21,7 @@
+ """
+ 
+ from contextlib import ExitStack
++from response_parallel import SERIAL, parallel_of
+ from dataclasses import dataclass, field
+ from pathlib import Path
+ from types import SimpleNamespace
+@@ -108,9 +109,11 @@
+             or outputs.size != self.spatial.coordinates.size
+         ):
+             raise ValueError("valence coordinate mismatch")
+-        return (
+-            self.spatial.operator @ e @ self.bands.operator
+-            + self.direct.operator @ self.bands.spherical_selector
++        parallel = parallel_of(self.model)
++        return parallel.local_to_global(
++            self.spatial.operator
++        ) @ e @ parallel.global_to_local(self.bands.operator) + parallel.sum_operator(
++            self.direct.operator @ self.bands.spherical_selector
+         )
+ 
+ 
+@@ -201,6 +204,9 @@
+     expected_fingerprints=None,
+     matrix_quadrature=None,
+     fft_grid="fast",
++    parallel=SERIAL,
++    cache_mb=256.0,
++    basis_cache_mb=128.0,
+ ):
+     """Prepare central native data; optionally reject a stale execution snapshot.
+ 
+@@ -245,7 +251,7 @@
+         if not found:
+             raise ValueError("missing native snapshot records: " + pattern)
+         paths.update({p.name: p for p in found})
+-    fingerprints = fingerprint_files(paths)
++    fingerprints = parallel.fingerprints(paths)
+     if expected_fingerprints is not None and fingerprints != expected_fingerprints:
+         raise ValueError("native valence snapshot fingerprints differ")
+     stack = ExitStack()
+@@ -261,11 +267,15 @@
+             stack,
+             matrix_quadrature=matrix_quadrature,
+             fft_grid=fft_grid,
++            parallel=parallel,
++            cache_mb=cache_mb,
++            basis_cache_mb=basis_cache_mb,
+         )
+     except BaseException:
+         stack.close()
+         raise
+     result.fingerprints = fingerprints
++    result.fingerprint_paths = paths
+     result.preparation_seconds = time.perf_counter() - started
+     return result
+ 
+@@ -281,11 +291,16 @@
+     *,
+     matrix_quadrature="atparn",
+     fft_grid="fast",
++    parallel=SERIAL,
++    cache_mb=256.0,
++    basis_cache_mb=128.0,
+ ):
+     central = Path(source)
+     mat = _snapshot_inputs(case, central, complex_vectors)
+     s = mat.s
+-    exported, records = CachedFrozenSigmaResponse.from_export(central / "response")
++    exported, records = CachedFrozenSigmaResponse.from_export(
++        central / "response", parallel=parallel, cache_mb=cache_mb
++    )
+     if nret is None:
+         nret = exported.eps.shape[1]
+     if int(nret) != nret or not 0 < nret <= exported.eps.shape[1]:
+@@ -316,6 +331,8 @@
+         normalized,
+         exported.kw,
+         exported.W,
++        parallel=parallel,
++        cache_mb=cache_mb,
+     )
+     del exported
+     # The derivative of X assumes X is the inverse square root for THIS k sum.
+@@ -334,11 +351,15 @@
+     bases = []
+     k_coordinates = []
+     for k, (ev, c, labels) in enumerate(mat.cv):
+-        hh = read_basis_matrix(central / f"native.ham.k{k+1:08d}.bin", b"EDMFTHV1")
+-        oo = read_basis_matrix(central / f"native.k{k+1:08d}.bin", b"EDMFTOV1")
++        hh = read_basis_matrix(
++            central / f"native.ham.k{records[k].kpoint:08d}.bin", b"EDMFTHV1"
++        )
++        oo = read_basis_matrix(
++            central / f"native.k{records[k].kpoint:08d}.bin", b"EDMFTOV1"
++        )
+         if (
+-            hh.kpoint != k + 1
+-            or oo.kpoint != k + 1
++            hh.kpoint != records[k].kpoint
++            or oo.kpoint != records[k].kpoint
+             or hh.nlo != mat.nlo_total
+             or oo.nlo != mat.nlo_total
+             or not np.array_equal(hh.reciprocal_k, oo.reciprocal_k)
+@@ -355,13 +376,18 @@
+             temperature=model.meta.temperature,
+         )
+         bases.append(base)
++        records[k].reciprocal_k = oo.reciprocal_k.copy()
+         k_coordinates.append(oo.reciprocal_k)
+         mixed = np.column_stack((base.retained, base.complement))
+         mat.cv[k] = (ev, mixed, labels)
+ 
++    if not np.isfinite(basis_cache_mb) or basis_cache_mb < 0:
++        raise ValueError("basis cache budget must be nonnegative")
++    basis_cache_limit = int(basis_cache_mb * 1024**2)
++    basis_cache_bytes = 0
+     nk = len(records)
+     for pattern in ["native.k????????.bin", "native.ham.k????????.bin"]:
+-        if len(list(central.glob(pattern))) != nk:
++        if len(list(central.glob(pattern))) != parallel.sum(nk):
+             raise ValueError("extra/missing native matrix k records")
+     rho = model.central_density()
+     reference = Density(central / (case + ".clmval"), central / (case + ".struct"))
+@@ -572,6 +598,22 @@
+                 ks,
+             )
+         )
++    for a, l, k, op in sphere:
++        for name, compute in [
++            ("_zpw", lambda op=op: op.zpw),
++            ("_kz", lambda op=op: op.kz),
++            ("_sz", lambda op=op: op.sz),
++        ]:
++            if (
++                getattr(op, name) is None
++                and basis_cache_bytes + op.z.nbytes <= basis_cache_limit
++            ):
++                array = compute()
++                array.setflags(write=False)
++                setattr(op, name, array)
++                basis_cache_bytes += array.nbytes
++    model.basis_cache_bytes = basis_cache_bytes
++    model.basis_cache_limit = basis_cache_limit
+     radial_projector = {}
+     with (central / "projectorw.dat").open() as f:
+         for _ in range(int(f.readline().split()[1])):
+@@ -627,6 +669,7 @@
+     reps = np.array(list(reference.pw))
+     allg = [r.labels[:, : r.nbasis - r.nlo].T for r in records]
+     extent = np.max([np.ptp(g, axis=0) for g in allg], axis=0)
++    extent = parallel.reduce(extent, "max")
+     star_extent = np.max(
+         abs(np.einsum("sij,qj->sqi", s.timat.transpose(0, 2, 1), reps)), axis=(0, 1)
+     )
+--- a/src/python/response_parallel.py
++++ b/src/python/response_parallel.py
+@@ -0,0 +1,202 @@
++"""K-distributed response, with replicated real-space Krylov coordinates.
++
++Only k-dependent matrices, wavefunctions and frequency caches are partitioned.
++Weights retain their GLOBAL normalization. Scalar/core/radial field coordinates
++are replicated; their inner product must not be summed over MPI ranks again.
++Collectives occur at explicit local/global map boundaries, including dX and dmu.
++No mpi4py dependency is needed for an ordinary serial import or calculation.
++"""
++
++from __future__ import annotations
++import numpy as np
++
++
++class ResponseParallel:
++    def __init__(self, comm=None):
++        self.comm = comm
++        self.rank = 0 if comm is None else comm.Get_rank()
++        self.size = 1 if comm is None else comm.Get_size()
++        self.root = self.rank == 0
++
++    @classmethod
++    def world(cls):
++        from mpi4py import MPI
++
++        return cls(MPI.COMM_WORLD)
++
++    def reduce(self, value, operation="sum"):
++        if self.size == 1:
++            return value
++        from mpi4py import MPI
++
++        op = {"sum": MPI.SUM, "min": MPI.MIN, "max": MPI.MAX}[operation]
++        if isinstance(value, np.ndarray):
++            source = np.ascontiguousarray(value)
++            result = np.empty_like(source)
++            self.comm.Allreduce(source, result, op=op)
++            return result
++        return self.comm.allreduce(value, op=op)
++
++    def sum(self, value):
++        return self.reduce(value)
++
++    def root_call(self, operation):
++        """Root-only I/O with success/error broadcast before dependent work."""
++        if self.size == 1:
++            return operation()
++        payload = None
++        if self.root:
++            try:
++                payload = (True, operation())
++            except Exception as error:
++                payload = (False, f"{type(error).__name__}: {error}")
++        ok, result = self.comm.bcast(payload, root=0)
++        if not ok:
++            raise RuntimeError(result)
++        return result
++
++    def fingerprints(self, paths):
++        """Hash disjoint files on each rank; exchange only small digest maps.
++
++        Stream files to bound temporary memory even for a very large vector.
++        Header/inventory discovery stays small and does not read dense matrices.
++        """
++        import hashlib
++        from pathlib import Path
++
++        partial = {}
++        for i, (name, path) in enumerate(sorted(paths.items())):
++            if i % self.size != self.rank:
++                continue
++            digest = hashlib.sha256()
++            with Path(path).open("rb") as stream:
++                for block in iter(lambda: stream.read(4 * 1024**2), b""):
++                    digest.update(block)
++            partial[str(name)] = digest.hexdigest()
++        return {k: v for part in self.gather(partial) for k, v in part.items()}
++
++    def gather(self, value):
++        return [value] if self.size == 1 else self.comm.allgather(value)
++
++    def partition(self, costs):
++        """Deterministic longest-job-first ownership; global IDs stay intact.
++
++        A nonempty partition is required by compact matrix coordinates. Extra
++        ranks are rejected explicitly, never silently left waiting in a solve.
++        Preparation scales roughly with the cube of the LAPW matrix dimension;
++        use that estimate, not renormalized Brillouin-zone integration weights.
++        """
++        costs = np.asarray(costs, dtype=float)
++        if len(costs) < self.size or np.any(costs <= 0):
++            raise ValueError(
++                "response MPI ranks must not exceed the number of k points"
++            )
++        loads = np.zeros(self.size)
++        owners = np.empty(len(costs), dtype=int)
++        for k in np.argsort(-costs, kind="stable"):
++            rank = int(np.argmin(loads))
++            owners[k] = rank
++            loads[rank] += costs[k]
++        return np.flatnonzero(owners == self.rank)
++
++    def check_transpose(
++        self,
++        operator,
++        *,
++        input_local=False,
++        output_local=False,
++        seed=59,
++        samples=3,
++        tolerance=1e-11,
++    ):
++        """Distributed dot test; count each replicated field exactly once."""
++        rx = np.random.default_rng(seed + (1009 * self.rank if input_local else 0))
++        ry = np.random.default_rng(seed + 1 + (1013 * self.rank if output_local else 0))
++        errors = []
++
++        def inner(a, b, local):
++            value = float(a @ b)
++            return self.sum(value) if local else value
++
++        for unused in range(samples):
++            x = rx.normal(size=operator.input_size)
++            y = ry.normal(size=operator.output_size)
++            ax, aty = operator.matvec(x), operator.rmatvec(y)
++            lhs = inner(y, ax, output_local)
++            rhs = inner(x, aty, input_local)
++            scale = max(
++                np.sqrt(inner(y, y, output_local) * inner(ax, ax, output_local)),
++                np.sqrt(inner(x, x, input_local) * inner(aty, aty, input_local)),
++                np.finfo(float).tiny,
++            )
++            errors.append(abs(lhs - rhs) / scale)
++        error = max(errors)
++        if error > tolerance:
++            raise ValueError(
++                f"{operator.name}: distributed transpose failed: {error:g}"
++            )
++        return error
++
++    def local_to_global(self, operator):
++        """Sum local output fields; transpose feeds the same covector to each k pool."""
++        from stress_response_adjoint import PairedOperator
++
++        return PairedOperator(
++            operator.input_size,
++            operator.output_size,
++            lambda x: self.sum(operator.matvec(x)),
++            operator.rmatvec,
++            "sum_k " + operator.name,
++        )
++
++    def global_to_local(self, operator):
++        """Replicated input, local k output; transpose sums local input covectors."""
++        from stress_response_adjoint import PairedOperator
++
++        return PairedOperator(
++            operator.input_size,
++            operator.output_size,
++            operator.matvec,
++            lambda y: self.sum(operator.rmatvec(y)),
++            operator.name + " replicated input",
++        )
++
++    def sum_operator(self, operator):
++        """Sum k-dependent contributions with BOTH input/output fields replicated."""
++        return self.global_to_local(self.local_to_global(operator))
++
++
++SERIAL = ResponseParallel()
++
++
++def parallel_of(model):
++    """Serial-compatible for independently constructed diagnostic states."""
++    return getattr(model, "parallel", SERIAL)
++
++
++def limit_blas_threads():
++    """Prevent nested BLAS workers from oversubscribing a k-point MPI launch.
++
++    Linux BLAS/OpenMP use the launch environment. Recent macOS Accelerate
++    additionally provides a per-calling-thread API; VECLIB_MAXIMUM_THREADS
++    alone does not reliably constrain its newer BLAS/LAPACK interface.
++    This is an execution policy, not a change to numerical operations.
++    """
++    import sys
++
++    if sys.platform != "darwin":
++        return "launch environment"
++    import ctypes
++
++    try:
++        library = ctypes.CDLL(
++            "/System/Library/Frameworks/Accelerate.framework/Accelerate"
++        )
++        setter = library.BLASSetThreading
++    except (OSError, AttributeError):
++        return "launch environment (legacy Accelerate)"
++    setter.argtypes = [ctypes.c_uint]
++    setter.restype = ctypes.c_int
++    if setter(1) != 0:
++        raise RuntimeError("Accelerate rejected single-thread BLAS setting")
++    return "Accelerate BLAS_THREADING_SINGLE_THREADED"
+--- a/src/python/tests/mpi_response_check.py
++++ b/src/python/tests/mpi_response_check.py
+@@ -0,0 +1,109 @@
++"""Run with mpiexec -n 1/2/4 ... mpi_response_check.py; no native fixtures needed.
++
++Compare distributed complex, real-linear symmetry, dX, dmu and generalized
++metric responses to an independent SERIAL context containing the entire mesh.
++Test both cache and no-cache paths, both ensembles, and collective transposes.
++"""
++
++import json
++import numpy as np
++from response_parallel import ResponseParallel
++from frozen_sigma_tangent import CachedFrozenSigmaResponse, real_inner
++from frozen_sigma_response import herm
++from test_frozen_sigma_tangent import complex_model
++from stress_response_adjoint import PairedOperator
++
++p = ResponseParallel.world()
++try:
++    central = complex_model()
++    copies = 4
++    eps = np.tile(central.eps, (copies, 1))
++    raw = np.tile(central.raw, (copies, 1, 1, 1))
++    weights = np.tile(central.kw, copies) / copies
++    normalized = central.apply_x(raw, central.X)
++    ids = p.partition(np.arange(len(eps)) + 1)
++    rng = np.random.default_rng(1861)
++    h = herm(
++        rng.normal(size=(*eps.shape, eps.shape[1]))
++        + 1j * rng.normal(size=(*eps.shape, eps.shape[1]))
++    )
++    o = herm(rng.normal(size=h.shape) + 1j * rng.normal(size=h.shape))
++    y = herm(rng.normal(size=h.shape) + 1j * rng.normal(size=h.shape))
++    r = rng.normal(size=raw.shape) + 1j * rng.normal(size=raw.shape)
++    max_error = 0.0
++
++    def same(a, b):
++        global max_error
++        max_error = max(max_error, float(np.max(abs(a - b))))
++        np.testing.assert_allclose(a, b, atol=2e-12, rtol=2e-11)
++
++    for cache in (0, 4):
++        allmodel = CachedFrozenSigmaResponse(
++            central.meta, eps, raw, normalized, weights, central.W, cache_mb=cache
++        )
++        local = CachedFrozenSigmaResponse(
++            central.meta,
++            eps[ids],
++            raw[ids],
++            normalized[ids],
++            weights[ids],
++            central.W,
++            parallel=p,
++            cache_mb=cache,
++        )
++        for fixed in (False, True):
++            full, fm = allmodel.generalized_response(h, o, r, fixed_number=fixed)
++            part, pm = local.generalized_response(
++                h[ids], o[ids], r[ids], fixed_number=fixed
++            )
++            same(part, full[ids])
++            same(np.array(pm["dmu"]), np.array(fm["dmu"]))
++            fb = allmodel.generalized_adjoint(y, fixed_number=fixed)
++            pb = local.generalized_adjoint(y[ids], fixed_number=fixed)
++            for a, b in zip(pb, fb):
++                same(a, b[ids])
++            lhs = p.sum(real_inner(y[ids], part))
++            rhs = p.sum(
++                sum(real_inner(a, b) for a, b in zip(pb, (h[ids], o[ids], r[ids])))
++            )
++            same(np.array(lhs), np.array(rhs))
++        for a, b in zip(local.projector_gradients(), allmodel.projector_gradients()):
++            same(a, b[ids])
++    # Global field -> local k matrix -> global field, including a separate
++    # replicated core term. Its transpose must sum only the k contributions.
++    b = rng.normal(size=(8, 3))
++    a = rng.normal(size=(4, 8))
++    core = rng.normal(size=(4, 3))
++    bop = PairedOperator(3, len(ids), lambda x: b[ids] @ x, lambda y: b[ids].T @ y)
++    aop = PairedOperator(
++        len(ids), 4, lambda x: a[:, ids] @ x, lambda y: a[:, ids].T @ y
++    )
++    direct = PairedOperator(
++        3, 4, lambda x: (a[:, ids] @ b[ids]) @ x, lambda y: (a[:, ids] @ b[ids]).T @ y
++    )
++    p.check_transpose(p.global_to_local(bop), output_local=True)
++    p.check_transpose(p.local_to_global(aop), input_local=True)
++    chain = p.local_to_global(aop) @ p.global_to_local(bop)
++    summed = p.sum_operator(direct)
++    for op in (chain, summed):
++        op.check_transpose(tolerance=2e-13)
++        same(op.matvec(np.ones(3)), a @ b @ np.ones(3))
++        same(op.rmatvec(np.ones(4)), b.T @ a.T @ np.ones(4))
++    if p.root:
++        print(
++            json.dumps(
++                dict(
++                    ranks=p.size,
++                    passed=True,
++                    max_absolute_error=p.reduce(max_error, "max"),
++                )
++            ),
++            flush=True,
++        )
++    else:
++        p.reduce(max_error, "max")
++except BaseException:
++    import traceback
++
++    traceback.print_exc()
++    p.comm.Abort(1)
+--- a/src/python/tests/test_analytic_stress_integration.py
++++ b/src/python/tests/test_analytic_stress_integration.py
+@@ -86,8 +86,8 @@
+                 self.assertEqual(result["mpi"], [])
+                 self.assertEqual(result["lapw1_worker"], str(bin / "lapw1_response"))
+                 req["config"]["solver"]["mpi"] = ["mpirun", "-np", "4"]
+-                with self.assertRaisesRegex(NotImplementedError, "requires solver.mpi"):
+-                    step.preflight("sample", req, bin, "mpirun -np 4")
++                result = step.preflight("sample", req, bin, "mpirun -np 4")
++                self.assertEqual(result["mpi"], ["mpirun", "-np", "4"])
+ 
+     def test_preparation_and_driver_are_isolated_then_ready_not_applied(self):
+         with fixture() as (root, bin, wi, req):
+@@ -164,3 +164,56 @@
+ 
+ if __name__ == "__main__":
+     unittest.main()
++
++
++class MPIIntegrationTests(unittest.TestCase):
++    def test_separate_python_native_launches_and_cache_budgets(self):
++        with fixture() as (root, bin, wi, req):
++            solver = dict(
++                backend="analytic",
++                wien_root=str(wi),
++                dmft2=str(bin / "dmft2_response"),
++                library=str(bin / "liblapw_response.so"),
++                mpi=["python-mpiexec", "-n", "4"],
++                native_mpi=["native-mpirun", "-np", "2"],
++                cache_mb=64.0,
++                basis_cache_mb=32.0,
++            )
++            for label in ["lapw0", "lapw1", "lcore"]:
++                solver[label + "_worker"] = str(bin / (label + "_response"))
++            calls = []
++
++            def child(command, **kw):
++                calls.append(command)
++                if len(calls) == 1:
++                    cfg = json.loads(Path(command[-1]).read_text())
++                    self.assertEqual(cfg["native_mpi"], solver["native_mpi"])
++                    self.assertNotIn("python-mpiexec", command)
++                else:
++                    self.assertEqual(command[:3], solver["mpi"])
++                    self.assertIn("--mpi", command)
++                    self.assertEqual(command[command.index("--cache-mb") + 1], "64.0")
++                    self.assertEqual(
++                        command[command.index("--basis-cache-mb") + 1], "32.0"
++                    )
++                    out = Path(command[command.index("--output") + 1])
++                    out.mkdir()
++                    (out / "report.json").write_text(
++                        json.dumps(
++                            dict(
++                                converged=True,
++                                full_tensor_within_symmetry=True,
++                                stress_Ry_Bohr3=[[0.1, 0, 0], [0, 0.1, 0], [0, 0, 0.1]],
++                            )
++                        )
++                    )
++                return SimpleNamespace(returncode=0)
++
++            with patch.object(step, "preflight", return_value=solver), patch.object(
++                step.subprocess, "run", side_effect=child
++            ):
++                result = step.compute_response(
++                    "sample", req, bin, "production-mpi", "run", io.StringIO()
++                )
++            self.assertTrue(result["stress_ready"])
++            self.assertEqual(len(calls), 2)
+--- a/src/python/tests/test_lapw_response_kpool.py
++++ b/src/python/tests/test_lapw_response_kpool.py
+@@ -0,0 +1,85 @@
++"""Native pool stream preservation and failure checks; no WIEN license needed."""
++
++from pathlib import Path
++import struct
++import tempfile
++import unittest
++from lapw_response_kpool import klist_records, merge_streams, remap_matrix
++
++
++def record(payload):
++    marker = struct.pack("<i", len(payload))
++    return marker + payload + marker
++
++
++class PoolTests(unittest.TestCase):
++    def test_klist_preserves_global_weight_and_energy_limits(self):
++        for width in (5, 10):
++            with self.subTest(width=width), tempfile.TemporaryDirectory() as folder:
++                rows = [
++                    f"{k:10d}"
++                    + "".join(f"{v:{width}d}" for v in (1, 3, 5, 20))
++                    + f"{weight:5.1f}"
++                    for k, weight in [(1, 8), (2, 4)]
++                ]
++                suffix = " -7.0  1.5"
++                path = Path(folder) / "case.klist"
++                path.write_text(rows[0] + suffix + "\n" + rows[1] + "\nEND\n")
++                parsed, end, limits = klist_records(path)
++                self.assertEqual(end, 15 + 4 * width)
++                self.assertEqual(parsed[1][:end] + limits, rows[1] + suffix)
++
++    def test_vector_header_is_kept_once_without_transforming_coefficients(self):
++        with tempfile.TemporaryDirectory() as folder:
++            root = Path(folder)
++            header = record(struct.pack("<2d", -0.3, 0.5)) + record(
++                struct.pack("<d", 995.0)
++            )
++            paths = []
++            for i in range(2):
++                p = root / str(i)
++                p.write_bytes(header + record(bytes([i]) * 50))
++                paths.append(p)
++            out = root / "vector"
++            merge_streams(paths, out, 1, binary=True)
++            self.assertEqual(
++                out.read_bytes(), header + record(bytes(50)) + record(bytes([1]) * 50)
++            )
++            paths[1].write_bytes(
++                record(struct.pack("<2d", -0.4, 0.5))
++                + record(struct.pack("<d", 995.0))
++                + record(b"x")
++            )
++            previous = out.read_bytes()
++            with self.assertRaisesRegex(ValueError, "different radial"):
++                merge_streams(paths, out, 1, binary=True)
++            self.assertEqual(out.read_bytes(), previous)
++            self.assertFalse(Path(str(out) + ".merging").exists())
++
++    def test_energy_header_and_k_order(self):
++        with tempfile.TemporaryDirectory() as folder:
++            root = Path(folder)
++            paths = []
++            for k in (1, 2):
++                p = root / str(k)
++                p.write_bytes(b"energy\nlo\n" + f"k {k}\n".encode())
++                paths.append(p)
++            out = root / "energy"
++            merge_streams(paths, out, 1, binary=False)
++            self.assertEqual(out.read_bytes(), b"energy\nlo\nk 1\nk 2\n")
++
++    def test_remap_changes_only_integer_global_provenance(self):
++        with tempfile.TemporaryDirectory() as folder:
++            root = Path(folder)
++            p = root / "local"
++            out = root / "global"
++            payload = (
++                b"EDMFTHV1"
++                + struct.pack("<I8i", 0x01020304, 1, 2, 0, 10, 1, 2, 1, 1)
++                + b"unchanged matrix payload"
++            )
++            p.write_bytes(payload)
++            remap_matrix(p, out, 75, 3)
++            self.assertEqual(out.read_bytes()[:16], payload[:16])
++            self.assertEqual(out.read_bytes()[24:], payload[24:])
++            self.assertEqual(struct.unpack("<ii", out.read_bytes()[16:24]), (75, 3))
+--- a/src/python/tests/test_response_parallel.py
++++ b/src/python/tests/test_response_parallel.py
+@@ -0,0 +1,80 @@
++"""Partition ownership and shared adjoint source contractions, independent matrices."""
++
++from types import SimpleNamespace as NS
++from pathlib import Path
++import hashlib
++import tempfile
++import unittest
++from unittest.mock import patch
++import numpy as np
++from response_parallel import ResponseParallel, SERIAL
++from stress_response_adjoint import PairedOperator
++from lapw_strain_charge import PreparedChargeSourceContraction
++
++
++class ParallelTests(unittest.TestCase):
++    def test_partition_covers_once_and_balances_cubic_cost(self):
++        costs = np.arange(1, 20, dtype=float) ** 3
++        ownership = []
++        loads = []
++        for rank in range(4):
++            p = ResponseParallel(NS(Get_rank=lambda: rank, Get_size=lambda: 4))
++            ids = p.partition(costs)
++            ownership.extend(ids.tolist())
++            loads.append(costs[ids].sum())
++        self.assertEqual(sorted(ownership), list(range(len(costs))))
++        self.assertLess(max(loads) - min(loads), costs.max())
++        with self.assertRaisesRegex(ValueError, "exceed"):
++            p.partition([1, 1])
++
++    def test_fingerprints_identical_to_native_sha256(self):
++        with tempfile.TemporaryDirectory() as folder:
++            f = Path(folder) / "vector"
++            f.write_bytes(b"native basis" * 500000)
++            self.assertEqual(
++                SERIAL.fingerprints({"v": f}),
++                {"v": hashlib.sha256(f.read_bytes()).hexdigest()},
++            )
++
++    def test_shared_adjoint_replaces_full_charge_source_exactly(self):
++        rng = np.random.default_rng(733)
++
++        def op(a):
++            return PairedOperator(
++                a.shape[1], a.shape[0], lambda x: a @ x, lambda y: a.T @ y
++            )
++
++        B = rng.normal(size=(7, 4))
++        E = rng.normal(size=(8, 7))
++        R = rng.normal(size=(5, 8))
++        D = rng.normal(size=(5, 4))
++        C = rng.normal(size=(5, 4))
++        N = rng.normal(size=(5, 5))
++        state = NS(
++            jacobian=NS(input_size=5),
++            chain=NS(
++                basis=op(B),
++                electronic=op(E),
++                density=op(R),
++                basis_density=op(D),
++                core=op(C),
++                normalization=op(N),
++            ),
++        )
++        lam = rng.normal(size=5)
++        readout = PreparedChargeSourceContraction(state, lam)
++        # The actual native normalization/transport offset is tested separately;
++        # this test verifies that its contribution is added once, outside N.
++        offset = rng.normal(size=5)
++        with patch(
++            "lapw_strain_charge.material_source_from_raw", return_value=(offset, {})
++        ):
++            for unused in range(6):
++                b = rng.normal(size=7)
++                v = rng.normal(size=4)
++                g = rng.normal(size=5)
++                expected = lam @ (
++                    N @ (R @ E @ (b + B @ v) + D @ v + C @ v + g) + offset
++                )
++                actual = readout.contraction(b, g, v, np.eye(3))
++                self.assertAlmostEqual(actual, expected, places=11)

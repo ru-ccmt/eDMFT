@@ -1,0 +1,596 @@
+STRESS RESPONSE: WHERE WE ARE AND WHAT COMES NEXT
+Current implementation roadmap, 9 November 2026
+
+MAIN POINT
+
+LATEST CHECKPOINT: core_functional_20261109/REPORT.txt
+
+We are in POINT 4, assembling the complete functional readout. Hydrostatic
+point 3 already supplies analytic s, J/J^T, and screened q. The lattice scalar
+and its forward/adjoint readouts were installed in functional_readout_20261109.
+This checkpoint adds the native core eigenvalue-sum gradient, spatial pairing,
+and actual discrete XC energy gradient. 239 regression tests pass against
+repository and dbin dependencies; default local XC potentials are unchanged.
+
+Core potential and explicit hydrostatic scalar derivatives pass native tests.
+The XC audit finds a discrete cancellation defect: grad E_xc differs from
+the spatial pairing with the separately implemented V_xc. The new analytic
+energy gradient reproduces the PBE-minus-LDA native defect in FeSe, both for
+a probe and saved full-mesh screened q. This is a derived scalar derivative,
+not a pressure fit. It is not yet added to production stress.
+
+At fixed geometry the eventual charge readout is
+ c = K^T[B^T g_lattice + g_core - W n_input] + r_C,
+ r_C = grad C_native + K^T W n_input.
+The XC part r_xc = grad E_xc - W V_xc is now implemented and validated.
+The remaining electrostatic/gauge residual and explicit geometric partners
+must be derived before the complete covector and Fortran-baseline subtraction
+are assembled. One combined adjoint then serves all physical strain sources.
+
+Matrix/spatial pairing can also differ because H uses LNSMAX=4 and density
+l<=8 in the archived cases, with different radial banks. Preserve that
+measured difference; do not silently identify P^T rho with spatial n_input.
+Neither raw nor normalized output density can replace input density away
+from a fixed point. Core exterior continuation is retained in its readout.
+
+NEXT: complete the native electrostatic density scalar (nuclear constants
+and gauge included), explicit geometric density-functional terms, and actual
+baseline subtraction. Validate the complete frozen-Sigma tangent on converged
+centers, then finish six physical strain sources and production publication.
+No new total pressure agreement is claimed. Wrappers still report
+stress_applied=false; their production behavior has not changed here.
+
+THE THREE LEVELS THAT CURRENTLY COEXIST
+
+1. Existing analytic stress
+   The existing DFT/eDMFT stress calculation continues through ordinary
+   dmft2, SCF assembly and mixer. The newly installed native response modules
+   have not changed the production dmft2 executable or supplied a new total
+   pressure comparison. Earlier analytic-versus-numeric discrepancies are
+   not declared resolved by the recent component tests.
+
+2. Slower reference response
+   A working reference computes the frozen-self-energy response by evaluating
+   perturbed native charge maps. Its steps use lapw0, lapw1, dmft2 and lcore.
+   Screening is an iterative linear-response solve, not an impurity solve or
+   two separately converged strained eDMFT calculations. Separate diagnostic
+   contractions were used in the earlier material studies.
+
+   The wrappers already schedule this reference calculation:
+     x_dmft.py dmft2: requested response immediately after dmft2;
+     run_dmft.py: requested response in one final measurement pass.
+
+   STRT and STRFT are wrapper aliases for requesting it. The ordinary native
+   executable receives STR or STRF through temporary inputs. Response work
+   is isolated in case.response_runs/<run_id>/, with density/potential outputs
+   recorded by case.stress_response.status.json.
+
+   Crucially, the current wrapper returns stress_applied=false. It saves the
+   screened density and potential; it does not add a complete corrected tensor
+   to mixer. The supported reference scope is nonmagnetic, no SOC, primitive
+   orthogonal cells, normalized projector 5, fixed band indices, fixed N and
+   hydrostatic strain. Fixed-mu MnO and magnetic MnTe are not supported by that
+   integrated driver yet, even though some lower-level routines support more.
+
+3. Faster analytic response engine under construction
+   This replaces repeated native program evaluations with prepared derivative
+   operations and their transposes. It reuses central data and avoids repeated
+   frequency work and, where the retained-state representation suffices,
+   diagonalization. Its component tests are ahead of its production integration.
+   The native reference remains our independent comparison.
+
+STATUS OF THE BUILDING PLAN
+
+A. Execution and file isolation: IMPLEMENTED
+   Shared dmft2_step executor, STRT/STRFT handling, final-only run_dmft policy,
+   separate response workspaces, input fingerprints and failure checks exist.
+   Final publication of a general corrected stress tensor remains pending.
+
+B. Matrix-only dftKS worker: IMPLEMENTED, OPTIONAL
+   Native H and O can be assembled without diagonalization. Real/complex and
+   serial/MPI checks passed. It remains a diagnostic/fallback building block;
+   the integrated reference solver still uses its existing native actions.
+
+C. Cached electronic response: IMPLEMENTED AND TESTED
+   Given joint band perturbations (delta H, delta O, delta Phi), calculate the
+   density-matrix response delta rho at fixed local Sigma and double counting.
+   Phi means RAW local-orbital overlaps, before window selection/normalization.
+   The normalized projector chain includes window motion, overlap symmetry,
+   inverse-square-root normalization and the moving overlap metric.
+   Forward and transpose actions are implemented. Fixed-N and fixed-mu
+   electronic branches exist; this does not extend the wrapper's supported scope.
+   Repeated Matsubara-dependent contractions can be cached in the central context.
+   The optional empty-complement extension now completes the finite LAPW space
+   using projected static solves from native H/O and retained KS eigenvectors.
+   It preserves normalized-projector feedback and supplies the density cross
+   blocks, with an exact transpose and explicit gap/thermal checks. Its material
+   adapter is still diagnostic; the production wrapper has not switched to it.
+   Accuracy remains subject to exported quadrature/tails and the stated bounds.
+
+D. Radial and basis response: IMPLEMENTED FOR TESTED CHANNELS
+   Native scalar NREL/RELA radial derivatives, normalization, the actual finite
+   energy-difference construction of udot, ordinary LO coefficients and matching
+   derivatives are implemented with forward and reverse actions.
+   They are derivatives of the discrete algorithm, not frozen-radial formulas.
+   Grid, RMT and local frames are held fixed in the present potential-response
+   building blocks. Energy changes are explicit inputs; automatic energy-search
+   differentiation/policy and DIRACOUT p1/2 remain unfinished.
+
+E. H/O/raw-projector assembly: GENERAL NATIVE POTENTIAL MAP TESTED
+   Full off-diagonal spherical H/O, nonspherical central-potential radial legs,
+   matching/LO response and raw projector-5 response have actions and transposes.
+   Native upper-triangle ordering is retained through a precomputed Wronskian
+   band tensor; no large PW matrix is rebuilt during each response action.
+   Actual local/equivalent-site orbital frames and Bloch phases reproduce the
+   FeSe/SrVO3 raw projector exports to roundoff, without a pseudoinverse.
+   E then applies metric, window, overlap symmetry and normalization exactly once.
+   The diagnostic material adapter is still restricted to the tested cases.
+   Nonspherical MT and native reanalyzed interstitial potential inputs now
+   connect to the same RR/QR electronic operation. Their explicit fixed-basis
+   H derivatives and exact transposes pass separate and joint native probes.
+   A complex-vector Fourier-convention error in the new staged map was found
+   and fixed before installation. Nonzero geometric projector tails and physical
+   strain sources now include tested explicit H/O/raw geometry and full
+   hydrostatic spatial-charge assembly. General tensor layouts and complete
+   functional reconciliation remain.
+
+F. Spatial valence response: ALL NATIVE POTENTIAL SECTORS TESTED
+   Muffin-tin and interstitial R and direct moving-basis D_s operations are
+   implemented. The coupled map delta n=(R E B_s+D_s) delta(r V_spherical)
+   agrees with native complete-basis endpoints and has a tested exact transpose.
+   Native contexts and quadratures are shared once per atom/l across k/site sums.
+   Geometry, RMT, local frames and radial energies are held fixed; material tests
+   first used fixed mu; coupled fixed-N native endpoint tests now pass after
+   independently tightening the endpoint chemical-potential roots.
+   The missing empty complement is now included without high-state eigenvectors.
+   Independent [retained,complement] material assembly matches the full spectral
+   result near 1e-13 and native FD near 1e-7. General native potential inputs
+   now pass separate nonspherical, interstitial and combined material probes.
+   Charge/gauge and broader-k native checks plus reusable loading are now
+   available; production MPI wiring remains pending. A small FeSe nonspherical residual is recorded.
+
+G. Hartree/XC and core response: STEP 2, NATIVE COMPONENTS VALIDATED
+   Periodic Hartree is installed. Prepared nonmagnetic LDA/PBE XC now follows
+   native radial splines, angular quadrature, 27-point interstitial gradient
+   fits, density branches and Fourier truncation/masking. NREL/RELA core
+   differentiates native inward/outward matching, the eigenvalue, exterior
+   potential and CHARGE normalization, with exact transposes.
+   A missing conjugation at the complex VNS file-coordinate boundary was found
+   and corrected in the new Hartree/XC adapter. The complete first-k unmixed
+   output-charge map now matches native endpoints at fixed mu and fixed N:
+   errors below 1e-6 at h=.0005 in FeSe/SrVO3. These are density derivatives,
+   not strains/GPa. Native MIXER output normalization and its transpose now
+   pass independent native checks. A versioned potential/core archive prepares
+   those maps without native launches and rejects stale snapshot fingerprints.
+   Reusable full-k valence loading and physical screening are now connected
+   in point 3. Broader material/spin/geometry and number-policy controls remain.
+
+H. Screening and single-adjoint solver: POINT 3, NATIVE CHARGE CONNECTED
+   The material adapter composes the complete native J and its exact transpose.
+   Matrix-free GMRES solves (I-J)q=b and verifies the final true residual.
+   Independent native finite-difference actions and cold-start native solves
+   test the connection. A muffin-tin charge observable first tested adjoint
+   reuse. The projector-only functional readout now also passes native scalar
+   endpoints and forward/adjoint checks; its metric and empty-complement
+   pullbacks reuse the same native operators. Kq is the induced potential;
+   the hydrostatic explicit potential is now analytic and independently
+   checked. Explicit band geometry is now independently checked as well.
+   The full hydrostatic charge source is now analytic and tested. Complete
+   functional/baseline terms and six-source layout expansion remain. See screened_native_20261108/REPORT.txt and
+   projector_functional_20261108/REPORT.txt and explicit_strain_20261108/REPORT.txt
+   for scope and numerical controls.
+
+I. Six physical strain sources and final tensor: NOT COMPLETED
+   The complete hydrostatic charge source is now analytic and validated.
+   General strain sources with fixed-RMT surface/transport terms, local
+   frame policy, tensor symmetry and all contributions are not assembled.
+   The final fast tensor must be validated and published once before SCF merge.
+   Independent radial on/off/diagnostic report policy exists, but is not yet a
+   complete automatic radial-correction path in the executor.
+
+CHECKPOINT HISTORY (OLDER LIMITATIONS MAY BE SUPERSEDED ABOVE)
+
+The shared q=0 source/readout increment has 169 passing tests, zero skips.
+ChargeResponseChain now accepts the explicit normalization geometry source
+AFTER the density normalization derivative, and solve_perturbation reconstructs
+the total screened potential and H/O/raw-projector input. A prepared stored-band
+G^-1 derivative reuses the normalized-projector chain and correctly restores
+the covariant overlap-metric leg. Independent nonlinear G^-1/G, basis-covariance,
+fixed-N gauge and source/screening tests pass. These are synthetic controls,
+not a native phonon calculation. The full-k valence loader remains the main
+next phase-2 task. See shared_gamma_response_20261108/REPORT.txt.
+
+The charge-closure checkpoint has 161 passing tests, zero skips. It adds native
+MIXER CHARGE/SETN/NORMAL endpoint comparisons, an exact normalization transpose,
+and a self-contained potential/core preparation archive. Normalized first-k
+fixed-N derivative errors at h=.0005 are 6.99e-7 (FeSe) and 4.99e-7 (SrVO3).
+Charge closure is within 1.43e-14 electrons per unit test amplitude. These are
+not strains or GPa. The native-vs-legacy charge quadrature difference is only
+about 2--3e-7 electrons here and is not claimed to resolve stress discrepancies.
+See charge_closure_20261108/REPORT.txt. The slow reference now defaults to native
+quadrature; an explicit legacy_spline option reproduces historical integration.
+
+The XC/core checkpoint brings the selected suite to 145 passing tests, zero
+skips. The native first-k charge derivative [R E B+D+C](K_H+K_xc), before
+spatial output normalization, has relative fixed-N errors 6.99e-7 (FeSe)
+and 4.95e-7 (SrVO3) at h=.0005. A second step is recorded; no physical strain
+or pressure is implied. Complete transpose errors are <=2.1e-14. Core costs
+about 13--19 ms per action; Hartree+XC about 19--86 ms. The complete first-k
+charge actions take about 1.1--2.0 s. See xc_core_response_20261108/REPORT.txt.
+This includes a correction to the new complex VNS coordinate adapter, and
+does not by itself change ordinary production stress output.
+
+The radial Hartree/charge checkpoint has seven new tests, including comparison
+with compiled native CoulInt/Spline and the radial Dirichlet assembly. The
+complete suite is 115 tests with both native reference libraries provided.
+Actual FeSe/SrVO3 induced-density harmonics agree with the native radial
+Hartree assembly within 5.94e-11 / 1.47e-11 relative; transpose errors are below
+3.6e-17. All MT harmonics take about 1.4 / 3.5 ms per action. This excludes the
+periodic boundary, XC, core, electronic response and screened solve.
+
+The coupled fixed-N valence-density response now has independent native
+endpoints. At h=0.0005 the relative errors are 4.30e-7 (FeSe) and 1.06e-6
+(SrVO3), after tightening endpoint chemical-potential roots. Native cmp_EF's
+1e-9 Ry absolute/relative stopping tolerances had caused a 2.56e-4 SrVO3
+finite-difference error; a separate nonlinear particle-count root removed it.
+The production chemical-potential solver was NOT changed.
+
+Band-space fixed-N charge is conserved near roundoff. Spatial integration
+leaves about 1--2e-6 electrons per unit test amplitude with the native l<=8
+density representation and l<=10 LAPW basis. Including l=9,10 in a diagnostic
+spatial map reduces the residual to 1.04e-7 / 3.30e-8. Extending the Fourier
+sum does not change it. This is mainly angular truncation, not evidence for
+another missing electronic term. Native density defaults were not changed.
+
+See hartree_radial_response_20261108/REPORT.txt and charge_response_checks_20261108/
+for exact scope and remaining spatial/energy-policy limitations. Full material
+gauge checks and general loading remain open, although native radial constant
+potential-plus-energy-shift tests already pass.
+
+The preceding general-input checkpoint established:
+
+The general native-potential checkpoint has 108 passing source tests, including
+six new Fourier/rectangular/coordinate tests, with the native radial library
+loaded. The same 108 tests also pass with dbin dependencies plus the staged
+modules. No production executable changes are part of this checkpoint.
+
+Thirty-two isolated native endpoints test nonspherical MT, interstitial and
+joint potential variations, including a four-step nonspherical check. The
+joint density-response relative errors at h=0.0005 are 1.37e-7 in FeSe RELA and
+5.66e-7 in SrVO3 NREL. Coupled forward/transpose errors are below 1.2e-17.
+These are ONE-K-POINT VALENCE-DENSITY derivatives, not stress/pressure results.
+The FeSe nonspherical density residual plateaus near 1.3e-6; it remains a
+small unresolved native/assembled difference and is not called exact agreement.
+
+The new complex interstitial map uses the conjugated native-vector convention,
+including native star phase averaging and the already masked .vns coefficients.
+No extra sphere mask, star multiplicity or volume factor is applied in B.
+The upstream Hartree/XC operator must output these precise native coordinates.
+
+The preceding empty-complement checkpoint established:
+
+The empty-complement checkpoint passes 102 source tests. Six new tests cover
+shifted solves, native nonorthogonal H/O, full DMFT response in both ensembles,
+independent nonlinear endpoints, gap/thermal rejection and exact transposes.
+
+With only 66 retained FeSe vectors or 43 retained SrVO3 vectors, the independently
+assembled complete spatial response agrees with the previous full spectral
+result to 1.76e-13 and 9.38e-14. Native-FD errors remain 1.19e-7 and 1.78e-7.
+The complete spatial-map transpose errors are 1.46e-15 and 3.28e-16.
+
+The repeated ELECTRONIC action is 21x / 41x faster than the full spectral
+implementation in these one-k FeSe / SrVO3 probes. This is not an end-to-end
+stress speedup. Material assembly and spatial response remain substantial.
+The shared direct reduction is prepared once; it is not an iterative solve
+or a new complement Matsubara calculation. Occupied or degenerate complements
+are rejected. See complement_response_20261108/REPORT.txt for the derivation,
+bounds, timings and limits of the material adapter.
+
+The PREVIOUS checkpoint established the need for this complement:
+
+96 source Python tests pass with a clean native response-library build. This
+includes four new compact spherical, raw-projector and nonspherical derivative/
+transpose tests, plus the existing density and native NREL/RELA radial controls.
+
+A one-k-point test fixes the native central calculation and all endpoints,
+changing ONLY the number of states in the analytic response representation:
+
+  Material       Usual stored states    200 states    Complete finite basis
+  FeSe RELA      0.544603 (66)          0.176345      1.5358e-7 (509)
+  SrVO3 NREL     0.190156 (43)          0.030142      7.2177e-7 (703)
+
+These are relative errors of the spatial VALENCE-DENSITY derivative for a smooth
+spherical MT potential perturbation at h=0.0005, not pressures or stress errors.
+At h=0.00025 the complete-basis errors become 1.19e-7 and 1.78e-7. The coupled
+forward/transpose checks agree near 1e-15. Central raw projectors agree with
+native exports to 2--5e-15; the central density agrees near 1e-12.
+
+This identified the response-space complement now supplied by the projected
+solver above. It does NOT prove that all previous pressure discrepancies have
+this cause, and it does not require changing the selected DMFT window. Empty high-energy states still contribute
+to the motion of low-energy eigenvectors and the window subspace.
+
+The new spherical action uses a cached native Wronskian tensor and small radial
+kernels. Its component cost is about 0.07--0.11 s in the recorded small-band
+first-k probes. Full-basis preparation is more expensive. No end-to-end screened
+stress speedup has been established.
+
+See coupled_valence_response_20261108/REPORT.txt for formulas, native gauge,
+step and band controls, the 100-Ry export limit in the SrVO3 fixture, limitations,
+and the next algorithm. Earlier spatial-only tests and timings remain recorded
+in spatial_density_response_20261108/REPORT.txt.
+
+The preceding augmentation checkpoint established the following:
+
+79 installed-source Python tests, nine installed-helper tests and 32 new native
+mixed-radial tests pass. The 32 new tests supplement earlier radial/Hamiltonian
+controls; they are not 32 full stress calculations.
+
+For a fixed-geometry, fixed-physical-H perturbation of the basis-generating
+potential, the complete retained-band H' and O' matrices at the smallest tested
+step agree with native finite differences as follows (relative matrix norms):
+
+  FeSe RELA:    H' 8.18e-8; O' 5.26e-8.
+  SrVO3 NREL:   H' 1.84e-8; O' 1.03e-8.
+
+These checks include off-diagonal entries and ordinary LOs at the first k point.
+Separate nonspherical-potential checks use three k points. The raw-projector
+radial derivative shows approximately quadratic step convergence. Small native
+cross-code residuals remain and are recorded. These are NOT new GPa results.
+
+The new cached augmentation coefficient calculation is about 8--9 times faster
+for the tested l=2 channel. Earlier cached electronic-response actions also have
+large measured speedups. Neither measurement is an end-to-end stress speedup.
+
+NEXT STEPS, WITH COMPLETION TESTS
+
+1. Valence-potential adapter: COMPLETED FOR THE TESTED NATIVE SCOPE.
+
+   Spherical, nonspherical and interstitial input sectors, their radial and
+   explicit basis-density contributions, the complete finite LAPW complement,
+   and their exact transposes are connected. Reusable full-k native loading,
+   RR/QR memory layout, number/gauge checks and independent native endpoints
+   are documented in shared_gamma_response and screened_native checkpoints.
+   Broader geometry/energy policies and production MPI are later extensions.
+
+2. Potential/core response and full charge Jacobian: COMPLETED FOR TESTED SCOPE.
+
+   Periodic Hartree, native nonmagnetic LDA/PBE XC, NREL/RELA core, native
+   output-charge normalization, and reusable central archives are connected
+   to the valence map. J and J^T pass native tests in SrVO3 and FeSe, including
+   broader-k forward and screened-response checks. The native reference stays
+   available for independent comparisons. Spin/SOC and general-cell coverage,
+   automatic energy searches and production MPI remain outside this scope.
+
+3. Solve and validate screened response with the complete native map.
+
+   Let J be the derivative of one UNMIXED physical output-charge update with
+   respect to input charge, at fixed local self-energy. It is not the mixer
+   algorithm's Jacobian and not a full impurity-vertex DMFT susceptibility.
+   For strain component nu, let q_nu be induced charge and b_nu the explicit
+   strain source. Then
+
+     (I-J) q_nu = b_nu.
+
+   The complete native J, numerical hydrostatic sources and screened q now
+   pass independent native checks in FeSe and SrVO3. True residuals, central
+   fixed-point residuals and timings are recorded in screened_native_20261108.
+   The projector-only readout passes its own native scalar/adjoint checks.
+   The analytic hydrostatic potential source and its sum with Kq now pass
+   independent native checks. Explicit band geometry is now tested too.
+   The complete hydrostatic charge source and its screened solution now pass
+   native checks too. Full functional/baseline reconciliation comes next.
+
+4. Complete the stress functional contraction and six strain sources.
+
+   In a consistent decomposition write the additional energy derivative as
+     Delta D_nu = d_nu + g^T q_nu.
+   Here d_nu is the explicit correction, and g is the common charge-response
+   gradient of the chosen correction functional after removing terms already
+   included in analytic stress. Derive and validate the complete g, including
+   radial, overlap and normalized-projector dependence. The window/normalization
+   potential gradient now includes complete finite-basis metric and radial
+   projector dependence and passes native material checks. The complete
+   lattice-scalar gradient and explicit+screened contractions now pass tests;
+   full functional/baseline subtraction remains.
+
+   Then solve once
+     (I-J^T) lambda = g,
+   and obtain each component from
+     Delta D_nu = d_nu + lambda^T b_nu.
+
+   The six-source algebra is implemented. The six PHYSICAL b_nu, complete g,
+   direct terms and their shared conventions still need to be assembled.
+   For engineering strain (exx,eyy,ezz,2eyz,2exz,2exy), Delta D_nu/Omega gives
+   the tensile stress correction. Pressure is minus the mean normal stress.
+
+   Completion tests: actual forward versus adjoint contractions; zero-Sigma DFT
+   limit; fixed-RMT boundary terms; normalized-projector symmetry; trace/pressure
+   and shear factors; central finite differences of the matching frozen-Sigma
+   functional; step, basis and band convergence. No fitting terms to pressures.
+
+5. Finish production integration, then broaden material scope.
+
+   Replace the reference action with the validated fast engine inside the shared
+   executor. Preserve STRT/STRFT controls and final-only run_dmft scheduling.
+   Assemble the complete validated tensor, prevent duplicate/stale corrections,
+   and add it before lcore/SCF assembly/mixer without changing the mixer format.
+   Preserve a separately selectable radial correction and component diagnostics.
+
+   First establish the complete path in nonmagnetic SrVO3 and FeSe, NREL/RELA.
+   Then add/validate fixed-mu insulating MnO and magnetic two-spin MnTe, followed
+   by broader cell, symmetry and SOC coverage. Measure total wall time and MPI/
+   memory behavior only on the connected workflow before claiming overall speedup.
+
+THE IMMEDIATE DELIVERABLE
+
+Complete point 4 by differentiating the remaining native electrostatic scalar
+and its geometry, combining it with the tested lattice/core/XC gradients,
+then subtracting the existing Fortran baseline. Keep the finite matrix/spatial
+pairing residual and charge fixed-point controls. Only the complete readout
+should drive one shared adjoint and subsequent total-stress comparisons.
+
+SOURCE AND EVIDENCE MAP
+
+Repository: /Users/haule/projects/eDMFT_new
+
+src/python/dmft2_step.py
+  Existing wrapper execution, final/deferred policy and reference response.
+src/python/frozen_sigma_tangent.py
+  Cached electronic and normalized-projector forward/reverse operations.
+src/dmft2/atpar/{outwin_response,lapw_radial_response,
+               lapw_radial_hamiltonian,lapw_radial_potential,lapw_radial_capi}.f90
+  Discrete radial and small radial matrix operations.
+src/python/{lapw_response_assembly,lapw_augmentation_response}.py
+  Band/angular projection and cached augmentation operations.
+src/python/{lapw_density_response,lapw_basis_density_response,lapw_radial_native}.py
+  Spatial density reconstruction, direct basis-density map and in-memory
+  native radial context, with forward/reverse PairedOperator interfaces.
+src/python/{lapw_spherical_response,lapw_nonspherical_response,
+            lapw_projector_response,lapw_spherical_potential_response}.py
+  Prepared joint H/O/raw-projector action/transpose for spherical MT potential
+  input, with native triangle, quadratures and explicit raw orbital gauge.
+src/python/lapw_hartree_radial.py
+  Cached native CoulEM prefix/suffix integrals and transpose; MT Dirichlet
+  Hartree action/reverse with explicit periodic boundary input and native units.
+src/python/lapw_hartree_periodic.py
+  Native CHARGE moments, STERN/YKAV geometry, pseudocharge/PW Poisson, MT
+  boundary values, FFT reanalysis and paired native potential-coordinate adapter.
+src/python/{lapw_xc_response,lapw_core_response}.py
+  Prepared native nonmagnetic LDA/PBE XC and spherical NREL/RELA core,
+  cached forward/reverse operations and periodic coordinate assembly.
+src/python/{lapw_charge_response,lapw_potential_core_state}.py
+  Native unmixed output normalization/transpose and explicit geometry source;
+  versioned potential/core central data, provenance checks and reusable loading.
+src/python/lapw_potential_response.py
+  Native nonspherical/interstitial/spherical input coordinates, complex Fourier
+  convention and joint RR/QR H/O/raw-projector map with exact transpose.
+src/python/{lapw_strain_potential,lapw_hydrostatic_potential}.py
+  Analytic hydrostatic potential source, native pseudocharge and ionic geometry,
+  XC spatial scaling, moving interstitial mask, fixed-label potential files
+  and explicit distinction between fixed-r and material-r potential derivatives.
+src/python/lapw_geometry_response.py
+  Fixed-native-potential H/O/raw geometry source: reciprocal/matching and LO
+  derivatives, spherical surface and ordered Wronskian, nonspherical legs,
+  interstitial overlap/kinetic and fixed local-frame raw projector overlaps.
+  RR/QR columns are preserved. This is not yet a full spatial-charge source.
+src/python/{lapw_strain_charge,lapw_strain_field}.py
+  Complete hydrostatic unmixed charge source: explicit spatial valence geometry,
+  fixed-RMT integration/normalization geometry, inverse output transport and
+  post-transport normalization. Diagonal Coulomb/XC geometry matches rounded
+  native probes with explicit scalar density transport. No stress publication.
+src/python/lapw_projector_functional.py
+  Extra normalized-projector scalar readout, full finite-basis metric/QR
+  pullbacks, one common native potential/charge gradient and adjoint reuse.
+  Does not supply the complete stress or choose the baseline subtraction.
+src/python/{lapw_strain_functional,lapw_physical_potential}.py
+  Separated direct and normalized-projector joint lattice covectors; complete
+  explicit geometry/potential plus screened readout, forward and one-adjoint.
+  Fixed-basis physical-potential map/transpose and its weighted-density readout.
+  Not the full Klein functional; does not choose or subtract the baseline.
+src/python/lapw_functional_cancellation.py
+  Native spatial W pairing, matched-core eigenvalue gradient with exterior
+  continuation, and exact discrete XC energy/density-term gradients. These
+  are fixed-geometry components, not a published total stress correction.
+src/python/lapw_complement_response.py
+  Native H/O + retained-vector complement construction, shared shifted solves,
+  metric/projector feedback, RR/QR density and paired block-coordinate interface.
+src/python/lapw_response_chain.py
+  Composition requiring explicit density, basis-density, potential and core maps.
+src/python/stress_response_adjoint.py
+  Generic screened forward/adjoint solver and multiple-source contractions.
+src/python/{wien_response_operators,stress_response_result}.py
+  Charge/transport operations and independent correction-report policy.
+
+Detailed checkpoints under src/doc/stress/:
+  frozen_sigma_response_20261108/REPORT.txt
+  dmft2_response_integration_20261108/dmft2_response_integration.txt
+  adjoint_response_20261108/REPORT.txt
+  native_hamiltonian_response_20261108/REPORT.txt
+  augmentation_response_20261108/REPORT.txt
+  spatial_density_response_20261108/REPORT.txt
+  coupled_valence_response_20261108/REPORT.txt
+  complement_response_20261108/REPORT.txt
+  general_potential_response_20261108/REPORT.txt
+  hartree_radial_response_20261108/REPORT.txt
+  charge_response_checks_20261108/REPORT.txt
+  hartree_periodic_response_20261108/REPORT.txt
+  xc_core_response_20261108/REPORT.txt
+  charge_closure_20261108/REPORT.txt
+  shared_gamma_response_20261108/REPORT.txt
+  screened_native_20261108/REPORT.txt
+  projector_functional_20261108/REPORT.txt
+  explicit_strain_20261108/REPORT.txt
+  band_geometry_20261108/REPORT.txt
+  strain_charge_20261109/REPORT.txt
+  functional_readout_20261109/REPORT.txt
+  core_functional_20261109/REPORT.txt
+
+Older checkpoint notes describe their state at the time and may contain tasks
+completed by later checkpoints. Use this roadmap for the current sequence and
+the individual reports for formulas, evidence and limitations.
+
+
+DEFERRED UNTIL STRAIN IS VALIDATED: FORCE WINDOW/NORMALIZATION AUDIT
+User-requested follow-up, 8 November 2026
+
+Priority: finish and validate the strain implementation first. Afterwards,
+measure how much of the new response machinery is necessary for accurate
+atomic forces. This is an open task, not an established force correction.
+
+For U_k = Pi_W,k Phi_k X, with X = S^(-1/2) and
+S = Sym sum_k w_k Phi_k^dagger Pi_W,k Phi_k, distinguish
+
+  d_A U = Pi_W (d_A Phi) X + (d_A Pi_W) Phi X + Pi_W Phi (d_A X),
+  d_A X = (d_A X)_Phi + (d_A X)_(Pi,explicit)
+                        + (d_A X)_(Pi,induced).
+
+The force implementation ALREADY includes explicit local-orbital motion and
+its normalization derivative. It also contains a complementary-band response
+contracted with the existing geometric force kernels at fixed X. Do not
+mistakenly describe normalization or all window response as absent.
+
+The later normalization-through-window pass is currently gated by Qstress
+(QnormWindow in src/dmft2/l2main.f90). Audit whether an analogous force
+contraction is missing or supplied elsewhere; do not declare its physical
+size or completeness before checking all cancellations.
+
+Separate two possible extensions:
+1. Complete the normalization partner of the SAME explicit geometric window
+   response already contracted in forces. This can reuse stored bands and
+   derivative kernels without a self-consistent screened-response solve.
+2. Add window and normalization response to the induced KS potential. The
+   complete derivative requires d_A V_Hxc = f_Hxc d_A n, obtained from the
+   screened-response engine (or an independent relaxed finite difference).
+   Differentiating the small normalization matrix alone cannot supply it.
+   The current response strategy holds local Sigma and double counting fixed;
+   this is distinct from including an impurity two-particle vertex.
+
+For either source B, with the appropriate symmetry operation included,
+  (d_A S)_(Pi,B) = Sym sum_k w_k Phi_k^dagger (d_A Pi_W,k)_B Phi_k,
+  X^(-1) (d_A X)_B + (d_A X)_B X^(-1) = -X (d_A S)_B X.
+The inverse-square-root derivative is cheap once its input is known. Its
+screened input is the costly part. Basis/metric, fixed-RMT boundary and local
+frame conventions must match across all branches; do not double count them.
+Explicit and induced terms can cancel, so adding one need not monotonically
+improve the force error.
+
+Validation after strain:
+- Compare individual analytic forces with derivatives of the consistent
+  frozen-Sigma Klein-tangent functional, relaxing charge and updating projector
+  normalization at each displaced endpoint. Match particle-number/mu policy.
+- Use nonzero-force distortions (e.g. FeSe Se height, SrVO3 O versus V motion),
+  not only symmetry-forced zero forces. Check two displacement magnitudes.
+- Converge the available response-band complement while keeping the DMFT
+  window fixed and avoiding a degeneracy cut at its boundary. Enlarging the
+  DMFT window changes the correlated model and is a separate experiment.
+- Compare existing forces, explicit normalization-window completion, and the
+  complete screened correction; audit radial response consistently as needed.
+- Check translation covariance and the acoustic sum, but do not treat a small
+  sum of forces as proof that individual forces are accurate.
+
+Code anchors: src/dmft2/l2main.f90 (QnormWindow,
+AddProjectorNormalizationDerivative, BuildWindowResponseMatrices,
+cmp_MT_force_only); src/dmft2/l2mainSubs.f90 (NORMALIZATION / FIXED-WINDOW
+CROSS RESPONSE and BuildNormalizationWindowResponseMatrices).
+No force code or material calculation was changed for this reminder.

@@ -1,0 +1,110 @@
+{
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/SrVO3.struct": {
+    "size": 2460,
+    "sha256": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/SrVO3.in1c": {
+    "size": 1021,
+    "sha256": "c183cde8196875c1045bd4c773364ec8b3610977a017e3a8e6eeccc3a7877d96"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/SrVO3.in2c": {
+    "size": 433,
+    "sha256": "9542a81bb9c6bff9a33e818d8a578e5d014529afc821a9e3dce3ed12f8942928"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/SrVO3.vector": {
+    "size": 1483774,
+    "sha256": "d55b9225f5cbc3d0c295dbeb75fbcd73f4f86af2a66669f347c440935cdc8a37"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/SrVO3.vsp": {
+    "size": 62864,
+    "sha256": "add80edb250060fc6f3add5a45c895fed4682c18fc9610ff0a4d300858cd9ba6"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/SrVO3.vns": {
+    "size": 751646,
+    "sha256": "8c7a2e0d8ece3823a6cb95e5b26bfed1a47133f12d9b20e27d2395c2e56a679f"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/SrVO3.indmfl": {
+    "size": 1607,
+    "sha256": "89211f1f20bda818963cb700a933b4105100bcf9ab9553c1e86423f3a0d344c4"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/projectorw.dat": {
+    "size": 49338,
+    "sha256": "2210ea1cc738767ec364ba400625b56761b1d734eb0a1ee1cee1848d2232b75b"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/SOlapm.dat": {
+    "size": 1018,
+    "sha256": "65c39a985a1d2fc33476e5449096aea8077cbf99339c2e120e5df7852ee47ab9"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/response.meta": {
+    "size": 228980,
+    "sha256": "fc8a8f5b8925ffa5e3267f1acc6752ed73911a9d8465f8b3aa2754c030ab0dcc"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/response.k00000001.bin": {
+    "size": 495948,
+    "sha256": "966b7706e5e88162c4a6ea7e814a20e43421383be8d330673503a6ccc2b1df69"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/response.k00000003.bin": {
+    "size": 494548,
+    "sha256": "62293b3ca90285774f577c9bb9d194930353d4f28efc8ab9a07ccd29f325d51b"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/SrVO3/central/response.k00000002.bin": {
+    "size": 500148,
+    "sha256": "38d697470640c9ceaece35578e3d37868d22f48fa8ffd0ae431453f89f0a0740"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/FeSe.struct": {
+    "size": 2226,
+    "sha256": "7503825334944f3d0e646b10a60d22f4f1924768ddb27499700f64682e59be16"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/FeSe.in1": {
+    "size": 704,
+    "sha256": "14d722e182701ba18ca381b23d256aa898f04eefb6959db65c63b22326d153c5"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/FeSe.in1c": {
+    "size": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/FeSe.in2": {
+    "size": 291,
+    "sha256": "438acbb01164492004a00be73ebf6c0f557c0a2f0607860430221dcc727056c2"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/FeSe.vector": {
+    "size": 822114,
+    "sha256": "54141e6a8df6523f21416b989d99c535d14f14e7bc7ae7c7347d473e24c023bd"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/FeSe.vsp": {
+    "size": 31472,
+    "sha256": "e9ed93ca6acdb64ea3b26414109f34de63c807c84fabf70c9e54d8d3b9e3f19b"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/FeSe.vns": {
+    "size": 318842,
+    "sha256": "8c0cf6f984620e8f56495661698a765942b207d4b7002353583f1e7347898fd1"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/FeSe.indmfl": {
+    "size": 3027,
+    "sha256": "115434d74ef65410b8f05d45e66fdc559cef155ccadbf6ac5bc9df1b76dbe244"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/projectorw.dat": {
+    "size": 49164,
+    "sha256": "5a259196a07a7600d5b620ecec55d0557ae5b36739387f981312c4010f154a1c"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/SOlapm.dat": {
+    "size": 2036,
+    "sha256": "cc1d5a32afff9110d330af609b19ff7f5392be36e140da3831a4623cefaf0622"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/response.meta": {
+    "size": 571512,
+    "sha256": "552d9f918fdcbc88e8660d7fb875e5da88bd3629474684eb4b13d055ad991922"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/response.k00000001.bin": {
+    "size": 554764,
+    "sha256": "d3b5a72f83153bd1685d6ad13d914bdeb2756bb216785b2d36c5368d5b7ca3e2"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/response.k00000003.bin": {
+    "size": 543016,
+    "sha256": "a5c4da68f8a05995a959755849dc6755e2056ef101163cee4f923bae982eaac9"
+  },
+  "/private/tmp/edmft_spatial_response_20261108/FeSe/central/response.k00000002.bin": {
+    "size": 549424,
+    "sha256": "f059164db9e16023206e19537ff29feea169df7d6668a2ff07bbfdacc6ceb563"
+  }
+}

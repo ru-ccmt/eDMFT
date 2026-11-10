@@ -1,0 +1,60 @@
+{
+  "SrVO3": {
+    "shape": [
+      75,
+      43,
+      43
+    ],
+    "window": 20,
+    "frequencies": 500,
+    "forward_max_abs_error": 1.3877787807814457e-17,
+    "forward_relative_error": 1.6801468407589014e-16,
+    "adjoint_left": -0.006431136296446317,
+    "adjoint_right": -0.006431136296446403,
+    "adjoint_relative_error": 1.3352043574057004e-14,
+    "reference_seconds": 2.73921108385548,
+    "cold_seconds": 2.7976572918705642,
+    "warm_seconds": 2.089328457834199,
+    "adjoint_seconds": 1.7882411661557853,
+    "kernel_speedup": 1.3110485685409896,
+    "cache": {
+      "resolvent_bytes": 240000000,
+      "resolvent_limit_bytes": 268435456,
+      "dense_window_inversions": 37500,
+      "preparation_seconds": 0.6542984161060303,
+      "approximation": "fixed central LAPW basis; stored complement"
+    },
+    "fixed_N_dN": -1.328147661294743e-17,
+    "common_projector_gradient_norm": 0.006931614169069304,
+    "scope": "saved central basis and stored bands; no radial/core/spatial-potential response"
+  },
+  "FeSe": {
+    "shape": [
+      140,
+      66,
+      66
+    ],
+    "window": 24,
+    "frequencies": 600,
+    "forward_max_abs_error": 8.153200337090993e-17,
+    "forward_relative_error": 1.1510760168646347e-15,
+    "adjoint_left": 0.0018566324082507396,
+    "adjoint_right": 0.001856632408250675,
+    "adjoint_relative_error": 3.480411587828391e-14,
+    "reference_seconds": 14.927251333137974,
+    "cold_seconds": 15.815904416842386,
+    "warm_seconds": 13.322866291040555,
+    "adjoint_seconds": 11.616049291798845,
+    "kernel_speedup": 1.1204234139298048,
+    "cache": {
+      "resolvent_bytes": 268369920,
+      "resolvent_limit_bytes": 268435456,
+      "dense_window_inversions": 303520,
+      "preparation_seconds": 2.5848206249065697,
+      "approximation": "fixed central LAPW basis; stored complement"
+    },
+    "fixed_N_dN": -6.938893903907228e-18,
+    "common_projector_gradient_norm": 0.003824191343683777,
+    "scope": "saved central basis and stored bands; no radial/core/spatial-potential response"
+  }
+}

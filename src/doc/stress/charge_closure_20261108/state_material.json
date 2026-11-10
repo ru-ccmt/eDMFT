@@ -1,0 +1,24 @@
+{
+  "FeSe": {
+    "archive_bytes": 159799,
+    "prepare_and_save_seconds": 4.894570542033762,
+    "load_and_prepare_seconds": 4.760344333946705,
+    "hxc_action_relative": 7.711190079232113e-13,
+    "hxc_reverse_relative": 3.479477920091589e-11,
+    "core_action_relative": 1.3121050932901637e-13,
+    "core_reverse_relative": 5.683452216681662e-15,
+    "hxc_transpose": 1.9776222889053857e-17,
+    "core_transpose": 3.1504303142279464e-17
+  },
+  "SrVO3": {
+    "archive_bytes": 335776,
+    "prepare_and_save_seconds": 0.5387859581969678,
+    "load_and_prepare_seconds": 0.5617252921219915,
+    "hxc_action_relative": 2.564630024460013e-16,
+    "hxc_reverse_relative": 9.944820933415333e-16,
+    "core_action_relative": 4.0324266152884444e-14,
+    "core_reverse_relative": 1.2080555734073988e-13,
+    "hxc_transpose": 1.8875601641033163e-17,
+    "core_transpose": 5.5227053218415725e-17
+  }
+}

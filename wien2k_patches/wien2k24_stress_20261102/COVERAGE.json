@@ -1,0 +1,601 @@
+{
+  "mandatory_sources": 36,
+  "optional_fftw_sources": 2,
+  "target_reference": "/Users/haule/wien2k_24",
+  "original_archives": "/Users/haule/software/wien_unpack_src",
+  "changes": [
+    {
+      "path": "SRC_2DRoptimize/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "e69b2e36da082fd577166e5f42208936421377a99ad14907c53b09a610d8f3b8"
+    },
+    {
+      "path": "SRC_3ddens/3ddens.F",
+      "coverage": "packaged-current",
+      "live_sha256": "c9fe09dc1aa8164095dd162b4e16feede8ca77559e889c91c79726721c0f30f0"
+    },
+    {
+      "path": "SRC_3ddens/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "6e288f2e233cf34525b92d7df2f645d6d4a632102e7bb84e0aba24bdade607c7"
+    },
+    {
+      "path": "SRC_IRelast/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "d1de4a5ce09b2573a9440d191b7e0e587aee93ff3bbb54865a20006c1d46403f"
+    },
+    {
+      "path": "SRC_Tmaker/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "52a7c286143f04a426cd4394e4516ceabbd096cd3409dfbdcfd5b0bc97dd2467"
+    },
+    {
+      "path": "SRC_afminput/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "10bba75b908b84b40c054d766568e4861a48b4d7bae8665345713973e6a3252a"
+    },
+    {
+      "path": "SRC_afmsim/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "b0c53944e42a087b784f005c10394e21c3dde4294219269564422053b227d720"
+    },
+    {
+      "path": "SRC_aim/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "fc011f4e822699bcbf7bd3db14fe9816ace74a6e0c2408ed30a030543c5f2f24"
+    },
+    {
+      "path": "SRC_animxsf/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "8dba2c88335d020f6edae55080ebed9615d3f7914d172f7bc936027d45e6c734"
+    },
+    {
+      "path": "SRC_arrows/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "e6dabec94dfdf7fe92ff651bcfcb08d5d74f4a5760d7e4e3c70acadcfde55339"
+    },
+    {
+      "path": "SRC_balsac-utils/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "c88307cb387f2d2231cf7bbac6b08ce6d24125780481495f1622c735b20db3af"
+    },
+    {
+      "path": "SRC_broadening/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "6172b64c85f7743dc4ddb175ddb2c9a3887dad19a6e0a75da857cd02fb763cc9"
+    },
+    {
+      "path": "SRC_cif2struct/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "f9e1f9bbeb297b49876adeead7a42a9a6499d66006bbe8a350fb4dc86b1478d4"
+    },
+    {
+      "path": "SRC_clmaddsub/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "baf245f4f42b2d3fccc8921a6bfaf055ef5fb57acb9541e38de984ab1e74d2ee"
+    },
+    {
+      "path": "SRC_clmcopy/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "896b7209a79dd75a2c6a1c846f9d4dc91e2c351bca1980585be909ef824a67a4"
+    },
+    {
+      "path": "SRC_clminter/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "fea2cc9827750efdef986eaeec30127bfbb9a22b7c11f04bb4659bd420da4018"
+    },
+    {
+      "path": "SRC_dipan/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "f38895015f4f961242fcf1343b5588042fa40df94ff1e1f4cd09937c0f169d0e"
+    },
+    {
+      "path": "SRC_dstart/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "d6e229b12b6760b6114dc9f1c7e9f18899b0e96c309cf61fbd570211355d9198"
+    },
+    {
+      "path": "SRC_elast/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "f9ba8370b1538bf11fe882f504dae086df060287438785555f9f85652f363eec"
+    },
+    {
+      "path": "SRC_eosfit/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "9853bfe282535824b85b5f2bad86fe152b529465e0f0bcdd94576787832c799a"
+    },
+    {
+      "path": "SRC_eosfit6/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "a445ac61400409a42407cca1b0ca0b82518029ac650a408e726a798df21797be"
+    },
+    {
+      "path": "SRC_filtvec/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "ee96edff7a9823c84865cd6d0b5cb6f1f9e75dd66b87724d3372946a919a5ee3"
+    },
+    {
+      "path": "SRC_fsgen/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "7985c3d604ef4b466142c47d00fc96798ce33cd2e315b651cdb9fe707dccb202"
+    },
+    {
+      "path": "SRC_hf/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "5a7f8be811fb879f6b4bea9e9e6d7fb7bae313cd744b18b51313cbbfd960d140"
+    },
+    {
+      "path": "SRC_hf/hf.F",
+      "coverage": "packaged-current",
+      "live_sha256": "de53a3c26b054db95d664645373b035e28ca7ef57c84b8a17a1a9182c317ac88"
+    },
+    {
+      "path": "SRC_initxspec/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "20ecd8fc95c72d2b07d359009d9ed4d1f84f76604ef1f0a2d7edb681d4fbcdca"
+    },
+    {
+      "path": "SRC_irrep/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "c551ef8556aee49f8e2157342829e8d76a7e8cc827c45a0a137c7761ddd20683"
+    },
+    {
+      "path": "SRC_joint/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "1e999d64ed1aa134c245deade48781649a71071b13dcc0d02694dfb0eccd7a65"
+    },
+    {
+      "path": "SRC_kgen/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "4e930635ff9227c3e4cdf959ef6fd96780f7774a5fa5fd1cac87bdf8a5327e19"
+    },
+    {
+      "path": "SRC_kram/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "34643039305e20478684337337cd37cc3610ba4f14d092a3b66e3961ef3805b8"
+    },
+    {
+      "path": "SRC_lapw0/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "968e5163d1ae776fbb4960e67b1497e2565f0512d0bb775e636362e71498abfe"
+    },
+    {
+      "path": "SRC_lapw0/bck/xcpot1.f",
+      "coverage": "backup; inactive",
+      "live_sha256": "7061fba6d14e90be93273ef88db19a423c03506f139803a1a86d1862ea3e641e"
+    },
+    {
+      "path": "SRC_lapw0/energy.F",
+      "coverage": "packaged-current",
+      "live_sha256": "61885de799d3c0200583876e39ba0903ab2d1650c6b338cd7856a371af74fc06"
+    },
+    {
+      "path": "SRC_lapw0/fft_modules.F",
+      "coverage": "packaged-current",
+      "live_sha256": "26689742c6a3e98ed1d583197b3c36a39e15fe09ce8a0a0f6a2589cbfcff726a"
+    },
+    {
+      "path": "SRC_lapw0/finl_elect_str.F",
+      "coverage": "packaged-current",
+      "live_sha256": "2e1dceca5fd58dd23afd1130ae4fbebd3456c8acc5e2098d23990579c809e38c"
+    },
+    {
+      "path": "SRC_lapw0/gga_metric_tensor.f",
+      "coverage": "packaged-current",
+      "live_sha256": "d6a06a290b8d192554995d9782d23dc9d7b572995073640daf70778a3ab499f9"
+    },
+    {
+      "path": "SRC_lapw0/lapw0.F",
+      "coverage": "packaged-current",
+      "live_sha256": "f7ed79e0ece28bc8c1a4cec1651547f3433e7777687f057185c1db3b6e784b32"
+    },
+    {
+      "path": "SRC_lapw0/modules.F",
+      "coverage": "packaged-current",
+      "live_sha256": "1008fd7e08c2e42f49dfb57a8efe9a5b17a48784f24ba46dc12d504fa84e9b60"
+    },
+    {
+      "path": "SRC_lapw0/pwxad5.f",
+      "coverage": "packaged-current",
+      "live_sha256": "4245f6524a8a96130decdec2c9d916545f7136eb2301d119c7b5693121dcfba1"
+    },
+    {
+      "path": "SRC_lapw0/stress_gga.F",
+      "coverage": "packaged-current",
+      "live_sha256": "cda4862df9e7cc9b3d20675c80b35e84d3a8256a0129d0d32057ed4759a88a30"
+    },
+    {
+      "path": "SRC_lapw0/suml.f",
+      "coverage": "packaged-current",
+      "live_sha256": "07f3a312ae60009544445925303005379af36ba28dc17836dd447126bd0c0fa3"
+    },
+    {
+      "path": "SRC_lapw0/vxclm2.F",
+      "coverage": "packaged-current",
+      "live_sha256": "a37eb3a93abd8cb45cb0c5aba4a7f8b3c918f5882dab52e7a9978e0672bbe1c1"
+    },
+    {
+      "path": "SRC_lapw0/xcpot1.f",
+      "coverage": "packaged-current",
+      "live_sha256": "e36779b1d1921f5c0f05b4105a66d97f723b14f165aba4a46eda1300f75131bb"
+    },
+    {
+      "path": "SRC_lapw0/xcpot3.F",
+      "coverage": "packaged-current",
+      "live_sha256": "47bb608c8e7997fbe5d9f57d6312792253406379450ceab22f5b9e269744cf22"
+    },
+    {
+      "path": "SRC_lapw1/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "21ae6d9d418c71143eeef019e6f01e3eb317782d77aa34267a442c1de5a9bdf9"
+    },
+    {
+      "path": "SRC_lapw1/atpar.F",
+      "coverage": "packaged-current",
+      "live_sha256": "d15a6ab7b419bd973c6318ee013f4746a78deea07754a0815bc7790016277174"
+    },
+    {
+      "path": "SRC_lapw1/calkpt.F",
+      "coverage": "packaged-current",
+      "live_sha256": "9b16ef1ff09438b83481dacaf78655068889d91fae3ffc58d3e5da12eeccab4e"
+    },
+    {
+      "path": "SRC_lapw1/coors.f",
+      "coverage": "packaged-current",
+      "live_sha256": "3ff60638610aa8576879bf091eaab84e39bd47b44de902295fabdad7b10253c6"
+    },
+    {
+      "path": "SRC_lapw1/forfhs.f",
+      "coverage": "packaged-current",
+      "live_sha256": "72d35dd693468ad201a8a7443085b5098132643307d308e17de74c514b3495ee"
+    },
+    {
+      "path": "SRC_lapw1/hamilt.F",
+      "coverage": "packaged-current",
+      "live_sha256": "c609892451fdc91b199409a605e43dea5ed78c224435711b026cd4327d05d698"
+    },
+    {
+      "path": "SRC_lapw1/inilpw.f",
+      "coverage": "packaged-current",
+      "live_sha256": "174a1f5a9f714808a8ac47f3872553a09d1526402911a6dd1f8e7e5af20659e0"
+    },
+    {
+      "path": "SRC_lapw1/modules.F",
+      "coverage": "packaged-current",
+      "live_sha256": "8c953ce5736e129dade19e6e9d3eb8e26c82766ec886ced0a1ce55e58459bac2"
+    },
+    {
+      "path": "SRC_lapw1/seclr4.F",
+      "coverage": "packaged-current",
+      "live_sha256": "40a088897e23231026afae3e6879cb9afd8c7a513d8cfb9bdc104d4b42100d4e"
+    },
+    {
+      "path": "SRC_lapw1/seclr5.F",
+      "coverage": "packaged-current",
+      "live_sha256": "60922ebce5ebecd17cf94faa0063f792a0266105f8bc5e4dab287844aae604bf"
+    },
+    {
+      "path": "SRC_lapw2/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "dd6ba55eb7f77072019b763e5c4d9c529c85fe1e2d48ecabeee66bf57b83ddac"
+    },
+    {
+      "path": "SRC_lapw2/atpar.F",
+      "coverage": "packaged-current",
+      "live_sha256": "1d00e4923eb67405cba6dae87dd262e962633328b6315209648881e4cfe6c170"
+    },
+    {
+      "path": "SRC_lapw2/kin_str_integrals.F",
+      "coverage": "packaged-current",
+      "live_sha256": "01dad803312e4f9be614e7aca8c04f61fa699df36e281b10280531bc62bacfaa"
+    },
+    {
+      "path": "SRC_lapw2/l2main.F",
+      "coverage": "packaged-current",
+      "live_sha256": "dd840caef5b65c4d568e5ea69597f8da3531d5bcf37b1167936426d00dc334fb"
+    },
+    {
+      "path": "SRC_lapw2/lapw2.F",
+      "coverage": "packaged-current",
+      "live_sha256": "c88688d59ea7a1b7583c0350088dbf287e343a29d620fe80da19ddd7fae66614"
+    },
+    {
+      "path": "SRC_lapw2/stress_APW_surface.f",
+      "coverage": "packaged-current",
+      "live_sha256": "597b099378961db05d17e1a2e3ba0007464d34a7304b24c430637b964b17fa7b"
+    },
+    {
+      "path": "SRC_lapw2/symmetrization_stress.f",
+      "coverage": "packaged-current",
+      "live_sha256": "ac42a65b07275315a6b760e4108bea46ff2295482c0486b263705523397bdb5f"
+    },
+    {
+      "path": "SRC_lapw2/val_corr_integrals.F",
+      "coverage": "packaged-current",
+      "live_sha256": "66f0a9659892d2d602707c4eeb110af97cd7a25af9020628b74c087e35f42503"
+    },
+    {
+      "path": "SRC_lapw2/val_corr_stress.F",
+      "coverage": "packaged-current",
+      "live_sha256": "1f5064f917dc479c7e7e243d2baa12f704dc7a7e7858e1023c3989cbe7127688"
+    },
+    {
+      "path": "SRC_lapw2/val_kin_interstitial.F",
+      "coverage": "packaged-current",
+      "live_sha256": "9cd573584b755fab618f8ffc8b0a1701dccc4188a0d4c97baf44431e3428d95b"
+    },
+    {
+      "path": "SRC_lapw2/val_kinstrmt.F",
+      "coverage": "packaged-current",
+      "live_sha256": "bab5e87420c71ecb15a101615aa84731e163153917906a000e93874a79c53c1d"
+    },
+    {
+      "path": "SRC_lapw2/val_rela_kinstrmt.F",
+      "coverage": "packaged-current",
+      "live_sha256": "b77330c1e5ef772e71b6d84bf2cf14eeab3bb237287ca22adf3256338ba14c36"
+    },
+    {
+      "path": "SRC_lapw3/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "3d33f0346d7a11111fdf5769a49ee924ed25a03a595dd9b1e9d759929f1b344f"
+    },
+    {
+      "path": "SRC_lapw5/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "82c21d29e8e7ff52851ae2f2eb6cbe71d611118badb10d03242d36170406a213"
+    },
+    {
+      "path": "SRC_lapw7/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "8b5aabffab2e6cad6699ed4275caa7fabf44f2bd2e10c635106d66a7c38db893"
+    },
+    {
+      "path": "SRC_lapwdm/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "1e0e16d999b326ea39c589b1958857a8802f11389a2d5939f9c0d00a1fcf0bc2"
+    },
+    {
+      "path": "SRC_lapwso/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "4b0d6def46a83877aec65e1307f3232c088f0e08bd8bfe66c0df5bb2e8a63610"
+    },
+    {
+      "path": "SRC_lcore/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "95826256600bd08a1f80e88186dd4936fe1dddd7b70d6c9ee1d55dc42bde4413"
+    },
+    {
+      "path": "SRC_lcore/core_corr_stress.f",
+      "coverage": "packaged-current",
+      "live_sha256": "5579ba136ac11ae600fb0e7dbefaaa55db2f6bc9c2c8bdbf6d4f054d7e5f7d44"
+    },
+    {
+      "path": "SRC_lcore/hfsd.f",
+      "coverage": "packaged-current",
+      "live_sha256": "942d83d09777b4dcb69626d67883fc91604b3f1bddd59ac05188f9ff70755bde"
+    },
+    {
+      "path": "SRC_lib/blas_lapw/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "393d107d58dcf57bdbfd042c56f47107ec179a72d0cd65319086858820a00cd0"
+    },
+    {
+      "path": "SRC_lib/lapack_lapw/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "11167ed255e5ad077bde648466e45504e668ed865c2f991481bda6912a41c499"
+    },
+    {
+      "path": "SRC_lorentz/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "9ed6c1cc3f4d61fec3e37150b74b081c4a378fcbd537ae53f027ffe96051b979"
+    },
+    {
+      "path": "SRC_lstart/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "78891bb460b660963b75ffb55f461b63b5c000c320bf356528ca82dec04323df"
+    },
+    {
+      "path": "SRC_mini/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "29ac3985f7e57d7a05d614d4fe315d24d4fa6a33ffd7e3880bb4ba3d46f2fb45"
+    },
+    {
+      "path": "SRC_mixer/AtomsDiag.f",
+      "coverage": "whitespace-only; no functional change",
+      "live_sha256": "7da6735e9306ec7091ee5d74a0ae15a3171f57472f88b83444d60666b9f62655"
+    },
+    {
+      "path": "SRC_mixer/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "153c6e43dd6e21616d5019a20fd0c8b7632e04802491f46ef71beadcb2425d83"
+    },
+    {
+      "path": "SRC_mixer/mixer.F",
+      "coverage": "packaged-current",
+      "live_sha256": "71ab8ee082902bf6498305cd35039a9c0d4644a6478e181c3d9c7d7413383b70"
+    },
+    {
+      "path": "SRC_mixer/scfana.f",
+      "coverage": "packaged-current",
+      "live_sha256": "dddcba2aab2d5cf2aa0ecb491b5028a26f23b5586ec43a9073d71f44daad4371"
+    },
+    {
+      "path": "SRC_mstar/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "82dacc8e39fe6b728f3a4df7741285ee99d478a0f608192e3e66968c48e44cb6"
+    },
+    {
+      "path": "SRC_nlvdw/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "02768f77a97629a854474d01dee5c5c5bfb1a1b7720d7d80c56c62da8617d623"
+    },
+    {
+      "path": "SRC_nmr/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "eb1ab71d9a7359718983ff56a52b2108d52b0b914003eac6b7b17630ef0897f1"
+    },
+    {
+      "path": "SRC_nn/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "cdf31d82c9d33c157ca7fe9ba3c28d2ca5a9c42411d5a78ca62362e957e8be22"
+    },
+    {
+      "path": "SRC_optic/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "91bc0ac69bfeebda210750f16a603f65a1891e0375e5e622a5da99965fe27d7f"
+    },
+    {
+      "path": "SRC_optimize/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "29fa2acf7c32e8d9d57c0bb6607b448d55852a44b5380ee161ef8990908db66e"
+    },
+    {
+      "path": "SRC_orb/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "9d2085983ece45720d57d9ed94212034ebe5a995abc86c20b97af176bd9f87a7"
+    },
+    {
+      "path": "SRC_pairhess/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "82f64dea32766bca0c9cd96390053025574a7e3c422bf7e961d77069fb37d62b"
+    },
+    {
+      "path": "SRC_pes/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "efb145f06458bf73e39fe38d807f8327c38ba3706c9cb5f43e89a36d7a3b2c52"
+    },
+    {
+      "path": "SRC_phonon/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "53faffa450b8fe2706a0836444e6fe5c9010427e6e227571a9427714d8b1537c"
+    },
+    {
+      "path": "SRC_qtl/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "60c4dadf11fc810951296767050c8e9e22095ee8778e2fe0b771d1526d890cb6"
+    },
+    {
+      "path": "SRC_reformat/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "7a694b318dd9aa15db1d478704d80511674132dc7cf5bba0faf717bc1342f916"
+    },
+    {
+      "path": "SRC_rendos/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "3a39fd9bdddbb16591972043e4dcc91bf4ab48ebd9aa57df5ddab5c784418b5b"
+    },
+    {
+      "path": "SRC_sgroup/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "d55dd1ab873f93b2da97f0b1d9a4fc8ac13c466242e8b4134f2f8f38f2e5691a"
+    },
+    {
+      "path": "SRC_spacegroup/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "fb50e1566d515f049ed79c39fb94d4a77f340cc26197772c92e8cdddd451898a"
+    },
+    {
+      "path": "SRC_spaghetti/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "956a1e590f19dfaa04c4a06474cff6ad3ca91c5c8d2ad46872c2d105b558632e"
+    },
+    {
+      "path": "SRC_structeditor/SRC_ncmsymmetry/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "1381fef17a8b379265c7c1936209f838f9a670c12cea699f44bdef347a1d971b"
+    },
+    {
+      "path": "SRC_structeditor/SRC_readwrite/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "27d33c1eaea025978a7fb1d0c59f42298e66a50b1991d5f5f2d3d19e7c3e3c3d"
+    },
+    {
+      "path": "SRC_structeditor/SRC_struct2mol/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "bf13d75032eb75705bc7efb5fb9317d8b9201a6a7283485f4dc63993750cbbf3"
+    },
+    {
+      "path": "SRC_structeditor/SRC_structgen/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "dbb2a765bc569bcf72dc81d38843ba58cd41d33d6cade21bff51a82be67d7aa5"
+    },
+    {
+      "path": "SRC_sumhfpara/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "a5ac5ea999e99a3b459294c4b8460628fe91a91382b86ffeb502b7ee2c559201"
+    },
+    {
+      "path": "SRC_sumpara/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "11a3718cd69caebc23b4496412d2ec632c9976322eecfff29015131d1b63e479"
+    },
+    {
+      "path": "SRC_supercell/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "647caf9134fe0ac1e1909275b8f74139d98544f85052f030f90f1a846e8558eb"
+    },
+    {
+      "path": "SRC_symmetry/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "6205c533c20b4d88fcba2bf56ed4fe7654321426f8296f47c174d2c943abe907"
+    },
+    {
+      "path": "SRC_symmetso/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "9b47d93ba236fd4852fa7e6b306ac5154edf51a396b83b8b5513fbfe4c39e242"
+    },
+    {
+      "path": "SRC_telnes3/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "eef69b780b99ecd4af711683fd2375a60193dc60d230ba66776e518370b8d125"
+    },
+    {
+      "path": "SRC_tetra/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "9707507df7015723452f3f709af6f6e005747cd518e0f2bca281d5e7e63e609a"
+    },
+    {
+      "path": "SRC_trig/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "ecacdc5849d56a8780c1dc3a1a81ea345bdd89bd0e32b98a1cbf597e316184bc"
+    },
+    {
+      "path": "SRC_txspec/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "fd883d37a2d7f2cfe2be5c222736bd42f8975b5ed3de1b46b93222a7ca0ed100"
+    },
+    {
+      "path": "SRC_vecpratt/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "7c9dad5ca7a8756009e279bd59fab7c52b4d347163bf8a38d79af5fe19cdfc80"
+    },
+    {
+      "path": "SRC_w2w/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "8f68a5cf819226fc0110b6c83b9a0eab34130c204377bbbce310af9a0d3c2757"
+    },
+    {
+      "path": "SRC_wplot/Makefile",
+      "coverage": "site-makefile; preserve destination settings",
+      "live_sha256": "46dd3faac00d9f28edec006df93edd19d35f4b1a5d88bca4eca6d32fba643d03"
+    }
+  ],
+  "excluded_site_scripts": [
+    "hfpara_lapw",
+    "testpara_lapw",
+    "x_lapw",
+    "run_lapw",
+    "x_nmr_lapw",
+    "dstartpara_lapw",
+    "irreppara_lapw",
+    "lapwdmpara_lapw",
+    "lapwsopara_lapw",
+    "qtlpara_lapw",
+    "lapw1para_lapw",
+    "migrate_lapw",
+    "lapw2para_lapw",
+    "opticpara_lapw",
+    "vec2old_lapw",
+    "opticcopy_lapw"
+  ]
+}

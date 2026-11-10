@@ -1,0 +1,22 @@
+{
+  "derivative_Ry": -0.11312913495787072,
+  "mean_tensile_stress_GPa": -1.0487113778804622,
+  "minus": {
+    "case": "FeSe",
+    "converged": true,
+    "same_vector_signature": true,
+    "nominal": -0.0005,
+    "actual_scale": 0.9994999756860309,
+    "K_Ry": -14813.353548414336,
+    "iterations": 30
+  },
+  "plus": {
+    "case": "FeSe",
+    "converged": true,
+    "same_vector_signature": true,
+    "nominal": 0.0005,
+    "actual_scale": 1.000500024313969,
+    "K_Ry": -14813.353661548972,
+    "iterations": 30
+  }
+}

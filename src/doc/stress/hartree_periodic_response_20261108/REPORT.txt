@@ -1,0 +1,274 @@
+PERIODIC HARTREE RESPONSE: ROADMAP STEP 2
+8 November 2026
+
+RESULT AND INSTALLATION STATUS
+
+The periodic-Hartree patch was installed on 8 November 2026 after approval;
+INSTALLATION.json records the verified copies and backups. Production native
+executables were not changed. The later XC/core checkpoint additionally fixes
+the complex VNS file-coordinate conjugation in native_potential_output.
+The numerical component results below refer to internal REAN4 coefficients;
+see xc_core_response_20261108/REPORT.txt for the complete file/native checks.
+
+The new lapw_hartree_periodic.py completes the fixed-geometry periodic Hartree
+map around the radial CoulEM operation already installed. It includes charge
+multipoles, plane-wave continuation subtraction, pseudocharge Poisson solve,
+muffin-tin boundary values, radial potentials, native interstitial reanalysis,
+and the exact reverse of every new operation. It also supplies an explicit
+coordinate adapter to NativePotentialBands. This is a Hartree component, NOT
+the full Hartree/XC/core Jacobian or a new total-stress result.
+
+The complete test suite passes: 124 tests, zero skips. Nine are new here.
+Both prior native libraries and the new native CHARGE library were supplied.
+Ten isolated native LAPW0 Hartree runs provide material finite differences.
+
+1. FIXED-GEOMETRY LINEAR MAP AND CONVENTIONS
+
+Let c_aL(r) be a density perturbation in an inequivalent atom a. L=(l,m)
+uses native real harmonics: a negative stored l denotes a sine harmonic.
+The physical angular momentum in powers/Bessel functions is abs(l).
+
+For L=00, c_00=4*pi*r^2*delta n_spherical (CLMSUM convention).
+For all other L, c_L=r^2*delta n_L.
+rho_j is the density Fourier STAR SUM for star representative G_j, not its
+coefficient per member. g_j=|G_j| in Bohr^-1; G_j integer labels acquire the
+reciprocal matrix, including 2*pi. R_a is the fixed muffin-tin radius.
+Omega is the fixed unit-cell volume in Bohr^3. Potentials are in Ry.
+
+The radial moments before conversion to complex harmonics are
+
+  m_aL = integral dr r^l c_aL(r) / z_L,                    (1)
+  z_00=sqrt(4*pi), z_L=1 otherwise.
+
+The integral in (1) is native CHARGE, not CoulInt or SciPy cubic integration.
+On n>=8 logarithmic points, its weights are r_i*delta(log r) times
+
+  [17/48, 59/48, 43/48, 49/48, 1, ..., 1,
+   49/48, 43/48, 59/48, 17/48].
+
+Native default short-grid rules are also implemented. The default branch adds
+no separate origin term. The internal radial Dirichlet solution continues to
+use the previously verified native CoulInt/Spline algorithm. Their quadratures
+must not be conflated even though both appear within the Hartree calculation.
+
+S converts real harmonic moments to complex harmonic moments. For m>0:
+
+  cosine: S_(+m)=(-1)^m/sqrt(2), S_(-m)=1/sqrt(2),
+  sine:   S_(+m)=-i*(-1)^m/sqrt(2), S_(-m)=i/sqrt(2).
+
+For m=0 the coefficient is one. Different real harmonics can contribute to
+the same complex harmonic; these contributions are added, not overwritten.
+
+Define the native star-averaged spherical harmonic
+
+  Ybar_a,lm,j = (1/N_j) sum_(G in star j)
+      tau_G exp(i G.d_a) Y_lm*(Rloc_a G),                  (2)
+
+where N_j is the number of DISTINCT star members, tau_G is the mean native
+translation phase for repeated symmetry operations producing the same G,
+and d_a is the atom position. R_a elsewhere is the scalar sphere radius.
+Local rotations
+follow LAPW0 SymmRot, including its repair of rounded structure-file entries.
+
+The Fourier-continuation sphere moments are (D rho)_a,lm, with
+
+  D_a,lm,j = 4*pi*R_a^(l+2)*i^l Ybar_a,lm,j
+             * j_(l+1)(g_j R_a)/g_j,      j != 0,         (3)
+  D_a,00,0 = 4*pi*R_a^3/[3*sqrt(4*pi)],
+  D_a,lm,0 = 0 for l>0.
+
+Here j_l(x) denotes a spherical Bessel function. The replacement multipoles
+in the native electron/ionic sign convention are
+
+  q = -S m + D rho.                                      (4)
+
+The ionic moments have zero derivative for this fixed-geometry density map.
+For smoothing order n=NCON, define
+
+  A_j,a,lm = -[8*pi/g_j^2] [4*pi/Omega] N_j Mult_a
+       * (-i/R_a)^l [(2*n+3)!!/(2*l+1)!!]
+       * j_(n+1)(g_j R_a)/(g_j R_a)^(n-l+1)
+       * Ybar_a,lm,j*,                     j != 0.        (5)
+
+Mult_a counts equivalent sites. The unmasked potential STAR SUM is
+
+  p_j = (8*pi/g_j^2) rho_j + sum_(a,lm) A_j,a,lm q_a,lm,
+  p_0 = 0.                                               (6)
+
+The latter is LAPW0's Coulomb gauge. This routine does not adjust particle
+number or add a separately inferred charged-cell compensation.
+
+2. BOUNDARY POTENTIALS AND INTERSTITIAL REANALYSIS
+
+For a real harmonic L with angular momentum l, define
+
+  t_aL = sum_(j != 0) p_j j_l(g_j R_a) Ybar_a,lm,j.
+
+For m=0 the boundary harmonic is Re[4*pi*i^l*t_aL].
+For m>0 multiply the expression inside Re by sqrt(2)/alpha_L, where
+alpha_L=(-1)^m for cosine, and -i*(-1)^m for sine. For the spherical channel,
+divide by sqrt(4*pi) to obtain the PHYSICAL SCALAR boundary potential.
+Collect this map as
+
+  b = Re(B p).                                          (7)
+
+The already tested radial Dirichlet operator gives
+
+  v_aL = T_aL c_aL + h_aL b_aL,                          (8)
+
+where v_00=r*delta V_spherical and h_00=r. For l>0, v_L=delta V_L
+and h_L=(r/R_a)^l. T is the native CoulEM radial Green-function operation.
+
+The interstitial output is
+
+  v_I = M p,                                            (9)
+
+where M reproduces REAN0/SETFFT/REAN4/GETFFT. Specifically: expand p_j/N_j
+with native star phases, Fourier-transform, take the real field, multiply
+by the native truncated Fourier representation of the interstitial step
+function, transform back, and average the resulting star members. REAN0
+uses the ENTIRE native FFT box, including frequencies absent from the density
+star list. The operation preserves native finite-grid aliasing and the complex
+phase convention. Output is a PER-MEMBER coefficient of theta_I*delta V,
+exactly the convention expected by the interstitial Hamiltonian adapter.
+Do not divide this output by star size or apply a second muffin-tin mask.
+
+The output selector explicitly chooses/reorders the LM and G channels used
+by NativePotentialBands. Its transpose returns their covectors to the full
+Hartree layout. Missing requested channels are errors. A spherical component
+is never silently counted again in the nonspherical part.
+
+3. REVERSE OPERATION
+
+All public vector coordinates use ordinary real Euclidean pairings. Complex
+intermediate arrays use Re(vdot). For output covectors y_MT and y_I:
+
+  (c_bar_direct, b_bar) = radial_Dirichlet^T y_MT,
+  p_bar = B^dagger b_bar + M^T y_I,
+  q_bar = A^dagger p_bar,
+  m_bar = -Re(S^dagger q_bar),
+  rho_bar = (8*pi/g^2) p_bar + D^dagger q_bar,
+  c_bar = c_bar_direct + moment_weights^T m_bar.          (10)
+
+The zero-frequency coefficient of the diagonal factor in (10) is zero.
+The reverse of M includes the native real-field projections. Symmetry of a
+continuum Coulomb kernel is not used as a substitute for this actual discrete
+transpose. No density-coordinate finite-difference probes are used to build K.
+
+4. INDEPENDENT NATIVE COMPARISONS
+
+An isolated copy of the user's WIEN2k24 LAPW0 is instrumented to stop after
+the Coulomb calculation, exporting full-precision radial potentials, unmasked
+POTK, REAN0 coefficients and REAN4(POTK). This excludes XC while preserving
+the original Coulomb algorithm. The scratch exporter allocates its own missing
+late-stage arrays before calling reanalysis. Installed sources are untouched.
+
+Inputs are actual FeSe and SrVO3 structures/CLMSUM files. The perturbation is
+the independent fixed-N induced valence density from the preceding checkpoint.
+Each material has central, +/-0.01 and +/-0.005 density-amplitude runs. These
+amplitudes are NOT physical strain magnitudes. Hartree is linear at fixed
+geometry; step halving probes file/arithmetic cancellation, not truncation of
+a nonlinear Hartree derivative. No impurity calculation is performed.
+
+Relative norm errors at amplitude 0.01:
+
+                                    FeSe                  SrVO3
+  unmasked potential star sums      1.52e-10              6.41e-10
+  MT boundary values                5.77e-11              1.54e-9
+  all radial potential entries      1.19e-10              7.14e-10
+  masked interstitial coefficients  7.01e-11              9.20e-10
+  complete Hartree transpose        1.68e-17              1.07e-17
+
+At amplitude 0.005, the complete radial/PW vector errors are 2.30e-10 and
+7.97e-10. Larger small-step errors are consistent with subtracting the large
+central ionic/core potentials and finite text precision of the density files.
+Native density/POTK small-value skip thresholds can also limit exact agreement;
+this adapter evaluates the linear kernels without introducing those cutoffs.
+
+REAN0 matches native to 1.00e-15 and 3.73e-15. Applying our REAN4 to the SAME
+native POTK matches the native reanalysis to 6.51e-16 and 1.81e-15.
+
+A first FeSe comparison showed a stable ~2.5e-8 boundary residual. The source
+audit traced it to missing SymmRot repair of 0.7071068 in the staged geometry.
+Adding the same native repair removed that residual. This was corrected in the
+NEW staged helper; no claim is made about the earlier unrelated stress residual.
+
+Portable tests also cover real/complex harmonic conversion including both sine
+signs, nonsymmorphic star cancellation, constant-potential masking, linearity,
+boundary values, output-coordinate selection, continuum quadrature convergence,
+and rejection of unsupported geometry/grids. Native CHARGE is independently
+compiled and compared on short and full radial meshes with smooth/random fields.
+
+5. CONNECTION TO THE VALENCE RESPONSE AND COST
+
+The new K_H has been composed with the existing complete first-k valence map
+
+  J_H,val = (R E B + D_basis) K_H.                        (11)
+
+E includes normalized-projector/window response and the finite LAPW empty
+complement at fixed N. B includes all native potential sectors. The direct
+moving-basis density leg D_basis is retained. Equation (11) is explicitly
+Hartree-only and valence-only: XC and core response have NOT been substituted
+by zero inside a purported full physical screened calculation.
+
+The composed transpose errors are 3.13e-16 (FeSe) and 2.70e-15 (SrVO3).
+These are first-k algebra/coordinate checks, not independent finite differences
+of a full all-k self-consistent map. Each physical constituent was compared
+to native endpoints in this or the preceding checkpoints.
+
+Representative single-thread timings:
+
+                                    FeSe                  SrVO3
+  prepare Hartree context            ~0.16 s              ~0.16 s
+  Hartree forward                    ~0.007 s             ~0.008 s
+  Hartree reverse                    ~0.008 s             ~0.010 s
+  first-k Hartree + valence action    0.929 s              1.967 s
+
+Radial integration is linear in radial-grid size. Small angular/PW matrices
+and the FFT step-function field are cached once; repeated actions use matrix
+products and FFTs. No lapw0 subprocess is used by the new helper. These are
+component timings, NOT end-to-end stress speedups or an MPI scaling result.
+
+6. SCOPE AND NEXT DEVELOPMENT
+
+This initial material adapter supports primitive orthogonal cells with native
+uncompressed real harmonics (negative atom indices), fixed geometry/RMT/local
+frames, default CoulEM/CHARGE, and explicit native FFT dimensions/NCON. It
+supports inversion-real and noncentrosymmetric complex Fourier fields, as tested
+by FeSe and displaced SrVO3. Compressed cubic harmonics and non-orthogonal or
+centered-cell geometry are explicitly rejected. Alternative LDMTest integration
+branches, moving nuclei/RMT/frames, and explicit charged-background variations
+are not implemented. These restrictions must be checked by the eventual loader.
+
+We remain in STEP 2. The next work is native XC response (including the GGA
+density-gradient terms and native angular/FFT discretization), then core-density
+response, then the complete one-step charge Jacobian. Step 3 is validation of
+the physical screened forward/adjoint solve with that full Jacobian. Completing
+the stress gradient, six strain sources and production tensor publication still
+follows. Existing wrapper status remains stress_applied=false.
+
+No new analytic-versus-numeric GPa comparison is claimed in this checkpoint.
+
+SOURCE REFERENCES AND REPRODUCTION
+
+Native source inspected (user's local installation):
+  SRC_lapw0/lapw0.F: ~1285-1630 moments/pseudocharge/POTK;
+                    ~1640-2000 boundary/radial potential;
+                    ~2732,2828 REAN0 and REAN4.
+  SRC_lapw0/{stern.f,ykav.f,multfc.f,multsu.f,potfac.f,SymmRot.f}
+  SRC_lapw0/{rean0.F,rean4.F,setfft.f,getfft.f,fft_modules.F}
+  SRC_Globals/{charge.f,W2kinit.F} default quadrature options.
+
+Material/reference evidence:
+  prepare_native.py: scratch-only reference instrumentation/build input.
+  native_instrumentation.txt: the actual isolated export block.
+  setup_endpoints.py: private density-amplitude runs, explicit .def files.
+  check_material.py, material_periodic_hartree.json: independent comparisons.
+  check_composition.py, *_composition.json: first-k paired composition checks.
+  full_tests.log: all 124 tests, zero skipped.
+
+All large reference inputs/binaries remain under
+  /private/tmp/edmft_hartree_periodic_20261108/.
+Only the new helper, its tests, documentation and small reproducibility files
+are proposed for the repository. Third-party LAPW0 source/binaries are not
+included in the proposed patch.

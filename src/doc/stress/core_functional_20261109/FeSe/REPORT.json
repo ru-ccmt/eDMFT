@@ -1,0 +1,61 @@
+{
+  "case": "FeSe",
+  "mode": "RELA",
+  "core_energy_Ry": -8460.1164494665,
+  "central_core_scalar_error_Ry": 0.0,
+  "core_number": 56.0,
+  "steps": {
+    "0.01": {
+      "core_fd_Ry": -9.859221213901037,
+      "core_error_Ry": -6.3600182897971536e-09,
+      "DEN_fd_Ry": 18.11435600002369,
+      "DEN_identity_defect_Ry": 0.0006927646368488638
+    },
+    "0.005": {
+      "core_fd_Ry": -9.859221216356673,
+      "core_error_Ry": -8.81565398458406e-09,
+      "DEN_fd_Ry": 18.11435600002369,
+      "DEN_identity_defect_Ry": 0.0006927646368488638
+    },
+    "0.001": {
+      "core_fd_Ry": -9.859221241640626,
+      "core_error_Ry": -3.4099606693871465e-08,
+      "DEN_fd_Ry": 18.114354999852367,
+      "DEN_identity_defect_Ry": 0.0006917644655253241
+    },
+    "0.0005": {
+      "core_fd_Ry": -9.859221294391318,
+      "core_error_Ry": -8.68502993967013e-08,
+      "DEN_fd_Ry": 18.11435000035999,
+      "DEN_identity_defect_Ry": 0.0006867649731496783
+    }
+  },
+  "core_derivative_Ry": -9.859221207541019,
+  "core_exterior_derivative_Ry": 8.11736119092791e-06,
+  "core_spatial_derivative_Ry": -9.859230360513463,
+  "core_minus_spatial_Ry": 9.152972446643296e-06,
+  "stationary_DEN_derivative_Ry": 18.11366323538684,
+  "potential_cancellation": {
+    "probe": {
+      "lattice_Ry": -7.890119697514244,
+      "core_Ry": -9.859221207541019,
+      "negative_input_pairing_Ry": 18.11366323538684,
+      "stationary_sum_Ry": 0.3643223303315761,
+      "output_minus_input_pairing_Ry": 0.17718903692284832,
+      "core_minus_spatial_Ry": 9.152972446643296e-06,
+      "core_exterior_Ry": 8.11736119092791e-06
+    },
+    "screened_induced": {
+      "lattice_Ry": 1124.7094196085363,
+      "core_Ry": 4863.183855279219,
+      "negative_input_pairing_Ry": -6001.853616826083,
+      "stationary_sum_Ry": -13.96034193832796,
+      "output_minus_input_pairing_Ry": -8.905225433213888,
+      "core_minus_spatial_Ry": 0.0002951365508576051,
+      "core_exterior_Ry": 0.00022043889550205802
+    }
+  },
+  "seconds": 4.664913709042594,
+  "stress_applied": false,
+  "full_klein_functional": false
+}

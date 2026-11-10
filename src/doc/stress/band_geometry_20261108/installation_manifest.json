@@ -1,0 +1,26 @@
+[
+  {
+    "source": "/private/tmp/edmft_band_geometry_20261108/stage/lapw_geometry_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_geometry_response.py",
+    "source_sha256": "d4a407f50600dbdedda07608c4c19991189f51d4b0a47b5b98309e465f68f31c",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_band_geometry_20261108/stage/lapw_geometry_response.py",
+    "destination": "/Users/haule/dbin/lapw_geometry_response.py",
+    "source_sha256": "d4a407f50600dbdedda07608c4c19991189f51d4b0a47b5b98309e465f68f31c",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_band_geometry_20261108/stage/tests/test_lapw_geometry_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_geometry_response.py",
+    "source_sha256": "f81a728ddbaaa2845f5f18f10e71a5a4e8f5837d93aac29f11d1e7e33d364b26",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_band_geometry_20261108/stage/stress_response_roadmap_20261108.txt",
+    "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+    "source_sha256": "4074d4407c13e673f21ccc30e9e63d0b92f92d6a19375dd4da8f0e7aa81c14fb",
+    "before_sha256": "4ad6f1d98a96fd0581a882e24611a38b5fe10b07f692e72e2eda2ee2e45e1a65"
+  }
+]

@@ -1,0 +1,25 @@
+21 44 1 5                             # hybridization band index nemin and nemax, renormalize for interstitials, projection type
+1 0.025 0.025 200 -3.000000 1.000000  # matsubara, broadening-corr, broadening-noncorr, nomega, omega_min, omega_max (in eV)
+1 # one correlated atom for raw-projector diagnostic
+1 1 -1
+  2   2   1                           # L, qsplit, cix
+ 0.70710678 -0.70710678  0.00000000   # new x-axis
+ 0.70710678  0.70710678 -0.00000000   # new y-axis
+ 0.00000000  0.00000000  1.00000000   # new z-axis
+#================ # Siginds and crystal-field transformations for correlated orbitals ================
+1 5 5
+1     5   5       # cix-num, dimension, num-independent-components
+#---------------- # Independent components are --------------
+'z^2' 'x^2-y^2' 'xz' 'yz' 'xy' 
+#---------------- # Sigind follows --------------------------
+1 0 0 0 0
+0 2 0 0 0
+0 0 3 0 0
+0 0 0 4 0
+0 0 0 0 5
+#---------------- # Transformation matrix follows -----------
+ 0.00000000  0.00000000    0.00000000  0.00000000    1.00000000  0.00000000    0.00000000  0.00000000    0.00000000  0.00000000  
+ 0.70710678  0.00000000    0.00000000  0.00000000    0.00000000  0.00000000    0.00000000  0.00000000    0.70710678  0.00000000  
+ 0.00000000  0.00000000    0.70710678  0.00000000    0.00000000  0.00000000   -0.70710678  0.00000000    0.00000000  0.00000000  
+ 0.00000000  0.00000000    0.00000000  0.70710678    0.00000000  0.00000000    0.00000000  0.70710678    0.00000000  0.00000000  
+ 0.00000000  0.70710678    0.00000000  0.00000000    0.00000000  0.00000000    0.00000000  0.00000000   -0.00000000 -0.70710678  

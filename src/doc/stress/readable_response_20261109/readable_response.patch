@@ -1,0 +1,783 @@
+--- a/src/python/dmft2_step.py
++++ b/src/python/dmft2_step.py
+@@ -402,12 +402,15 @@
+     directly, avoiding recursive x_dmft/run_dmft response execution.
+     """
+     solver = preflight(case, req, root, mpi)
++    from stress_response_summary import progress, summary_path
++    journal = summary_path(case).resolve()
+     if solver.get("backend") == "analytic":
+         for label, key in [("Python", "mpi"), ("native", "native_mpi")]:
+             command = solver.get(key, [])
+             print("RESPONSE ..... " + label + " MPI: " +
+                   (shlex.join(command) if command else "serial"),
+                   file=output, flush=True)
++            progress(journal, label + " MPI: " + (shlex.join(command) if command else "serial"))
+     base = (
+         Path(req["config"].get("workspace_root", f"{case}.response_runs"))
+         .expanduser()
+@@ -416,6 +419,7 @@
+     base.mkdir(parents=True, exist_ok=True)
+     work = base / run_id
+     work.mkdir()
++    progress(journal, "Saving isolated central inputs in " + str(work))
+     snapshot = work / "reference"
+     snapshot.mkdir()
+     fingerprints = {}
+@@ -488,6 +492,7 @@
+         "lapw_radial_energy_policy",
+         "lapw_native_potential_export",
+         "stress_response_publish",
++        "stress_response_summary",
+         "dmft2_step",
+         "wien_frozen_sigma_response",
+         "frozen_sigma_screening",
+@@ -547,6 +552,8 @@
+                 solver["library"],
+                 "--output",
+                 str(work / "total_stress"),
++                "--progress-file",
++                str(journal),
+             ],
+         ]
+         commands[1] += ["--cache-mb", str(solver.get("cache_mb", 256.0))]
+@@ -554,6 +561,8 @@
+         if solver.get("mpi"):
+             commands[1] = solver["mpi"] + commands[1] + ["--mpi"]
+         for i, command in enumerate(commands):
++            progress(journal, "Preparing central LAPW0/LAPW1/DMFT2/LCORE exports"
++                     if i == 0 else "Starting analytic screened response and stress sources")
+             print(
+                 "RESPONSE ..... running:", shlex.join(command), file=output, flush=True
+             )
+@@ -576,6 +585,7 @@
+                 )
+             if result.returncode:
+                 raise RuntimeError(f"analytic response failed; see {log}")
++            progress(journal, ("Central preparation" if i == 0 else "Analytic response") + " finished")
+         path = work / "total_stress/report.json"
+         report = json.loads(path.read_text())
+         if (
+@@ -687,15 +697,20 @@
+     tracking = req["enabled"] or status_path.exists() or req["mode"] in ALIASES
+     lock = None
+     locked = False
++    from stress_response_summary import begin, finish, progress, summary_path
++    journal = summary_path(case)
+     try:
+         if tracking:
+             lock = open("." + case + ".dmft2-response.lock", "a+")
+             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+             locked = True
++            begin(case, status)
+         if due:
+             preflight(case, req, root, mpi)
+         if tracking:
+             atomic_json(status_path, status)
++            progress(journal, "Running ordinary dmft2" +
++                     ("; response follows this step" if due else "; response not due on this step"))
+         magnetic = due and Path(case+".indmfldn").is_file() and Path(case+".indmfldn").stat().st_size > 0
+         if magnetic:
+             from lapw_response_policy import detect_policy
+@@ -723,6 +738,7 @@
+             )
+         if tracking:
+             atomic_json(status_path, status)
++            finish(case, status)
+         return status
+     except BaseException as exc:
+         # Failure must stop the caller before lcore/mixer; do not leave an old
+@@ -730,6 +746,7 @@
+         if tracking and locked:
+             status.update(status="failed", error=str(exc))
+             atomic_json(status_path, status)
++            finish(case, status)
+         raise
+     finally:
+         if lock is not None:
+--- a/src/python/lapw_total_stress_driver.py
++++ b/src/python/lapw_total_stress_driver.py
+@@ -57,6 +57,7 @@
+     parallel.root_call(lambda: output.mkdir(parents=True, exist_ok=False))
+     if not parallel.root:
+         progress = lambda message: None
++    progress("Loading central potential/core data")
+     library = Path(library or Path(__file__).with_name("liblapw_response.so")).resolve()
+     if not library.is_file():
+         raise ValueError("native radial library missing")
+@@ -91,6 +92,7 @@
+     core = Density(snapshot / (case + ".clmcor"), snapshot / (case + ".struct"))
+     target = float(np.dot(pc.structure.mult, pc.structure.Znuc))
+     timings = dict(prepare_potential_core_seconds=time.perf_counter() - start)
++    progress("Preparing electronic response on distributed k points")
+     with ExitStack() as stack:
+         branches = [stack.enter_context(load_native_valence_state(
+             snapshot, case, complex_vectors=complex_vectors, energy_policy="fixed",
+@@ -105,6 +107,7 @@
+             normalization_enabled=policy.normalization_enabled,
+         )
+         t = time.perf_counter()
++        progress("Preparing complete functional and radial-energy-search derivatives")
+         total = PreparedTotalStress(
+             state,
+             snapshot,
+@@ -159,6 +162,7 @@
+         readout = None
+         if not full_sources:
+             t = time.perf_counter()
++            progress("Solving one screened adjoint for all strain directions")
+             solved = total.energy.screened.solve(
+                 total.energy.charge_gradient,
+                 adjoint=True,
+@@ -168,12 +172,14 @@
+                 max_cycles=8,
+             )
+             timings["adjoint_solve_seconds"] = time.perf_counter() - t
++            progress("Adjoint converged; preparing shared source readout")
+             t = time.perf_counter()
+             readout = PreparedChargeSourceContraction(state, solved[0])
+             timings["source_readout_seconds"] = time.perf_counter() - t
+         sources = []
+         timings["source_seconds"] = []
+         for i, e in enumerate(total.strains):
++            progress(f"Preparing strain source {i+1}/{len(total.strains)}")
+             t = time.perf_counter()
+             x = total.prepare_source(e, readout=readout)
+             sources.append(x)
+@@ -201,6 +207,7 @@
+                     geometry=x.geometry,
+                 )
+             progress(f"Prepared strain source {i+1}/{len(total.strains)}")
++        progress("Combining explicit and induced derivatives into the complete tensor")
+         sigma, lam, report = total.contract(sources, solved_adjoint=solved)
+         timings["adjoint_action_seconds"] = action_times
+         parallel.root_call(
+@@ -263,6 +270,8 @@
+     p.add_argument("--output", required=True, type=Path)
+     p.add_argument("--potential-core", type=Path)
+     p.add_argument("--library", type=Path)
++    p.add_argument("--progress-file", type=Path,
++                   help="append live root-rank progress to the parent response text summary")
+     p.add_argument("--fixed-point-tolerance", type=float, default=1e-3)
+     p.add_argument(
+         "--mpi", action="store_true", help="distribute k points over MPI ranks"
+@@ -292,6 +301,13 @@
+                    help="omit singular window pairs ONLY in a non-publishable diagnostic")
+     a = p.parse_args()
+     parallel = ResponseParallel.world() if a.mpi else SERIAL
++
++    def report_progress(message):
++        print(message, flush=True)
++        if a.progress_file is not None:
++            from stress_response_summary import progress
++            progress(a.progress_file, message)
++
+     run_prepared(
+         a.snapshot,
+         a.case,
+@@ -299,7 +315,7 @@
+         potential_core=a.potential_core,
+         library=a.library,
+         fixed_point_tolerance=a.fixed_point_tolerance,
+-        progress=lambda x: print(x, flush=True),
++        progress=report_progress,
+         parallel=parallel,
+         cache_mb=a.cache_mb,
+         basis_cache_mb=a.basis_cache_mb,
+--- a/src/python/merge_scf.py
++++ b/src/python/merge_scf.py
+@@ -144,7 +144,8 @@
+     destination = Path(f"{case}.scf")
+     old_mode = destination.stat().st_mode if destination.exists() else None
+     from stress_response_publish import response_rows, mark_published
+-    correction = response_rows(case, '\n'.join(p.read_text() for p in components))
++    current_iteration = '\n'.join(p.read_text() for p in components)
++    correction = response_rows(case, current_iteration)
+ 
+     fd, temporary_name = tempfile.mkstemp(
+         prefix=f".{case}.scf.merge.", dir=Path.cwd()
+@@ -183,7 +184,7 @@
+         temporary.unlink(missing_ok=True)
+         raise
+ 
+-    mark_published(case, correction, destination)
++    mark_published(case, correction, destination, current_iteration=current_iteration)
+     return destination
+ 
+ 
+--- a/src/python/scf_merge.py
++++ b/src/python/scf_merge.py
+@@ -212,11 +212,12 @@
+     # Publish only after valence, density and fresh core parts are assembled.
+     # The helper replaces their total and verifies the exact response snapshot.
+     from stress_response_publish import response_rows, mark_published
+-    correction = response_rows(case, ''.join(dat))
++    current_iteration = ''.join(dat)
++    correction = response_rows(case, current_iteration)
+     dat += correction
+     with open(case+outfile, 'a') as fs:
+         fs.writelines(dat)
+-    mark_published(case, correction, case+outfile)
++    mark_published(case, correction, case+outfile, current_iteration=current_iteration)
+ 
+ def scfm(fday, case, WIEN):
+     dat=[]
+--- a/src/python/stress_response_publish.py
++++ b/src/python/stress_response_publish.py
+@@ -11,7 +11,8 @@
+ import numpy as np
+ 
+ 
+-def mixer_accumulator(text):
++def mixer_components(text):
++    """Read this iteration's raw tensors; reporting shares the publication parser."""
+     arrays = {name: np.zeros((3, 3)) for name in ["VAL", "CORE", "DENS"]}
+     seen = {name: set() for name in arrays}
+     pattern = re.compile(r"^:STR_(VAL|CORE|DENS)(00[123]):\s*(.*)$")
+@@ -36,6 +37,11 @@
+         raise ValueError(
+             "response publication requires complete DENS, VAL and CORE tensors; run lcore before SCF assembly"
+         )
++    return arrays
++
++
++def mixer_accumulator(text):
++    arrays = mixer_components(text)
+     return arrays["VAL"] + arrays["CORE"] - arrays["DENS"]
+ 
+ 
+@@ -95,7 +101,7 @@
+     )
+ 
+ 
+-def mark_published(case, correction, scf, *, directory="."):
++def mark_published(case, correction, scf, *, directory=".", current_iteration=None):
+     """Record publication only after the SCF write succeeds, under the run lock."""
+     if not correction:
+         return
+@@ -114,3 +120,8 @@
+             raise RuntimeError("response state changed during SCF publication")
+         status.update(stress_applied=True, published_scf=str(Path(scf).resolve()))
+         atomic_json(path, status)
++        # Report only after successful SCF publication. Do not read whole SCF
++        # history: the caller passes the exact freshly assembled iteration.
++        from stress_response_summary import published
++        parts = mixer_components(current_iteration) if current_iteration is not None else None
++        published(case, status, correction, components=parts, directory=directory)
+--- /dev/null
++++ b/src/python/stress_response_summary.py
+@@ -0,0 +1,336 @@
++"""Readable response journal shared by x_dmft and run_dmft SCF assembly.
++
++This module only reports existing results. JSON reports and their hashes remain
++the authority for stress publication. In particular, induced_Ry is NOT the
++correction to the old mixer stress. Both decompositions are printed separately.
++Only the launcher and MPI rank zero write this journal, sequentially. Reporting
++errors warn without hiding a solver failure or invalidating completed physics.
++"""
++from datetime import datetime
++from functools import wraps
++from pathlib import Path
++import hashlib
++import json
++import shutil
++import sys
++
++# Same conversion as the response JSON driver (stress_response_adjoint.py).
++RY_BOHR3_TO_GPA = 14710.507641078
++
++
++def best_effort(function):
++    @wraps(function)
++    def call(*args, **kwargs):
++        try:
++            return function(*args, **kwargs)
++        except Exception as error:
++            print(f"Response text summary: {function.__name__} failed: {error}",
++                  file=sys.stderr, flush=True)
++    return call
++
++
++def summary_path(case, directory="."):
++    return Path(directory) / (case + ".outputdmf2_response")
++
++
++def _time():
++    return datetime.now().astimezone().isoformat(timespec="seconds")
++
++
++def _run_id(status):
++    return status.get("run_id", status.get("reference_id", "unknown"))
++
++
++def _append(path, text):
++    with Path(path).open("a") as stream:
++        stream.write(text)
++        stream.flush()
++
++
++@best_effort
++def progress(path, message):
++    """Append a flushed stage/action message; MPI callers use rank zero only."""
++    if path is not None:
++        _append(path, f"[{_time()}] {message}\n")
++
++
++@best_effort
++def begin(case, status, *, directory=".", reconstructed=False):
++    """Start the latest-run view. Completed runs also keep an archived copy."""
++    text = (
++        f"DFT+eDMFT STRESS RESPONSE -- {case}\n"
++        + "=" * 78 + "\n"
++        + f"Run ID: {_run_id(status)}\n"
++        + f"Summary created: {_time()}\n"
++        + f"Execution: {status.get('phase', 'unknown')}; IN2 mode: "
++          f"{status.get('requested_mode', 'unknown')}\n"
++        + "Workflow: dmft2 -> isolated response -> lcore -> SCF assembly -> mixer\n"
++        + "run_dmft: response is deferred until the final measurement pass.\n"
++        + "Stress convention: tensile positive; compression pressure = -trace/3.\n"
++        + "The native :PRESSURE: line currently prints trace/3 (mean tensile stress).\n"
++        + "This file is informational; status/report JSON controls publication.\n\n"
++    )
++    if reconstructed:
++        text += "Reconstructed from saved results; no calculation was rerun.\n\n"
++    summary_path(case, directory).write_text(text)
++
++
++def _archive(case, status, directory):
++    if status.get("workspace"):
++        work = Path(status["workspace"])
++        if work.is_dir():
++            shutil.copy2(summary_path(case, directory), work / "outputdmf2_response.txt")
++
++
++def _number(value, precision=9):
++    return "not recorded" if value is None else f"{float(value):.{precision}g}"
++
++
++def _stress_table(rows):
++    """Physical Cartesian stress contributions, including all allowed shear."""
++    import numpy as np
++    lines = ["All entries below are GPa; mean = (xx+yy+zz)/3.\n",
++             f"{'Contribution':29s}" + "".join(f"{x:>17s}" for x in
++             ("xx", "yy", "zz", "mean")) + "\n"]
++    for label, values in rows:
++        t = np.asarray(values, float)
++        elements = [t[0, 0], t[1, 1], t[2, 2], np.trace(t)/3]
++        lines.append(f"{label:29s}" + "".join(f"{v:17.6f}" for v in elements) + "\n")
++    if any(np.max(abs(np.asarray(t)-np.diag(np.diag(t)))) > 1e-12 for _, t in rows):
++        lines.append(f"{'Shear components':29s}" +
++                     "".join(f"{x:>17s}" for x in ("yz", "xz", "xy")) + "\n")
++        for label, values in rows:
++            t = np.asarray(values)
++            lines.append(f"{label:29s}" + "".join(f"{v:17.6f}" for v in
++                         (t[1, 2], t[0, 2], t[0, 1])) + "\n")
++    else:
++        lines.append("All shear components in this table are zero.\n")
++    return "".join(lines)
++
++
++def _report_text(report):
++    import numpy as np
++    sigma = np.asarray(report["stress_Ry_Bohr3"], float) * RY_BOHR3_TO_GPA
++    lines = ["\nCOMPLETE RESPONSE RESULT\n", "-" * 78 + "\n",
++             _stress_table([("Complete stress", sigma)]),
++             f"Compression-positive pressure: {-np.trace(sigma)/3:.9f} GPa\n",
++             f"Scope: {report.get('scope', 'see JSON report')}\n"]
++    if "sigma_symmetry_relative_error" in report:
++        lines.append("Self-energy symmetry relative error: " +
++                     _number(report["sigma_symmetry_relative_error"]) + "\n")
++    if report.get("tensor_is_symmetry_projection"):
++        lines.append("Tensor is projected onto the imposed charge symmetry.\n")
++
++    # The explicit part includes radial-energy-search completion. The older
++    # fixed-energy pieces alone do not sum to explicit_Ry; show that difference
++    # explicitly rather than leaving an unexplained discrepancy in the table.
++    if all(k in report for k in ("strains", "explicit_Ry", "induced_Ry", "derivatives_Ry")):
++        e = report["strains"]
++        explicit = np.asarray(report["explicit_Ry"])
++        lines += ["\nFUNCTIONAL DERIVATIVE BREAKDOWN\n",
++                  "D_nu = dK/deta for epsilon = eta*e_nu; entries are Ry per unit eta.\n",
++                  "D_nu = a_nu + lambda.s_nu, with (I-J)^T lambda = c.\n",
++                  "J: charge-update Jacobian; c: functional gradient in charge coordinates;\n",
++                  "s_nu: explicit charge source; a_nu: explicit functional derivative.\n",
++                  "This explicit/induced split is NOT the old-stress/net-correction split.\n"]
++        for i, strain in enumerate(e):
++            label = "hydrostatic" if np.allclose(strain, np.eye(3)) else "general"
++            for axis, name in enumerate(("xx", "yy", "zz")):
++                if np.allclose(strain, np.diag(np.eye(3)[axis])):
++                    label = name
++            lines.append(f"Direction {i+1} ({label}): e = {strain}\n")
++        lines.append(f"{'Derivative contribution':36s}" +
++                     "".join(f"{'direction '+str(i+1):>21s}" for i in range(len(e))) + "\n")
++        parts = report.get("fixed_energy_explicit_parts", {})
++        labels = {
++            "lattice_geometry_Ry": "Lattice geometry",
++            "lattice_explicit_potential_Ry": "Lattice explicit potential",
++            "core_explicit_Ry": "Core explicit potential",
++            "density_explicit_Ry": "Density functional explicit",
++        }
++        rows = [(labels.get(k, k), np.asarray(v)) for k, v in parts.items()]
++        if parts:
++            rows.append(("Radial-energy-search completion*",
++                         explicit - sum(np.asarray(v) for v in parts.values())))
++        rows += [("Explicit subtotal a_nu", explicit),
++                 ("Screened induced lambda.s_nu", report["induced_Ry"]),
++                 ("TOTAL D_nu", report["derivatives_Ry"])]
++        for label, values in rows:
++            lines.append(f"{label:36s}" + "".join(f"{v:21.12f}" for v in values) + "\n")
++        if parts:
++            lines.append("* Calculated as explicit_Ry minus the fixed-energy explicit pieces.\n")
++        lines += ["Large individual terms cancel; only consistently combined totals are physical.\n",
++                  "D_nu = Omega*sum_ij(sigma_ij*e_nu,ij). For hydrostatic strain,\n",
++                  "mean tensile stress = D_hydro/(3*Omega), with conversion to GPa.\n"]
++
++    central = report.get("central", {})
++    adjoint = report.get("adjoint", {})
++    timing = report.get("timings", {})
++    lines += ["\nCONVERGENCE AND COMPUTATIONAL WORK\n",
++              f"Response converged: {report.get('converged', 'not recorded')}\n",
++              f"k points: {central.get('kpoints', 'not recorded')}; retained bands: "
++              f"{central.get('retained_bands', 'not recorded')}; MPI ranks: "
++              f"{report.get('parallel', {}).get('ranks', central.get('mpi_ranks', 'not recorded'))}\n",
++              "Ensemble: " + ("fixed total particle number" if
++                  report.get('physical_policy', {}).get('fixed_number', central.get('fixed_number', True))
++                  else "fixed chemical potential") + "; DMFT spin channels: " +
++                  str(central.get('dmft_spin_channels', 'not recorded')) + "\n",
++              "Charge normalization: " + str(central.get('normalization_enabled', 'not recorded')) +
++                  "; common mu: " + _number(central.get('common_mu_Ry')) + " Ry\n",
++              "Central charge fixed-point residual (native coordinates): " +
++              _number(central.get("central_fixed_point_residual_norm")) + "\n",
++              "Native valence/core reconstruction relative errors: " +
++              _number(central.get("central_valence_relative_error")) + " / " +
++              _number(central.get("central_core_relative_error")) + "\n",
++              f"Adjoint: converged={adjoint.get('converged', 'not recorded')}, "
++              f"operator applications={adjoint.get('actions', 'not recorded')}, "
++              f"GMRES info={adjoint.get('gmres_info', 'not recorded')}\n",
++              "Adjoint true residual / threshold: " + _number(adjoint.get("residual_norm")) +
++              " / " + _number(adjoint.get("threshold")) + "\n"]
++    for key, label in [
++        ("prepare_potential_core_seconds", "Potential/core setup"),
++        ("prepare_valence_seconds", "Electronic response setup"),
++        ("prepare_functional_search_seconds", "Functional/radial-search setup"),
++        ("adjoint_solve_seconds", "Adjoint solve"),
++        ("source_readout_seconds", "Shared source readout"),
++        ("total_seconds", "Response driver total"),
++    ]:
++        if key in timing:
++            lines.append(f"{label:37s}{timing[key]:12.3f} s\n")
++    if "source_seconds" in timing:
++        lines.append("Individual strain-source times: " +
++                     ", ".join(f"{v:.3f} s" for v in timing["source_seconds"]) + "\n")
++    lines.append("Setup sub-times may overlap; do not sum them to estimate wall time.\n")
++    return "".join(lines)
++
++
++@best_effort
++def finish(case, status, *, directory="."):
++    path = summary_path(case, directory)
++    state = status.get("status", "unknown")
++    explanations = {
++        "deferred_until_final": "Response deferred until the final run_dmft measurement pass.",
++        "disabled": "Response disabled for this step; no response correction is available.",
++        "skipped_noncharge": "No response for this non-charge dmft2 step.",
++        "failed": "FAILED. This run has no publishable response correction.",
++        "complete": "Response calculation complete.",
++    }
++    progress(path, explanations.get(state, state))
++    if state == "failed":
++        _append(path, "Failure: " + status.get("error", "unspecified") + "\n")
++    if state == "complete" and status.get("report"):
++        report = json.loads(Path(status["report"]).read_text())
++        if "stress_Ry_Bohr3" in report:
++            _append(path, _report_text(report))
++        else:
++            _append(path, "Legacy response backend: no complete stress tensor supplied.\n")
++        if status.get("workspace"):
++            work = Path(status["workspace"])
++            prep = work / "central/preparation.json"
++            if prep.is_file():
++                times = json.loads(prep.read_text()).get("timings", [])
++                _append(path, "\nIsolated native preparation (before response driver):\n" +
++                        "".join(f"  {r['program']:30s}{r['seconds']:12.3f} s\n" for r in times))
++            _append(path, "\nDETAILED RECORDS\n" +
++                    f"Workspace: {work}\nReport: {status['report']}\n" +
++                    f"Progress log: {work/'response.log'}\nNative preparation log: {work/'prepare.log'}\n" +
++                    f"Input/executable hashes: {work/'reference.json'}\n" +
++                    f"Saved inputs: {work/'reference'}\nNative exports: {work/'central'}\n")
++        _append(path, f"Status/SCF publication record: {Path(directory).resolve()/(case+'.stress_response.status.json')}\n")
++        if not status.get("stress_applied"):
++            progress(path, "NEXT: lcore and SCF assembly. Original stress and net correction "
++                     "will be recorded here after successful assembly.")
++        else:
++            progress(path, "Status JSON records successful SCF publication; see comparison below.")
++    _archive(case, status, directory)
++
++
++@best_effort
++def published(case, status, correction, *, components=None, directory="."):
++    """Report the actual assembly, after SCF write and status update succeed."""
++    import numpy as np
++    path = summary_path(case, directory)
++    if not path.is_file() or f"Run ID: {_run_id(status)}\n" not in path.read_text():
++        begin(case, status, directory=directory, reconstructed=True)
++        finish(case, status, directory=directory)
++    report = json.loads(Path(status["report"]).read_text())
++    final = np.asarray(report["stress_Ry_Bohr3"], float)
++    # These are added VAL rows, whose physical stress contribution has the
++    # opposite sign. Reconstruct even when an older caller supplied no parts.
++    values = [list(map(float, row.split()[1:4])) for row in correction.splitlines()
++              if row.startswith(":STR_VAL")]
++    delta_val = np.asarray(values)
++    if delta_val.shape != (3, 3):
++        raise ValueError("three publication correction rows required")
++    old = final + delta_val
++    rows = []
++    if components is not None:
++        rows = [("Density contribution (+D)", components["DENS"]),
++                ("Valence contribution (-V)", -components["VAL"]),
++                ("Core contribution (-C)", -components["CORE"])]
++        old = components["DENS"] - components["VAL"] - components["CORE"]
++    rows += [("Original total", old), ("Net response correction", final-old),
++             ("FINAL TOTAL", final)]
++    _append(path, "\nSCF PUBLICATION: ORIGINAL STRESS AND CORRECTION\n" + "-"*78 + "\n" +
++            _stress_table([(label, value*RY_BOHR3_TO_GPA) for label,value in rows]) +
++            "sigma_old = D-V-C; appended delta_VAL = sigma_old-sigma_new.\n" +
++            "The extra STR_VAL rows carry a TOTAL replacement, not a pure valence term.\n" +
++            f"Published SCF: {status.get('published_scf', 'not recorded')}\n" +
++            f"Reference ID: {status.get('reference_id', 'not recorded')}\n" +
++            "The response does not rewrite case.scf2. Mixer reads the appended SCF block.\n")
++    progress(path, "SCF publication complete. Tensor is ready for mixer; mixer completion "
++             "is not tracked by this journal. Its final output is case.scfm.")
++    _archive(case, status, directory)
++
++
++def _rebuild(case, *, directory="."):
++    """Recreate a readable report from an existing result, without rerunning it.
++
++    If already published, use the same reference's last SCF correction block
++    and the preceding density/valence/core rows, never sums over SCF history.
++    This also works after mixer has updated clmsum: it is historical reporting,
++    not permission to reuse that stress on a new charge iterate.
++    """
++    directory = Path(directory)
++    status = json.loads((directory/(case+".stress_response.status.json")).read_text())
++    if status.get("report"):
++        data = Path(status["report"]).read_bytes()
++        if hashlib.sha256(data).hexdigest() != status.get("report_sha256"):
++            raise ValueError("saved response report hash mismatch")
++    correction = None
++    components = None
++    if status.get("stress_applied"):
++        from stress_response_publish import mixer_components
++        text = Path(status["published_scf"]).read_text()
++        tag = ":STRRESP_BEGIN: " + status["reference_id"] + " "
++        begin_at = text.rfind(tag)
++        end_at = text.find(":STRRESP_END:", begin_at)
++        if begin_at < 0 or end_at < 0:
++            raise ValueError("matching publication block is absent from saved SCF")
++        start = text.rfind(":STR_DENS001:", 0, begin_at)
++        if start < 0:
++            raise ValueError("original density stress missing before publication")
++        components = mixer_components(text[start:begin_at])
++        correction = text[begin_at:end_at]
++    begin(case, status, directory=directory, reconstructed=True)
++    finish(case, status, directory=directory)
++    if correction is not None:
++        published(case, status, correction, components=components, directory=directory)
++    return summary_path(case, directory)
++
++
++def rebuild(case, *, directory="."):
++    """Hold the launcher lock while reconstructing a historical text summary."""
++    import fcntl
++    with (Path(directory)/("."+case+".dmft2-response.lock")).open("a+") as lock:
++        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
++        return _rebuild(case, directory=directory)
++
++
++if __name__ == "__main__":
++    import argparse
++    parser = argparse.ArgumentParser(description="Rebuild the readable response summary from saved results.")
++    parser.add_argument("case")
++    parser.add_argument("--directory", default=".")
++    args = parser.parse_args()
++    print(rebuild(args.case, directory=args.directory))
+--- a/src/python/tests/test_analytic_stress_integration.py
++++ b/src/python/tests/test_analytic_stress_integration.py
+@@ -118,6 +118,8 @@
+                     self.assertNotEqual(Path(cfg["reference"]), root)
+                 else:
+                     self.assertEqual(script, "lapw_total_stress_driver.py")
++                    self.assertEqual(Path(command[command.index("--progress-file") + 1]),
++                                     root / "sample.outputdmf2_response")
+                     out = Path(command[command.index("--output") + 1])
+                     out.mkdir()
+                     (out / "report.json").write_text(
+--- a/src/python/tests/test_dmft2_step.py
++++ b/src/python/tests/test_dmft2_step.py
+@@ -55,6 +55,7 @@
+                     "deferred_until_final",
+                 )
+             response.assert_not_called()
++            self.assertIn("Response deferred until the final", Path("sample.outputdmf2_response").read_text())
+             result = step.execute("sample", "/unused", phase="final")
+             self.assertEqual(result["status"], "complete")
+             response.assert_called_once()
+@@ -134,6 +135,9 @@
+             result = json.loads(Path("sample.stress_response.status.json").read_text())
+             self.assertEqual(result["status"], "failed")
+             self.assertNotIn("outputs", result)
++            summary = Path("sample.outputdmf2_response").read_text()
++            self.assertIn("FAILED", summary)
++            self.assertIn("no convergence", summary)
+ 
+     def test_concurrent_run_cannot_overwrite_status(self):
+         with case_directory(), patch.object(step, "run_core") as core:
+@@ -142,12 +146,14 @@
+                 Path("sample.stress_response.status.json").write_text(
+                     '{"status":"running_response"}'
+                 )
++                Path("sample.outputdmf2_response").write_text("active job")
+                 with self.assertRaises(BlockingIOError):
+                     step.execute("sample", "/unused")
+                 self.assertEqual(
+                     Path("sample.stress_response.status.json").read_text(),
+                     '{"status":"running_response"}',
+                 )
++                self.assertEqual(Path("sample.outputdmf2_response").read_text(), "active job")
+             core.assert_not_called()
+ 
+     def test_config_errors_are_not_silent(self):
+--- /dev/null
++++ b/src/python/tests/test_stress_response_summary.py
+@@ -0,0 +1,129 @@
++"""Readable reports must match native SCF publication and preserve history."""
++from contextlib import contextmanager
++from pathlib import Path
++from unittest.mock import patch
++import hashlib
++import io
++import json
++import os
++import tempfile
++import unittest
++import numpy as np
++import merge_scf
++import scf_merge
++import stress_response_summary as summary
++from stress_response_publish import mixer_accumulator, response_rows, mark_published
++from test_stress_response_publish import fixture as tensors
++
++
++@contextmanager
++def case():
++    old = os.getcwd()
++    with tempfile.TemporaryDirectory() as d:
++        os.chdir(d)
++        try:
++            root = Path(d)
++            work = root/'sample.response_runs/test'
++            work.mkdir(parents=True)
++            report = dict(
++                converged=True, full_tensor_within_symmetry=True,
++                stress_Ry_Bohr3=np.diag([.001,.001,.002]).tolist(),
++                strains=[np.eye(3).tolist()], explicit_Ry=[3.0],
++                induced_Ry=[-2.5], derivatives_Ry=[.5],
++                fixed_energy_explicit_parts=dict(lattice_geometry_Ry=[1.0],
++                    core_explicit_Ry=[-5.0],density_explicit_Ry=[6.0]),
++            )
++            reportpath = work/'report.json'
++            reportpath.write_text(json.dumps(report))
++            status = dict(run_id='test',reference_id='reference',status='complete',
++                requested_mode='STRFT',phase='final',backend='analytic',
++                stress_ready=True,converged=True,stress_applied=False,
++                workspace=str(work),report=str(reportpath),parent_fingerprints={},
++                report_sha256=hashlib.sha256(reportpath.read_bytes()).hexdigest())
++            Path('sample.stress_response.status.json').write_text(json.dumps(status))
++            for suffix, label in [('0','DENS'),('2','VAL'),('c','CORE')]:
++                Path('sample.scf'+suffix).write_text('\n'.join(l for l in tensors().splitlines()
++                                                            if ':STR_'+label in l)+'\n')
++            yield root,status,report
++        finally:
++            os.chdir(old)
++
++
++class SummaryTests(unittest.TestCase):
++    def test_both_mergers_publish_same_tensor_and_report_correct_physical_signs(self):
++        reports=[]
++        for standalone in (True,False):
++            with self.subTest(standalone=standalone),case() as (root,status,report):
++                files=[Path('sample.scf'+s) for s in ['0','2','c']]
++                saved=[p.read_bytes() for p in files]
++                summary.begin('sample',status)
++                summary.finish('sample',status)
++                if standalone:
++                    merge_scf.merge('sample',files,replace=True)
++                else:
++                    scf_merge.scf('sample',dict(updn=False,m_extn=''))
++                np.testing.assert_allclose(-mixer_accumulator(Path('sample.scf').read_text()),
++                                           report['stress_Ry_Bohr3'],atol=1e-14)
++                self.assertEqual(saved,[p.read_bytes() for p in files])
++                text=Path('sample.outputdmf2_response').read_text()
++                rows={line[:29].strip():np.array(list(map(float,line[29:].split())))
++                      for line in text.splitlines() if line.startswith(
++                          ('Original total','Net response correction','FINAL TOTAL'))}
++                expected=np.array([.1,.2,.3,.2])*summary.RY_BOHR3_TO_GPA
++                np.testing.assert_allclose(rows['Original total'],expected,atol=1e-6)
++                np.testing.assert_allclose(rows['Original total']+rows['Net response correction'],
++                                           rows['FINAL TOTAL'],atol=1.1e-6)
++                self.assertIn('SCF publication complete',text)
++                self.assertEqual((Path(status['workspace'])/'outputdmf2_response.txt').read_text(),text)
++                reports.append(rows)
++        for key in reports[0]:np.testing.assert_array_equal(reports[0][key],reports[1][key])
++
++    def test_rebuild_uses_last_matching_iteration_not_whole_history(self):
++        with case() as (root,status,report):
++            files=[Path('sample.scf'+s) for s in ['0','2','c']]
++            merge_scf.merge('sample',files,replace=True)
++            current=Path('sample.scf').read_text()
++            Path('sample.scf').write_text(current.replace('reference','old-reference')+current)
++            before=Path('sample.scf').read_bytes()
++            Path('sample.outputdmf2_response').unlink()
++            path=summary.rebuild('sample')
++            text=path.read_text()
++            self.assertIn('Reconstructed from saved results',text)
++            original=next(l for l in text.splitlines() if l.startswith('Original total'))
++            self.assertAlmostEqual(float(original.split()[-1]),.2*summary.RY_BOHR3_TO_GPA,places=6)
++            self.assertEqual(before,Path('sample.scf').read_bytes())
++
++    def test_saved_report_tampering_is_rejected_before_overwriting_summary(self):
++        with case() as (root,status,report):
++            path=Path('sample.outputdmf2_response');path.write_text('keep me')
++            Path(status['report']).write_text('{}')
++            with self.assertRaisesRegex(ValueError,'hash mismatch'):summary.rebuild('sample')
++            self.assertEqual(path.read_text(),'keep me')
++
++    def test_searched_energy_completion_and_induced_term_are_separate(self):
++        with case() as (root,status,report):
++            text=summary._report_text(report)
++            line=next(l for l in text.splitlines() if l.startswith('Radial-energy-search completion'))
++            self.assertEqual(float(line.split()[-1]),1.0)
++            self.assertIn('NOT the old-stress/net-correction split',text)
++            self.assertIn('Compression-positive pressure: -',text)
++
++    def test_shear_values_are_printed_when_present(self):
++        tensor=np.array([[1.,2.,3.],[2.,4.,5.],[3.,5.,6.]])
++        text=summary._stress_table([('Complete stress',tensor)])
++        self.assertIn('Shear components',text)
++        row=text.split('Shear components')[1].splitlines()[1]
++        self.assertEqual(list(map(float,row[29:].split())),[5.,3.,2.])
++
++    def test_reporting_failure_does_not_invalidate_successful_publication(self):
++        with case() as (root,status,report):
++            correction=response_rows('sample',tensors())
++            with patch.object(summary,'_append',side_effect=OSError('disk full')), \
++                 patch('sys.stderr',new_callable=io.StringIO) as warning:
++                mark_published('sample',correction,'sample.scf',current_iteration=tensors())
++            self.assertTrue(json.loads(Path('sample.stress_response.status.json').read_text())['stress_applied'])
++            self.assertIn('disk full',warning.getvalue())
++
++
++if __name__ == '__main__':
++    unittest.main()

@@ -1,0 +1,836 @@
+{
+  "repository": "/Users/haule/projects/eDMFT_new",
+  "dbin": "/Users/haule/dbin",
+  "checkpoint": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109",
+  "git_head": "1055c8cb6b1cf393a9012b671321ee90be518e07",
+  "entries": [
+    {
+      "source": "python/dmft2_step.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/dmft2_step.py",
+      "before_sha256": "b2442fd87d167df60587475e026fc233d94dde69d79e6d295d1fb56f2ec963bc",
+      "sha256": "42dc34665deff445c926e844fb249de302fa9e25da0447206553e94c02dbe161",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/dmft2_step.py",
+      "destination": "/Users/haule/dbin/dmft2_step.py",
+      "before_sha256": "b2442fd87d167df60587475e026fc233d94dde69d79e6d295d1fb56f2ec963bc",
+      "sha256": "42dc34665deff445c926e844fb249de302fa9e25da0447206553e94c02dbe161",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_compact_blocks.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_compact_blocks.py",
+      "before_sha256": "11fb3b36c65486e9dc35f3c09d041115b17129d732dde6deb92c9d01fc600d58",
+      "sha256": "2d8248185868c104d01b7f626efe061e3d8416ebab7a624938080b2b7ec4ac17",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_compact_blocks.py",
+      "destination": "/Users/haule/dbin/lapw_compact_blocks.py",
+      "before_sha256": "11fb3b36c65486e9dc35f3c09d041115b17129d732dde6deb92c9d01fc600d58",
+      "sha256": "2d8248185868c104d01b7f626efe061e3d8416ebab7a624938080b2b7ec4ac17",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_density_functional.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_density_functional.py",
+      "before_sha256": null,
+      "sha256": "62af6d1ce186fd65c3d41d222cf673db3a7e547f89e4c55d712f27fb9ddd4817",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_density_functional.py",
+      "destination": "/Users/haule/dbin/lapw_density_functional.py",
+      "before_sha256": null,
+      "sha256": "62af6d1ce186fd65c3d41d222cf673db3a7e547f89e4c55d712f27fb9ddd4817",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_density_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_density_response.py",
+      "before_sha256": "85da2f9e7129502de4b994526584b2e9b0564a3ac4d8a323e9d179d50ab09828",
+      "sha256": "73c0a5f837817c8d85caf9b577c6188ffb66bdb9bd53a293cd93c5b35866bf25",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_density_response.py",
+      "destination": "/Users/haule/dbin/lapw_density_response.py",
+      "before_sha256": "85da2f9e7129502de4b994526584b2e9b0564a3ac4d8a323e9d179d50ab09828",
+      "sha256": "73c0a5f837817c8d85caf9b577c6188ffb66bdb9bd53a293cd93c5b35866bf25",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_energy_readout.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_energy_readout.py",
+      "before_sha256": null,
+      "sha256": "69d0b4c9dcb8c8fa9136216ea1e8208c5e5b1a5564e65a1ec22c06de097c681a",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_energy_readout.py",
+      "destination": "/Users/haule/dbin/lapw_energy_readout.py",
+      "before_sha256": null,
+      "sha256": "69d0b4c9dcb8c8fa9136216ea1e8208c5e5b1a5564e65a1ec22c06de097c681a",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_energy_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_energy_response.py",
+      "before_sha256": null,
+      "sha256": "f3e0a05f7a9a5fe3c52ad772496dde9abf1c839d83c166b8efdfa4a1fb43a549",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_energy_response.py",
+      "destination": "/Users/haule/dbin/lapw_energy_response.py",
+      "before_sha256": null,
+      "sha256": "f3e0a05f7a9a5fe3c52ad772496dde9abf1c839d83c166b8efdfa4a1fb43a549",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_functional_cancellation.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_functional_cancellation.py",
+      "before_sha256": "f1e626bf082b62bbd4caf9ad77d92a01bfd2d7a05f5c2f02c83a99fe6a2a29d5",
+      "sha256": "f2d6a1a03407c22727e4ff4b58f72ceeabff8c383232b499e56648bc9b57dbff",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_functional_cancellation.py",
+      "destination": "/Users/haule/dbin/lapw_functional_cancellation.py",
+      "before_sha256": "f1e626bf082b62bbd4caf9ad77d92a01bfd2d7a05f5c2f02c83a99fe6a2a29d5",
+      "sha256": "f2d6a1a03407c22727e4ff4b58f72ceeabff8c383232b499e56648bc9b57dbff",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_klein_functional.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_klein_functional.py",
+      "before_sha256": null,
+      "sha256": "c9e45d3b256fea72f6fba250290671bfcbb1fef6704961cb81c5059800602aa8",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_klein_functional.py",
+      "destination": "/Users/haule/dbin/lapw_klein_functional.py",
+      "before_sha256": null,
+      "sha256": "c9e45d3b256fea72f6fba250290671bfcbb1fef6704961cb81c5059800602aa8",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_native_potential_export.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_native_potential_export.py",
+      "before_sha256": null,
+      "sha256": "d05ee6d5beddc5503863270950ed3247de455b41020467619377c95741459728",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_native_potential_export.py",
+      "destination": "/Users/haule/dbin/lapw_native_potential_export.py",
+      "before_sha256": null,
+      "sha256": "d05ee6d5beddc5503863270950ed3247de455b41020467619377c95741459728",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_radial_energy_policy.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_radial_energy_policy.py",
+      "before_sha256": null,
+      "sha256": "0690540dcf83bdd429696eff847f79748dbbd020fd8813ae4dbabc9ead042594",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_radial_energy_policy.py",
+      "destination": "/Users/haule/dbin/lapw_radial_energy_policy.py",
+      "before_sha256": null,
+      "sha256": "0690540dcf83bdd429696eff847f79748dbbd020fd8813ae4dbabc9ead042594",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_response_prepare.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_response_prepare.py",
+      "before_sha256": null,
+      "sha256": "3202836dafa380ca212f8a9ee3d597f42544aea982bd327d4ea6aa6f3259a187",
+      "mode": 493,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_response_prepare.py",
+      "destination": "/Users/haule/dbin/lapw_response_prepare.py",
+      "before_sha256": null,
+      "sha256": "3202836dafa380ca212f8a9ee3d597f42544aea982bd327d4ea6aa6f3259a187",
+      "mode": 493,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_spherical_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_spherical_response.py",
+      "before_sha256": "dd253e2b5c2c72340935a08e3bfc27d8384b81ea7844a370c0f8e01f34561f5a",
+      "sha256": "6a2fcfa1b7b2ace2fc05f32de9f04c32317459747d53ae0bab89d410ddcff492",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_spherical_response.py",
+      "destination": "/Users/haule/dbin/lapw_spherical_response.py",
+      "before_sha256": "dd253e2b5c2c72340935a08e3bfc27d8384b81ea7844a370c0f8e01f34561f5a",
+      "sha256": "6a2fcfa1b7b2ace2fc05f32de9f04c32317459747d53ae0bab89d410ddcff492",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_strain_charge.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_strain_charge.py",
+      "before_sha256": "bf2a1f3024ce93c4f447ec52eb2218321b7642c27e009ca6ed188dcaa00ba92d",
+      "sha256": "3da200fbaf64036175aa9745b613e16dec5ea583d41ebdcc46487f7c746c6d4e",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_strain_charge.py",
+      "destination": "/Users/haule/dbin/lapw_strain_charge.py",
+      "before_sha256": "bf2a1f3024ce93c4f447ec52eb2218321b7642c27e009ca6ed188dcaa00ba92d",
+      "sha256": "3da200fbaf64036175aa9745b613e16dec5ea583d41ebdcc46487f7c746c6d4e",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_total_stress.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_total_stress.py",
+      "before_sha256": null,
+      "sha256": "25d68cf057ac250794ae3fe11888283ce9c289cc3a580d1b259c6f30721bde3a",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_total_stress.py",
+      "destination": "/Users/haule/dbin/lapw_total_stress.py",
+      "before_sha256": null,
+      "sha256": "25d68cf057ac250794ae3fe11888283ce9c289cc3a580d1b259c6f30721bde3a",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_total_stress_driver.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_total_stress_driver.py",
+      "before_sha256": null,
+      "sha256": "3e06421d7b423a0e11c217a5ff6fb997cfc61c9be6680cc2b6ce71cfc7243f27",
+      "mode": 493,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_total_stress_driver.py",
+      "destination": "/Users/haule/dbin/lapw_total_stress_driver.py",
+      "before_sha256": null,
+      "sha256": "3e06421d7b423a0e11c217a5ff6fb997cfc61c9be6680cc2b6ce71cfc7243f27",
+      "mode": 493,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_valence_state.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_valence_state.py",
+      "before_sha256": "cfb6cf5f2d7c1f71e6633b42f189e7438b001c8e312f8fc01d857b2ca562fe71",
+      "sha256": "563f6197e5f9226d19fb144027003f7f548689565817616dfc0e75b50118ebcd",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/lapw_valence_state.py",
+      "destination": "/Users/haule/dbin/lapw_valence_state.py",
+      "before_sha256": "cfb6cf5f2d7c1f71e6633b42f189e7438b001c8e312f8fc01d857b2ca562fe71",
+      "sha256": "563f6197e5f9226d19fb144027003f7f548689565817616dfc0e75b50118ebcd",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/merge_scf.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/merge_scf.py",
+      "before_sha256": "80f4a2f0fb89144284e973411af023b51181406977d09507194f6d98e7b5e889",
+      "sha256": "47f313badd82ae7deb524da6929ff77bfc74d807545210ba7eddf68ef9149b85",
+      "mode": 493,
+      "kind": "python"
+    },
+    {
+      "source": "python/merge_scf.py",
+      "destination": "/Users/haule/dbin/merge_scf.py",
+      "before_sha256": "80f4a2f0fb89144284e973411af023b51181406977d09507194f6d98e7b5e889",
+      "sha256": "47f313badd82ae7deb524da6929ff77bfc74d807545210ba7eddf68ef9149b85",
+      "mode": 493,
+      "kind": "python"
+    },
+    {
+      "source": "python/scf_merge.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/scf_merge.py",
+      "before_sha256": "bc4e9b7895abef64b94feee2d36ec1562a032f6e2f582b4e7374ba96a2fc584d",
+      "sha256": "345a7bd0be4687fd5adb848dffa9a88ef140530d0d4f32a4c64d06cb3cc15221",
+      "mode": 493,
+      "kind": "python"
+    },
+    {
+      "source": "python/scf_merge.py",
+      "destination": "/Users/haule/dbin/scf_merge.py",
+      "before_sha256": "bc4e9b7895abef64b94feee2d36ec1562a032f6e2f582b4e7374ba96a2fc584d",
+      "sha256": "345a7bd0be4687fd5adb848dffa9a88ef140530d0d4f32a4c64d06cb3cc15221",
+      "mode": 493,
+      "kind": "python"
+    },
+    {
+      "source": "python/stress_response_publish.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/stress_response_publish.py",
+      "before_sha256": null,
+      "sha256": "2d2a389eb1de0cf00bd35068dd026374a45b8666657b2ee3059d525a5b07fad6",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "python/stress_response_publish.py",
+      "destination": "/Users/haule/dbin/stress_response_publish.py",
+      "before_sha256": null,
+      "sha256": "2d2a389eb1de0cf00bd35068dd026374a45b8666657b2ee3059d525a5b07fad6",
+      "mode": 420,
+      "kind": "python"
+    },
+    {
+      "source": "tests/test_analytic_stress_integration.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_analytic_stress_integration.py",
+      "before_sha256": null,
+      "sha256": "983c4b94452f32438311edfc9c10b32ccc47d4ecc92a2eae7a3a225586e4fd65",
+      "mode": 420,
+      "kind": "test"
+    },
+    {
+      "source": "tests/test_lapw_density_functional.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_density_functional.py",
+      "before_sha256": null,
+      "sha256": "05b116ca905ca0652b88b3b98e5110e10ffc357a5cd625f0efe2d7085c5bee04",
+      "mode": 420,
+      "kind": "test"
+    },
+    {
+      "source": "tests/test_lapw_energy_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_energy_response.py",
+      "before_sha256": null,
+      "sha256": "75b8a6c987e71a1bb620ed2a889869ce28e4c28e15e5f971ef4e22a2a0b0ae28",
+      "mode": 420,
+      "kind": "test"
+    },
+    {
+      "source": "tests/test_lapw_strain_charge.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_strain_charge.py",
+      "before_sha256": "4a48821356657aa52fee7f3dd001a903c450246b3d74a4b645f9018bb30f2998",
+      "sha256": "4b7c0b3a5b0334e5bbe7bb832b0d975cffe5c5e5b8a6a491fc884288a642f911",
+      "mode": 420,
+      "kind": "test"
+    },
+    {
+      "source": "tests/test_lapw_total_stress.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_total_stress.py",
+      "before_sha256": null,
+      "sha256": "44323c6939e411c2e028b6c266063e555a89c6fca11d1463f5aa6d5c2940498c",
+      "mode": 420,
+      "kind": "test"
+    },
+    {
+      "source": "tests/test_stress_response_publish.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_stress_response_publish.py",
+      "before_sha256": null,
+      "sha256": "f5d844ead55758448d612f8a4e63711b95729ceaef1358d15b31a11f0d67a156",
+      "mode": 420,
+      "kind": "test"
+    },
+    {
+      "source": "stress_response_roadmap_20261108.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+      "before_sha256": "9ab4f27b8f5f680e77c7a3b346d09a95443f7d6889d9479b674dabcdd65f7e17",
+      "sha256": "89d8f73b79b187cee3af3d61a6c7f5fbae714a04662c430224912eb90d6dcafa",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "workers/lapw0_response",
+      "destination": "/Users/haule/dbin/lapw0_response",
+      "before_sha256": null,
+      "sha256": "c5e1be43658448d36b61366bc701bfec42ddf04b8c3fae18f63a273852e5b823",
+      "mode": 493,
+      "kind": "executable"
+    },
+    {
+      "source": "workers/lcore_response",
+      "destination": "/Users/haule/dbin/lcore_response",
+      "before_sha256": null,
+      "sha256": "85ec0410558501aa97eab262342291f676e612ab40c5abfc97fe198cef60ca30",
+      "mode": 493,
+      "kind": "executable"
+    },
+    {
+      "source": "workers/lapw1_response",
+      "destination": "/Users/haule/dbin/lapw1_response",
+      "before_sha256": null,
+      "sha256": "e31a8ab968779bb28eb57308bedffe5b766c1fd13b023914e8498eeb155c9e19",
+      "mode": 493,
+      "kind": "executable"
+    },
+    {
+      "source": "workers/lapw1c_response",
+      "destination": "/Users/haule/dbin/lapw1c_response",
+      "before_sha256": null,
+      "sha256": "7e68a8050bd9915939348d2ba92b39d7a282701ae1b8e8c976490aad98de5937",
+      "mode": 493,
+      "kind": "executable"
+    },
+    {
+      "source": "docs/COORDINATE_CORRECTION.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/COORDINATE_CORRECTION.txt",
+      "before_sha256": null,
+      "sha256": "c393da5fa134c018b8a3f7f6ce45249e2815a57237f4f5220da27a5fd878ae5b",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/IMPLEMENTATION.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/IMPLEMENTATION.txt",
+      "before_sha256": null,
+      "sha256": "46b1555d844151704995f059788a10a70e23db5b8e1289eeff6335f1ce327ff0",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/NATIVE_WORKERS.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/NATIVE_WORKERS.json",
+      "before_sha256": null,
+      "sha256": "0e0fdf7cd63507946cfb8fef8f542766bc0073c9005353ac17a694399fdd03ad",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/NATIVE_WORKERS.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/NATIVE_WORKERS.txt",
+      "before_sha256": null,
+      "sha256": "1a7e79f9bfd43a9e2dbc00bb4929ee9dfdddbfe0a498176adfc64b6d05631fc4",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/RESULTS.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/RESULTS.json",
+      "before_sha256": null,
+      "sha256": "d5026c5f7c06e8fbaa7573c529ed56f7428f1743299faf68e93a1028b93cd6eb",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/RESULTS.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/RESULTS.txt",
+      "before_sha256": null,
+      "sha256": "a8f9de6d635387e1a38a9b1147d36e663022cc37b3c3166248bfbf81ed9b80aa",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/complete_strain.patch",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/complete_strain.patch",
+      "before_sha256": null,
+      "sha256": "2aa2cc389b2d8ca4e056b323b6e320b3fda915fe6a35b34ab3c8797297b433a3",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/adjoint_benchmark.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/adjoint_benchmark.json",
+      "before_sha256": null,
+      "sha256": "b4b850694011b2e571d3b64d2bc2986996b09f39e0f8542a334abe48f1bf6655",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/fft_benchmark.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/fft_benchmark.json",
+      "before_sha256": null,
+      "sha256": "36b337ff77489f98484fdb77c255a8832bb4d741c9a59bfe3531329cfeac7e53",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/fresh_direction/REPORT.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/fresh_direction/REPORT.json",
+      "before_sha256": null,
+      "sha256": "cc80ee33e5bc8e66ba353e9865f6a9ab407ef5b6bc4d512e3fe75f4a85fac1c8",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/fresh_direction_0.0005/REPORT.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/fresh_direction_0.0005/REPORT.json",
+      "before_sha256": null,
+      "sha256": "f6e7890b9394639e30996fb95ecdf398667ef68a2823acbb766f840a37a7faae",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/halfstep/REPORT.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/halfstep/REPORT.json",
+      "before_sha256": null,
+      "sha256": "2580a6cfe13152a07454584d1ba6383f01802d391965402df66f45c651ab8725",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/halfstep/density_readout.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/halfstep/density_readout.json",
+      "before_sha256": null,
+      "sha256": "7a80503525f975fa169f58bbed9a7d3ba9971c62fb7b7da827e42c00ddd042eb",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/optimized_total/report.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/optimized_total/report.json",
+      "before_sha256": null,
+      "sha256": "1027f8f54706316e4f55603f14355ef4dc95beb0a318534ae6b5bc58e7a88797",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/physical_sources.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/physical_sources.json",
+      "before_sha256": null,
+      "sha256": "a78e9970b18be1903d0c32468370b8f316c1245aa48b9af97601dd8dd2b49f6f",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/physical_total/report.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/physical_total/report.json",
+      "before_sha256": null,
+      "sha256": "a51b4d6f8bfda33661831c91fb5783066cd353130cc2eed4e7e7421f1c83c036",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/refined_total/report.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/refined_total/report.json",
+      "before_sha256": null,
+      "sha256": "ba68e17a39dfc196799a4b16c33876eeafa0f3b0e1f58f11937073c55c826c4e",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/FeSe/scalar_endpoints/REPORT.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/FeSe/scalar_endpoints/REPORT.json",
+      "before_sha256": null,
+      "sha256": "db44bbd7172e8fa3fed9ded54f4acaf9c231d96ea3e1bd313b835f644a4eab02",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/SrVO3/fft_benchmark.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/SrVO3/fft_benchmark.json",
+      "before_sha256": null,
+      "sha256": "bda005836870883c8ab5aa854931fcaad9f8c26dc97ffa6e582cec577e96f5ef",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/SrVO3/live_comparison.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/SrVO3/live_comparison.json",
+      "before_sha256": null,
+      "sha256": "e74a6cc25b9ff5fcc662bdda451c28db8008b34d4767d7eafcedcd79cee4e6aa",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/SrVO3/native_live/REPORT.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/SrVO3/native_live/REPORT.json",
+      "before_sha256": null,
+      "sha256": "1fb7165bda5484d2676374a91ac36ee4606a49a313d304a77f78b357d1b2e685",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/SrVO3/physical_total/report.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/SrVO3/physical_total/report.json",
+      "before_sha256": null,
+      "sha256": "82f6975f8ac63124b7028b5db715773a5098d8098eb65699ce6e19ad082a2578",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/SrVO3/prepared_auto/preparation.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/SrVO3/prepared_auto/preparation.json",
+      "before_sha256": null,
+      "sha256": "5436a35bcfc140a841e5069031b35c252c98c8680eb2434baf3b55f1146124a0",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/SrVO3/publication/REPORT.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/SrVO3/publication/REPORT.json",
+      "before_sha256": null,
+      "sha256": "c0609f9b699c54ef61a01d7b7c68e8427cf12e447bfbd5f654403eb7caca4db8",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/SrVO3/searched_readout/REPORT.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/SrVO3/searched_readout/REPORT.json",
+      "before_sha256": null,
+      "sha256": "8def6975c40b1bf06d5a5a1aad396bca432f6c7ca6df601481317f1d88bd3daf",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/SrVO3/tensor/REPORT.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/SrVO3/tensor/REPORT.json",
+      "before_sha256": null,
+      "sha256": "5701fe6695efe7a735c5504d21e79b384727e5b830a2b9b84240efb30eb992e9",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/coordinate_charge.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/coordinate_charge.json",
+      "before_sha256": null,
+      "sha256": "dcf87230085013b016d95fec2e5a166112dfc6a8ea1abd5b566476fac096e770",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/final_regression.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/final_regression.log",
+      "before_sha256": null,
+      "sha256": "dcd73e126a5ce81e9acaba9825561187e91c6ee0e5d23b437fe168515f90d7ad",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/evidence/installer_test.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/evidence/installer_test.json",
+      "before_sha256": null,
+      "sha256": "5d9f4bc2b884e8ea6b43e07b20db7661e7874c6352b9a7ace78698c41c0500ed",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/native_worker_sources.tar.gz",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/native_worker_sources.tar.gz",
+      "before_sha256": null,
+      "sha256": "4b176fb9227b1fa7ebab7a9c2271fbffaa066e1e1fdfae9f7e6acd83f5059463",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/benchmark_fft.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/benchmark_fft.py",
+      "before_sha256": null,
+      "sha256": "19655244f2f2312efe76dfb30c8413b34e0036fb84fb288a2b3d4188eac08a67",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/benchmark_full_adjoint.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/benchmark_full_adjoint.py",
+      "before_sha256": null,
+      "sha256": "8b01ef8462d74354fc39b799a25e995934feda304576e4bfd1c30422e3ab0b75",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_adjoint_speed.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_adjoint_speed.py",
+      "before_sha256": null,
+      "sha256": "a96a05434048544ab11d7b8e3dee802190e23cc66925d6dab95e58f48afcf908",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_charge_paths.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_charge_paths.py",
+      "before_sha256": null,
+      "sha256": "0c5c5bc4b6767d42acdefd7c9b6ef275ef8e289dced1a94c142ab05294675f1d",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_coordinate_charge.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_coordinate_charge.py",
+      "before_sha256": null,
+      "sha256": "3847236d6f5e9c9ed02ff329926e87149eca1b0d3e6bb2eea6eba5e5b7b1f1de",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_current.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_current.py",
+      "before_sha256": null,
+      "sha256": "6c913db3e06e2f78b0781a0007a663124799758fd729e34453bd8ed95c1b8f67",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_density.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_density.py",
+      "before_sha256": null,
+      "sha256": "cd1a7932f8cca3f7ede3f10012fedd73c8affa137c4b2b6f507cc9bb484e5915",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_energy_parameters.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_energy_parameters.py",
+      "before_sha256": null,
+      "sha256": "3f541e8c9cb04f37b731a8b22eb2fe0ee945726fe480701f1686aa35ad9fcb5d",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_energy_policy.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_energy_policy.py",
+      "before_sha256": null,
+      "sha256": "9c703ea3001e1c6f2cba3e5941f8866428eb02af473a36ae2128f1f2afcc9ac1",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_fresh_direction.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_fresh_direction.py",
+      "before_sha256": null,
+      "sha256": "13aa8e826659b8eeddc102b16bc3ed2e70e455146f8c880e86fd27fa6049762d",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_installer.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_installer.py",
+      "before_sha256": null,
+      "sha256": "f028f0481aa5f542c10c466a6f2b1b5f39e754cc7289cedb4d8f2fe90d6a2733",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_physical_sources.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_physical_sources.py",
+      "before_sha256": null,
+      "sha256": "bf0323d194f1a6f6126edf8c20f4ef3dbc02d69ee1c83b569f6f439ec536ac5a",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_publication.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_publication.py",
+      "before_sha256": null,
+      "sha256": "1a50753b32830fde73664ab0bf338d14f93425a85e2c6572ff34f61798ac87be",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_relaxed_scalar.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_relaxed_scalar.py",
+      "before_sha256": null,
+      "sha256": "71ba1231a545770f9cd90632a608734b0fa5c761276964952d163ded76a7ca39",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_searched_energy.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_searched_energy.py",
+      "before_sha256": null,
+      "sha256": "efa00a94b0027e69e37141150bb3713d3cd4c0dd5b28859d35c959e5b6f5c88e",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_tensor.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_tensor.py",
+      "before_sha256": null,
+      "sha256": "fb34ffbd8e51747890a8d348e23c060df1e3991eb39fc6e19b457e6fbe93a096",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_total_path.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_total_path.py",
+      "before_sha256": null,
+      "sha256": "2c4e6c2eb16927f9e75d181f0c411f4ac407adcd7cd46addb54942d65a252d44",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/check_zz_source.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/check_zz_source.py",
+      "before_sha256": null,
+      "sha256": "88d5611e4774b09aef302ecfdeb193fab890f9f628d5e303687547c93edb2faf",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/halfstep_relax.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/halfstep_relax.py",
+      "before_sha256": null,
+      "sha256": "be42dd858a9fa66af625e96cde42da9bdd0f9c2cf2ff90c3847a14c319d9aaf3",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/native_live_replay.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/native_live_replay.py",
+      "before_sha256": null,
+      "sha256": "ac9d7bf088be066e3a683018175c12da1872f4659ef038c5df278b7f0e9dbad7",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/prepare_current.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/prepare_current.py",
+      "before_sha256": null,
+      "sha256": "3360c3079688098a2b9b78ec3c484e3cfea26d79ec2edcd1cdf7de2d33040a12",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/prepare_refined.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/prepare_refined.py",
+      "before_sha256": null,
+      "sha256": "dc03e44c6cf09f80ecce27cc1c71445ad95c9ae413c741486e4a44d8b51566c4",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/recontract_physical.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/recontract_physical.py",
+      "before_sha256": null,
+      "sha256": "2c5cee94be8aed8136e7d61d48c080156fbc9bedb7ff07d3ff4032307280a8ac",
+      "mode": 420,
+      "kind": "documentation"
+    },
+    {
+      "source": "docs/reproduce/write_results.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/complete_strain_20261109/reproduce/write_results.py",
+      "before_sha256": null,
+      "sha256": "ef9920ffd5f0cfe30923c12c7dc4d4b4df9cc403a9f2ae117e531a1e66d6ebf4",
+      "mode": 420,
+      "kind": "documentation"
+    }
+  ],
+  "existing_runtime": {
+    "/Users/haule/dbin/dmft2_response": "16844ec83836f27df60a605313993fef41b74dbf6048a040e063695e634f010c",
+    "/Users/haule/dbin/liblapw_response.so": "19533e60a0b40dbe7a472d510dbffa3c19af87c29b4e461a743a89439948f00d"
+  }
+}

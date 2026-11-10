@@ -1,0 +1,179 @@
+nargs= 1
+argi=dmft2.def
+ OpeningMnO.outputdmf2                                                                                                                                                                      
+:MATSUBARA_CUBIC_WEIGHTS:     600    2387   2.38700000E+03   2.38700000E+03   1.26890255E+00   2.03435246E+01
+:MATSUBARA_CUBIC_WEIGHTS:     600    2387   2.38700000E+03   2.38700000E+03   1.26890255E+00   2.03435246E+01
+:MATSUBARA_CUBIC_WEIGHTS:     600    2387   2.38700000E+03   2.38700000E+03   1.26890255E+00   2.03435246E+01
+ after first reading case.nsh NGAU set to         132
+ after first reading case.nsh NGAU set to         132
+ after first reading case.nsh NGAU set to         132
+  1) Finished k-point number  19   1 with #bands=  11
+  2) Finished k-point number  37   1 with #bands=  11
+  1) Finished k-point number  20   2 with #bands=  11
+  3) Finished k-point number  55   1 with #bands=  11
+  2) Finished k-point number  38   2 with #bands=  11
+  1) Finished k-point number  21   3 with #bands=  11
+  3) Finished k-point number  56   2 with #bands=  11
+  1) Finished k-point number  22   4 with #bands=  11
+  2) Finished k-point number  39   3 with #bands=  11
+  3) Finished k-point number  57   3 with #bands=  11
+  1) Finished k-point number  23   5 with #bands=  11
+  2) Finished k-point number  40   4 with #bands=  11
+  3) Finished k-point number  58   4 with #bands=  11
+  1) Finished k-point number  24   6 with #bands=  11
+  2) Finished k-point number  41   5 with #bands=  11
+  3) Finished k-point number  59   5 with #bands=  11
+  1) Finished k-point number  25   7 with #bands=  11
+  3) Finished k-point number  60   6 with #bands=  11
+  2) Finished k-point number  42   6 with #bands=  11
+  1) Finished k-point number  26   8 with #bands=  11
+  3) Finished k-point number  61   7 with #bands=  11
+  1) Finished k-point number  27   9 with #bands=  11
+  2) Finished k-point number  43   7 with #bands=  11
+  1) Finished k-point number  28  10 with #bands=  11
+  2) Finished k-point number  44   8 with #bands=  11
+  3) Finished k-point number  62   8 with #bands=  11
+  1) Finished k-point number  29  11 with #bands=  11
+  2) Finished k-point number  45   9 with #bands=  11
+  3) Finished k-point number  63   9 with #bands=  11
+  1) Finished k-point number  30  12 with #bands=  11
+  2) Finished k-point number  46  10 with #bands=  11
+  3) Finished k-point number  64  10 with #bands=  11
+  1) Finished k-point number  31  13 with #bands=  11
+  2) Finished k-point number  47  11 with #bands=  11
+  3) Finished k-point number  65  11 with #bands=  11
+  2) Finished k-point number  48  12 with #bands=  11
+  1) Finished k-point number  32  14 with #bands=  11
+  3) Finished k-point number  66  12 with #bands=  11
+  2) Finished k-point number  49  13 with #bands=  11
+  1) Finished k-point number  33  15 with #bands=  11
+  3) Finished k-point number  67  13 with #bands=  11
+  2) Finished k-point number  50  14 with #bands=  11
+  1) Finished k-point number  34  16 with #bands=  11
+  3) Finished k-point number  68  14 with #bands=  11
+  2) Finished k-point number  51  15 with #bands=  11
+  1) Finished k-point number  35  17 with #bands=  11
+  2) Finished k-point number  52  16 with #bands=  11
+  3) Finished k-point number  69  15 with #bands=  11
+  1) Finished k-point number  36  18 with #bands=  11
+  2) Finished k-point number  53  17 with #bands=  11
+  3) Finished k-point number  70  16 with #bands=  11
+  2) Finished k-point number  54  18 with #bands=  11
+  3) Finished k-point number  71  17 with #bands=  11
+  3) Finished k-point number  72  18 with #bands=  11
+:DMFT_SIGMAG_DIRECT:    19    3.297461694E-03    4.627367402E-15   -7.267016942E-03   -7.267016942E-03   -1.493164668E-19
+  1) Finished k-point  19    1 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    55    1.338476397E-02    4.291151565E-15   -2.929359967E-02   -2.929359967E-02   -1.286331612E-19
+  3) Finished k-point  55    1 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    37    1.340827502E-02    8.214185019E-15   -2.955612483E-02   -2.955612483E-02   -3.365995495E-19
+  2) Finished k-point  37    1 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    56    1.338368314E-02    5.619539382E-15   -2.942921706E-02   -2.942921706E-02   -1.646164464E-19
+  3) Finished k-point  56    2 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    38    1.342752033E-02    4.432210825E-15   -2.957008469E-02   -2.957008469E-02   -8.613321806E-20
+  2) Finished k-point  38    2 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    20    1.327244250E-02    4.740371532E-15   -2.915993544E-02   -2.915993544E-02    3.059995905E-19
+  1) Finished k-point  20    2 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    57    2.682761403E-02    4.862368221E-15   -5.901799325E-02   -5.901799325E-02   -2.969329359E-19
+  3) Finished k-point  57    3 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    39    6.723159438E-03    4.102787723E-15   -1.477132780E-02   -1.477132780E-02   -1.898330793E-20
+  2) Finished k-point  39    3 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    21    1.335492476E-02    4.351899966E-15   -2.926282699E-02   -2.926282699E-02    2.946662723E-19
+  1) Finished k-point  21    3 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    58    2.687418902E-02    4.427295947E-15   -5.910907439E-02   -5.910907439E-02    1.722664361E-19
+  3) Finished k-point  58    4 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    40    3.355160401E-03    6.823446339E-15   -7.401030199E-03   -7.401030199E-03    2.593990669E-20
+  2) Finished k-point  40    4 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  15
+:DMFT_SIGMAG_DIRECT:    22    1.342388237E-02    4.517067340E-15   -2.936121896E-02   -2.936121896E-02    1.586664543E-19
+  1) Finished k-point  22    4 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    41    1.340817910E-02    4.421036549E-15   -2.961523477E-02   -2.961523477E-02   -3.343328859E-20
+  2) Finished k-point  41    5 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    59    2.689912743E-02    5.167604989E-15   -5.909817146E-02   -5.909817146E-02   -2.719996360E-19
+  3) Finished k-point  59    5 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    23    1.346508663E-02    3.785543207E-15   -2.942446959E-02   -2.942446959E-02   -3.173329086E-19
+  1) Finished k-point  23    5 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    42    6.702702106E-03    3.817103820E-15   -1.479888294E-02   -1.479888294E-02    3.144995791E-20
+  2) Finished k-point  42    6 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    60    1.344902203E-02    4.770153954E-15   -2.949182761E-02   -2.949182761E-02    7.029490592E-19
+  3) Finished k-point  60    6 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    24    1.347251257E-02    3.137103593E-15   -2.942690878E-02   -2.942690878E-02   -3.717328358E-19
+  1) Finished k-point  24    6 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    43    1.678002422E-03    4.885478377E-15   -3.706944158E-03   -3.706944158E-03    8.641655101E-21
+  2) Finished k-point  43    7 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  15
+:DMFT_SIGMAG_DIRECT:    61    1.340699414E-02    6.796589739E-15   -2.957221553E-02   -2.957221553E-02    1.410998112E-19
+  3) Finished k-point  61    7 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    25    1.344607349E-02    4.195026199E-15   -2.936691182E-02   -2.936691182E-02    1.767997634E-19
+  1) Finished k-point  25    7 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    44    1.324982889E-02    3.362880785E-15   -2.912055397E-02   -2.912055397E-02    1.495997998E-19
+  2) Finished k-point  44    8 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    62    2.683167267E-02    5.315021687E-15   -5.919226684E-02   -5.919226684E-02    2.674663087E-19
+  3) Finished k-point  62    8 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    26    1.339274795E-02    4.957928899E-15   -2.927253002E-02   -2.927253002E-02   -1.314664907E-19
+  1) Finished k-point  26    8 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    45    2.666067369E-02    6.414376462E-15   -5.840001878E-02   -5.840001878E-02    5.893325446E-20
+  2) Finished k-point  45    9 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    63    1.342953330E-02    5.652180579E-15   -2.958790476E-02   -2.958790476E-02   -1.195665066E-19
+  3) Finished k-point  63    9 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    27    6.662819167E-03    4.382079950E-15   -1.459170801E-02   -1.459170801E-02   -9.179987714E-20
+  1) Finished k-point  27    9 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    46    2.681231863E-02    4.800706082E-15   -5.859201248E-02   -5.859201248E-02    3.626661813E-20
+  2) Finished k-point  46   10 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    64    6.705260028E-03    4.327571195E-15   -1.481140306E-02   -1.481140306E-02   -3.116662496E-20
+  3) Finished k-point  64   10 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    28    3.329029810E-03    6.430001635E-15   -7.312497678E-03   -7.312497678E-03   -6.799990900E-21
+  1) Finished k-point  28   10 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    47    2.691723397E-02    6.850894853E-15   -5.875518614E-02   -5.875518614E-02   -1.160531780E-18
+  2) Finished k-point  47   11 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    65    1.342048599E-02    4.857251087E-15   -2.944952494E-02   -2.944952494E-02    3.853328176E-20
+  3) Finished k-point  65   11 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    29    1.335501684E-02    5.178158780E-15   -2.933902236E-02   -2.933902236E-02   -3.173329086E-20
+  1) Finished k-point  29   11 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    48    1.347761573E-02    5.303330510E-15   -2.941085339E-02   -2.941085339E-02   -3.581328540E-19
+  2) Finished k-point  48   12 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    66    2.689223694E-02    6.315990975E-15   -5.905703560E-02   -5.905703560E-02   -4.261327630E-19
+  3) Finished k-point  66   12 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    30    1.339883538E-02    5.783713111E-15   -2.943047293E-02   -2.943047293E-02   -7.502656626E-19
+  1) Finished k-point  30   12 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    49    1.332581230E-02    4.213052301E-15   -2.924626496E-02   -2.924626496E-02   -2.719996360E-20
+  2) Finished k-point  49   13 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    67    1.345511706E-02    3.675511273E-15   -2.955831486E-02   -2.955831486E-02   -3.853328176E-19
+  3) Finished k-point  67   13 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    31    1.343667131E-02    4.189668871E-15   -2.949927386E-02   -2.949927386E-02    3.082662541E-19
+  1) Finished k-point  31   13 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    50    2.677289864E-02    5.124256568E-15   -5.870145804E-02   -5.870145804E-02   -2.810662905E-19
+  2) Finished k-point  50   14 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    68    1.343234204E-02    3.621813646E-15   -2.957556187E-02   -2.957556187E-02    1.405331453E-19
+  3) Finished k-point  68   14 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    32    1.345615118E-02    4.867339188E-15   -2.951482062E-02   -2.951482062E-02   -2.085330543E-19
+  1) Finished k-point  32   14 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    51    2.687400844E-02    3.824271091E-15   -5.888923214E-02   -5.888923214E-02   -1.631997816E-19
+  2) Finished k-point  51   15 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    69    2.688450890E-02    9.234545579E-15   -5.920388766E-02   -5.920388766E-02    5.213326356E-20
+  3) Finished k-point  69   15 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    33    1.345424385E-02    4.339953641E-15   -2.947002665E-02   -2.947002665E-02    9.565320532E-19
+  1) Finished k-point  33   15 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    52    2.692748270E-02    5.766206536E-15   -5.898475742E-02   -5.898475742E-02    1.183198417E-18
+  2) Finished k-point  52   16 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    70    1.344675625E-02    4.169300727E-15   -2.958494565E-02   -2.958494565E-02   -3.898661449E-19
+  3) Finished k-point  70   16 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    34    6.715373142E-03    4.825022192E-15   -1.468895927E-02   -1.468895927E-02   -1.175831760E-20
+  1) Finished k-point  34   16 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    53    2.692326996E-02    3.520470010E-15   -5.894684540E-02   -5.894684540E-02   -2.493329996E-19
+  2) Finished k-point  53   17 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    71    6.716374440E-03    6.339160660E-15   -1.480971775E-02   -1.480971775E-02   -1.699997725E-21
+  3) Finished k-point  71   17 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    35    3.348390246E-03    6.011047323E-15   -7.363865876E-03   -7.363865876E-03   -1.027081959E-20
+  1) Finished k-point  35   17 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    72    3.362322524E-03    5.441294226E-15   -7.406648371E-03   -7.406648371E-03   -8.669988397E-20
+  3) Finished k-point  72   18 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    54    2.686529243E-02    4.553628655E-15   -5.879285824E-02   -5.879285824E-02   -2.719996360E-20
+  2) Finished k-point  54   18 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_SIGMAG_DIRECT:    36    1.339789100E-02    4.731185655E-15   -2.951541396E-02   -2.951541396E-02   -7.763322944E-20
+  1) Finished k-point  36   18 with nemin=   1 nemax=  23 DM_nemin=   6 DM_nemax=  16 DM_nemaxx=  16
+:DMFT_NORMALIZATION_ADJOINT:    1    1.342980921569E+00    1.342980921569E+00    1.653371253149E-16
+:DMFT_NORMALIZATION_ADJOINT:    1    1.342980921569E+00    1.342980921569E+00    1.653371253149E-16
+:DMFT_NORMALIZATION_ADJOINT:    1    1.342980921569E+00    1.342980921569E+00    1.653371253149E-16
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+STOP  DMFT2 END
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO

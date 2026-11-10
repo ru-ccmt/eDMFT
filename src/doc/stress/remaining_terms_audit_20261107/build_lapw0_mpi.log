@@ -1,0 +1,396 @@
+if [ -f .sequential ]; then \
+	   rm -f .sequential modules.o libxc_mod.o W2kinit.o fft_modules.o reallocate.o energy.o finl_elect_str.o getff1.o getfft.o gtfnam.o lapw0.o outerr.o rean_direct_fft.o rean0.o rean3.o rean4.o setff1.o setff2.o setfft.o stress_gga.o xcpot1.o xcpot1Q.o xcpot3.o eramps.o inputpars.o *.mod; \
+	fi
+touch .parallel
+/Library/Developer/CommandLineTools/usr/bin/make PARALLEL=-DParallel ./lapw0_mpi \
+	  FORT=/opt/homebrew/bin/mpifort FFLAGS=' -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel'
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c W2kinit.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c fft_modules.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c reallocate.f
+make[1]: Circular pwxad4.o <- pwxad4.o dependency dropped.
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c pwxad4.F
+pwxad4.F:48:18:
+
+   48 |       DO 199 J=1,3
+      |                  1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 199 at (1)
+pwxad4.F:49:37:
+
+   49 |   199 DELT(I,J)=AVEC(I,J)/dble(LL(J))
+      |                                     1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 199 at (1)
+pwxad4.F:52:16:
+
+   52 |   200 AM(J)=0.D0
+      |                1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 200 at (1)
+pwxad4.F:65:23:
+
+   65 |       DO 201 I=-N0,N0,1
+      |                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 201 at (1)
+pwxad4.F:66:23:
+
+   66 |       DO 201 K=-IK,IK,1
+      |                       1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 201 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c br89.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c brj.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c charge.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c dfundr.f
+dfundr.f:116:72:
+
+  116 |     1 PS=PS+TERM *P(J)/DENOM
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 1 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c energy.F
+energy.F:131:24:
+
+  131 |          DO 40 ISPIN=1,2
+      |                        1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 40 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c epot1.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c eramps.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c gbj.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c getff1.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c getfft.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c gpoint.f
+gpoint.f:56:20:
+
+   56 |       DO 110 I=0,LUP
+      |                    1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 110 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c gpointL.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c gtfnam.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c hcthc.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c hcthx.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c hjs.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c inputpars.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c lapw0.F
+lapw0.F:1153:24:
+
+  380 |          call MPI_Bcast(iscf,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      |                        2
+......
+ 1153 |          call MPI_Bcast(rhokin,1,MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,ierr)
+      |                        1
+Warning: Type mismatch between actual argument at (1) and actual argument at (2) (COMPLEX(8)/INTEGER(4)).
+lapw0.F:2039:24:
+
+  703 |                 CALL MPI_RECV(CLM(1,LM1,JATOM),jri(jatom) , MPI_DOUBLE_PRECISION, 0, &
+      |                              2
+......
+ 2039 |           CALL MPI_RECV(i,1,MPI_INTEGER,myid-1,MPI_ANY_TAG,comm_coul &
+      |                        1
+Warning: Type mismatch between actual argument at (1) and actual argument at (2) (INTEGER(4)/REAL(8)).
+lapw0.F:2086:24:
+
+  695 |               CALL MPI_SEND(clm_tmp, jri(jatom), MPI_DOUBLE_PRECISION, myid1, 0, comm_coul, ierr)
+      |                            2
+......
+ 2086 |           CALL MPI_SEND(i,1,MPI_INTEGER,myid+1, 0,comm_coul,ierr)
+      |                        1
+Warning: Type mismatch between actual argument at (1) and actual argument at (2) (INTEGER(4)/REAL(8)).
+lapw0.F:2541:24:
+
+ 2459 |       call mpi_reduce(force_buf,force,1,MPI_LOGICAL,MPI_LOR,0,comm_coul,ierr)
+      |                      2  
+......
+ 2541 |         call mpi_reduce(vxcrhoc_buf,vxcrhoc,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,comm_coul,ierr)
+      |                        1
+Warning: Type mismatch between actual argument at (1) and actual argument at (2) (REAL(8)/LOGICAL(4)).
+lapw0.F:2541:36:
+
+ 2459 |       call mpi_reduce(force_buf,force,1,MPI_LOGICAL,MPI_LOR,0,comm_coul,ierr)
+      |                                2    
+......
+ 2541 |         call mpi_reduce(vxcrhoc_buf,vxcrhoc,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,comm_coul,ierr)
+      |                                    1
+Warning: Type mismatch between actual argument at (1) and actual argument at (2) (REAL(8)/LOGICAL(4)).
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c latgen.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c libxc.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c mgga_ms.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c multsu.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c outerr.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c pbea.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c pbec.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c pbex.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c poissn.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c pwxad5.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c readstruct.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c rean_direct_fft.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c rean0.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c rean3.F
+rean3.F:40:74:
+
+   40 |            DO 5000 I2=1,IFFT2
+      |                                                                          1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 5000 at (1)
+rean3.F:43:77:
+
+   43 |               DO 5000 I1=1,IFFT1
+      |                                                                             1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 5000 at (1)
+rean3.F:70:21:
+
+   30 |         call MPI_Bcast(vmean, 1, MPI_DOUBLE_COMPLEX, 0,MPI_COMM_WORLD , ierr)
+      |                       2
+......
+   70 |       call MPI_Bcast(u0, 1, MPI_DOUBLE_COMPLEX, 0,MPI_COMM_WORLD , ierr)
+      |                     1
+Warning: Type mismatch between actual argument at (1) and actual argument at (2) (REAL(8)/COMPLEX(8)).
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c rean4.F
+rean4.F:72:24:
+
+   72 |          DO 7 I2=1,IFFT2
+      |                        1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 7 at (1)
+rean4.F:73:27:
+
+   73 |             DO 7 I1=1,IFFT1
+      |                           1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 7 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c rotdef.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c rpbe.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c setff1.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c setfft.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c setff2.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c stern.f
+stern.f:36:71:
+
+   36 |    3       K=IZ(J,L,I)*G(L)+K
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 3 at (1)
+stern.f:66:72:
+
+   66 |    6     STG(J,NST)=STG(J,I)
+      |                                                                        1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 6 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c vresp.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c vxclm2.F
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c vx_screened.f
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c xcpot1.f
+xcpot1.f:1004:71:
+
+ 1004 |   19   EXC(ir,LM1,JATOM,1)=bbbu(LM1)
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 19 at (1)
+xcpot1.f:1015:77:
+
+ 1015 |  5019           EXC(ir,LM1,JATOM,2)=bbbd(LM1)
+      |                                                                             1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 5019 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c xcpot1Q.f
+xcpot1Q.f:563:73:
+
+  563 |   13      TEST=TEST+bbu(LM1)*YY(LM1,k)
+      |                                                                         1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 13 at (1)
+xcpot1Q.f:572:52:
+
+  572 |   12      SIGMA=SIGMA+weight(k)*(vxcsu(k)-TEST)**2
+      |                                                    1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 12 at (1)
+xcpot1Q.f:590:73:
+
+  590 |    11     VXC(ir,LM1,JATOM,1)=bbu(LM1)
+      |                                                                         1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 11 at (1)
+xcpot1Q.f:596:73:
+
+  596 |  113      TEST=TEST+bbu(LM1)*YY(LM1,k)
+      |                                                                         1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 113 at (1)
+xcpot1Q.f:601:82:
+
+  601 |  112      SIGMA=SIGMA+weight(k)*(vxcsu(k)-TEST)**2
+      |                                                                                  1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 112 at (1)
+xcpot1Q.f:634:74:
+
+  634 |  5013      TEST=TEST+bbd(LM1)*YY(LM1,k)
+      |                                                                          1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 5013 at (1)
+xcpot1Q.f:643:58:
+
+  643 |  5012     SIGMA=SIGMA+weight(k)*(vxcsd(k)-TEST)**2
+      |                                                          1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 5012 at (1)
+xcpot1Q.f:659:73:
+
+  659 |  5011     VXC(ir,LM1,JATOM,2)=bbd(LM1)
+      |                                                                         1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 5011 at (1)
+xcpot1Q.f:665:76:
+
+  665 |  5113        TEST=TEST+bbd(LM1)*YY(LM1,k)
+      |                                                                            1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 5113 at (1)
+xcpot1Q.f:670:54:
+
+  670 |  5112     SIGMA=SIGMA+weight(k)*(vxcsd(k)-TEST)**2
+      |                                                      1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 5112 at (1)
+xcpot1Q.f:694:71:
+
+  694 |   19   EXC(ir,LM1,JATOM,1)=bbbu(LM1)
+      |                                                                       1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 19 at (1)
+xcpot1Q.f:705:77:
+
+  705 |  5019           EXC(ir,LM1,JATOM,2)=bbbd(LM1)
+      |                                                                             1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 5019 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c xcpot3.F
+xcpot3.F:752:30:
+
+  752 |           DO 7781 I2=3,IFFT2-2
+      |                              1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 7781 at (1)
+xcpot3.F:753:31:
+
+  753 |            DO 7781 I3=3,IFFT3-2
+      |                               1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 7781 at (1)
+xcpot3.F:921:27:
+
+  921 |             DO 8 I2=1,IFFT2
+      |                           1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 8 at (1)
+xcpot3.F:922:30:
+
+  922 |                DO 8 I1=1,IFFT1
+      |                              1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 8 at (1)
+xcpot3.F:930:27:
+
+  930 |             DO 7 I2=1,IFFT2
+      |                           1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 7 at (1)
+xcpot3.F:931:30:
+
+  931 |                DO 7 I1=1,IFFT1
+      |                              1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 7 at (1)
+xcpot3.F:955:26:
+
+  955 |          DO 778 I2=1,IFFT2
+      |                          1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 778 at (1)
+xcpot3.F:956:29:
+
+  956 |             DO 778 I1=1,IFFT1
+      |                             1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 778 at (1)
+xcpot3.F:684:37:
+
+  684 |             if(myid.eq.0) write(21,*), ':INFO  :V_lmbj-up average in interstital:',lowrhocount1,v_mbj_limit1
+      |                                     1
+Warning: Legacy Extension: Comma before i/o item list at (1)
+xcpot3.F:696:37:
+
+  696 |             if(myid.eq.0) write(21,*), ':INFO  :V_xc-up average in interstital:',lowrhocount1,tau_over_rho1
+      |                                     1
+Warning: Legacy Extension: Comma before i/o item list at (1)
+xcpot3.F:710:37:
+
+  710 |             if(myid.eq.0) write(21,*), ':INFO  :V_lmbj-dn average in interstital:',lowrhocount2,v_mbj_limit2
+      |                                     1
+Warning: Legacy Extension: Comma before i/o item list at (1)
+xcpot3.F:723:37:
+
+  723 |             if(myid.eq.0) write(21,*), ':INFO  :V_xc-dn average in interstital:',lowrhocount2,v_mbj_limit2
+      |                                     1
+Warning: Legacy Extension: Comma before i/o item list at (1)
+xcpot3.F:164:24:
+
+  151 |         call MPI_Bcast(nkksp,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      |                       2 
+......
+  164 |          call MPI_Bcast(rhoksp,nkksp*2,MPI_DOUBLE_COMPLEX,0,MPI_COMM_WORLD,ierr)
+      |                        1
+Warning: Type mismatch between actual argument at (1) and actual argument at (2) (COMPLEX(8)/INTEGER(4)).
+xcpot3.F:671:25:
+
+  435 |          CALL MPI_ALLREDUCE(prociff3, prociff3_buf, npe, MPI_INTEGER, MPI_SUM,MPI_COMM_WORLD, ierr )
+      |                            2
+......
+  671 |       call MPI_ALLREDUCE(lowrhocount1,lowrhocount1_buf,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+      |                         1
+Warning: Rank mismatch between actual argument at (1) and actual argument at (2) (rank-1 and scalar)
+xcpot3.F:671:38:
+
+  435 |          CALL MPI_ALLREDUCE(prociff3, prociff3_buf, npe, MPI_INTEGER, MPI_SUM,MPI_COMM_WORLD, ierr )
+      |                                      2
+......
+  671 |       call MPI_ALLREDUCE(lowrhocount1,lowrhocount1_buf,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+      |                                      1
+Warning: Rank mismatch between actual argument at (1) and actual argument at (2) (rank-1 and scalar)
+xcpot3.F:672:25:
+
+  435 |          CALL MPI_ALLREDUCE(prociff3, prociff3_buf, npe, MPI_INTEGER, MPI_SUM,MPI_COMM_WORLD, ierr )
+      |                            2
+......
+  672 |       call MPI_ALLREDUCE(lowrhocount2,lowrhocount2_buf,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+      |                         1
+Warning: Rank mismatch between actual argument at (1) and actual argument at (2) (rank-1 and scalar)
+xcpot3.F:672:38:
+
+  435 |          CALL MPI_ALLREDUCE(prociff3, prociff3_buf, npe, MPI_INTEGER, MPI_SUM,MPI_COMM_WORLD, ierr )
+      |                                      2
+......
+  672 |       call MPI_ALLREDUCE(lowrhocount2,lowrhocount2_buf,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+      |                                      1
+Warning: Rank mismatch between actual argument at (1) and actual argument at (2) (rank-1 and scalar)
+xcpot3.F:673:25:
+
+  435 |          CALL MPI_ALLREDUCE(prociff3, prociff3_buf, npe, MPI_INTEGER, MPI_SUM,MPI_COMM_WORLD, ierr )
+      |                            2
+......
+  673 |       call MPI_ALLREDUCE(tau_over_rho1,tau_over_rho1_buf,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      |                         1
+Warning: Type mismatch between actual argument at (1) and actual argument at (2) (REAL(8)/INTEGER(4)).
+xcpot3.F:673:39:
+
+  435 |          CALL MPI_ALLREDUCE(prociff3, prociff3_buf, npe, MPI_INTEGER, MPI_SUM,MPI_COMM_WORLD, ierr )
+      |                                      2 
+......
+  673 |       call MPI_ALLREDUCE(tau_over_rho1,tau_over_rho1_buf,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      |                                       1
+Warning: Type mismatch between actual argument at (1) and actual argument at (2) (REAL(8)/INTEGER(4)).
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c ykav.f
+ykav.f:27:96:
+
+   27 |  37      yka(lmx)=(0.d0,0.d0)    !  corrected 3.21. average of angles is zero dcmplx(sqfpi,0.d0)
+      |                                                                                                1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 37 at (1)
+ykav.f:34:31:
+
+   34 |  40   index=index+mult(latom-1)
+      |                               1
+Warning: Fortran 2018 deleted feature: DO termination statement which is not END DO or CONTINUE with label 40 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c finl_elect_str.F
+finl_elect_str.F:589:28:
+
+  589 |    DO 20 mu = 1, mult(jatom)
+      |                            1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 20 at (1)
+finl_elect_str.F:604:27:
+
+  604 |          DO 40 ispin = 1, 2
+      |                           1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 40 at (1)
+finl_elect_str.F:642:35:
+
+  642 |           DO 50 mu = 1, mult(jatom)
+      |                                   1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 50 at (1)
+/opt/homebrew/bin/mpifort -ffree-form -O2 -ffree-line-length-none -fallow-argument-mismatch -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include -fopenmp -DParallel -c stress_gga.F
+stress_gga.F:102:32:
+
+  102 |     DO 29 mu    = 1, mult(jatom)
+      |                                1
+Warning: Fortran 2018 deleted feature: Shared DO termination label 29 at (1)
+/opt/homebrew/bin/mpifort -o ./lapw0_mpi cputim.o modules.o libxc_mod.o W2kinit.o fft_modules.o reallocate.o acggac.o ainv.o ak13.o am05_xscss.o b88.o br89.o brj.o cap.o charge.o chfac.o chslv.o corgga.o corpbe_revtpss.o corpbe_tpss.o cub_xc_back.o corlsd.o dergl.o dfxhpbe.o dfxrevtpss.o dfxtpss.o dfundr.o dylm.o efg.o energy.o epot1.o eramps.o errclr.o errflg.o ev92.o ev92ex.o exch.o fxhpbe.o fx_revtpss.o fx_tpss.o gbass.o gbj.o gcor.o getff1.o getfft.o gpoint.o gpointL.o gpointm.o grans.o gtfnam.o hcthc.o hcthx.o hjs.o htbs.o id_func_get.o ifflim.o inputpars.o kcis.o lapw0.o latgen.o lb94.o libxc.o lyp.o mbeefx.o mgga_ms.o multfc.o multsu.o mvsx.o optb86b.o optb88.o outerr.o pbea.o pbec.o pbeint.o pbex.o poissn.o potfac.o pwxad4.o pwxad5.o readstruct.o rean_direct_fft.o rean0.o rean3.o rean4.o rge2.o rhopw.o rotate.o rotdef.o rpbe.o rscanc.o rscanx.o r2scanc.o r2scanx.o scanc.o scanx.o setff0.o setff1.o setfft.o setff2.o sortag.o sg4c.o sg4x.o sicpbe.o sicpbe_revtpss.o sicpbe_tm.o sicpbe_tpss.o sphbes.o spline.o srolyl.o stern.o sumfac.o suml.o SymmRot.o tmx.o vpw91.o vresp.o vs98.o vwn5.o vxclm2.o vxcpw2.o vx_screened.o wc05.o workf1.o W2kutils.o xcener.o xcpot.o xcpot1.o xcpot1Q.o xcpot3.o ykav.o ylm.o coulint.o c_alpha_m.o gaunt.o notri.o t3j0.o t3j.o ph.o finl_elect_str.o kahan_summ_gxyz.o stress_gga.o gga_metric_tensor.o -ffree-form -O2 -ftree-vectorize -march=native -ffree-line-length-none -ffpe-summary=none  -DFFTW3 -DFFTW_OMP -I/opt/homebrew/include  -fopenmp -L../SRC_lib  -lfftw3_mpi  -L/opt/homebrew/lib -lfftw3_omp -lfftw3 -framework Accelerate   
+ld: warning: search path '../SRC_lib' not found
+if [ -f /include/xc_funcs.h ]; then cp /include/xc_funcs.h .; fi

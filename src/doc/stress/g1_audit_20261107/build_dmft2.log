@@ -1,0 +1,3 @@
+mpif90  -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c stress_modules.f90 -o stress_modules.o
+/Users/haule/miniconda3-clean/envs/work311/bin/mpif90: line 402: arm64-apple-darwin20.0.0-gfortran: command not found
+make: *** [stress_modules.o] Error 127

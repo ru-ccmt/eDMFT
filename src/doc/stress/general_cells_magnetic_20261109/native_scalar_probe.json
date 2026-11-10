@@ -1,0 +1,68 @@
+{
+  "MnO": {
+    "scope": "One native update on saved endpoint densities, NOT newly reconverged endpoints. Independent reconstruction C_DEN+core+L+mu*Ntarget.",
+    "values": [
+      {
+        "directory": "MnO_center",
+        "core_ry": -1395.7098424479998,
+        "den_ry": -1044.14257662,
+        "lattice_ry": -31.378621036732326,
+        "K_ry": -2471.2310401047325,
+        "mu_ry": 0.48570421866071534,
+        "volume": 148.11716074988342
+      },
+      {
+        "directory": "MnO_m_0.001",
+        "core_ry": -1395.7023074,
+        "den_ry": -1044.17175876,
+        "lattice_ry": -31.354828716381384,
+        "K_ry": -2471.2288948763817,
+        "mu_ry": 0.4857899917878711,
+        "volume": 147.67324755737317
+      },
+      {
+        "directory": "MnO_p_0.001",
+        "core_ry": -1395.715731174,
+        "den_ry": -1044.1167071,
+        "lattice_ry": -31.400827571844793,
+        "K_ry": -2471.233265845845,
+        "mu_ry": 0.4857899917878711,
+        "volume": 148.56196266906022
+      }
+    ],
+    "mean_numeric_stress_GPa": -72.35171059018768
+  },
+  "MnTe": {
+    "scope": "One native update on saved endpoint densities, NOT newly reconverged endpoints. Independent reconstruction C_DEN+core+L+mu*Ntarget.",
+    "values": [
+      {
+        "directory": "dmft",
+        "core_ry": -19114.996978190007,
+        "den_ry": -12602.76363649,
+        "lattice_ry": -106.12195683886786,
+        "K_ry": -31823.88257151888,
+        "mu_ry": 0.44832342410243764,
+        "volume": 674.5630071858831
+      },
+      {
+        "directory": "dmft_m_0.001",
+        "core_ry": -19114.796131828003,
+        "den_ry": -12603.09442515,
+        "lattice_ry": -105.99190756014475,
+        "K_ry": -31823.88246453815,
+        "mu_ry": 0.45073694162049116,
+        "volume": 672.5412824542705
+      },
+      {
+        "directory": "dmft_p_0.001",
+        "core_ry": -19115.197619521998,
+        "den_ry": -12602.43316314,
+        "lattice_ry": -106.25186544889978,
+        "K_ry": -31823.882648110895,
+        "mu_ry": 0.4459132840068797,
+        "volume": 676.5887795309089
+      }
+    ],
+    "mean_numeric_stress_GPa": -0.667209300357142
+  }
+}

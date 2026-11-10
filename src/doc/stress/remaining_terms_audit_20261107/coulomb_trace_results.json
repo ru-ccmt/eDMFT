@@ -1,0 +1,34 @@
+{
+  "SrVO3_DFT": {
+    "E_es_Ry": -16838.89080313,
+    "density_coulomb_trace_Ry": 16838.890687776082,
+    "identity_residual_mean_GPa": -0.001477985952835894,
+    "E_xc_Ry": -334.83511963,
+    "volume": 382.70904,
+    "original_identity_residual_mean_GPa": -0.0019834593199584854
+  },
+  "SrVO3_DMFT": {
+    "E_es_Ry": -16839.076139599998,
+    "density_coulomb_trace_Ry": 16839.07602425859,
+    "identity_residual_mean_GPa": -0.0014778256470856313,
+    "E_xc_Ry": -334.85904012,
+    "volume": 382.70904,
+    "original_identity_residual_mean_GPa": -0.0038248676416377057
+  },
+  "FeSe_DFT": {
+    "E_es_Ry": -29349.300140419997,
+    "density_coulomb_trace_Ry": 29349.300091665573,
+    "identity_residual_mean_GPa": -0.0004519556355862151,
+    "E_xc_Ry": -575.660958,
+    "volume": 528.96251,
+    "original_identity_residual_mean_GPa": -0.06540213853429806
+  },
+  "FeSe_DMFT": {
+    "E_es_Ry": -29350.075934290002,
+    "density_coulomb_trace_Ry": 29350.075885532282,
+    "identity_residual_mean_GPa": -0.00045198619158338537,
+    "E_xc_Ry": -575.63414356,
+    "volume": 528.96251,
+    "original_identity_residual_mean_GPa": -0.05730688994850459
+  }
+}

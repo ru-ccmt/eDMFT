@@ -1,0 +1,30 @@
+{
+  "material": "FeSe",
+  "transpose": {
+    "forward": -1.0320714304669005,
+    "reverse": -1.0320714304669039,
+    "relative": 3.2271691430976746e-15
+  },
+  "direct_basis_norm": 0.10823766059255435,
+  "density_matrix_norm": 1.0922172316141119,
+  "steps": [
+    {
+      "step": 0.002,
+      "relative": 1.7551069673664978e-07,
+      "maximum": 1.7395571316747294e-08,
+      "frozen_basis_relative": 0.09529667520007129
+    },
+    {
+      "step": 0.001,
+      "relative": 4.386427040305255e-08,
+      "maximum": 4.350311999523626e-09,
+      "frozen_basis_relative": 0.0952967245124759
+    },
+    {
+      "step": 0.0005,
+      "relative": 1.1342461088862335e-08,
+      "maximum": 1.2043399888472806e-09,
+      "frozen_basis_relative": 0.09529673618609287
+    }
+  ]
+}

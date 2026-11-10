@@ -1,0 +1,528 @@
+{
+  "SrVO3": {
+    "before": {
+      "diagonal_GPa": [
+        8.615101456387219,
+        8.615101456387219,
+        8.649891621754703
+      ],
+      "mean_GPa": 8.626698178176381,
+      "density_RyBohr3": [
+        [
+          14.949488763207,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          14.949488763207,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          14.949486308956
+        ]
+      ],
+      "core_RyBohr3": [
+        [
+          14.3196723002,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          14.3196723002,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          14.3196717967
+        ]
+      ]
+    },
+    "after": {
+      "diagonal_GPa": [
+        8.616830736437361,
+        8.616830736437361,
+        8.647949465815799
+      ],
+      "mean_GPa": 8.627203646230173,
+      "density_RyBohr3": [
+        [
+          14.949488880761,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          14.949488880761,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          14.949486176931
+        ]
+      ],
+      "core_RyBohr3": [
+        [
+          14.3196723002,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          14.3196723002,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          14.3196717967
+        ]
+      ]
+    },
+    "case": "SrVO3",
+    "source": "/Users/haule/projects/materials/SrVO3/DFT_center",
+    "input_hashes": {
+      "SrVO3.struct": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563",
+      "SrVO3.clmsum": "20d0c43a8f2e047107f8204bede9165a40406309efce853247f143fdd86a5cd5",
+      "SrVO3.clmup": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "SrVO3.clmdn": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "SrVO3.in0": "a5063cfa01bd56d3a41eb44304a7ef01f44e42435b8098edc1337624c101fb78",
+      "SrVO3.in1c": "45f176e2764a25a33d4976eafe043df3d55ebcb1f5ca7021a1b73721b3250aea",
+      "SrVO3.in2c": "9ac5e1940aa0c00e4309781280009241ab44b579af463419540d161224a489d5",
+      "SrVO3.inc": "251bc8a02b68d1000c2fd13645b61283a0aebdc758dd9e9e0123bd2b21d82dc7",
+      "SrVO3.inm": "727743e55e3d46ec4ec34a9284e78ed772f3c635e5bc79b085bcf043dc49eabc",
+      "SrVO3.klist": "c6939ae844372c9a9c8e45e47b220fa6b7a1aff54c42df87807006442c5d4b69",
+      "SrVO3.kgen": "304ca985c715bc11b266c76947ef618d38423fe86a1c8e5a5976bafacc27273f",
+      "SrVO3.rotlm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "SrVO3.vsp": "add80edb250060fc6f3add5a45c895fed4682c18fc9610ff0a4d300858cd9ba6",
+      "SrVO3.vns": "8c7a2e0d8ece3823a6cb95e5b26bfed1a47133f12d9b20e27d2395c2e56a679f",
+      "SrVO3.clmcor": "39bbca68821f09d6a6c3e8da2bd357a9f5d31f8f0217281ad09fac6a0f4e69bd",
+      "SrVO3.r2v": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "reference_dirs": [
+      "/Users/haule/projects/materials/SrVO3/DFT_m001",
+      "/Users/haule/projects/materials/SrVO3/DFT_center",
+      "/Users/haule/projects/materials/SrVO3/DFT_p001"
+    ],
+    "energies_Ry": [
+      -8592.40883374,
+      -8592.40820021,
+      -8592.40752198
+    ],
+    "charge_distances": [
+      5e-07,
+      0.0,
+      2e-07
+    ],
+    "Eorb_hashes": [
+      "e71de7fe271878c5e70cf17b4fd380882b049f1482b200ff4e9ba7f235ec8399",
+      "e71de7fe271878c5e70cf17b4fd380882b049f1482b200ff4e9ba7f235ec8399",
+      "e71de7fe271878c5e70cf17b4fd380882b049f1482b200ff4e9ba7f235ec8399"
+    ],
+    "volume": 382.70904,
+    "numerical_GPa": 8.403541158276836,
+    "after_minus_numeric_GPa": 0.22366248795333732,
+    "ordinary_outputs_identical": {
+      "vsp": true,
+      "vns": true,
+      "clmcor": true
+    },
+    "reference_input_hashes": [
+      {
+        "struct": "a44f84665fb00d0b8941bf4bfb64ccf517337e6da49c85175ffcdb7afae46bcf",
+        "in0": "2bee8d34243532ddadcbad51c4e68489c49188b8ade049aa78a4740b3c49d8a0",
+        "in1c": "684fb8b69725f38a5ec0db3b32341522dbaa9723aade427952f11cdb99fe49a1",
+        "in2c": "750f55b441458b3eefa30fb995bce82253b8e820cbc34546525f2a7342cfbd0c",
+        "klist": "c6939ae844372c9a9c8e45e47b220fa6b7a1aff54c42df87807006442c5d4b69"
+      },
+      {
+        "struct": "fa16cd9fc103234c73682da1d3935dfe251d7af78f796680d3a6962ee1d88563",
+        "in0": "a5063cfa01bd56d3a41eb44304a7ef01f44e42435b8098edc1337624c101fb78",
+        "in1c": "45f176e2764a25a33d4976eafe043df3d55ebcb1f5ca7021a1b73721b3250aea",
+        "in2c": "9ac5e1940aa0c00e4309781280009241ab44b579af463419540d161224a489d5",
+        "klist": "c6939ae844372c9a9c8e45e47b220fa6b7a1aff54c42df87807006442c5d4b69"
+      },
+      {
+        "struct": "06338c0a3405ae621fc18ebdfa2c355c8e344e8832d9eddce5bc746efe092221",
+        "in0": "2bee8d34243532ddadcbad51c4e68489c49188b8ade049aa78a4740b3c49d8a0",
+        "in1c": "fde739f56114522affd0a55f9b4ba95a34f7c545de085adda80d206fd95e9db8",
+        "in2c": "61822f0e35fa6e72e58081dacaa00e5306853e3b61801c487a63823ba187c8e2",
+        "klist": "c6939ae844372c9a9c8e45e47b220fa6b7a1aff54c42df87807006442c5d4b69"
+      }
+    ],
+    "basis_consistency": {
+      "k": true,
+      "weight": true,
+      "basis": true,
+      "bands": true,
+      "pw_hash": true
+    },
+    "original_center_vector_nk": 12,
+    "nk": 75,
+    "nbands": [
+      43
+    ],
+    "basis_range": [
+      690,
+      713
+    ],
+    "mixer_mean_GPa": 8.6272,
+    "fresh_charge_distance": 1.3e-06
+  },
+  "FeSe": {
+    "before": {
+      "diagonal_GPa": [
+        13.182516193001007,
+        13.182516193001007,
+        9.591815828548183
+      ],
+      "mean_GPa": 11.985616071516732,
+      "density_RyBohr3": [
+        [
+          18.850387836228,
+          -0.0,
+          -0.0
+        ],
+        [
+          -0.0,
+          18.850387836228,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          18.853083787536
+        ]
+      ],
+      "core_RyBohr3": [
+        [
+          17.097282365,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          17.097282365,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          17.0975715736
+        ]
+      ]
+    },
+    "after": {
+      "diagonal_GPa": [
+        13.494882490565532,
+        13.494882490565532,
+        9.714513715676818
+      ],
+      "mean_GPa": 12.234759565602628,
+      "density_RyBohr3": [
+        [
+          18.850409070445,
+          -0.0,
+          -0.0
+        ],
+        [
+          -0.0,
+          18.850409070445,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          18.853092128364
+        ]
+      ],
+      "core_RyBohr3": [
+        [
+          17.097282365,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          17.097282365,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          17.0975715736
+        ]
+      ]
+    },
+    "case": "FeSe",
+    "source": "/Users/haule/projects/materials/FeSe_again/FeSe_stress/DFT_RELA",
+    "input_hashes": {
+      "FeSe.struct": "7503825334944f3d0e646b10a60d22f4f1924768ddb27499700f64682e59be16",
+      "FeSe.clmsum": "e0097b896696c3f309d3868de13dcf4db796611309247e2d567d1763b0bba19c",
+      "FeSe.clmup": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "FeSe.clmdn": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "FeSe.in0": "1bb921ceb142731037ffe64f093784d432fa3482b6326bfed591d9590cac6dc0",
+      "FeSe.in1": "39058e05b1d10915102828cdd815adf4ba9b5ca3d7c87a964537f2a6d45cb13d",
+      "FeSe.in2": "c85783b1ed2633c0e42480f823d3e2f1c1ef2ef75449b812685c221d3035ef2a",
+      "FeSe.inc": "0ac3ab457ee4eec66d89db0f174d778051428cac83f955b3e97932ae9364fed7",
+      "FeSe.inm": "cbba28dc54651799133bfe9794bb9ba0a9ab48dc9d2d100a4757714068d609ba",
+      "FeSe.klist": "fdbbfa4febf7e879ec4b386ea778c72fee43d8949806482a5c393c9602b183b1",
+      "FeSe.kgen": "59e613fe8ff1cf9777e7b47304f7eda16905f29902e642acd23ed594d8f9c75e",
+      "FeSe.rotlm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "FeSe.vsp": "6fd231f71462a68c830957901993ff404e2f17a4cf8c01d62da55c0185a7e059",
+      "FeSe.vns": "aa73dfd0fe36f7b945f0134a460930d0fcd8baac4295afadd234461881abe91e",
+      "FeSe.clmcor": "e459d0bf3711d87efacf6b40d77b6badec1c836815cdb8892da27114d2352d19",
+      "FeSe.r2v": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "reference_dirs": [
+      "/Users/haule/projects/materials/FeSe_again/FeSe_stress/DFT_RELA_m001",
+      "/Users/haule/projects/materials/FeSe_again/FeSe_stress/DFT_RELA",
+      "/Users/haule/projects/materials/FeSe_again/FeSe_stress/DFT_RELA_p001"
+    ],
+    "energies_Ry": [
+      -14811.71733719,
+      -14811.7160405,
+      -14811.71471824
+    ],
+    "charge_distances": [
+      4e-07,
+      1e-07,
+      3e-07
+    ],
+    "Eorb_hashes": [
+      "e7739fd4cbc13d3697094c500e47547cd17460fe8a8c01f2df708202b3f74ade",
+      "e7739fd4cbc13d3697094c500e47547cd17460fe8a8c01f2df708202b3f74ade",
+      "e7739fd4cbc13d3697094c500e47547cd17460fe8a8c01f2df708202b3f74ade"
+    ],
+    "volume": 528.96251,
+    "numerical_GPa": 12.138890191714445,
+    "after_minus_numeric_GPa": 0.09586937388818306,
+    "ordinary_outputs_identical": {
+      "vsp": true,
+      "vns": true,
+      "clmcor": true
+    },
+    "reference_input_hashes": [
+      {
+        "struct": "314f3d2808715e9e6e220ec7a5b3e52d9b57b763d64b85e4eff9a84ba4e39565",
+        "in0": "1bb921ceb142731037ffe64f093784d432fa3482b6326bfed591d9590cac6dc0",
+        "in1": "1cc5080c9daaec44e602c5ebb01add0cc43e998d9b73195787b7fd2f5a0e41cb",
+        "in2": "3a2553bd25d773c11fb8b7e2aa5647164b7158f734423c443859f4ff029a4ab0",
+        "klist": "fdbbfa4febf7e879ec4b386ea778c72fee43d8949806482a5c393c9602b183b1"
+      },
+      {
+        "struct": "7503825334944f3d0e646b10a60d22f4f1924768ddb27499700f64682e59be16",
+        "in0": "1bb921ceb142731037ffe64f093784d432fa3482b6326bfed591d9590cac6dc0",
+        "in1": "39058e05b1d10915102828cdd815adf4ba9b5ca3d7c87a964537f2a6d45cb13d",
+        "in2": "c85783b1ed2633c0e42480f823d3e2f1c1ef2ef75449b812685c221d3035ef2a",
+        "klist": "fdbbfa4febf7e879ec4b386ea778c72fee43d8949806482a5c393c9602b183b1"
+      },
+      {
+        "struct": "adffb7c1382bf50458538f0b01334d83c639235b2f275c914d99985aea6cc5e7",
+        "in0": "1bb921ceb142731037ffe64f093784d432fa3482b6326bfed591d9590cac6dc0",
+        "in1": "659f2b92878595a3fbd3807d903ba9e9abdf4c75c542537b7dc5ef930308644e",
+        "in2": "72a3039d19ed4d3a53f06182e6f74fbcb1134d077437641a43dd7d9d6901cd4b",
+        "klist": "fdbbfa4febf7e879ec4b386ea778c72fee43d8949806482a5c393c9602b183b1"
+      }
+    ],
+    "basis_consistency": {
+      "k": true,
+      "weight": true,
+      "basis": true,
+      "bands": true,
+      "pw_hash": true
+    },
+    "original_center_vector_nk": 140,
+    "nk": 140,
+    "nbands": [
+      66
+    ],
+    "basis_range": [
+      492,
+      516
+    ],
+    "mixer_mean_GPa": 12.23476,
+    "fresh_charge_distance": 1.04e-05
+  },
+  "MnTe": {
+    "before": {
+      "diagonal_GPa": [
+        13.8904087937293,
+        13.8904087937293,
+        22.82085048444107
+      ],
+      "mean_GPa": 16.867222690633223,
+      "density_RyBohr3": [
+        [
+          32.243982091595,
+          -0.0,
+          -0.0
+        ],
+        [
+          -0.0,
+          32.243982091595,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          32.242168070567
+        ]
+      ],
+      "core_RyBohr3": [
+        [
+          31.1136835101,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          31.1136835101,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          31.1135499761
+        ]
+      ]
+    },
+    "after": {
+      "diagonal_GPa": [
+        13.870129493598917,
+        13.870129523074826,
+        23.077982882399883
+      ],
+      "mean_GPa": 16.939413966357876,
+      "density_RyBohr3": [
+        [
+          32.243980713037,
+          -0.0,
+          -0.0
+        ],
+        [
+          -0.0,
+          32.243980713039,
+          -0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          32.242185550062
+        ]
+      ],
+      "core_RyBohr3": [
+        [
+          31.1136835101,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          31.1136835101,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          31.1135499761
+        ]
+      ]
+    },
+    "case": "0_800_MnTe",
+    "source": "/Users/haule/projects/materials/MnTe/0_800_MnTe",
+    "input_hashes": {
+      "0_800_MnTe.struct": "8dae93934c08eaa490a4c33a2fd87631a08bf5bf3edb6c1851dd33b2cb757e20",
+      "0_800_MnTe.clmsum": "6d6f53a376fe69e3261c5f36f75eb142d268434fce85ef500ff6a9c00e23850d",
+      "0_800_MnTe.clmup": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "0_800_MnTe.clmdn": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "0_800_MnTe.in0": "7b3bf0a332c727254d4a108b48b3dc5cee76142c6d39cb2d61ee72fe651b58cc",
+      "0_800_MnTe.in1": "bb27d01294bd75aa8d10f7e0209ea7659b5f8510ea6368011b36c75fca10f33b",
+      "0_800_MnTe.in1c": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "0_800_MnTe.in2": "f2a8c8b7518da468699bd5fabd21e3f8d5ffc95d8931e2cfa9db41511fcf89b5",
+      "0_800_MnTe.inc": "8493e9f213cb722639562a722d8c6b31051a6fa0ee683f1a262753596bfe3dbf",
+      "0_800_MnTe.inm": "727743e55e3d46ec4ec34a9284e78ed772f3c635e5bc79b085bcf043dc49eabc",
+      "0_800_MnTe.klist": "1ae6d388007ce2099f6830992c27bacd7f9c2e63f11f2b6d13c4f75681377751",
+      "0_800_MnTe.kgen": "9dd0b6e170cee76707461371f8f9537c4b0de65fdca5756f332209a5b3d8c2ad",
+      "0_800_MnTe.rotlm": "6407ed5dceaa317d6377a533eec98e106e226eb66260a5f9cbe5a446d937867a",
+      "0_800_MnTe.vsp": "6b2aacbc18c315a258e177d2eb38c718ec3cab501ae64859b17bf42bda22906f",
+      "0_800_MnTe.vns": "bc5998941f2654e10528b28a987bbb75c9371d8f392bad9f8c2bbbc74f234093",
+      "0_800_MnTe.clmcor": "bdd0f8a54242d4c13cf2ca1e0360972d2ccf88900de14f77b20b5fb5da394dd5",
+      "0_800_MnTe.r2v": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "reference_dirs": [
+      "/Users/haule/projects/materials/MnTe/MnTe_m_0.001",
+      "/Users/haule/projects/materials/MnTe/0_800_MnTe",
+      "/Users/haule/projects/materials/MnTe/MnTe_p_0.001"
+    ],
+    "energies_Ry": [
+      -31822.00697387,
+      -31822.00453333,
+      -31822.00208137
+    ],
+    "charge_distances": [
+      1e-07,
+      4e-07,
+      4e-07
+    ],
+    "Eorb_hashes": [
+      null,
+      null,
+      null
+    ],
+    "volume": 674.56301,
+    "numerical_GPa": 17.78217909539281,
+    "after_minus_numeric_GPa": -0.8427651290349338,
+    "ordinary_outputs_identical": {
+      "vsp": true,
+      "vns": true,
+      "clmcor": true
+    },
+    "reference_input_hashes": [
+      {
+        "struct": "c69ae6ce164bcd7e6ab8e0cb387e393ebc5742e72ab13c72f6c12952b10b5945",
+        "in0": "73d1e113f30a428061a35ca154f9fa5a33fbca8aa59533206b24fcb2eeaaaf4a",
+        "in1": "b2cf1107d5d46726cb546fb9a3a553685dd6ea5f6918ecbdd7de4bc09af9dd8c",
+        "in2": "2a173a8edc31b030f28d32fa1d960c958e6aa9403dc0f66982c9ed31c277b35a",
+        "klist": "1ae6d388007ce2099f6830992c27bacd7f9c2e63f11f2b6d13c4f75681377751"
+      },
+      {
+        "struct": "8dae93934c08eaa490a4c33a2fd87631a08bf5bf3edb6c1851dd33b2cb757e20",
+        "in0": "7b3bf0a332c727254d4a108b48b3dc5cee76142c6d39cb2d61ee72fe651b58cc",
+        "in1": "bb27d01294bd75aa8d10f7e0209ea7659b5f8510ea6368011b36c75fca10f33b",
+        "in2": "f2a8c8b7518da468699bd5fabd21e3f8d5ffc95d8931e2cfa9db41511fcf89b5",
+        "klist": "1ae6d388007ce2099f6830992c27bacd7f9c2e63f11f2b6d13c4f75681377751"
+      },
+      {
+        "struct": "8620f44f48c042fc041565f868d22a68afa9f5a81344960a3dc7c4951c525530",
+        "in0": "73d1e113f30a428061a35ca154f9fa5a33fbca8aa59533206b24fcb2eeaaaf4a",
+        "in1": "f04d811bbbc8ce3d58c03d67cfc18c7e8d5bbb328ca3538eb1c598d1e598595b",
+        "in2": "0153c50fa67ef393ad9346e514f4c996e4df26ffb2056602118e9e4224c35823",
+        "klist": "1ae6d388007ce2099f6830992c27bacd7f9c2e63f11f2b6d13c4f75681377751"
+      }
+    ],
+    "basis_consistency": {
+      "k": true,
+      "weight": true,
+      "basis": true,
+      "bands": true,
+      "pw_hash": true
+    },
+    "original_center_vector_nk": 100,
+    "nk": 100,
+    "nbands": [
+      64
+    ],
+    "basis_range": [
+      399,
+      440
+    ],
+    "mixer_mean_GPa": 16.93941,
+    "fresh_charge_distance": 5.25e-05
+  }
+}

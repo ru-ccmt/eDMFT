@@ -1,0 +1,950 @@
+--- /dev/null
++++ b/SRC_lapw2/val_rela_kinstrmt.F
+@@ -0,0 +1,947 @@
++module rela_operator_cache
++ implicit none
++ integer, allocatable, save :: basis_lm(:),basis_ch(:),pair_p(:),pair_q(:)
++ integer*8, allocatable, save :: input_key(:)
++ complex*16, allocatable, save :: operators(:,:,:)
++ real*8, allocatable, save :: overlap(:)
++ integer, save :: nbasis=0,npairs=0,builds=0,hits=0
++contains
++subroutine apply_cached_rela(nemin,nemax,jatom,alm,blm,clm, &
++    rmesh,dx,lf,ldf,sf,sdf,qd,qu,dvry,nmap,outmap,hmap,dmap, &
++    nmap2,outmap2,hmap2,old_scale,surf_scale,en_scale,nat_scale,mass_scale, &
++    band_energy,buf_corr,buf_sr,buf_old,buf_surf)
++ use lo, only: ilo,loor
++ use TestCases, only: SimpInt,ConOpt
++ implicit none
++ integer,intent(in)::nemin,nemax,jatom,nmap(:),outmap(:,:),nmap2(:),outmap2(:,:)
++ complex*16,intent(in)::alm(:,:),blm(:,:),clm(:,:,:),hmap(:,:,:),dmap(:,:,:),hmap2(:,:,:)
++ real*8,intent(in)::rmesh(:),dx,lf(:,0:,:),ldf(:,0:,:),sf(:,0:,:),sdf(:,0:,:), &
++    qd(:,0:,:),qu(:,0:,:),dvry(:),old_scale,surf_scale,en_scale,nat_scale,mass_scale,band_energy(:)
++ complex*16,intent(out)::buf_corr(:,:,:),buf_sr(:,:,:),buf_old(:,:,:),buf_surf(:,:,:)
++ real*8,allocatable::key_real(:)
++ integer*8,allocatable::new_key(:)
++ complex*16,allocatable::coeff(:)
++ complex*16::sums(9,5),product,norm_value
++ integer::num,p,q,k,a,b,t,u,log_unit
++ logical::refresh
++ character(len=32)::cache_env
++ integer::cache_status
++ real*8::t0,t1,t2
++ key_real=[dble(jatom),dble(size(rmesh)),dble(size(lf,2)),dble(size(lf,3)),dx,merge(1.d0,0.d0,SimpInt),merge(1.d0,0.d0,ConOpt),old_scale,surf_scale,en_scale,nat_scale,mass_scale, &
++    dble(ilo),reshape(merge(1.d0,0.d0,loor),[size(loor)]), &
++    rmesh,dvry,reshape(lf,[size(lf)]),reshape(ldf,[size(ldf)]), &
++    reshape(sf,[size(sf)]),reshape(sdf,[size(sdf)]), &
++    reshape(qd,[size(qd)]),reshape(qu,[size(qu)])]
++ new_key=transfer(key_real,[0_8],size(key_real))
++ refresh=.true.
++ if(allocated(input_key)) then
++    if(size(input_key).eq.size(new_key)) refresh=any(input_key.ne.new_key)
++ endif
++ call cpu_time(t0)
++ if(refresh) then
++    call build_operators(rmesh,dx,lf,ldf,sf,sdf,qd,qu,dvry, &
++       nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2,old_scale,surf_scale,en_scale,nat_scale,mass_scale)
++    input_key=new_key
++    builds=builds+1
++ else
++    hits=hits+1
++ endif
++ call cpu_time(t1)
++ buf_corr=(0.d0,0.d0);buf_sr=(0.d0,0.d0);buf_old=(0.d0,0.d0);buf_surf=(0.d0,0.d0)
++!$omp parallel default(shared) private(num,coeff,p,q,k,a,b,t,u,product,sums,norm_value)
++ allocate(coeff(nbasis))
++!$omp do schedule(dynamic,1)
++ do num=nemin,nemax
++    do p=1,nbasis
++       if(basis_ch(p).eq.1) then
++          coeff(p)=alm(basis_lm(p),num)
++       else if(basis_ch(p).eq.2) then
++          coeff(p)=blm(basis_lm(p),num)
++       else
++          coeff(p)=clm(basis_lm(p),num,basis_ch(p)-2)
++       endif
++    enddo
++    sums=(0.d0,0.d0);norm_value=(0.d0,0.d0)
++    do k=1,npairs
++       p=pair_p(k);q=pair_q(k)
++       product=conjg(coeff(p))*coeff(q)
++       do u=1,4
++          do t=1,9
++             sums(t,u)=sums(t,u)+product*operators(t,u,k)
++          enddo
++       enddo
++       if(nat_scale.ne.0.d0) then
++          do t=1,9
++             sums(t,5)=sums(t,5)+product*operators(t,5,k)
++          enddo
++       endif
++       if(en_scale.ne.0.d0) norm_value=norm_value+product*overlap(k)
++    enddo
++    do b=1,3
++       do a=1,3
++          t=a+3*(b-1)
++          buf_sr(a,b,num)=sums(t,1)
++          buf_old(a,b,num)=sums(t,2)
++          buf_surf(a,b,num)=sums(t,3)
++          buf_corr(a,b,num)=sums(t,1)-sums(t,2)
++          if(nat_scale.ne.0.d0) buf_corr(a,b,num)=buf_corr(a,b,num)+nat_scale*band_energy(num)*sums(t,5)
++          if(mass_scale.ne.0.d0) buf_corr(a,b,num)=buf_corr(a,b,num)-0.5d0*mass_scale*real(sums(t,4))
++       enddo
++    enddo
++    if(en_scale.ne.0.d0) then
++       do a=1,3
++          buf_surf(a,a,num)=buf_surf(a,a,num)-en_scale*band_energy(num)*real(norm_value)/3.d0
++       enddo
++    endif
++ enddo
++!$omp end do
++ deallocate(coeff)
++!$omp end parallel
++ call cpu_time(t2)
++ cache_env=''
++ call get_environment_variable('WIEN_STRESS_RELA_CACHE_DIAG',cache_env,status=cache_status)
++ if(cache_status.eq.0.and.len_trim(cache_env).gt.0.and.trim(cache_env).ne.'0') then
++ open(newunit=log_unit,file='operator-cache.log',status='unknown',position='append')
++ write(log_unit,*) jatom,refresh,nbasis,npairs,builds,hits,t1-t0,t2-t1
++ close(log_unit)
++ endif
++end subroutine
++
++subroutine build_operators(r,dx,lf,ldf,sf,sdf,qd,qu,dvry, &
++    nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2,old_scale,surf_scale,en_scale,nat_scale,mass_scale)
++ use lo, only: ilo,loor
++ implicit none
++ integer,intent(in)::nmap(:),outmap(:,:),nmap2(:),outmap2(:,:)
++ complex*16,intent(in)::hmap(:,:,:),dmap(:,:,:),hmap2(:,:,:)
++ real*8,intent(in)::r(:),dx,lf(:,0:,:),ldf(:,0:,:),sf(:,0:,:),sdf(:,0:,:), &
++    qd(:,0:,:),qu(:,0:,:),dvry(:),old_scale,surf_scale,en_scale,nat_scale,mass_scale
++ real*8,allocatable::gv(:,:,:),fv(:,:,:),sv(:,:,:),small(:,:),rad(:,:,:,:,:),rs(:,:,:),fun(:)
++ integer,allocatable::rl(:),rc(:),lookup(:,:),br(:),first(:),last(:)
++ complex*16,allocatable::angular(:,:,:,:),moment(:,:,:,:,:)
++ complex*16::aa(3,3,2,2),mm(3,3,2,2),op(9,5),ang
++ real*8::c2inv,me,rsq,rr,ev
++ integer::nr,lmax,nin,nout,nout2,nchan,nlc,l,m,lm,ch,z,p,q,ip,iq,lp,lq, &
++          i,j,a,b,v,k,w,out,output,t,iu,iv,maxpairs
++ nr=size(r);lmax=ubound(lf,2);nchan=size(lf,3)
++ nin=size(nmap);nout=size(nmap2);nout2=(lmax+3)**2
++ c2inv=1.d0/(137.0359895d0**2);me=0.25d0*c2inv
++ allocate(lookup(0:lmax,nchan));lookup=0
++ nlc=0
++ do l=0,lmax
++    do ch=1,nchan
++       if(ch.gt.2) then
++          if(ch-2.gt.ilo(l)) cycle
++          if(.not.loor(ch-2,l)) cycle
++       endif
++       nlc=nlc+1;lookup(l,ch)=nlc
++    enddo
++ enddo
++ allocate(rl(nlc),rc(nlc),gv(nr,2,nlc),fv(nr,2,nlc),sv(nr,2,nlc),small(nr,nlc))
++ do l=0,lmax
++    do ch=1,nchan
++       z=lookup(l,ch);if(z.eq.0) cycle
++       rl(z)=l;rc(z)=ch
++       gv(:,1,z)=ldf(:,l,ch);gv(:,2,z)=lf(:,l,ch)/r
++       fv(:,1,z)=qd(:,l,ch);fv(:,2,z)=qu(:,l,ch)
++       sv(:,1,z)=sdf(:,l,ch);sv(:,2,z)=sf(:,l,ch)/r
++       small(:,z)=sf(:,l,ch)
++    enddo
++ enddo
++ allocate(rad(2,2,nlc,nlc,5),rs(nlc,nlc,2),fun(nr));rad=0.d0;rs=0.d0
++ do q=1,nlc
++    do p=1,nlc
++       do j=1,2
++          do i=1,2
++             fun=r*r*gv(:,i,p)*gv(:,j,q)
++             call charge(r,dx,fun,1,nr,rad(i,j,p,q,1))
++             fun=r*r*gv(:,i,p)*fv(:,j,q)
++             call charge(r,dx,fun,1,nr,rad(i,j,p,q,2))
++             fun=r*r*sv(:,i,p)*sv(:,j,q)
++             call charge(r,dx,fun,1,nr,rad(i,j,p,q,3))
++             if(nat_scale.ne.0.d0) then
++                fun=r*r*fv(:,i,p)*fv(:,j,q)
++                call charge(r,dx,fun,1,nr,rad(i,j,p,q,4))
++             endif
++             if(mass_scale.ne.0.d0) then
++                fun=r*r*r*dvry*fv(:,i,p)*fv(:,j,q)
++                call charge(r,dx,fun,1,nr,rad(i,j,p,q,5))
++             endif
++          enddo
++       enddo
++       if(mass_scale.ne.0.d0) then
++          fun=r*r*r*dvry*small(:,p)*small(:,q)
++          call charge(r,dx,fun,1,nr,rs(p,q,1))
++       endif
++       if(en_scale.ne.0.d0) then
++          fun=r*r*c2inv*small(:,p)*small(:,q)
++          call charge(r,dx,fun,1,nr,rs(p,q,2))
++       endif
++    enddo
++ enddo
++ allocate(angular(nout,3,2,nin),moment(nout2,3,3,2,nin))
++ angular=(0.d0,0.d0);moment=(0.d0,0.d0)
++ do lm=1,nin
++    do k=1,nmap(lm)
++       out=outmap(k,lm)
++       angular(out,:,1,lm)=hmap(:,k,lm)
++       angular(out,:,2,lm)=dmap(:,k,lm)
++    enddo
++ enddo
++ if(mass_scale.ne.0.d0) then
++    do lm=1,nin
++       do i=1,2
++          do v=1,3
++             do out=1,nout
++                do k=1,nmap2(out)
++                   output=outmap2(k,out)
++                   do a=1,3
++                      moment(output,a,v,i,lm)=moment(output,a,v,i,lm)+ &
++                          hmap2(a,k,out)*angular(out,v,i,lm)
++                   enddo
++                enddo
++             enddo
++          enddo
++       enddo
++    enddo
++ endif
++ nbasis=0
++ do l=0,lmax
++    nbasis=nbasis+(2*l+1)*count(lookup(l,:).ne.0)
++ enddo
++ if(allocated(basis_lm)) deallocate(basis_lm,basis_ch,pair_p,pair_q,operators,overlap)
++ allocate(basis_lm(nbasis),basis_ch(nbasis),br(nbasis),first(nin),last(nin))
++ p=0
++ do lm=1,nin
++    l=int(sqrt(dble(lm-1)));first(lm)=p+1
++    do ch=1,nchan
++       if(lookup(l,ch).eq.0) cycle
++       p=p+1;basis_lm(p)=lm;basis_ch(p)=ch;br(p)=lookup(l,ch)
++    enddo
++    last(lm)=p
++ enddo
++ maxpairs=nbasis*nbasis
++ allocate(pair_p(maxpairs),pair_q(maxpairs),operators(9,5,maxpairs),overlap(maxpairs))
++ npairs=0;rsq=r(nr)*r(nr)
++ do iq=1,nin
++    do ip=1,nin
++       aa=(0.d0,0.d0);mm=(0.d0,0.d0)
++       do j=1,2
++          do i=1,2
++             do b=1,3
++                do a=1,3
++                   aa(a,b,i,j)=0.5d0*sum(conjg(angular(:,a,i,ip))*angular(:,b,j,iq)+ &
++                                                conjg(angular(:,b,i,ip))*angular(:,a,j,iq))
++                   if(mass_scale.ne.0.d0) then
++                      do v=1,3
++                         mm(a,b,i,j)=mm(a,b,i,j)+0.5d0*sum( &
++                            conjg(moment(:,a,v,i,ip))*moment(:,b,v,j,iq)+ &
++                            conjg(moment(:,b,v,i,ip))*moment(:,a,v,j,iq))
++                      enddo
++                   endif
++                enddo
++             enddo
++          enddo
++       enddo
++       if(all(aa.eq.(0.d0,0.d0)).and.all(mm.eq.(0.d0,0.d0)).and.ip.ne.iq) cycle
++       do q=first(iq),last(iq)
++          do p=first(ip),last(ip)
++             lp=br(p);lq=br(q);op=(0.d0,0.d0)
++             do b=1,3
++                do a=1,3
++                   t=a+3*(b-1)
++                   do j=1,2
++                      do i=1,2
++                         ang=aa(a,b,i,j)
++                         op(t,1)=op(t,1)+0.5d0*ang*(rad(i,j,lp,lq,2)+rad(j,i,lq,lp,2))
++                         op(t,2)=op(t,2)+ang*(rad(i,j,lp,lq,1)+old_scale*c2inv*rad(i,j,lp,lq,3))
++                         if(nat_scale.ne.0.d0) op(t,5)=op(t,5)+me*ang*rad(i,j,lp,lq,4)
++                         if(mass_scale.ne.0.d0) op(t,4)=op(t,4)+me*mm(a,b,i,j)*rad(i,j,lp,lq,5)
++                      enddo
++                   enddo
++                   if(mass_scale.ne.0.d0) op(t,4)=op(t,4)-c2inv*aa(a,b,1,1)*rs(lp,lq,1)
++                   op(t,3)=rsq*aa(a,b,1,1)*lf(nr,rl(lp),rc(lp))* &
++                              (qd(nr,rl(lq),rc(lq))-ldf(nr,rl(lq),rc(lq)))
++                   if(surf_scale.ne.0.d0) then
++                      do j=1,2
++                         op(t,3)=op(t,3)+surf_scale*rsq*c2inv*small(nr,lp)*aa(a,b,1,j)*sv(nr,j,lq)
++                      enddo
++                   endif
++                enddo
++             enddo
++             ev=0.d0
++             if(en_scale.ne.0.d0.and.ip.eq.iq) ev=rs(lp,lq,2)
++             if(all(op.eq.(0.d0,0.d0)).and.ev.eq.0.d0) cycle
++             npairs=npairs+1;pair_p(npairs)=p;pair_q(npairs)=q
++             operators(:,:,npairs)=op;overlap(npairs)=ev
++          enddo
++       enddo
++    enddo
++ enddo
++end subroutine
++end module rela_operator_cache
++
++subroutine val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
++                             buf_corr,buf_sr,buf_old,buf_surf)
++   ! Scalar-relativistic correction to the valence kinetic stress inside
++   ! one muffin-tin sphere.
++   !
++   ! WHY THIS ROUTINE IS NEEDED
++   ! --------------------------
++   ! The historical stress implementation evaluates the nonrelativistic
++   ! operator p_alpha p_beta.  With CALC=RELA the radial functions and their
++   ! normalization are scalar relativistic, but p_alpha p_beta is still the
++   ! operator used by val_kinstrmt.  Merely including the small component in
++   ! RINT13 does not turn that operator into the Koelling-Harmon operator.
++   !
++   ! In Rydberg units the upper component obeys the variational equation
++   !
++   !   H_SR(E) = -div[ A(r,E) grad ] + V(r),
++   !   A(r,E)  = 1/M(r,E),
++   !   M(r,E)  = 1 + (E - V(r))/(4*c_atomic**2).
++   !
++   ! A homogeneous strain changes the metric in the gradient bilinear.
++   ! Consequently the scalar-relativistic kinetic stress is built from
++   !
++   !   Q_ab^SR = 1/4 Integral { (d_a psi)^* q_b
++   !                           + q_a^* d_b psi
++   !                           + (a <-> b) } d^3r,
++   !
++   ! where q=A grad(psi).  This symmetrized form is Hermitian also between
++   ! radial basis functions generated at different linearization energies.
++   ! For an energy derivative udot one must differentiate A as well:
++   !
++   !   q[udot] = A grad(udot) + A_E grad(u),
++   !   A_E     = -1/(4*c_atomic**2*M**2).
++   !
++   ! The old RELA path corresponds, after partial integration, to the plain
++   ! gradient bilinear of the large component plus 1/c_atomic**2 times the
++   ! same bilinear of the stored small component.  We return the local,
++   ! explicitly variational correction
++   !
++   !   buf_corr = Q_SR - Q_old,
++   !
++   ! as well as both terms separately.  This volume replacement is not the
++   ! whole correction.  Partial integration produces an APW boundary term.
++   ! The interstitial operator is nonrelativistic, whereas the radial flux on
++   ! the muffin-tin side is A*d_r(psi).  The historical surface term uses
++   ! d_r(psi) on both sides.  We therefore also return
++   !
++   !   buf_surf = R_MT^2 int dOmega n_a n_b psi^*
++   !                              [A*d_r(psi)-d_r(psi)] .
++   !
++   ! This is a flux correction, not the fixed-RMT shape derivative.  The two
++   ! have different origins and must never be combined.  l2main supplies
++   ! occupation factors, spin factor two, equivalent-atom rotations, and the
++   ! final 1/volume.
++   !
++   ! ANGULAR ALGEBRA
++   ! ---------------
++   ! Appendix C of Belbase, Troester, and Blaha gives
++   !
++   ! d_a[f_l(r)Y_lm] = rhat_a f'_l Y_lm
++   !                  + f_l/r Sum_{s=+-1,t} c^a_st(l,m)Y_{l+s,m+t}.
++   !
++   ! hcoef below expands rhat_a Y_lm in the same output harmonics, while
++   ! dcoef stores c^a_st.  Once both gradients are expressed in an
++   ! orthonormal Y_LM basis, the angular integral is just a dot product.
++
++   use rela_operator_cache, only: apply_cached_rela
++   use param
++   use com, only: rel
++   use struk, only: r0,dx,jri
++   use atspdt, only: el
++   use xa, only: band_energy=>e
++   use radial_functions, only: vr,rrad1,rrad2,rade1,rade2, &
++                               radp1,radp2,radpe1,radpe2
++   use lo, only: ilo,loor,rlo,sdlo,elo,a1lo,b1lo,ap1lo,bp1lo
++   implicit none
++
++   integer, intent(in) :: nemin,nemax,jatom
++   complex*16, intent(in) :: alm((lmax2+1)*(lmax2+1),nume), &
++                             blm((lmax2+1)*(lmax2+1),nume), &
++                             clm((lmax2+1)*(lmax2+1),nume,nloat)
++   complex*16, intent(out) :: buf_corr(3,3,nume),buf_sr(3,3,nume), &
++                              buf_old(3,3,nume),buf_surf(3,3,nume)
++
++   integer :: lmax,nin,nout,nout2,imax,l,m,ll,mm,lm,lmout,v,t,alpha,beta
++   integer :: ir,num,jlo,ich,nchan,diag_status,imap,small_scale_status, &
++              small_surf_status,ensmall_status,ennat_status,massv_status
++   real*8 :: c_atomic,c2inv,me,mass,ainv,ae,aee,r,energy,g0
++   real*8 :: gaunt_value,h_norm,d_norm,hd_cross,max_h_err,max_d_err, &
++             max_flux_err,max_flux_boundary_err,flux_scale
++   real*8 :: sum_re,sum_im,old_small_scale,small_surf_scale, &
++             ensmall_scale,small_norm,ennat_scale,massv_scale
++   real*8, external :: gaunt
++   character(len=32) :: diag_env,small_scale_env,small_surf_env,ensmall_env, &
++                        ennat_env,massv_env
++   complex*16 :: c_am(3,-1:1),cfac(3,-1:1,-1:1),zval
++   integer, allocatable :: nmap(:),outmap(:,:),nmap2(:),outmap2(:,:)
++   complex*16, allocatable :: hmap(:,:,:),dmap(:,:,:),hmap2(:,:,:)
++   complex*16, allocatable :: fvec(:),dfvec(:),svec(:),dsvec(:)
++   complex*16, allocatable :: qdvec(:),quvec(:)
++   complex*16, allocatable :: grad(:,:),aux(:,:),sgrad(:,:), &
++                              npsi(:,:),ndflux(:,:),nsval(:,:),naux(:,:,:)
++   complex*16, allocatable :: integ_sr(:,:,:),integ_old(:,:,:), &
++                              integ_nat(:,:,:)
++   real*8, allocatable :: rmesh(:),funct_re(:),funct_im(:), &
++                          vry(:),dvry(:),massv_tensor(:,:,:)
++   real*8, allocatable :: lf(:,:,:),ldf(:,:,:),sf(:,:,:),sdf(:,:,:)
++   real*8, allocatable :: qd(:,:,:),qu(:,:,:),tmp(:)
++
++   buf_corr = (0.d0,0.d0)
++   buf_sr   = (0.d0,0.d0)
++   buf_old  = (0.d0,0.d0)
++   buf_surf = (0.d0,0.d0)
++   if(.not.rel) return
++
++   lmax = lmax2n
++   nin  = (lmax+1)*(lmax+1)
++   ! A Cartesian derivative of Y_lm contains l+1, so the output angular
++   ! space needs one shell more than the input LAPW expansion.
++   nout = (lmax+2)*(lmax+2)
++   nout2 = (lmax+3)*(lmax+3)
++   imax = jri(jatom)
++   nchan = nloat+2             ! 1=u, 2=udot, 2+jlo=local orbital
++
++   ! Each input Y_lm reaches at most six output harmonics: l+-1 and
++   ! m+t, t=-1,0,1.  Store this sparse map explicitly.  A dense
++   ! (nout x nin) contraction made the first diagnostic prototype roughly
++   ! twenty-five times more expensive without changing any algebra.
++   allocate(nmap(nin),outmap(6,nin))
++   allocate(hmap(3,6,nin),dmap(3,6,nin))
++   allocate(nmap2(nout),outmap2(6,nout),hmap2(3,6,nout))
++   allocate(rmesh(imax))
++   allocate(vry(imax),dvry(imax))
++   allocate(lf(imax,0:lmax,nchan),ldf(imax,0:lmax,nchan))
++   allocate(sf(imax,0:lmax,nchan),sdf(imax,0:lmax,nchan))
++   allocate(qd(imax,0:lmax,nchan),qu(imax,0:lmax,nchan))
++
++   nmap = 0
++   outmap = 0
++   hmap = (0.d0,0.d0)
++   dmap = (0.d0,0.d0)
++   nmap2 = 0
++   outmap2 = 0
++   hmap2 = (0.d0,0.d0)
++   call c_alpha_m(c_am)
++
++   ! Precompute the two angular maps in Eq. (C9).  GAUNT(L,l,1,M,m,t)
++   ! is Integral Y_LM^* Y_lm Y_1t dOmega in WIEN2k's convention.
++   do l=0,lmax
++      do m=-l,l
++         lm = l*(l+1)+m+1
++         call c_factor(l,m,cfac)
++         do v=-1,1,2
++            ll=l+v
++            if(ll.lt.0) cycle
++            do t=-1,1
++               mm=m+t
++               if(abs(mm).gt.ll) cycle
++               lmout=ll*(ll+1)+mm+1
++               nmap(lm)=nmap(lm)+1
++               imap=nmap(lm)
++               outmap(imap,lm)=lmout
++               gaunt_value=gaunt(ll,l,1,mm,m,t)
++               do alpha=1,3
++                  dmap(alpha,imap,lm)=cfac(alpha,v,t)
++                  hmap(alpha,imap,lm)=c_am(alpha,t)*gaunt_value
++               enddo
++            enddo
++         enddo
++      enddo
++   enddo
++
++   ! A second multiplication map is needed for the full tensor moment
++   ! int n_alpha*n_beta*rho_KH.  AUX already spans angular momenta through
++   ! lmax+1, so multiplying it by one more direction cosine reaches
++   ! lmax+2.  Keeping this map separate prevents accidental truncation of
++   ! the relativistic density moment at the top angular channel.
++   do l=0,lmax+1
++      do m=-l,l
++         lm=l*(l+1)+m+1
++         do v=-1,1,2
++            ll=l+v
++            if(ll.lt.0) cycle
++            do t=-1,1
++               mm=m+t
++               if(abs(mm).gt.ll) cycle
++               lmout=ll*(ll+1)+mm+1
++               nmap2(lm)=nmap2(lm)+1
++               imap=nmap2(lm)
++               outmap2(imap,lm)=lmout
++               gaunt_value=gaunt(ll,l,1,mm,m,t)
++               do alpha=1,3
++                  hmap2(alpha,imap,lm)=c_am(alpha,t)*gaunt_value
++               enddo
++            enddo
++         enddo
++      enddo
++   enddo
++
++   ! Optional exact angular identities.  These are valuable guards against
++   ! a phase or index-convention error in the new relativistic term:
++   ! Sum_a ||rhat_a Y_lm||^2=1, Sum_a ||r d_aY_lm||^2=l(l+1), and their
++   ! summed cross term vanishes.
++   max_h_err=0.d0
++   max_d_err=0.d0
++   do lm=1,nin
++      l=int(sqrt(dble(lm-1)))
++      h_norm=0.d0
++      d_norm=0.d0
++      hd_cross=0.d0
++      do alpha=1,3
++         do imap=1,nmap(lm)
++            h_norm=h_norm+abs(hmap(alpha,imap,lm))**2
++            d_norm=d_norm+abs(dmap(alpha,imap,lm))**2
++            hd_cross=hd_cross+real(conjg(hmap(alpha,imap,lm))* &
++                                   dmap(alpha,imap,lm))
++         enddo
++      enddo
++      max_h_err=max(max_h_err,abs(h_norm-1.d0))
++      max_d_err=max(max_d_err,abs(d_norm-dble(l*(l+1))))
++      max_d_err=max(max_d_err,abs(hd_cross))
++   enddo
++   diag_env=''
++   call get_environment_variable('WIEN_STRESS_RELA_DIAG',diag_env, &
++                                 status=diag_status)
++   if(diag_status.eq.0 .and. len_trim(diag_env).gt.0 .and. &
++      trim(diag_env).ne.'0') then
++      write(6,'(A,2(1X,ES23.15))') ':DBG_RELA_ANGULAR:', &
++                                    max_h_err,max_d_err
++   endif
++
++   do ir=1,imax
++      rmesh(ir)=r0(jatom)*exp(dx(jatom)*dble(ir-1))
++   enddo
++
++   lf=0.d0; ldf=0.d0; sf=0.d0; sdf=0.d0; qd=0.d0; qu=0.d0
++   c_atomic=137.0359895d0
++   c2inv=1.d0/(c_atomic*c_atomic)
++   me=0.25d0*c2inv
++
++   ! Diagnostic scale of the historical small-component p_a p_b term.
++   ! Production always uses one.  Setting the environment variable to zero
++   ! is useful for determining whether a discrepancy belongs to the
++   ! Koelling-Harmon large-component metric or to WIEN2k's separately stored
++   ! radial small component.  It is deliberately a real scale (rather than a
++   ! Boolean) so that linearity can be checked.  No result obtained with a
++   ! non-unit value is suitable for production.
++   old_small_scale=1.d0
++   small_scale_env=''
++   call get_environment_variable('WIEN_STRESS_RELA_OLD_SMALL_SCALE', &
++                                 small_scale_env,status=small_scale_status)
++   if(small_scale_status.eq.0 .and. len_trim(small_scale_env).gt.0) &
++      read(small_scale_env,*,err=997) old_small_scale
++
++   ! Diagnostic/validation switch for the surface left by the historical
++   ! small-component second-derivative operator.  VAL_KINSTRMT applies
++   ! -d_a d_b to both components through RINT13, whereas
++   ! STRESS_APW_SURFACE contains only the large component that is matched to
++   ! the interstitial plane wave.  Converting the old small-component term
++   ! to the gradient form subtracted in Q_OLD therefore requires the exact
++   ! integration-by-parts surface
++   !
++   !   S_ab^small = R_MT^2/(2 c^2) int dOmega
++   !       [ n_a s^* d_b s + n_b s^* d_a s ].
++   !
++   ! Keep it opt-in until its sign and magnitude have been checked against
++   ! the independent finite-strain pressure.  A value of one applies the
++   ! derived term; zero reproduces the first RELA prototype.
++   small_surf_scale=0.d0
++   small_surf_env=''
++   call get_environment_variable('WIEN_STRESS_RELA_SMALL_SURF_SCALE', &
++                                 small_surf_env,status=small_surf_status)
++   if(small_surf_status.eq.0 .and. len_trim(small_surf_env).gt.0) &
++      read(small_surf_env,*,err=996) small_surf_scale
++
++   ! Diagnostic for the leading generalized-overlap term of the
++   ! Koelling-Harmon implementation.  WIEN2k normalizes each radial pair as
++   ! int(P^2+Q^2/c^2)dr, so differentiating the implemented generalized
++   ! eigenproblem produces an energy times small-component overlap term that
++   ! is absent from the upper-component metric replacement above.  For an
++   ! isotropic strain its tensor share is -epsilon*N_small/3 before the
++   ! common factor two applied in L2MAIN.  The exact coefficient is one;
++   ! SCALE is exposed only to measure 0 versus 1 while the complete tensor
++   ! derivation is checked.
++   ensmall_scale=0.d0
++   ensmall_env=''
++   call get_environment_variable('WIEN_STRESS_RELA_ENSMALL_SCALE', &
++                                 ensmall_env,status=ensmall_status)
++   if(ensmall_status.eq.0 .and. len_trim(ensmall_env).gt.0) &
++      read(ensmall_env,*,err=995) ensmall_scale
++
++   ! Diagnostic energy-dependent overlap of the eliminated Koelling-Harmon
++   ! equation.  For
++   !
++   !     H(E) = -div[A(E,V) grad] + V,
++   !
++   ! the stationary norm is 1-H_E.  Its relativistic tensor is therefore
++   !
++   !     N^E_ab = 1/(4 c^2) Re int (A d_a psi)^* (A d_b psi) d^3r.
++   !
++   ! This is *not* the radial B^2/c^2 norm tested above: it contains the
++   ! complete angular gradient and can consequently be much larger for
++   ! semicore p and d channels.  It would enter if LAPW2 differentiated the
++   ! eliminated, energy-dependent upper-component equation directly.
++   ! WIEN2k does not implement that generalized eigenproblem: LAPW1 builds
++   ! H*c=epsilon*S*c with the stored large-plus-small RINT13 overlap, and the
++   ! existing Pulay terms already differentiate that S.  Adding N^E_ab here
++   ! therefore differentiates a second overlap which is not present in the
++   ! implemented matrix problem.  The FeSe RELA-minus-NREL fixed-G test
++   ! confirms the double count: unit scale adds about 0.825 GPa to the
++   ! relativistic pressure error.  Production scale is zero.  The switch is
++   ! retained only for reproducing and auditing the eliminated-equation
++   ! diagnostic; a nonzero value is not a production setting.
++   ennat_scale=0.d0
++   ennat_env=''
++   call get_environment_variable('WIEN_STRESS_RELA_ENNAT_SCALE', &
++                                 ennat_env,status=ennat_status)
++   if(ennat_status.eq.0 .and. len_trim(ennat_env).gt.0) &
++      read(ennat_env,*,err=994) ennat_scale
++
++   ! Trace diagnostic for the potential part generated by the same
++   ! energy-dependent mass.  The eigenvalue derivative of H(E,V) couples
++   ! dV to the natural Koelling-Harmon density
++   !
++   !   rho_KH = |psi|^2 + (4 c^2)^-1 |A grad psi|^2,
++   !
++   ! whereas WIEN2k's electrostatic cancellation uses the implemented
++   ! two-component density |psi|^2+|B|^2/c^2.  Their norm difference is
++   ! small, but under an affine dilation it is multiplied by r*dV/dr,
++   ! which is large in the nuclear region.  The residual contribution to
++   ! the total-energy derivative must be represented by the opposite sign
++   ! in STR_VAL because mixer forms STR_DENS-STR_VAL-STR_CORE.
++   ! The one-half below is not an adjustable coefficient.  L2MAIN applies
++   ! a common factor two to buffers representing the two metric derivatives
++   ! of p_alpha*p_beta.  Delta-rho*dV has only one strain derivative, so its
++   ! buffer must compensate that common factor by 1/2.
++   ! The FeSe fixed-G finite-strain test reduces the missing RELA pressure
++   ! from about 26 GPa to below 0.4 GPa when this derived term and N^E_ab are
++   ! combined.  Keep unit scale as the production value; the environment
++   ! variable is a diagnostic multiplier, not a fitted coefficient.
++   massv_scale=1.d0
++   massv_env=''
++   call get_environment_variable('WIEN_STRESS_RELA_MASSV_SCALE', &
++                                 massv_env,status=massv_status)
++   if(massv_status.eq.0 .and. len_trim(massv_env).gt.0) &
++      read(massv_env,*,err=993) massv_scale
++
++   ! VRY is the spherical potential in Rydberg.  A centered derivative on
++   ! the logarithmic mesh is more reliable here than imposing an even/odd
++   ! origin continuation on the Coulomb singularity.
++   do ir=1,imax
++      vry(ir)=2.d0*vr(ir)/rmesh(ir)
++   enddo
++   dvry(1)=(vry(2)-vry(1))/(rmesh(2)-rmesh(1))
++   do ir=2,imax-1
++      dvry(ir)=(vry(ir+1)-vry(ir-1))/(rmesh(ir+1)-rmesh(ir-1))
++   enddo
++   dvry(imax)=(vry(imax)-vry(imax-1))/(rmesh(imax)-rmesh(imax-1))
++
++   ! Construct values and ordinary radial derivatives of every radial basis
++   ! function.  LAPW stores r*u(r) and r*du(r)/dr, hence the division by
++   ! RMESH.  It is essential to use ATPAR's RADP/RADPE/AP1LO arrays here.
++   ! Re-differentiating r*u/r with DERGL looks innocuous but loses accuracy
++   ! precisely at the small radii where the relativistic mass differs most
++   ! from one.  More importantly, it violates OUTWIN's exact first-order
++   ! Koelling-Harmon flux identity and produced a large, spurious residual in
++   ! the FeSe finite-difference test.
++   do l=0,lmax
++      lf(:,l,1)=rrad1(1:imax,l)/rmesh
++      lf(:,l,2)=rade1(1:imax,l)/rmesh
++      sf(:,l,1)=rrad2(1:imax,l)/rmesh
++      sf(:,l,2)=rade2(1:imax,l)/rmesh
++      ldf(:,l,1)=radp1(1:imax,l)/rmesh
++      ldf(:,l,2)=radpe1(1:imax,l)/rmesh
++      sdf(:,l,1)=radp2(1:imax,l)/rmesh
++      sdf(:,l,2)=radpe2(1:imax,l)/rmesh
++      do jlo=1,ilo(l)
++         if(.not.loor(jlo,l)) cycle
++         ich=2+jlo
++         lf(:,l,ich)=a1lo(1:imax,jlo,l)/rmesh
++         sf(:,l,ich)=b1lo(1:imax,jlo,l)/rmesh
++         ldf(:,l,ich)=ap1lo(1:imax,jlo,l)/rmesh
++         sdf(:,l,ich)=bp1lo(1:imax,jlo,l)/rmesh
++      enddo
++   enddo
++
++   ! q=A grad(u) for u, and q=d[A grad(u)]/dE for udot.  The potential
++   ! stored in VR is r*V_Hartree; 2*VR/r is therefore V in Rydberg units,
++   ! consistent with EL and ELO.
++   !
++   ! Do NOT reconstruct the radial component as A*u' from RADP below.
++   ! OUTWIN integrates the coupled Koelling-Harmon equations and stores the
++   ! second radial component B explicitly.  Its first equation is the exact
++   ! mesh identity
++   !
++   !              A(r,E) u'(r,E) = 2 B(r,E)/r .
++   !
++   ! The same identity can be differentiated with respect to the Rydberg
++   ! energy once or twice.  Thus 2*SF is also the complete radial flux for
++   ! udot and for an SDLO; it already contains every A_E and A_EE term.
++   ! Reconstructing it from a separately stored/numerically differentiated
++   ! large-component slope produced 5--7 percent pointwise errors near the
++   ! nucleus in RELA mode, even though the two forms coincided accidentally
++   ! at R_MT.  The angular component has no analogous stored flux and is
++   ! therefore still evaluated explicitly with A, A_E, and A_EE.
++   do l=0,lmax
++      do ir=1,imax
++         r=rmesh(ir)
++         mass=1.d0+(el(l)-2.d0*vr(ir)/r)*me
++         ainv=1.d0/mass
++         ae=-me/(mass*mass)
++         qd(ir,l,1)=2.d0*sf(ir,l,1)
++         qu(ir,l,1)=ainv*lf(ir,l,1)/r
++         qd(ir,l,2)=2.d0*sf(ir,l,2)
++         qu(ir,l,2)=ainv*lf(ir,l,2)/r+ae*lf(ir,l,1)/r
++      enddo
++
++      do jlo=1,ilo(l)
++         if(.not.loor(jlo,l)) cycle
++         ich=2+jlo
++         energy=elo(l,jlo)
++         do ir=1,imax
++            r=rmesh(ir)
++            mass=1.d0+(energy-2.d0*vr(ir)/r)*me
++            ainv=1.d0/mass
++            ae=-me/(mass*mass)
++            aee=2.d0*me*me/(mass*mass*mass)
++
++            if(sdlo(jlo,l,jatom) .and. abs(energy-el(l)).lt.1.d-6) then
++               ! a1lo is d^2u/dE_Ry^2 for an SDLO.  Differentiate A twice;
++               ! omitting these two terms would lose the relativistic
++               ! response of the energy-linearized local orbital.
++               qd(ir,l,ich)=2.d0*sf(ir,l,ich)
++               qu(ir,l,ich)=ainv*lf(ir,l,ich)/r+ &
++                    2.d0*ae*lf(ir,l,2)/r+aee*lf(ir,l,1)/r
++            else
++               ! Ordinary local orbital (or the conservative fallback for
++               ! an uncommon SDLO whose parent energy differs from EL).
++               qd(ir,l,ich)=2.d0*sf(ir,l,ich)
++               qu(ir,l,ich)=ainv*lf(ir,l,ich)/r
++            endif
++         enddo
++         if(rlo(jlo,l,jatom) .and. diag_status.eq.0 .and. &
++            len_trim(diag_env).gt.0 .and. trim(diag_env).ne.'0') then
++            write(6,'(A,3I5)') ':DBG_RELA_RLO_FALLBACK:',jatom,l,jlo
++         endif
++      enddo
++   enddo
++
++   ! OUTWIN's first Koelling-Harmon equation gives the independent identity
++   ! A*u'(r)=2*B_stored(r)/r for a primitive radial solution (WIEN2k stores
++   ! c times the physical small component).  Check it before using A in a
++   ! stress expression; a Hartree/Rydberg factor error would show up here
++   ! immediately and would contaminate the full correction.
++   max_flux_err=0.d0
++   max_flux_boundary_err=0.d0
++   do l=0,lmax
++      do ir=1,imax
++         ! SF=B_stored/r, so the right-hand side is simply 2*SF.
++         flux_scale=max(1.d-14,abs(qd(ir,l,1)),abs(2.d0*sf(ir,l,1)))
++         max_flux_err=max(max_flux_err, &
++              abs(qd(ir,l,1)-2.d0*sf(ir,l,1))/flux_scale)
++      enddo
++      flux_scale=max(1.d-14,abs(qd(imax,l,1)), &
++                     abs(2.d0*sf(imax,l,1)))
++      max_flux_boundary_err=max(max_flux_boundary_err, &
++           abs(qd(imax,l,1)-2.d0*sf(imax,l,1))/flux_scale)
++   enddo
++   if(diag_status.eq.0 .and. len_trim(diag_env).gt.0 .and. &
++      trim(diag_env).ne.'0') then
++      write(6,'(A,I5,2(1X,ES23.15))') ':DBG_RELA_FLUX:',jatom, &
++                                      max_flux_err,max_flux_boundary_err
++   endif
++
++   call apply_cached_rela(nemin,nemax,jatom,alm,blm,clm, &
++      rmesh,dx(jatom),lf,ldf,sf,sdf,qd,qu,dvry,nmap,outmap,hmap,dmap, &
++      nmap2,outmap2,hmap2,old_small_scale,small_surf_scale,ensmall_scale, &
++      ennat_scale,massv_scale,band_energy,buf_corr,buf_sr,buf_old,buf_surf)
++
++   deallocate(nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2, &
++              rmesh,vry,dvry)
++   deallocate(lf,ldf,sf,sdf,qd,qu)
++   return
++993 write(6,*) 'Invalid WIEN_STRESS_RELA_MASSV_SCALE: ',trim(massv_env)
++    stop 'WIEN_STRESS_RELA_MASSV_SCALE must be a real number'
++994 write(6,*) 'Invalid WIEN_STRESS_RELA_ENNAT_SCALE: ',trim(ennat_env)
++    stop 'WIEN_STRESS_RELA_ENNAT_SCALE must be a real number'
++995 write(6,*) 'Invalid WIEN_STRESS_RELA_ENSMALL_SCALE: ', &
++               trim(ensmall_env)
++    stop 'WIEN_STRESS_RELA_ENSMALL_SCALE must be a real number'
++996 write(6,*) 'Invalid WIEN_STRESS_RELA_SMALL_SURF_SCALE: ', &
++               trim(small_surf_env)
++    stop 'WIEN_STRESS_RELA_SMALL_SURF_SCALE must be a real number'
++997 write(6,*) 'Invalid WIEN_STRESS_RELA_OLD_SMALL_SCALE: ', &
++               trim(small_scale_env)
++    stop 'WIEN_STRESS_RELA_OLD_SMALL_SCALE must be a real number'
++end subroutine val_rela_kinstrmt
++
++
++subroutine rela_pulay_d_corr(nemin,nemax,jatom,alm,blm,clm, &
++                             capd0lm,capd1lm,buf_corr)
++   ! Exact scalar-relativistic replacement of the matching-coefficient
++   ! (D) part of the spherical incomplete-basis correction.
++   !
++   ! For an energy-independent Hamiltonian and a radial solution u_j made
++   ! at E_j one may use
++   !
++   !   <u_i | H-epsilon | u_j> = (E_j-epsilon)<u_i|u_j> .
++   !
++   ! VAL_CORR_STRESS uses this identity, including the usual udot and LO
++   ! derivatives.  In CALC=RELA, however,
++   !
++   !   H_SR(epsilon) = -div[A(r,epsilon) grad] + V,
++   !   A(r,epsilon)  = 1/[1+(epsilon-V)/(4c^2)],
++   !
++   ! and the operator tested at the band energy is not the operator that
++   ! generated a radial basis function at E_l or E_LO.  This routine
++   ! evaluates the strong radial matrix element directly for the large
++   ! component and returns exact minus the historical two-component
++   ! identity.  Adding the difference leaves NREL bitwise unchanged.
++   !
++   ! The weak radial form is used for numerical stability and its outer
++   ! boundary term is subtracted explicitly:
++   !
++   ! F_ij = int_0^R dr r^2 { A_eps[f_i' f_j'
++   !                    +l(l+1)f_i f_j/r^2]+(V-eps)f_i f_j }
++   !        - R^2 f_i(R) A_eps(R) f_j'(R).
++   !
++   ! CAPD0/1 are the already validated derivatives of the APW matching
++   ! coefficients.  Only their bra-side contraction belongs to this first
++   ! Pulay line; radial-coordinate and angular Pulay responses are separate
++   ! terms and are deliberately not mixed into this diagnostic.
++
++   use param
++   use com, only: rel
++   use struk, only: r0,dx,jri
++   use atspdt, only: el,pei
++   use xa, only: e
++   use radial_functions, only: vr,rrad1,rade1,radp1,radpe1
++   use lo, only: ilo,loor,elo,a1lo,ap1lo
++   use stress_kb, only: jlaplo1_02,jlaplo1_12
++   implicit none
++
++   integer, intent(in) :: nemin,nemax,jatom
++   complex*16, intent(in) :: alm((lmax2+1)*(lmax2+1),nume), &
++                             blm((lmax2+1)*(lmax2+1),nume), &
++                             clm((lmax2+1)*(lmax2+1),nume,nloat)
++   complex*16, intent(in) :: capd0lm(3,3,(lmax2+1)*(lmax2+1),nume), &
++                             capd1lm(3,3,(lmax2+1)*(lmax2+1),nume)
++   complex*16, intent(out) :: buf_corr(3,3,nume)
++
++   integer :: imax,l,m,lm,num,alpha,beta,jlo,ich,nchan,ir,ibra,jket
++   real*8 :: c_atomic,me,r,vpot,aeps,eps,llp1,sumf,boundary
++   complex*16 :: exact_value,old_value,ket_coeff
++   real*8, allocatable :: rmesh(:),funct(:)
++   real*8, allocatable :: f(:,:,:),df(:,:,:),fmat(:,:)
++
++   buf_corr=(0.d0,0.d0)
++   if(.not.rel) return
++
++   imax=jri(jatom)
++   nchan=nloat+2
++   allocate(rmesh(imax),funct(imax))
++   allocate(f(imax,0:lmax2n,nchan),df(imax,0:lmax2n,nchan))
++   allocate(fmat(2,nchan))
++   do ir=1,imax
++      rmesh(ir)=r0(jatom)*exp(dx(jatom)*dble(ir-1))
++   enddo
++
++   f=0.d0
++   df=0.d0
++   do l=0,lmax2n
++      f(:,l,1)=rrad1(1:imax,l)/rmesh
++      f(:,l,2)=rade1(1:imax,l)/rmesh
++      df(:,l,1)=radp1(1:imax,l)/rmesh
++      df(:,l,2)=radpe1(1:imax,l)/rmesh
++      do jlo=1,ilo(l)
++         if(.not.loor(jlo,l)) cycle
++         ich=2+jlo
++         f(:,l,ich)=a1lo(1:imax,jlo,l)/rmesh
++         df(:,l,ich)=ap1lo(1:imax,jlo,l)/rmesh
++      enddo
++   enddo
++
++   c_atomic=137.0359895d0
++   me=1.d0/(4.d0*c_atomic*c_atomic)
++
++   do num=nemin,nemax
++      eps=e(num)
++      do l=0,lmax2n
++         llp1=dble(l*(l+1))
++         fmat=0.d0
++         do ibra=1,2
++            do jket=1,nchan
++               ! Channels beyond the actual LO count for this l remain
++               ! identically zero and are harmless, but skip them to avoid
++               ! unnecessary radial integrations.
++               if(jket.gt.2) then
++                  jlo=jket-2
++                  if(jlo.gt.ilo(l)) cycle
++                  if(.not.loor(jlo,l)) cycle
++               endif
++               do ir=1,imax
++                  r=rmesh(ir)
++                  vpot=2.d0*vr(ir)/r
++                  aeps=1.d0/(1.d0+(eps-vpot)*me)
++                  funct(ir)=r*r*(aeps*(df(ir,l,ibra)*df(ir,l,jket)+ &
++                       llp1*f(ir,l,ibra)*f(ir,l,jket)/(r*r))+ &
++                       (vpot-eps)*f(ir,l,ibra)*f(ir,l,jket))
++               enddo
++               call charge(rmesh,dx(jatom),funct,1,imax,sumf)
++               r=rmesh(imax)
++               vpot=2.d0*vr(imax)/r
++               aeps=1.d0/(1.d0+(eps-vpot)*me)
++               boundary=r*r*f(imax,l,ibra)*aeps*df(imax,l,jket)
++               fmat(ibra,jket)=sumf-boundary
++            enddo
++         enddo
++
++         do m=-l,l
++            lm=l*(l+1)+m+1
++            do alpha=1,3
++               do beta=1,3
++                  exact_value=conjg(capd0lm(alpha,beta,lm,num))*( &
++                       alm(lm,num)*fmat(1,1)+ &
++                       blm(lm,num)*fmat(1,2)) + &
++                       conjg(capd1lm(alpha,beta,lm,num))*( &
++                       alm(lm,num)*fmat(2,1)+ &
++                       blm(lm,num)*fmat(2,2))
++                  do jlo=1,ilo(l)
++                     if(.not.loor(jlo,l)) cycle
++                     ich=2+jlo
++                     exact_value=exact_value+clm(lm,num,jlo)*( &
++                          conjg(capd0lm(alpha,beta,lm,num))* &
++                          fmat(1,ich)+ &
++                          conjg(capd1lm(alpha,beta,lm,num))* &
++                          fmat(2,ich))
++                  enddo
++
++                  ! Reproduce exactly the historical first-line identity
++                  ! from VAL_CORR_STRESS so the returned tensor is a pure
++                  ! RELA replacement and contains no duplicated NREL term.
++                  old_value=(el(l)-eps)*( &
++                       conjg(capd0lm(alpha,beta,lm,num))*alm(lm,num)+ &
++                       conjg(capd1lm(alpha,beta,lm,num))* &
++                       blm(lm,num)*pei(l)) + &
++                       conjg(capd0lm(alpha,beta,lm,num))*blm(lm,num)
++                  do jlo=1,ilo(l)
++                     if(.not.loor(jlo,l)) cycle
++                     old_value=old_value+( &
++                          conjg(capd0lm(alpha,beta,lm,num))* &
++                          jlaplo1_02(jlo,l)+ &
++                          conjg(capd1lm(alpha,beta,lm,num))* &
++                          jlaplo1_12(jlo,l))* &
++                          (elo(l,jlo)-eps)*clm(lm,num,jlo)
++                  enddo
++                  buf_corr(alpha,beta,num)=buf_corr(alpha,beta,num)+ &
++                                             exact_value-old_value
++               enddo
++            enddo
++         enddo
++      enddo
++   enddo
++
++   deallocate(rmesh,funct,f,df,fmat)
++end subroutine rela_pulay_d_corr

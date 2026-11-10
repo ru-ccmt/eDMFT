@@ -1,0 +1,5 @@
+DMFT_noncommuting 1.2539573646108693e-07
+DFT_diagonal 1.0633963620776399e-07
+geometric_cancellation 1.2511140567994516e-07
+PASS combined G1+G2 full-H/O finite difference
+:DMFT_G2_COMPLETE_CACHE:      1    36     2    8.88208176E-16    5.55111512E-17

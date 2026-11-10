@@ -1,0 +1,13 @@
+{
+  "case": "SrVO3",
+  "retained_bands": 43,
+  "complete_coefficient_dimension": 703,
+  "setup_and_forward_seconds": 10.739201584132388,
+  "central_density_relative": 1.6262428695810265e-12,
+  "full_spectral_relative": 9.389630975270356e-14,
+  "native_fd_relative": 1.775506091857609e-07,
+  "transpose": 5.576847710161252e-16,
+  "independent_assembly": true,
+  "coupled_forward_seconds": 2.0112236249260604,
+  "coupled_reverse_seconds": 2.181409915909171
+}

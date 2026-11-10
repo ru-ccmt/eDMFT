@@ -1,0 +1,48 @@
+{
+  "stress": {
+    "full": {
+      "response": -0.22023494045369,
+      "norm_response": -0.012877209150393578,
+      "total_Ry": -0.23311214960408358,
+      "GPa": -2.9867755915207272,
+      "analytic_plus_correction_GPa": 2.690108558479273,
+      "numerical_GPa": 2.933285422,
+      "remaining_analytic_minus_numerical_GPa": -0.24317686352072698
+    },
+    "half_": {
+      "response": -0.22023365104283166,
+      "norm_response": -0.012877191879781398,
+      "total_Ry": -0.23311084292261305,
+      "GPa": -2.986758849517667,
+      "analytic_plus_correction_GPa": 2.6901253004823333,
+      "numerical_GPa": 2.933836407,
+      "remaining_analytic_minus_numerical_GPa": -0.24371110651766648
+    }
+  },
+  "functional_checks": [
+    {
+      "h": 1e-05,
+      "slopes_Ry": {
+        "fixed": 622.0439742179451,
+        "moving": 621.8108651584231
+      },
+      "extra_Ry": -0.23310905952200756,
+      "extra_GPa": -2.9867359994971623,
+      "analytic_Ry": -0.23311084292261305,
+      "difference_Ry": 1.7834006054984197e-06,
+      "seconds": 0.3344910831656307
+    },
+    {
+      "h": 5e-06,
+      "slopes_Ry": {
+        "fixed": 622.0447472884416,
+        "moving": 621.8116383024608
+      },
+      "extra_Ry": -0.2331089859808344,
+      "extra_GPa": -2.986735057242624,
+      "analytic_Ry": -0.23311084292261305,
+      "difference_Ry": 1.85694177864959e-06,
+      "seconds": 0.31447033304721117
+    }
+  ]
+}

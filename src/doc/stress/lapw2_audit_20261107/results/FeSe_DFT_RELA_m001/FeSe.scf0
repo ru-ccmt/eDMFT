@@ -1,0 +1,95 @@
+ Euler-Maclaurian Coulomb
+ Consistent 3/8+Simpson combinations at start/end
+ New Mode for Coulomb Integral
+ Extension of core to zero
+ LDM version in phi
+ Fifth-order quadrature in outwin
+ Lebedev-Laikov Grid in lapw0
+
+
+            ---------
+:ITE443:443. ITERATION
+            ---------
+
+:NATO :    2 INDEPENDENT AND    4 TOTAL ATOMS IN UNITCELL
+       SUBSTANCE: FeSe                                                        
+
+       LATTICE                      = P   
+:LAT  : LATTICE CONSTANTS=  7.11431  7.11431 10.41972    1.571    1.571    1.571
+:VOL  : UNIT CELL VOLUME =     527.37728
+:POT  : POTENTIAL OPTION EX_PBE EC_PBE VX_PBE VC_PBE
+       MODE OF CALCULATION IS       = RELA
+       NON-SPINPOLARIZED CALCULATION
+:IFFT  : FFT-parameters:   60   60   80 Factor: 2.00
+
+
+   CONVERGENCE PARAMETER FOR PSEUDOCHARGE: NCON=  9
+   MAXIMAL VALUE OF RMT(JATOM)*ABSK(NKK) : RK  =27.38036
+
+
+:VKCOUL :  VK-COUL convergence: 0.999E-07
+ Lebedev grid of          350
+ :rho_min:   2.0000000000000000E-008   1.0000000000000001E-009
+:DBG_STR_INT_COUL_JAC:   1.571428600959666E+00 F
+
+:STRESS (Ry/Bohr^3)
+:STR_DENS001:       18.907062701368     -0.000000000000      0.000000000000
+:STR_DENS002:       -0.000000000000     18.907062701368      0.000000000000
+:STR_DENS003:        0.000000000000      0.000000000000     18.909773150324
+
+:VCOUL001 ATOMNUMBER=  1 Fe      VCOUL-ZERO =  0.32645E+00
+:EFG001:                        EFG         =     0.49926   *10**21  V / m**2
+                               V20  TOT/SRF=     0.43237    -0.01211
+                               V22  TOT/SRF=     0.00000     0.00000
+                               V22M TOT/SRF=     0.00000     0.00000
+                               V21  TOT/SRF=     0.00000     0.00000
+                               V21M TOT/SRF=     0.00000     0.00000
+
+             -0.24963    0.00000    0.00000       -0.24963    0.00000    0.00000
+              0.00000   -0.24963    0.00000        0.00000   -0.24963    0.00000
+              0.00000    0.00000    0.49926        0.00000    0.00000    0.49926
+
+         MAIN DIRECTIONS OF THE EFG   1.0000 -0.0000  0.0000
+                                      0.0000  1.0000  0.0000
+                                      0.0000  0.0000  1.0000
+:ANG001:  ANGLE WITH OLD X-AXIS =         0.0
+
+:ETA001:                         ASYMM. ETA =     0.00000
+
+
+:VCOUL002 ATOMNUMBER=  2 Se      VCOUL-ZERO =  0.18757E+00
+:EFG002:                        EFG         =    -5.07632   *10**21  V / m**2
+                               V20  TOT/SRF=    -4.39622     0.01171
+                               V22  TOT/SRF=     0.00000     0.00000
+                               V22M TOT/SRF=     0.00000     0.00000
+                               V21  TOT/SRF=     0.00000     0.00000
+                               V21M TOT/SRF=     0.00000     0.00000
+
+              2.53816    0.00000    0.00000        2.53816    0.00000    0.00000
+              0.00000    2.53816    0.00000        0.00000    2.53816    0.00000
+              0.00000    0.00000   -5.07632        0.00000    0.00000   -5.07632
+
+         MAIN DIRECTIONS OF THE EFG   1.0000 -0.0000 -0.0000
+                                      0.0000  1.0000 -0.0000
+                                      0.0000  0.0000  1.0000
+:ANG002:  ANGLE WITH OLD X-AXIS =         0.0
+
+:ETA002:                         ASYMM. ETA =    -0.00000
+
+
+     HELLMANN-FEYNMAN-FORCE IN mRy/a.u. = |F|  Fx       Fy             Fz
+:FHF001:   1.ATOM      0.000000000000      0.000000000000      0.000000000000      0.000000000000
+
+     HELLMANN-FEYNMAN-FORCE IN mRy/a.u. = |F|  Fx       Fy             Fz
+:FHF002:   2.ATOM   1465.672179295086      0.000000000000      0.000000000000  -1465.672179295086
+
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.4685222E-02
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.4685222E-02
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.7600296E-03
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.7600296E-03
+:DEN  : DENSITY INTEGRAL  =         -6226.38811191   (Ry)
+       ELS_POTENTIAL_AT Z=0 and Z=0.5:  -0.64106   0.58782
+       ELS_POTENTIAL_AT Y=0 and Y=0.5:   0.00000   0.00000
+:VZERO:v0,v0c,v0x  -1.44946  -0.64106  -0.80840 v5,v5c,v5x   0.07310   0.58782  -0.51473
+:VZERY:v0,v0c,v0x  -0.70342   0.00000  -0.70342 v5,v5c,v5x  -0.70342   0.00000  -0.70342
+:VZERX:v0,v0c,v0x   0.07371   0.75330  -0.67959 v5,v5c,v5x   0.07371   0.75330  -0.67959

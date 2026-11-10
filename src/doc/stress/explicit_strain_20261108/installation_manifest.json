@@ -1,0 +1,38 @@
+[
+  {
+    "source": "/private/tmp/edmft_explicit_strain_20261108/stage/lapw_strain_potential.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_strain_potential.py",
+    "source_sha256": "d67fb998f4a2d8169189da984b387797c58ddfaae13cb01324d8e15b523197fc",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_explicit_strain_20261108/stage/lapw_strain_potential.py",
+    "destination": "/Users/haule/dbin/lapw_strain_potential.py",
+    "source_sha256": "d67fb998f4a2d8169189da984b387797c58ddfaae13cb01324d8e15b523197fc",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_explicit_strain_20261108/stage/lapw_hydrostatic_potential.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_hydrostatic_potential.py",
+    "source_sha256": "1a1dae567a1c14e08d6e7fefae413606f8016cffdc546cb09df9ed1e802a258e",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_explicit_strain_20261108/stage/lapw_hydrostatic_potential.py",
+    "destination": "/Users/haule/dbin/lapw_hydrostatic_potential.py",
+    "source_sha256": "1a1dae567a1c14e08d6e7fefae413606f8016cffdc546cb09df9ed1e802a258e",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_explicit_strain_20261108/stage/tests/test_lapw_strain_potential.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_strain_potential.py",
+    "source_sha256": "add309abe762356b6499588812925148555b980b04d4f8fd4c3b17bb04c5678f",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_explicit_strain_20261108/stage/stress_response_roadmap_20261108.txt",
+    "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+    "source_sha256": "4ad6f1d98a96fd0581a882e24611a38b5fe10b07f692e72e2eda2ee2e45e1a65",
+    "before_sha256": "11a2647f87195069a7c16e8c27e9779e1dc218363b8157e5cedc9f561c8aab37"
+  }
+]

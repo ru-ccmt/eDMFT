@@ -1,0 +1,828 @@
+--- /dev/null
++++ b/src/python/lapw_strain_potential.py
+@@ -0,0 +1,272 @@
++"""Native potential coordinates and explicit fixed-RMT strain ingredients.
++
++The radial file convention is MIXED: spherical VSP stores r*V_00 (physical
++spherical average), nonspherical VNS stores V_lm. The interstitial VNS entries
++are masked per-member Fourier coefficients, in the file conjugation convention.
++Changing geometry changes those coefficients even for a constant potential.
++
++This module supplies strict file-coordinate matching, the analytic moving-mask
++source and the hydrostatic MT coordinate-transport term. It does not claim to
++generate the entire geometric Hartree/XC/ionic source or a total stress tensor.
++Native centered potential samples remain a reference for the unfinished source.
++"""
++
++from dataclasses import dataclass
++from pathlib import Path
++import re
++import numpy as np
++from scipy.interpolate import CubicSpline
++from scipy.special import spherical_jn
++from lapw_density_response import checked
++
++
++FLOAT = re.compile(r"[-+]?\d+\.\d+[ED][-+]?\d+", re.I)
++ATOM = re.compile(r"ATOMNUMBER\s*=\s*(\d+)")
++LM = re.compile(r"VLM\(R\) FOR L\s*(-?\d+)\s+M=\s*(-?\d+)")
++
++
++@dataclass(frozen=True)
++class PotentialFile:
++    radial: dict
++    interstitial: dict
++
++
++def read_potential_file(path, radial_lengths):
++    """Read exactly NPT values per channel and label every Fourier coefficient.
++
++    No positional band/star matching, regex spill into the next channel, silent
++    absent harmonics, or extra complex conjugation. Both VSP and VNS use this
++    parser; their physical units are assigned by NativePotentialFileLayout.
++    """
++    lines = Path(path).read_text().splitlines()
++    radial, pw = {}, {}
++    atom = None
++    i = 0
++    while i < len(lines):
++        line = lines[i]
++        am = ATOM.search(line)
++        if am:
++            atom = int(am[1]) - 1
++            if not 0 <= atom < len(radial_lengths):
++                raise ValueError("invalid potential atom index")
++        lm = LM.search(line)
++        if lm:
++            if atom is None:
++                raise ValueError("potential channel precedes atom header")
++            key = (atom, int(lm[1]), int(lm[2]))
++            if key in radial:
++                raise ValueError("duplicate potential harmonic")
++            values = []
++            i += 1
++            while i < len(lines) and len(values) < radial_lengths[atom]:
++                if (
++                    ATOM.search(lines[i])
++                    or LM.search(lines[i])
++                    or "NUMBER OF PW" in lines[i]
++                ):
++                    break
++                values.extend(
++                    float(x.replace("D", "E").replace("d", "e"))
++                    for x in FLOAT.findall(lines[i])
++                )
++                i += 1
++            a = np.array(values)
++            if a.shape != (radial_lengths[atom],) or not np.all(np.isfinite(a)):
++                raise ValueError("truncated, oversized or nonfinite potential harmonic")
++            a.setflags(write=False)
++            radial[key] = a
++            continue
++        if "NUMBER OF PW" in line:
++            if pw:
++                raise ValueError("multiple interstitial potential blocks")
++            count = int(line.split()[0])
++            if count < 1 or i + count >= len(lines):
++                raise ValueError("truncated interstitial potential block")
++            for row in lines[i + 1 : i + 1 + count]:
++                g = tuple(int(row[j : j + 5]) for j in [3, 8, 13])
++                z = complex(
++                    float(row[18:37].replace("D", "E")),
++                    float(row[37:56].replace("D", "E")),
++                )
++                if g in pw or not np.isfinite(z):
++                    raise ValueError("duplicate/nonfinite potential star")
++                pw[g] = z
++            i += count
++        i += 1
++    if not radial:
++        raise ValueError("no radial potential data")
++    return PotentialFile(radial, pw)
++
++
++class NativePotentialFileLayout:
++    """Central, fixed-label selector between prepared fields and VSP/VNS files.
++
++    Layout comes from actual central files. Missing requested labels at an
++    endpoint fail. Additional endpoint stars are permitted only if exactly
++    negligible: a changing active cutoff invalidates this derivative reference.
++    Fixed RMT, radial grids, symmetry/axes and fractional positions must also
++    be checked from structures by the caller; potential files omit those data.
++    """
++
++    def __init__(self, hartree, vsp, vns, *, complex_interstitial):
++        self.lengths = tuple(g.n for g in hartree.integrations)
++        self.keys = tuple(hartree.keys)
++        self.harmonics = {
++            a: tuple(key[1:] for key in vns.radial if key[0] == a)
++            for a in range(len(self.lengths))
++        }
++        self.harmonics = {a: lm for a, lm in self.harmonics.items() if lm}
++        self.representatives = tuple(vns.interstitial)
++        self.complex = complex_interstitial
++        self.selector, self.coordinates = hartree.native_potential_output(
++            tuple(range(len(self.lengths))),
++            self.harmonics,
++            np.asarray(self.representatives, int),
++            complex_interstitial=complex_interstitial,
++        )
++        self.central = self.pack(vsp, vns)
++        self.central.setflags(write=False)
++
++    def pack(self, vsp, vns):
++        wanted = {(a, 0, 0) for a in range(len(self.lengths))}
++        if set(vsp.radial) != wanted:
++            raise ValueError("spherical potential atom/harmonic labels differ")
++        expected = {(a, *lm) for a, ls in self.harmonics.items() for lm in ls}
++        if set(vns.radial) != expected:
++            raise ValueError("nonspherical potential labels differ")
++        missing = set(self.representatives) - set(vns.interstitial)
++        extra = set(vns.interstitial) - set(self.representatives)
++        if missing or any(abs(vns.interstitial[g]) > 1e-12 for g in extra):
++            raise ValueError("active interstitial potential cutoff differs")
++        sphere = np.concatenate([vsp.radial[a, 0, 0] for a in range(len(self.lengths))])
++        ns = {
++            a: np.array([vns.radial[a, *lm] for lm in ls]).T
++            for a, ls in self.harmonics.items()
++        }
++        ir = np.array([vns.interstitial[g] for g in self.representatives])
++        if not self.complex:
++            if np.max(abs(ir.imag)) > 1e-12:
++                raise ValueError("complex coefficients in real potential layout")
++            ir = ir.real
++        return self.coordinates.pack(sphere, ns, ir)
++
++    def read(self, vsp_path, vns_path):
++        return self.pack(
++            read_potential_file(vsp_path, self.lengths),
++            read_potential_file(vns_path, self.lengths),
++        )
++
++    def covector(self, prepared_field_gradient):
++        """Convert a full-field gradient only if its entire support is retained."""
++        g = checked(
++            prepared_field_gradient,
++            (self.selector.input_size,),
++            "field gradient",
++            real=True,
++        )
++        result = self.selector.matvec(g)
++        residual = g - self.selector.rmatvec(result)
++        if np.linalg.norm(residual) > 1e-12 * max(1, np.linalg.norm(g)):
++            raise ValueError(
++                "functional gradient uses channels absent from potential files"
++            )
++        return result
++
++
++def unequal_centered_derivative(minus, center, plus, minus_step, plus_step):
++    """Three-point derivative at zero for the ACTUAL signed structure steps."""
++    hm, hp = float(minus_step), float(plus_step)
++    if not np.isfinite(hm + hp) or not hm < 0 < hp:
++        raise ValueError("steps must straddle the central structure")
++    center = np.asarray(center)
++    if np.iscomplexobj(center) or not np.all(np.isfinite(center)):
++        raise ValueError("finite real central potential required")
++    minus = checked(minus, center.shape, "minus potential", real=True)
++    plus = checked(plus, center.shape, "plus potential", real=True)
++    # Difference form avoids summing three large central potentials.
++    return (-hp / (hm * (hm - hp))) * (minus - center) + (-hm / (hp * (hp - hm))) * (
++        plus - center
++    )
++
++
++def hydrostatic_mt_transport(radial, log_grids):
++    """Convert fixed-r potential derivative to material-r derivative.
++
++    Add this term ONLY if changing convention: for F=r*V_00, material F is
++    F_lambda(lambda*r)/lambda, giving dF/dlog(r)-F; for nonspherical V_lm,
++    material V is V_lambda(lambda*r), giving dV_lm/dlog(r). No density-like
++    lambda**3 factor belongs to a potential. The fixed-r B operator must NOT
++    receive this addition while its band-geometry source remains unchanged.
++    """
++    result = {}
++    for key, v in radial.items():
++        x = log_grids[key[0]]
++        v = checked(v, (len(x),), "radial potential", real=True)
++        result[key] = CubicSpline(x, v)(x, 1) - (v if key[1:] == (0, 0) else 0)
++    return result
++
++
++def strain_mask_derivative(reanalysis, reciprocal, positions, radii, volume, strain):
++    """Analytic derivative of the native fixed-RMT interstitial mask.
++
++    A_eta=(I+eta*strain)A; fractional sites and integer G labels are fixed.
++    dG=-strain^T G, dOmega=tr(strain)*Omega. On the FULL native FFT box,
++      dM_G=sum_a (4*pi*R_a**3/Omega)*phase_a*
++              [tr(strain)*f(x)+direction*x*f'(x)],
++      f(x)=j1(x)/x, x=|G|R, direction=G^T strain G/|G|^2.
++    For hydrostatic strain=I the bracket reduces to j0(x). Finite RMT surface
++    terms survive even for a constant potential. The native G=0 gauge is not
++    altered. This term alone is not the full interstitial potential source.
++    """
++    b = checked(reciprocal, (3, 3), "reciprocal basis", real=True)
++    e = checked(strain, (3, 3), "strain direction", real=True)
++    positions = np.asarray(positions)
++    checked(positions, (len(positions), 3), "fractional sites", real=True)
++    radii = checked(radii, (len(positions),), "fixed radii", real=True)
++    if (
++        not np.allclose(e, e.T, rtol=0, atol=1e-14)
++        or np.any(radii <= 0)
++        or not np.isfinite(volume)
++        or volume <= 0
++    ):
++        raise ValueError("symmetric strain and positive fixed-RMT geometry required")
++    axes = [np.fft.fftfreq(n) * n for n in reanalysis.shape]
++    labels = np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1)
++    g = labels @ b.T
++    norm = np.linalg.norm(g, axis=-1)
++    direction = np.divide(
++        np.einsum("...i,ij,...j->...", g, e, g),
++        norm**2,
++        out=np.zeros_like(norm),
++        where=norm != 0,
++    )
++    result = np.zeros(reanalysis.shape, complex)
++    for p, r in zip(positions, radii):
++        x = norm * r
++        f = np.divide(spherical_jn(1, x), x, out=np.full_like(x, 1 / 3), where=x != 0)
++        xfprime = spherical_jn(0, x) - 3 * f
++        phase = np.exp(2j * np.pi * (labels @ p))
++        if reanalysis.stars.inversion:
++            phase = phase.real
++        result += (
++            4 * np.pi * r**3 / volume * phase * (np.trace(e) * f + direction * xfprime)
++        )
++    return result
++
++
++def masked_potential_strain_source(reanalysis, unmasked_star_sums, mask_derivative):
++    """d(REAN4)/deta applied to FIXED unmasked potential star sums.
++
++    Returns internal REAN4 per-member coefficients. The existing native file
++    selector supplies conjugation once; do not conjugate before that selector.
++    The other leg, REAN4*d(unmasked potential), must be added separately.
++    """
++    z = checked(unmasked_star_sums, (reanalysis.stars.nstar,), "unmasked potential")
++    mask = checked(mask_derivative, reanalysis.shape, "mask derivative")
++    grid = np.zeros(reanalysis.shape, complex)
++    grid[reanalysis.indices] = z[reanalysis.stars.owners] * reanalysis.weight
++    physical = np.fft.fftn(grid).real
++    transformed = np.fft.ifftn(physical * np.fft.fftn(mask.conj()).real)
++    return reanalysis._collect(
++        transformed[reanalysis.indices] * reanalysis.weight.conj()
++    )
+--- /dev/null
++++ b/src/python/lapw_hydrostatic_potential.py
+@@ -0,0 +1,185 @@
++"""Analytic hydrostatic LAPW0 source at fixed RMT and fractional ionic sites.
++
++For A_eta=(1+eta)A and input Density.transport(1+eta), compute
++    v_exp = K * tau_n + (dH_geometry)n + dV_ion + dV_xc,geometry.
++The output is in PreparedPotentialCore field coordinates. There are no native
++launches, geometry finite differences, nuclear finite differences or self-
++consistent iterations. Frozen branch/cutoff assumptions match the prepared
++potential/core state. Only hydrostatic primitive orthogonal cells are supplied.
++"""
++
++import numpy as np
++from scipy.special import spherical_jn, factorial2
++from lapw_hartree_periodic import native_local_axes
++from wien_response_operators import hydrostatic_transport_source
++from lapw_strain_potential import strain_mask_derivative, masked_potential_strain_source
++
++
++def hydrostatic_coulomb_geometry(prepared):
++    """Coulomb source at fixed NATIVE density coefficients, including nuclei.
++
++    Native notation: Q=-S*m+D*rho+Q_ion; P=diag*rho+A*Q; boundary=Re(B*P).
++    At fixed radial grid/RMT, S and m do not move; dQ=dD*rho. Reciprocal lengths
++    decrease, volume increases, while Y_lm(local G) and fractional phases stay
++    fixed. Differentiate spherical Bessel functions without division by them,
++    so their zeros are regular. The point nucleus has Q_ion=S*Z/sqrt(4*pi);
++    its local Dirichlet potential -2Z(1-r/R) in rV units is geometry invariant.
++    """
++    h, s = prepared.hartree, prepared.structure
++    b = np.diag(2 * np.pi / np.array([s.a, s.b, s.c]))
++    norm = np.linalg.norm(h.stars.representatives @ b.T, axis=1)
++    dA = []
++    dD = []
++    dB = np.zeros_like(h.B)
++    first = np.r_[0, np.cumsum(s.mult)[:-1]]
++    for atom in range(s.nat):
++        keys = [k for k, key in enumerate(h.keys) if key[0] == atom]
++        lm = sorted(
++            set(
++                (abs(h.keys[k][1]), m)
++                for k in keys
++                for m in {h.keys[k][2], -h.keys[k][2]}
++            )
++        )
++        lookup = {key: i for i, key in enumerate(lm)}
++        y = h.stars.harmonic_average(
++            b, s.pos[first[atom]], native_local_axes(s.rotloc[atom]), lm
++        )
++        radius = s.rmt[atom]
++        x = norm[1:] * radius
++        dd = np.zeros((len(lm), h.stars.nstar), complex)
++        da = np.zeros((h.stars.nstar, len(lm)), complex)
++        for i, (l, m) in enumerate(lm):
++            dd[i, 1:] = (
++                4
++                * np.pi
++                * radius ** (l + 2)
++                * 1j**l
++                * y[i, 1:]
++                / norm[1:]
++                * (spherical_jn(l + 1, x) - x * spherical_jn(l + 1, x, derivative=True))
++            )
++            power = h.ncon - l + 1
++            pref = (
++                -h.diagonal[1:]
++                * (4 * np.pi / h.volume)
++                * h.stars.sizes[1:]
++                * s.mult[atom]
++                * (-1j / radius) ** l
++                * factorial2(2 * h.ncon + 3)
++                / factorial2(2 * l + 1)
++                * y[i, 1:].conj()
++            )
++            da[1:, i] = pref * (
++                (power - 1) * spherical_jn(h.ncon + 1, x) / x**power
++                - spherical_jn(h.ncon + 1, x, derivative=True) / x ** (power - 1)
++            )
++        for k in keys:
++            a, signed_l, m = h.keys[k]
++            l = abs(signed_l)
++            phase = (-1j if signed_l < 0 else 1) * (-1) ** m
++            factor = 4 * np.pi * 1j**l
++            if m:
++                factor *= np.sqrt(2) / phase
++            if l == 0:
++                factor /= np.sqrt(4 * np.pi)
++            dB[k, 1:] = (
++                factor
++                * (-x * spherical_jn(l, x, derivative=True))
++                * y[lookup[l, m], 1:]
++            )
++        dA.append(da)
++        dD.append(dd)
++    dA = np.concatenate(dA, axis=1)
++    dD = np.concatenate(dD, axis=0)
++    radial, rho = h._split(prepared.input_density.vector())
++    m = np.array([w @ c for w, c in zip(h.moments, radial)])
++    z = np.array(
++        [
++            s.Znuc[a] / np.sqrt(4 * np.pi) if (l, mm) == (0, 0) else 0
++            for a, l, mm in h.keys
++        ]
++    )
++    multipoles = -h.S @ m + h.D @ rho + h.S @ z
++    p = h.diagonal * rho + h.A @ multipoles
++    dp = 2 * h.diagonal * rho + dA @ multipoles + h.A @ (dD @ rho)
++    db = (dB @ p + h.B @ dp).real
++    mask = strain_mask_derivative(
++        h.reanalysis, b, s.pos, np.repeat(s.rmt, s.mult), h.volume, np.eye(3)
++    )
++    mt = [op.boundary * bound for op, bound in zip(h.radial, db)]
++    ir = h.reanalysis.action(dp) + masked_potential_strain_source(h.reanalysis, p, mask)
++    source = np.concatenate(mt + [ir.view(float)])
++    # Central nonlinear Coulomb reconstruction is an independent provenance
++    # check against native total potential after adding prepared XC.
++    central = []
++    boundaries = (h.B @ p).real
++    for key, op, c, bb in zip(h.keys, h.radial, radial, boundaries):
++        value = op.action(c, bb)
++        a, l, mm = key
++        if (l, mm) == (0, 0):
++            r = h.integrations[a].r
++            value = value - 2 * s.Znuc[a] * (1 - r / s.rmt[a])
++        central.append(value)
++    central = np.concatenate(central + [h.reanalysis.action(p).view(float)])
++    return source, central, mask
++
++
++def hydrostatic_xc_geometry(prepared, mask_derivative):
++    """XC source at fixed native density coefficients.
++
++    MT grids and angular axes are fixed, so their explicit geometry source is
++    zero. In the IR native quadratic fit, first spatial derivatives scale as
++    lambda^-1 and second derivatives as lambda^-2 at fixed density samples.
++    The existing analytic XC formulas supply a directional complex-step
++    derivative on the central branch. Native vacuum averaging, star truncation
++    and moving-mask response follow in exactly that order.
++    """
++    h, xc = prepared.hartree, prepared.xc
++    ir = xc.ir
++    _, rho = h._split(prepared.input_density.vector())
++    density = np.maximum(ir.expand(rho), 0)
++    if ir.functional == "PBE":
++        fields = ir.fields(density)
++        direction = fields.copy()
++        direction[..., 0] = 0
++        direction[..., 1:4] *= -1
++        direction[..., 4:] *= -2
++        point = np.imag(ir._point(fields + 1j * 1e-24 * direction)) / 1e-24
++    else:
++        point = np.zeros(ir.shape)
++    dp = ir.select(ir.average(point))
++    pw = h.reanalysis.action(dp) + masked_potential_strain_source(
++        h.reanalysis, ir.central_stars, mask_derivative
++    )
++    source = np.zeros(h.size)
++    source[h.pw_offset :] = pw.view(float)
++    central = np.zeros(h.size)
++    for atom, slices in zip(xc.mt, xc.atom_slices):
++        for sl, col in zip(slices, atom.central.T):
++            central[sl] = col
++    central[h.pw_offset :] = ir.central.view(float)
++    return source, central
++
++
++def hydrostatic_explicit_potential(prepared):
++    """Return analytic source and diagnostics; no total-stress publication.
++
++    tau_n is the SAME Density.transport derivative used to define the screened
++    density coordinate. K*q must be added separately. In particular do not add
++    a further r.grad(V) to this fixed-r source unless transforming all band
++    geometry and functional derivatives to material coordinates as well.
++    """
++    tau = hydrostatic_transport_source(prepared.input_density).vector()
++    transported = prepared.potential_operator.matvec(tau)
++    coulomb, vc, mask = hydrostatic_coulomb_geometry(prepared)
++    xc, vxc = hydrostatic_xc_geometry(prepared, mask)
++    return transported + coulomb + xc, dict(
++        transport=transported,
++        coulomb_geometry=coulomb,
++        xc_geometry=xc,
++        central_coulomb=vc,
++        central_xc=vxc,
++        central_potential=vc + vxc,
++        mask_derivative=mask,
++    )
+--- /dev/null
++++ b/src/python/tests/test_lapw_strain_potential.py
+@@ -0,0 +1,224 @@
++"""Independent nonlinear geometry, native-coordinate and transport controls."""
++
++from copy import deepcopy
++from pathlib import Path
++from tempfile import TemporaryDirectory
++from types import SimpleNamespace as NS
++import unittest
++import numpy as np
++from scipy.interpolate import CubicSpline
++from lapw_hartree_periodic import (
++    NativeStarTable,
++    NativeHartreeReanalysis,
++    PeriodicHartreeResponse,
++)
++from lapw_strain_potential import (
++    PotentialFile,
++    read_potential_file,
++    NativePotentialFileLayout,
++    unequal_centered_derivative,
++    hydrostatic_mt_transport,
++    strain_mask_derivative,
++    masked_potential_strain_source,
++)
++from lapw_hydrostatic_potential import hydrostatic_coulomb_geometry
++from test_lapw_hartree_periodic import fixture
++from wien_response_density import Density
++
++
++class ExplicitStrainPotentialTests(unittest.TestCase):
++    def setUp(self):
++        self.d, self.s, self.reps = fixture()
++        self.h = PeriodicHartreeResponse(self.d, self.s, (12, 14, 16), inversion=False)
++        self.b = np.diag(2 * np.pi / np.array([self.s.a, self.s.b, self.s.c]))
++
++    def test_file_coordinate_selection_conjugation_and_labels(self):
++        h = self.h
++        sph = PotentialFile({(0, 0, 0): np.arange(301.0)}, {})
++        ns = PotentialFile(
++            {
++                key: np.full(301, i + 0.5)
++                for i, key in enumerate(h.keys)
++                if key[1:] != (0, 0)
++            },
++            {tuple(g): complex(i, -i / 3) for i, g in enumerate(self.reps)},
++        )
++        layout = NativePotentialFileLayout(h, sph, ns, complex_interstitial=True)
++        field = np.zeros(h.size)
++        for key, sl in zip(h.keys, h.slices):
++            field[sl] = (sph.radial | ns.radial)[key]
++        # Internal REAN4 is the conjugate of VNS file data.
++        field[h.pw_offset :] = (
++            np.array(list(ns.interstitial.values())).conj().view(float)
++        )
++        np.testing.assert_array_equal(layout.selector.matvec(field), layout.central)
++        # Dict insertion/file-row order must not replace explicit G labels.
++        reversed_ns = PotentialFile(
++            dict(reversed(list(ns.radial.items()))),
++            dict(reversed(list(ns.interstitial.items()))),
++        )
++        np.testing.assert_array_equal(layout.pack(sph, reversed_ns), layout.central)
++        native = np.arange(layout.coordinates.size, dtype=float)
++        np.testing.assert_array_equal(
++            layout.covector(layout.selector.rmatvec(native)), native
++        )
++        bad = PotentialFile(
++            ns.radial, {g: v for g, v in ns.interstitial.items() if g != (0, 0, 0)}
++        )
++        with self.assertRaises(ValueError):
++            layout.pack(sph, bad)
++
++    def test_parser_rejects_truncation_and_duplicate_channels(self):
++        header = "   ATOMNUMBER = 1\n VLM(R) FOR L 0 M= 0\n"
++        values = "   " + "".join(f"{v:19.12E}" for v in [1.0, 2.0, 3.0, 4.0]) + "\n"
++        pw = (
++            " 1 NUMBER OF PW\n"
++            + "   "
++            + "".join(f"{v:5d}" for v in [0, 0, 0])
++            + f"{2.:19.12E}{-3.:19.12E}\n"
++        )
++        with TemporaryDirectory() as temp:
++            p = Path(temp) / "potential"
++            p.write_text(header + values + pw)
++            x = read_potential_file(p, [4])
++            np.testing.assert_array_equal(x.radial[0, 0, 0], [1, 2, 3, 4])
++            self.assertEqual(x.interstitial[0, 0, 0], 2 - 3j)
++            p.write_text(header + values + header + values)
++            with self.assertRaises(ValueError):
++                read_potential_file(p, [4])
++            p.write_text(header + values + pw)
++            with self.assertRaises(ValueError):
++                read_potential_file(p, [5])
++
++    def test_unequal_steps_are_exact_for_quadratic(self):
++        a = np.array([2.0, 3.0, 4.0])
++        b = np.array([1.7, -0.4, 2.0])
++        c = np.array([3.0, -9.0, 0.1])
++        hm, hp = -0.00021, 0.00019
++        actual = unequal_centered_derivative(
++            a + b * hm + c * hm**2, a, a + b * hp + c * hp**2, hm, hp
++        )
++        np.testing.assert_allclose(actual, b, atol=2e-12, rtol=0)
++        with self.assertRaises(ValueError):
++            unequal_centered_derivative(a, a, a, 0.1, 0.2)
++
++    def test_potential_material_transport_mixed_radial_units(self):
++        x = np.linspace(-4, 1, 101)
++        radial = {(0, 0, 0): -8 + 3 * x + x**2, (0, 2, 0): 1 + 2 * x + x**3 / 10}
++        expected = hydrostatic_mt_transport(radial, [x])
++        step = 1e-5
++        for key, v in radial.items():
++            endpoints = []
++            for sign in [-1, 1]:
++                lam = 1 + sign * step
++                endpoints.append(
++                    CubicSpline(x, v)(x + np.log(lam))
++                    / (lam if key[1:] == (0, 0) else 1)
++                )
++            np.testing.assert_allclose(
++                (endpoints[1] - endpoints[0]) / (2 * step),
++                expected[key],
++                rtol=2e-9,
++                atol=2e-9,
++            )
++        # The point nucleus is constant in rV at fixed r, but is not constant
++        # when pulled back to material coordinates. No zero-at-RMT assumption.
++        np.testing.assert_allclose(
++            hydrostatic_mt_transport({(0, 0, 0): np.full(101, -8.0)}, [x])[0, 0, 0], 8.0
++        )
++
++    def reanalysis(self, t, e):
++        f = np.eye(3) + t * e
++        return NativeHartreeReanalysis(
++            self.h.stars,
++            self.h.reanalysis.shape,
++            np.linalg.inv(f).T @ self.b,
++            self.s.pos,
++            self.s.rmt,
++            self.h.volume * np.linalg.det(f),
++        )
++
++    def test_mask_hydrostatic_and_shear_against_full_geometry(self):
++        for e in [
++            np.eye(3),
++            np.array([[0.2, 0.3, 0], [0.3, -0.1, 0.1], [0, 0.1, 0.4]]),
++        ]:
++            exact = strain_mask_derivative(
++                self.h.reanalysis, self.b, self.s.pos, self.s.rmt, self.h.volume, e
++            )
++            errors = []
++            for step in [4e-4, 2e-4]:
++                fd = (
++                    self.reanalysis(step, e).mask_fourier
++                    - self.reanalysis(-step, e).mask_fourier
++                ) / (2 * step)
++                errors.append(np.linalg.norm(fd - exact) / np.linalg.norm(exact))
++            self.assertLess(errors[-1], 2e-6)
++            self.assertGreater(errors[0] / errors[1], 3.8)
++        expected = 4 * np.pi * self.s.rmt[0] ** 3 / self.h.volume
++        exact = strain_mask_derivative(
++            self.h.reanalysis, self.b, self.s.pos, self.s.rmt, self.h.volume, np.eye(3)
++        )
++        self.assertAlmostEqual(exact[0, 0, 0].real, expected, places=15)
++
++    def test_reanalysis_surface_source_for_nonconstant_potential(self):
++        rng = np.random.default_rng(928)
++        potential = rng.normal(size=len(self.reps)) + 1j * rng.normal(
++            size=len(self.reps)
++        )
++        e = np.array([[1, 0.1, 0], [0.1, 0.7, 0], [0, 0, -0.3]])
++        mask = strain_mask_derivative(
++            self.h.reanalysis, self.b, self.s.pos, self.s.rmt, self.h.volume, e
++        )
++        actual = masked_potential_strain_source(self.h.reanalysis, potential, mask)
++        step = 1e-5
++        expected = (
++            self.reanalysis(step, e).action(potential)
++            - self.reanalysis(-step, e).action(potential)
++        ) / (2 * step)
++        np.testing.assert_allclose(actual, expected, rtol=2e-8, atol=2e-10)
++
++    def test_coulomb_geometry_includes_nucleus_and_boundary(self):
++        rng = np.random.default_rng(172)
++        d = Density.__new__(Density)
++        d.__dict__.update(self.d.__dict__)
++        d.mult = [1]
++        d.rad = {
++            key: rng.normal(size=301) * np.exp(2 * self.d.grids[0])
++            for key in self.h.keys
++        }
++        d.pw = {tuple(g): rng.normal() + 1j * rng.normal() for g in self.reps}
++        s = deepcopy(self.s)
++        s.Znuc = np.array([3.0])
++        central = NS(hartree=self.h, structure=s, input_density=d)
++        source, _, _ = hydrostatic_coulomb_geometry(central)
++
++        # Nonlinear reference: rebuild native Poisson matrices at endpoints;
++        # add the point-nucleus multipole and local Dirichlet potential.
++        def value(t):
++            ss = deepcopy(s)
++            ss.a *= 1 + t
++            ss.b *= 1 + t
++            ss.c *= 1 + t
++            h = PeriodicHartreeResponse(d, ss, (12, 14, 16), inversion=False)
++            z = np.zeros(len(h.keys))
++            z[0] = 3 / np.sqrt(4 * np.pi)
++            ion_pw = h.A @ (h.S @ z)
++            bound = (h.B @ ion_pw).real
++            ion_mt = [op.boundary * bb for op, bb in zip(h.radial, bound)]
++            r = h.integrations[0].r
++            ion_mt[0] -= 6 * (1 - r / ss.rmt[0])
++            return h.action(d.vector()) + np.concatenate(
++                ion_mt + [h.reanalysis.action(ion_pw).view(float)]
++            )
++
++        errors = []
++        for step in [4e-4, 2e-4]:
++            fd = (value(step) - value(-step)) / (2 * step)
++            errors.append(np.linalg.norm(fd - source) / np.linalg.norm(source))
++        self.assertLess(errors[-1], 2e-6)
++        self.assertGreater(errors[0] / errors[1], 3.8)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/src/doc/stress/stress_response_roadmap_20261108.txt
++++ b/src/doc/stress/stress_response_roadmap_20261108.txt
+@@ -3,43 +3,47 @@
+ 
+ MAIN POINT
+ 
+-LATEST CHECKPOINT: projector_functional_20261108/REPORT.txt
+-
+-We are in point 3. NativeScreenedState connects the complete charge Jacobian
+-  J = N [R E B + D + C] K,   (I-J) q_nu = s_nu,
+-with native hydrostatic source and full-mesh screening validation recorded in
+-screened_native_20261108/. s_nu is the source called b_nu in earlier reports.
+-
+-PreparedProjectorFunctional now adds the potential/charge readout of the extra
+-NORMALIZED-PROJECTOR dependence of the regularized lattice scalar:
+-  g_v = B^T g_joint,   c = K^T g_v,
+-  (I-J)^T lambda = c,
+-  dL_projector,potential,nu = g_v^T v_explicit,nu + lambda^T s_nu.
+-It includes the moving overlap metric, global X and actual orbital symmetry,
+-and the empty complement of the stored KS space using prepared shifted solves.
+-One adjoint serves multiple sources. Explicit potential inputs are required.
+-
+-194 tests pass with repository and dbin dependencies. Independent three-k
+-native scalar endpoints validate the new gradient in FeSe and SrVO3; actual
+-projector-readout forward/adjoint contractions agree within true residual bounds.
+-Full configured meshes (140/75 k points) prepare the common gradient and pass
+-the potential-to-charge pullback check. Exact data and scope are in the report.
+-
+-This is the PROJECTOR-ONLY scalar readout, not the full Klein-functional
+-gradient. It excludes direct density/Hamiltonian and baseline terms. The
+-induced potential Kq is only part of the total potential. Partial contractions,
+-especially FeSe's, can be large and must not be interpreted as total pressure
+-corrections. Diagnostic central states were not newly reconverged. No total
+-stress/GPa comparison or automatic stress publication is claimed.
+-
+-NEXT WITHIN POINT 3: define the explicit affine/ionic potential in the same
+-native coordinates, assemble its projector contraction and complementary
+-direct radial H/O/geometry terms against the existing analytic stress, and
+-validate the COMBINED hydrostatic derivative without double counting.
+-Then complete six analytic geometry sources and production publication.
+-The production wrapper still uses its native reference; the prepared engine
+-has not replaced that backend. MPI/streaming remains necessary for large
+-meshes. The deferred force audit stays after strain validation.
++LATEST CHECKPOINT: explicit_strain_20261108/REPORT.txt
++
++We are in point 3. The complete native charge Jacobian J, numerical hydrostatic
++charge source and q, and the projector-only functional readout are connected
++and validated. The explicit hydrostatic POTENTIAL source is now analytic:
++  n_eta = T_eta(n0 + eta*q),
++  s_V = K*tau_n + Coulomb_geometry(n0,ions) + XC_geometry(n0),
++  v_eta' = s_V + K*q.
++Here tau_n is the derivative of the existing density transport; it must not
++be added again to q. s_V is not the entire explicit CHARGE source s_charge.
++
++The source includes fixed-RMT boundary/mask motion, periodic ionic Coulomb,
++native pseudocharge/radial geometry, and LDA/PBE XC geometry. It uses mixed
++native radial units (rV spherical, V_lm nonspherical) and the existing complex
++VNS conjugation convention. A separate material-radial conversion is supplied
++for diagnostics and is not silently inserted in the fixed-r response map.
++
++201 tests pass with repository and dbin dependencies. Independent native
++LAPW0 endpoint checks pass in SrVO3 and FeSe with step convergence; exact
++errors and a small residual near the innermost FeSe spherical grid are
++recorded in the checkpoint report. Source preparation costs about 0.2/0.5 s
++after potential/core preparation, without native launches or SCF iteration.
++An isolated native precision switch removed six-decimal lattice rounding
++from the pure-hydrostatic validation. That switch is not installed in WIEN2k.
++
++The projector readout uses
++  g_V = B^T g_joint, c=K^T g_V, (I-J)^T lambda=c,
++  dL_projector,potential = g_V^T s_V + lambda^T s_charge.
++Explicit and induced pieces cancel substantially. This is still only the
++projector potential contribution, not the full Klein derivative or total
++stress. Diagnostic states were not newly reconverged and no new pressure
++agreement or automatic stress publication is claimed.
++
++NEXT WITHIN POINT 3: finish the explicit joint H/O/raw-projector geometry
++source at fixed NATIVE potential coefficients. Reconcile its functional
++contraction and direct radial terms with the existing analytic stress so that
++the moving-mask term is counted exactly once. Validate the combined
++hydrostatic derivative, then the fully analytic charge source, six strains,
++and production publication. The wrapper still uses its native reference;
++the prepared engine has not replaced that backend. MPI/streaming and the
++deferred force audit remain as previously planned.
+ 
+ THE THREE LEVELS THAT CURRENTLY COEXIST
+ 
+@@ -172,13 +176,15 @@
+    reuse. The projector-only functional readout now also passes native scalar
+    endpoints and forward/adjoint checks; its metric and empty-complement
+    pullbacks reuse the same native operators. Kq is the induced potential;
+-   the explicit geometric potential and remaining functional/baseline terms
+-   must still be assembled once. See screened_native_20261108/REPORT.txt and
+-   projector_functional_20261108/REPORT.txt for scope and numerical controls.
++   the hydrostatic explicit potential is now analytic and independently
++   checked. Remaining band geometry and functional/baseline terms must still
++   be assembled once. See screened_native_20261108/REPORT.txt and
++   projector_functional_20261108/REPORT.txt and explicit_strain_20261108/REPORT.txt
++   for scope and numerical controls.
+ 
+ I. Six physical strain sources and final tensor: NOT COMPLETED
+-   Hydrostatic reference sources and a hydrostatic density-transport derivative
+-   exist. General strain sources with fixed-RMT surface/transport terms, local
++   Numerical hydrostatic charge sources and an analytic hydrostatic potential
++   source exist. General strain sources with fixed-RMT surface/transport terms, local
+    frame policy, tensor symmetry and all contributions are not assembled.
+    The final fast tensor must be validated and published once before SCF merge.
+    Independent radial on/off/diagnostic report policy exists, but is not yet a
+@@ -400,7 +406,9 @@
+    pass independent native checks in FeSe and SrVO3. True residuals, central
+    fixed-point residuals and timings are recorded in screened_native_20261108.
+    The projector-only readout passes its own native scalar/adjoint checks.
+-   Complete total potential/readout validation is the immediate next step.
++   The analytic hydrostatic potential source and its sum with Kq now pass
++   independent native checks. Explicit band geometry and complete functional/
++   baseline reconciliation are the immediate next step.
+ 
+ 4. Complete the stress functional contraction and six strain sources.
+ 
+@@ -491,6 +499,10 @@
+ src/python/lapw_potential_response.py
+   Native nonspherical/interstitial/spherical input coordinates, complex Fourier
+   convention and joint RR/QR H/O/raw-projector map with exact transpose.
++src/python/{lapw_strain_potential,lapw_hydrostatic_potential}.py
++  Analytic hydrostatic potential source, native pseudocharge and ionic geometry,
++  XC spatial scaling, moving interstitial mask, fixed-label potential files
++  and explicit distinction between fixed-r and material-r potential derivatives.
+ src/python/lapw_projector_functional.py
+   Extra normalized-projector scalar readout, full finite-basis metric/QR
+   pullbacks, one common native potential/charge gradient and adjoint reuse.
+@@ -523,6 +535,7 @@
+   shared_gamma_response_20261108/REPORT.txt
+   screened_native_20261108/REPORT.txt
+   projector_functional_20261108/REPORT.txt
++  explicit_strain_20261108/REPORT.txt
+ 
+ Older checkpoint notes describe their state at the time and may contain tasks
+ completed by later checkpoints. Use this roadmap for the current sequence and

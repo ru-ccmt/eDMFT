@@ -1,0 +1,308 @@
+{
+  "converged": true,
+  "threshold": 0.02,
+  "iterations": [
+    {
+      "iteration": 0,
+      "residual_norm": 1309.4891610853224,
+      "seconds": 17.97611654200591
+    },
+    {
+      "iteration": 1,
+      "residual_norm": 644.040407245556,
+      "seconds": 17.968395916046575
+    },
+    {
+      "iteration": 2,
+      "residual_norm": 285.5417979033349,
+      "seconds": 17.990452124970034
+    },
+    {
+      "iteration": 3,
+      "residual_norm": 31.839613139079102,
+      "seconds": 22.735867124982178
+    },
+    {
+      "iteration": 4,
+      "residual_norm": 12.997746307020186,
+      "seconds": 17.939019750105217
+    },
+    {
+      "iteration": 5,
+      "residual_norm": 1.441745561809305,
+      "seconds": 17.965941374888644
+    },
+    {
+      "iteration": 6,
+      "residual_norm": 0.0963353069315905,
+      "seconds": 17.98063929216005
+    },
+    {
+      "iteration": 7,
+      "residual_norm": 0.05535234414698663,
+      "seconds": 18.120523917023093
+    },
+    {
+      "iteration": 8,
+      "residual_norm": 0.012120700189064774,
+      "seconds": 18.00205845804885
+    }
+  ],
+  "case": "SrVO3",
+  "central_charge_residual_norm": 0.00017798227521593135,
+  "ensemble": "fixed N",
+  "fixed_G": true,
+  "kpoints": 75,
+  "band_window": [
+    12,
+    31
+  ],
+  "stored_bands": [
+    43
+  ],
+  "source_strain": 0.00025,
+  "probe_step": 1e-05,
+  "potential_convention": "physical endpoint potentials; material derivative requires pullback",
+  "timings": [
+    {
+      "folder": "central",
+      "program": "lapw0",
+      "seconds": 0.7273961249738932
+    },
+    {
+      "folder": "central",
+      "program": "lapw1",
+      "seconds": 15.246234499849379
+    },
+    {
+      "folder": "central",
+      "program": "dmft2",
+      "seconds": 2.0444754159543663
+    },
+    {
+      "folder": "central",
+      "program": "lcore",
+      "seconds": 0.07573137502186
+    },
+    {
+      "folder": "source_plus",
+      "program": "lapw0",
+      "seconds": 0.6743139170575887
+    },
+    {
+      "folder": "source_plus",
+      "program": "lapw1",
+      "seconds": 14.65144587494433
+    },
+    {
+      "folder": "source_plus",
+      "program": "dmft2",
+      "seconds": 2.0447607091628015
+    },
+    {
+      "folder": "source_plus",
+      "program": "lcore",
+      "seconds": 0.07381295808590949
+    },
+    {
+      "folder": "source_minus",
+      "program": "lapw0",
+      "seconds": 0.6798611669801176
+    },
+    {
+      "folder": "source_minus",
+      "program": "lapw1",
+      "seconds": 14.75914508313872
+    },
+    {
+      "folder": "source_minus",
+      "program": "dmft2",
+      "seconds": 2.046331875026226
+    },
+    {
+      "folder": "source_minus",
+      "program": "lcore",
+      "seconds": 0.07330808416008949
+    },
+    {
+      "folder": "action_000",
+      "program": "lapw0",
+      "seconds": 0.6809400420170277
+    },
+    {
+      "folder": "action_000",
+      "program": "lapw1",
+      "seconds": 14.711898833047599
+    },
+    {
+      "folder": "action_000",
+      "program": "dmft2",
+      "seconds": 2.044652957934886
+    },
+    {
+      "folder": "action_000",
+      "program": "lcore",
+      "seconds": 0.07785791577771306
+    },
+    {
+      "folder": "action_001",
+      "program": "lapw0",
+      "seconds": 0.678820958128199
+    },
+    {
+      "folder": "action_001",
+      "program": "lapw1",
+      "seconds": 14.700395249994472
+    },
+    {
+      "folder": "action_001",
+      "program": "dmft2",
+      "seconds": 2.049093042034656
+    },
+    {
+      "folder": "action_001",
+      "program": "lcore",
+      "seconds": 0.07826550002209842
+    },
+    {
+      "folder": "action_002",
+      "program": "lapw0",
+      "seconds": 0.6922528748400509
+    },
+    {
+      "folder": "action_002",
+      "program": "lapw1",
+      "seconds": 14.665827041957527
+    },
+    {
+      "folder": "action_002",
+      "program": "dmft2",
+      "seconds": 2.0784824159927666
+    },
+    {
+      "folder": "action_002",
+      "program": "lcore",
+      "seconds": 0.07704687491059303
+    },
+    {
+      "folder": "action_003",
+      "program": "lapw0",
+      "seconds": 0.7012762089725584
+    },
+    {
+      "folder": "action_003",
+      "program": "lapw1",
+      "seconds": 19.407371416920796
+    },
+    {
+      "folder": "action_003",
+      "program": "dmft2",
+      "seconds": 2.0663355831056833
+    },
+    {
+      "folder": "action_003",
+      "program": "lcore",
+      "seconds": 0.08234058297239244
+    },
+    {
+      "folder": "action_004",
+      "program": "lapw0",
+      "seconds": 0.7118869998957962
+    },
+    {
+      "folder": "action_004",
+      "program": "lapw1",
+      "seconds": 14.64126450009644
+    },
+    {
+      "folder": "action_004",
+      "program": "dmft2",
+      "seconds": 2.047128832899034
+    },
+    {
+      "folder": "action_004",
+      "program": "lcore",
+      "seconds": 0.07677183416672051
+    },
+    {
+      "folder": "action_005",
+      "program": "lapw0",
+      "seconds": 0.7007418749853969
+    },
+    {
+      "folder": "action_005",
+      "program": "lapw1",
+      "seconds": 14.674481249880046
+    },
+    {
+      "folder": "action_005",
+      "program": "dmft2",
+      "seconds": 2.049236166058108
+    },
+    {
+      "folder": "action_005",
+      "program": "lcore",
+      "seconds": 0.0791847500950098
+    },
+    {
+      "folder": "action_006",
+      "program": "lapw0",
+      "seconds": 0.6981934159994125
+    },
+    {
+      "folder": "action_006",
+      "program": "lapw1",
+      "seconds": 14.692511291941628
+    },
+    {
+      "folder": "action_006",
+      "program": "dmft2",
+      "seconds": 2.046971125062555
+    },
+    {
+      "folder": "action_006",
+      "program": "lcore",
+      "seconds": 0.07902791700325906
+    },
+    {
+      "folder": "action_007",
+      "program": "lapw0",
+      "seconds": 0.7021967079490423
+    },
+    {
+      "folder": "action_007",
+      "program": "lapw1",
+      "seconds": 14.740786124952137
+    },
+    {
+      "folder": "action_007",
+      "program": "dmft2",
+      "seconds": 2.0640357909724116
+    },
+    {
+      "folder": "action_007",
+      "program": "lcore",
+      "seconds": 0.0843857501167804
+    },
+    {
+      "folder": "action_008",
+      "program": "lapw0",
+      "seconds": 0.7245278749614954
+    },
+    {
+      "folder": "action_008",
+      "program": "lapw1",
+      "seconds": 14.682633000193164
+    },
+    {
+      "folder": "action_008",
+      "program": "dmft2",
+      "seconds": 2.0537352501414716
+    },
+    {
+      "folder": "action_008",
+      "program": "lcore",
+      "seconds": 0.07860324997454882
+    }
+  ]
+}

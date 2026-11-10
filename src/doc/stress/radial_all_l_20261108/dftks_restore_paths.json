@@ -1,0 +1,36 @@
+{
+  "SrVO3": {
+    "independent_paths": [
+      {
+        "k": 0.0,
+        "ham.k": 0.0
+      },
+      {
+        "k": 0.0,
+        "ham.k": 0.0
+      },
+      {
+        "k": 0.0,
+        "ham.k": 0.0
+      }
+    ],
+    "zero_probe_bitwise_identical": true
+  },
+  "FeSe": {
+    "independent_paths": [
+      {
+        "k": 0.0,
+        "ham.k": 0.0
+      },
+      {
+        "k": 0.0,
+        "ham.k": 0.0
+      },
+      {
+        "k": 0.0,
+        "ham.k": 0.0
+      }
+    ],
+    "zero_probe_bitwise_identical": true
+  }
+}

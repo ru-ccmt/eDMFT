@@ -1,0 +1,53 @@
+         666004 function calls (631939 primitive calls) in 1.824 seconds
+
+   Ordered by: cumulative time
+   List reduced from 319 to 45 due to restriction <45>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     19/1    0.004    0.000    1.824    1.824 stress_response_adjoint.py:53(rmatvec)
+      7/1    0.000    0.000    1.823    1.823 stress_response_adjoint.py:67(<lambda>)
+      2/1    0.000    0.000    1.708    1.708 stress_response_adjoint.py:78(<lambda>)
+        1    0.000    0.000    1.255    1.255 lapw_potential_response.py:378(pullback)
+        1    0.046    0.046    1.193    1.193 lapw_compact_response.py:156(pullback)
+      132    0.144    0.001    1.071    0.008 lapw_spherical_response.py:323(pullback)
+      816    0.489    0.001    0.717    0.001 lapw_compact_blocks.py:34(right_multiply_columns)
+        1    0.048    0.048    0.298    0.298 lapw_compact_response.py:292(pullback)
+     2570    0.247    0.000    0.292    0.000 lapw_density_response.py:18(checked)
+     1188    0.002    0.000    0.286    0.000 lapw_compact_blocks.py:13(checked_columns)
+       15    0.008    0.001    0.207    0.014 _pocketfft.py:741(_raw_fftnd)
+     2908    0.016    0.000    0.205    0.000 einsumfunc.py:1057(einsum)
+       45    0.199    0.004    0.199    0.004 _pocketfft.py:58(_raw_fft)
+        1    0.000    0.000    0.116    0.116 lapw_xc_response.py:684(<lambda>)
+        9    0.000    0.000    0.106    0.012 _pocketfft.py:887(ifftn)
+        1    0.001    0.001    0.103    0.103 lapw_xc_response.py:705(pullback)
+        1    0.001    0.001    0.102    0.102 lapw_xc_response.py:688(_map)
+       27    0.000    0.000    0.102    0.004 _pocketfft.py:219(ifft)
+        6    0.000    0.000    0.102    0.017 _pocketfft.py:755(fftn)
+        1    0.000    0.000    0.101    0.101 lapw_basis_density_response.py:118(pullback)
+        3    0.002    0.001    0.100    0.033 lapw_density_response.py:363(_waves)
+     1220    0.025    0.000    0.099    0.000 einsumfunc.py:742(einsum_path)
+       18    0.000    0.000    0.097    0.005 _pocketfft.py:120(fft)
+        4    0.003    0.001    0.096    0.024 lapw_density_response.py:151(component_pullback)
+        3    0.001    0.000    0.094    0.031 lapw_density_response.py:368(_wave_pullback)
+        1    0.001    0.001    0.093    0.093 lapw_density_response.py:479(pullback)
+        2    0.005    0.002    0.076    0.038 lapw_density_response.py:252(pullback)
+      438    0.014    0.000    0.073    0.000 lapw_augmentation_response.py:155(pullback)
+        1    0.042    0.042    0.068    0.068 lapw_xc_response.py:630(pullback)
+     6097    0.002    0.000    0.063    0.000 {built-in method builtins.sum}
+     4050    0.062    0.000    0.062    0.000 {built-in method numpy._core._multiarray_umath.c_einsum}
+        2    0.014    0.007    0.061    0.031 lapw_nonspherical_response.py:209(pullback)
+     1302    0.045    0.000    0.045    0.000 lapw_augmentation_response.py:15(real_pair)
+        4    0.002    0.000    0.039    0.010 lapw_potential_response.py:399(<genexpr>)
+      816    0.009    0.000    0.039    0.000 einsumfunc.py:328(_greedy_path)
+        3    0.033    0.011    0.037    0.012 lapw_potential_response.py:152(pullback)
+        2    0.002    0.001    0.033    0.017 wien_response_density.py:147(from_vector)
+        2    0.030    0.015    0.033    0.016 lapw_xc_response.py:447(pullback)
+     2406    0.005    0.000    0.032    0.000 _linalg.py:2623(norm)
+        2    0.000    0.000    0.031    0.016 wien_response_density.py:81(copy)
+  34034/2    0.017    0.000    0.031    0.016 copy.py:128(deepcopy)
+        2    0.000    0.000    0.031    0.016 copy.py:259(_reconstruct)
+     10/2    0.002    0.000    0.031    0.016 copy.py:227(_deepcopy_dict)
+     8174    0.030    0.000    0.030    0.000 {method 'conj' of 'numpy.ndarray' objects}
+        1    0.000    0.000    0.029    0.029 lapw_complement_response.py:449(reverse)
+
+

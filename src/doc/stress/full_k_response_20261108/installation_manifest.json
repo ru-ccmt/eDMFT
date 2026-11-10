@@ -1,0 +1,104 @@
+[
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_compact_blocks.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_compact_blocks.py",
+    "source_sha256": "11fb3b36c65486e9dc35f3c09d041115b17129d732dde6deb92c9d01fc600d58",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_compact_blocks.py",
+    "destination": "/Users/haule/dbin/lapw_compact_blocks.py",
+    "source_sha256": "11fb3b36c65486e9dc35f3c09d041115b17129d732dde6deb92c9d01fc600d58",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_compact_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_compact_response.py",
+    "source_sha256": "ff2b6552ea5f89585badd6420442d51530d973e99a5b8ec08f93068e6eeb742a",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_compact_response.py",
+    "destination": "/Users/haule/dbin/lapw_compact_response.py",
+    "source_sha256": "ff2b6552ea5f89585badd6420442d51530d973e99a5b8ec08f93068e6eeb742a",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_native_snapshot.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_native_snapshot.py",
+    "source_sha256": "68769c3d18fb58a1d8025d1f307022bd091faf3540dcd2c9f0149d5ad5baab3a",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_native_snapshot.py",
+    "destination": "/Users/haule/dbin/lapw_native_snapshot.py",
+    "source_sha256": "68769c3d18fb58a1d8025d1f307022bd091faf3540dcd2c9f0149d5ad5baab3a",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_nonspherical_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_nonspherical_response.py",
+    "source_sha256": "0fdf668ff6def5aa5a1d7ce083e551acaf179d7b1eb624b31a302840a6493b46",
+    "before_sha256": "47c16c9f838532273ef359ec34351c63f5f428cfd39af951c73dddfa9f7e2512"
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_nonspherical_response.py",
+    "destination": "/Users/haule/dbin/lapw_nonspherical_response.py",
+    "source_sha256": "0fdf668ff6def5aa5a1d7ce083e551acaf179d7b1eb624b31a302840a6493b46",
+    "before_sha256": "47c16c9f838532273ef359ec34351c63f5f428cfd39af951c73dddfa9f7e2512"
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_potential_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_potential_response.py",
+    "source_sha256": "69f3e5a6be957b3523b95d044475d281f17b74e107d109e36fe41e9fe15b8ca2",
+    "before_sha256": "43133420c99927ceb3232e96203ac18cc9c058daa390c0d50b0da0f10bf2899f"
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_potential_response.py",
+    "destination": "/Users/haule/dbin/lapw_potential_response.py",
+    "source_sha256": "69f3e5a6be957b3523b95d044475d281f17b74e107d109e36fe41e9fe15b8ca2",
+    "before_sha256": "43133420c99927ceb3232e96203ac18cc9c058daa390c0d50b0da0f10bf2899f"
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_spherical_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_spherical_response.py",
+    "source_sha256": "33e8f86024ddf7d19e24b16c01e4caee43eb68b299f11ceec9a5fefedcae4ba4",
+    "before_sha256": "0e924e66b99d9ae2927b3278c87228a21f0097fd5cf442bf89f37eec1bdfe870"
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_spherical_response.py",
+    "destination": "/Users/haule/dbin/lapw_spherical_response.py",
+    "source_sha256": "33e8f86024ddf7d19e24b16c01e4caee43eb68b299f11ceec9a5fefedcae4ba4",
+    "before_sha256": "0e924e66b99d9ae2927b3278c87228a21f0097fd5cf442bf89f37eec1bdfe870"
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_valence_state.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_valence_state.py",
+    "source_sha256": "65249523ed592929746591145b1dc2b663521209840a173acc7e519e77df9ed1",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/lapw_valence_state.py",
+    "destination": "/Users/haule/dbin/lapw_valence_state.py",
+    "source_sha256": "65249523ed592929746591145b1dc2b663521209840a173acc7e519e77df9ed1",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/tests/test_lapw_compact_response.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_compact_response.py",
+    "source_sha256": "29ab4fa02174d47e9d9a5e77c841b763a01bca70e3fa62aec98bec4c10c971fe",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/stage/tests/test_lapw_valence_state.py",
+    "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_valence_state.py",
+    "source_sha256": "6e76d1a15906a7463b19cc72f57567cb96d623db83ca3e8b434c00db3c9d3b7f",
+    "before_sha256": null
+  },
+  {
+    "source": "/private/tmp/edmft_full_k_response_20261108/roadmap.txt",
+    "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+    "source_sha256": "0a1a3cd10db062a8e22526dee0d1664e5d99102c109477d954bae8574a0d7a9a",
+    "before_sha256": "b409d87ed648a8384facfe8d97aa8a1254c53e268f3d07cb21b774e715e7f3a0"
+  }
+]

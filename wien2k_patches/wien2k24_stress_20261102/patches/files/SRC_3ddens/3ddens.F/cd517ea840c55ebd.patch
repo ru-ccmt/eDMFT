@@ -1,0 +1,35 @@
+--- a/SRC_3ddens/3ddens.F
++++ b/SRC_3ddens/3ddens.F
+@@ -20,6 +20,7 @@
+      use fftpack
+ #endif     
+      use four
++     use, intrinsic :: ISO_C_BINDING, only: C_INT
+ 
+      implicit none
+      
+@@ -48,7 +49,8 @@
+      complex*16, allocatable :: rho_intg(:)
+ 
+ #ifdef FFTW_OMP
+-     integer omp_error, omp_get_max_threads
++     integer(C_INT) omp_error
++     integer omp_get_max_threads
+ #endif
+ 
+ !    error handling  
+@@ -364,8 +366,12 @@
+ !      call haveinversion 
+ 
+ #ifdef FFTW_OMP
+-     call dfftw_init_threads(omp_error)
+-     call dfftw_plan_with_nthreads(omp_get_max_threads())
++     omp_error = fftw_init_threads()
++     if (omp_error.eq.0_C_INT) then
++        write(*,*) 'ERROR: FFTW thread initialization failed in 3DDENS'
++        stop 1
++     endif
++     call fftw_plan_with_nthreads(int(omp_get_max_threads(),C_INT))
+ #endif
+ 
+      call setfft2(nsg,fftx,ffty,fftz,rho_intg,fft,ngxyzsl)

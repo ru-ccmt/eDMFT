@@ -1,0 +1,36 @@
+{
+  "ranks": 4,
+  "kpoints": 75,
+  "pools": [
+    {
+      "rank": 0,
+      "first": 1,
+      "last": 18,
+      "seconds": 6.218586790841073,
+      "nsh_sha256": "ed239ee720ba6c7d11bbcb9c6d7941052d7357b07992bdca4dbb917d2a0e0325"
+    },
+    {
+      "rank": 1,
+      "first": 19,
+      "last": 37,
+      "seconds": 6.574098417069763,
+      "nsh_sha256": "ed239ee720ba6c7d11bbcb9c6d7941052d7357b07992bdca4dbb917d2a0e0325"
+    },
+    {
+      "rank": 2,
+      "first": 38,
+      "last": 56,
+      "seconds": 6.516813750145957,
+      "nsh_sha256": "ed239ee720ba6c7d11bbcb9c6d7941052d7357b07992bdca4dbb917d2a0e0325"
+    },
+    {
+      "rank": 3,
+      "first": 57,
+      "last": 75,
+      "seconds": 6.5043919591698796,
+      "nsh_sha256": "ed239ee720ba6c7d11bbcb9c6d7941052d7357b07992bdca4dbb917d2a0e0325"
+    }
+  ],
+  "seconds": 6.6036091251298785,
+  "scope": "isolated WIEN LAPW1 k pools"
+}

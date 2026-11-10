@@ -1,0 +1,219 @@
+{
+  "installed_utc": "2026-11-08T23:23:53.117866+00:00",
+  "authorization": "User: apply patch and continue to next step.",
+  "files": [
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/stage/lapw_hartree_radial.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_hartree_radial.py",
+      "before_sha256": null,
+      "after_sha256": "3e5024dd22043ad358d3e32727e0af9735d2e2be03566e929190e2848253436d"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/stage/lapw_hartree_radial.py",
+      "destination": "/Users/haule/dbin/lapw_hartree_radial.py",
+      "before_sha256": null,
+      "after_sha256": "3e5024dd22043ad358d3e32727e0af9735d2e2be03566e929190e2848253436d"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/stage/test_lapw_hartree_radial.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_hartree_radial.py",
+      "before_sha256": null,
+      "after_sha256": "ee550e1c0b4557c422f134fb6a6169ed9b2d786e4af69efca458831a369bb3a4"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/stage/stress_response_roadmap_20261108.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+      "before_sha256": "0e9ed407b03f1d9c2d6999e70b7f80c493e10c0d1e6b974b6456a3511bee5e0a",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_radial_response_20261108/before_installation/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+      "after_sha256": "f7dab17e482c0b590b3e8d0f4c0f699a9082ea0f36bf02eebc98ed9aca80f64b"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/REPORT.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_radial_response_20261108/REPORT.txt",
+      "before_sha256": null,
+      "after_sha256": "1b85fb5fab3b308ca59526429a7f659c21a75874d63e207c8e8ac1473de08908"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/expected.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_radial_response_20261108/expected.json",
+      "before_sha256": null,
+      "after_sha256": "284e19e45f704b2f4efaa24eb169b0513398bf934e846e15abf681a4f081a0fd"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/staged_tests.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_radial_response_20261108/staged_tests.log",
+      "before_sha256": null,
+      "after_sha256": "35fafa385e5235cc23c0e1be62b1cb891e3bae6c81ab6590c3fe912e0d8b26fc"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/material_radial_hartree.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_radial_response_20261108/material_radial_hartree.json",
+      "before_sha256": null,
+      "after_sha256": "d2d450981e51e4bc220e530ccc967bc6950b8018030ba9be75957404facde124"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/check_material_radial.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_radial_response_20261108/check_material_radial.py",
+      "before_sha256": null,
+      "after_sha256": "9a3fd8d8d590404710a954b03bd4802b0ba51367e8f3d6e655a5f4e89fb45739"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/stage/lapw_hartree_radial.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_radial_response_20261108/source/lapw_hartree_radial.py",
+      "before_sha256": null,
+      "after_sha256": "3e5024dd22043ad358d3e32727e0af9735d2e2be03566e929190e2848253436d"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/stage/test_lapw_hartree_radial.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_radial_response_20261108/source/test_lapw_hartree_radial.py",
+      "before_sha256": null,
+      "after_sha256": "ee550e1c0b4557c422f134fb6a6169ed9b2d786e4af69efca458831a369bb3a4"
+    },
+    {
+      "source": "/private/tmp/edmft_hartree_radial_20261108/native/reference.f90",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_radial_response_20261108/native_reference/reference.f90",
+      "before_sha256": null,
+      "after_sha256": "89bc6328eb22db0457ee1ab7e59238cb19669218a009abde7e3887f56a77eb34"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/SrVO3_charge_check.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/SrVO3_charge_check.log",
+      "before_sha256": null,
+      "after_sha256": "55eab2f03e1aa1b99f12eade04bbdaa216f91794704bce97d279f1aa9642f89b"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/SrVO3_fixed_N_polished.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/SrVO3_fixed_N_polished.log",
+      "before_sha256": null,
+      "after_sha256": "11dc1bcb04e0e4d012b9d87b02fc6280184d3432c03e3e8b69fe0817580ec510"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/SrVO3_fixed_N.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/SrVO3_fixed_N.log",
+      "before_sha256": null,
+      "after_sha256": "15d57aa1b3d3040eecec63aef803a2e3ea69d15ae20b8f689236242b5053c694"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/polish_fixed_n.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/polish_fixed_n.py",
+      "before_sha256": null,
+      "after_sha256": "5b83aa25ee7f59b47cf4a7ed6121e8f2e2da8506220363e05d808cc72763da32"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/FeSe_charge_check.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/FeSe_charge_check.log",
+      "before_sha256": null,
+      "after_sha256": "acb2690263f5a89da279d5fe3668619fa79cbc0bd76d450aa430df4b8b0fa079"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/FeSe_charge_all_l.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/FeSe_charge_all_l.json",
+      "before_sha256": null,
+      "after_sha256": "14503fb4380f5efc8650abb95efff891ef0bd2597703625eb3003e49d1bc0075"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/FeSe_fixed_N.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/FeSe_fixed_N.log",
+      "before_sha256": null,
+      "after_sha256": "30a023a56abb2b849a2418c0919c4db8168f06dd4e6a4d2b7ceda1c1dc193d8d"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/check_charge.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/check_charge.py",
+      "before_sha256": null,
+      "after_sha256": "60eb6487be1c7fdea4082d4f5c502a1bad812339d7d51a3a4eca5fe9c3dd459f"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/SrVO3_charge_check.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/SrVO3_charge_check.json",
+      "before_sha256": null,
+      "after_sha256": "b6488845bedbb1d503561e4420f9f84aead77fae69f920c76e73588450f4466d"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/check_charge_all_l.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/check_charge_all_l.py",
+      "before_sha256": null,
+      "after_sha256": "f74935e61abc2e9a0b7f14857b8f499cf11e497c088e7881b6028d8d81cbcbe0"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/SrVO3_fixed_N_endpoints.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/SrVO3_fixed_N_endpoints.json",
+      "before_sha256": null,
+      "after_sha256": "07de3350b19e50bb25af56506057f68981e55211e7c52487ae71ce75c15d2d38"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/FeSe_fixed_N_endpoints.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/FeSe_fixed_N_endpoints.json",
+      "before_sha256": null,
+      "after_sha256": "f3b44d20af16734cd0d02d5b0d8b9460133ac76c35052b2f15ed088657cfe0a7"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/FeSe_fixed_N_polished.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/FeSe_fixed_N_polished.log",
+      "before_sha256": null,
+      "after_sha256": "07b0cc0761190df19f1e92f1dd31ba244e1b4fe7fc3d7815d62a6ef6bdcc1980"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/fixed_n_endpoints.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/fixed_n_endpoints.py",
+      "before_sha256": null,
+      "after_sha256": "9ff96ef5e408107f68385abe19e49f7659237aa5c08cb7983148794c3b9c1f64"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/REPORT.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/REPORT.txt",
+      "before_sha256": null,
+      "after_sha256": "c6ee48b30468eb22467dc02293902c8e08f32a89d2be8086723fc90d52243130"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/FeSe_charge_check.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/FeSe_charge_check.json",
+      "before_sha256": null,
+      "after_sha256": "12d45184a39866260c82d565a456b413fd43c1a08d1bda793562f1904951f112"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/FeSe_fixed_N_polished.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/FeSe_fixed_N_polished.json",
+      "before_sha256": null,
+      "after_sha256": "7ff3f714d18b787cd4ae0ae7e086970e01bff705511270f2a58b5bac8e7866e0"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/SrVO3_charge_all_l.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/SrVO3_charge_all_l.json",
+      "before_sha256": null,
+      "after_sha256": "437dc547aef4c9cf10b043d7daab94d2be3e784f4c892ec2cd35689f28e01167"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/FeSe_charge_all_l.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/FeSe_charge_all_l.log",
+      "before_sha256": null,
+      "after_sha256": "45fa268344b08917a759271f74646dd615e66b9055cecbe0df590cfcd4346447"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/build_all_l_material.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/build_all_l_material.py",
+      "before_sha256": null,
+      "after_sha256": "63ff687e35db1eddf7c181861f16ee1ec182711280f7c8a6fa32e4d8690b0b75"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/SrVO3_fixed_N_polished.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/SrVO3_fixed_N_polished.json",
+      "before_sha256": null,
+      "after_sha256": "84f4ec25bbc8028336be3d347adcab60b1b7790d20a5216433611a33deb26b19"
+    },
+    {
+      "source": "/private/tmp/edmft_valence_charge_checks_20261108/SrVO3_charge_all_l.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/charge_response_checks_20261108/SrVO3_charge_all_l.log",
+      "before_sha256": null,
+      "after_sha256": "74ee8a621e3cc4b53fe3f4427ab343f7fceb137b074e477ab4a13b9211f70550"
+    }
+  ],
+  "native_executables_changed": false,
+  "verification": {
+    "source_tests": 115,
+    "native_hartree_tests_included": 2,
+    "installed_helper_tests": 7,
+    "all_source_helper_pairs_identical": true,
+    "production_dmft2_hashes_unchanged": true
+  }
+}

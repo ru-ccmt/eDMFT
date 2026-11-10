@@ -1,0 +1,39 @@
+"""Independent basis-only free-energy finite difference and projector closure.
+
+For fixed physical H and frozen Sigma, the linearized impurity functional
+cancels dTr[(Sigma-Vdc)Gloc]. The remaining stationary derivative is that of
+the lattice log determinant plus mu*N (:VSUM). The basis VSP is used by
+dmft2 to reconstruct the SAME orbitals as LAPW1; eigenvalues remain those of
+the physical, central Hamiltonian. All calculations are isolated.
+"""
+from run_tests import *
+
+def run(case):
+    root=ROOT/(case+'_DMFT'); c=root/'center'
+    for sign in ['minus','plus']:
+        d=root/sign
+        if not (root/(sign+'_free.scf2')).exists():
+            execute(d,'dmft2_free',['/opt/homebrew/bin/mpirun','-n','4','/Users/haule/dbin/dmft2_response','dmft2.def'])
+            shutil.copy2(d/(case+'.scf2'),root/(sign+'_free.scf2'))
+    # The diagnostic drix is a positive physical radial derivative; the
+    # production projector prefactor already converts to raw WIEN stress.
+    extra={'EDMFT_STRESS_RADIAL_RESPONSE':str(root/'radial_response.dat'),
+           'EDMFT_STRESS_DETAILED_DIAGNOSTICS':'1',
+           'EDMFT_STRESS_RADIAL_PROJECTOR':'1',
+           'EDMFT_STRESS_RADIAL_PROJECTOR_SIGN':'CURRENT',
+           'EDMFT_ONEPARTICLE_DUMP':str(root/'one_particle'),
+           'EDMFT_STRESS_STERNHEIMER_DUMP':str(root/'projector'),
+           'EDMFT_STRESS_RESPONSE_DUMP':str(root/'window')}
+    execute(c,'dmft2_projector',['/opt/homebrew/bin/mpirun','-n','4','/Users/haule/dbin/dmft2_response','dmft2.def'],extra)
+    shutil.copy2(c/(case+'.outputdmf2'),root/'radial_projector.out')
+    shutil.copy2(c/(case+'.scf2'),root/'radial_projector.scf2')
+    result=json.loads((root/'summary.json').read_text())
+    vals={}
+    for sign in ['minus','plus']:
+        txt=(root/(sign+'_free.scf2')).read_text()
+        vals[sign]=float(re.findall(r'^:VSUM.*?=\s*([-+0-9.Ee]+)',txt,re.M)[-1])
+    result['vsum_basis_only']=vals
+    result['basis_free_energy_fd_GPa']=(vals['plus']-vals['minus'])/(2*result['step']*3*result['volume'])*14710.507641078
+    (root/'closure.json').write_text(json.dumps(result,indent=2)+'\n');print(result,flush=True)
+
+if __name__=='__main__':run(sys.argv[1])

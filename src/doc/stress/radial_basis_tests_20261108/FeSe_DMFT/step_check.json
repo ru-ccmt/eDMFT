@@ -1,0 +1,10 @@
+{
+  "values": {
+    "minus": -128.095651057,
+    "plus": -128.095652921,
+    "zero": -128.095652002
+  },
+  "half_step_GPa": -0.06911740336305733,
+  "zero_vsum_error_Ry": 0.0,
+  "zero_reference": "saved portable_FeSe_fixedg_real/central"
+}

@@ -45,7 +45,9 @@ def Diff(case, fday):
         dene = abs(DEne[-1]-DEne[-2])
     else:
         dene = 1.0
-    if dene==0: dene = 1.0    
+    # Equal printed SCF energies are a valid zero change at output precision.
+    # Keep it zero: the caller also requires the charge residual to converge.
+    # Insufficient energy history is handled by the fallback above.
     print(':ENERGY convergence: '+str(dene))
     print(':CHARGE convergence: '+str(drho))
     print(':ENERGY convergence: '+str(dene),file=fday)

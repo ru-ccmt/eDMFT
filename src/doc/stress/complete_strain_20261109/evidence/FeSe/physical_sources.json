@@ -1,0 +1,17 @@
+{
+  "physical_axial_source": [
+    {
+      "step": 0.00025,
+      "relative_error": 7.612402884258507e-07,
+      "absolute_error": 0.0004024276785970171
+    },
+    {
+      "step": 0.000125,
+      "relative_error": 1.111940205744908e-06,
+      "absolute_error": 0.0005878242685524908
+    }
+  ],
+  "native_density_readout_Ry": -0.11311745359935355,
+  "native_density_readout_mean_GPa": -1.0486030870432188,
+  "relaxed_numeric_mean_GPa": -1.0487113778804622
+}

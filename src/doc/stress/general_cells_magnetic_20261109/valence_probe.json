@@ -1,0 +1,38 @@
+{
+  "MnTe": {
+    "metadata": {
+      "fixed_number": false,
+      "target_charge": 154.0,
+      "normalization_enabled": true,
+      "normalization_alpha": 1.0001903184305754,
+      "central_valence_relative_error": 1.1437022992260117e-10,
+      "central_core_relative_error": 7.336064005687022e-14,
+      "central_fixed_point_residual_norm": 0.005031405600483016,
+      "kpoints": 100,
+      "mpi_ranks": 1,
+      "retained_bands": 64,
+      "matrix_quadrature": "wien2k24",
+      "stress_applied": false
+    },
+    "transpose": 1.8845670274998057e-14,
+    "seconds": 221.73953704093583
+  },
+  "MnO": {
+    "metadata": {
+      "fixed_number": false,
+      "target_charge": 33.0,
+      "normalization_enabled": true,
+      "normalization_alpha": 0.9999067663286557,
+      "central_valence_relative_error": 1.1379269066907118e-12,
+      "central_core_relative_error": 1.1804673194205386e-13,
+      "central_fixed_point_residual_norm": 0.00036354179939269065,
+      "kpoints": 72,
+      "mpi_ranks": 1,
+      "retained_bands": 23,
+      "matrix_quadrature": "wien2k24",
+      "stress_applied": false
+    },
+    "transpose": 2.892001984899e-14,
+    "seconds": 20.212229707976803
+  }
+}

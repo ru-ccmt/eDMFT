@@ -1,0 +1,36 @@
+FeSe full_bz prepared 118.24675062508322
+FeSe full_bz native lattice 0.00025 {'offsets': [-0.00024998132921416616, 0.0002499813292142772], 'values_Ry': [-154.85605727364683, -155.48087501224762], 'fd_Ry': -1249.7288108772286, 'error_Ry': 0.008424691607615387, 'relative_error': 6.741170357927892e-06}
+FeSe full_bz native lattice 0.000125 {'offsets': [-0.0001249906646071386, 0.00012499066460702757], 'values_Ry': [-155.01213995559755, -155.32455040411168], 'fd_Ry': -1249.7351282042264, 'error_Ry': 0.002107364609855722, 'relative_error': 1.6862461562942262e-06}
+FeSe full_bz projector adjoint action 1 seconds 46.84414075012319
+FeSe full_bz projector adjoint action 2 seconds 47.213930249912664
+FeSe full_bz projector adjoint action 3 seconds 48.053000665968284
+FeSe full_bz projector adjoint action 4 seconds 47.13909870898351
+FeSe full_bz projector adjoint action 5 seconds 46.66840887488797
+FeSe full_bz projector adjoint action 6 seconds 46.60037908400409
+FeSe full_bz projector adjoint action 7 seconds 46.4817391668912
+FeSe full_bz projector adjoint action 8 seconds 47.11084391688928
+FeSe full_bz projector adjoint action 9 seconds 47.75247787497938
+FeSe full_bz projector adjoint action 10 seconds 49.96427687490359
+FeSe full_bz projector adjoint action 11 seconds 48.78670533304103
+FeSe full_bz projector adjoint action 12 seconds 48.428937250049785
+FeSe full_bz projector adjoint action 13 seconds 47.88089124998078
+FeSe full_bz projector adjoint action 14 seconds 47.46801450010389
+FeSe full_bz projector adjoint action 15 seconds 46.41979558300227
+FeSe full_bz projector {"observable": "projector regularized frozen-Sigma lattice term", "units": "Ry per supplied perturbation parameter", "geometry_derivatives": [-0.3872255871570881], "explicit_potential_derivatives": [15.271178894360787], "induced_derivatives": [-13.192864896461176], "stress_applied": false, "full_klein_functional": false, "baseline_subtracted": false, "forward_Ry": [1.6910884107425233], "explicit_joint_Ry": 14.883953307203742, "adjoint_initial": "/private/tmp/edmft_functional_readout_20261109/three_k/FeSe/covectors.npz", "adjoint_action_seconds": [46.84414075012319, 47.213930249912664, 48.053000665968284, 47.13909870898351, 46.66840887488797, 46.60037908400409, 46.4817391668912, 47.11084391688928, 47.75247787497938, 49.96427687490359, 48.78670533304103, 48.428937250049785, 47.88089124998078, 47.46801450010389, 46.41979558300227], "adjoint": {"observable": "projector regularized frozen-Sigma lattice term", "units": "Ry per supplied perturbation parameter", "geometry_derivatives": [-0.3872255871570881], "explicit_potential_derivatives": [15.271178894360787], "induced_derivatives": [-13.192865030813206], "stress_applied": false, "full_klein_functional": false, "baseline_subtracted": false, "adjoint": {"converged": true, "gmres_info": 0, "direction": "adjoint", "residual_norm": 1.1481584632382243e-08, "threshold": 6.297515212639382e-08, "actions": 15, "inner_residual_history": [0.048097575909669, 0.023926224527842453, 0.005463901252830835, 0.0009916400849506713, 0.000420120735504771, 6.1010738551555945e-05, 1.1493661200945343e-05, 2.3073348842283476e-06, 3.320556694169853e-07, 7.397348568981913e-08, 6.522581496802752e-09, 3.645698797960255e-10], "seconds": 712.8179138749838}}, "adjoint_Ry": [1.6910882763904933], "forward_adjoint_error_Ry": 1.3435202994571682e-07, "residual_bound_Ry": 0.00014834285116427533}
+FeSe full_bz lattice adjoint action 1 seconds 50.756644083885476
+FeSe full_bz lattice adjoint action 2 seconds 49.24103320785798
+FeSe full_bz lattice adjoint action 3 seconds 48.29261720809154
+FeSe full_bz lattice adjoint action 4 seconds 47.5781371248886
+FeSe full_bz lattice adjoint action 5 seconds 47.80831704195589
+FeSe full_bz lattice adjoint action 6 seconds 46.86127295787446
+FeSe full_bz lattice adjoint action 7 seconds 50.734611792024225
+FeSe full_bz lattice adjoint action 8 seconds 47.18967333296314
+FeSe full_bz lattice adjoint action 9 seconds 47.25397879211232
+FeSe full_bz lattice adjoint action 10 seconds 46.75920808315277
+FeSe full_bz lattice adjoint action 11 seconds 47.13363966695033
+FeSe full_bz lattice adjoint action 12 seconds 47.42927079088986
+FeSe full_bz lattice adjoint action 13 seconds 48.90912620886229
+FeSe full_bz lattice adjoint action 14 seconds 47.344611999811605
+FeSe full_bz lattice adjoint action 15 seconds 48.16151108406484
+FeSe full_bz lattice {"observable": "lattice regularized frozen-Sigma lattice term", "units": "Ry per supplied perturbation parameter", "geometry_derivatives": [2.0580091023649008], "explicit_potential_derivatives": [-1251.7952446711956], "induced_derivatives": [1126.490401898659], "stress_applied": false, "full_klein_functional": false, "baseline_subtracted": false, "forward_Ry": [-123.24683367017178], "explicit_joint_Ry": -1249.7372355688362, "adjoint_initial": "/private/tmp/edmft_functional_readout_20261109/three_k/FeSe/covectors.npz", "adjoint_action_seconds": [50.756644083885476, 49.24103320785798, 48.29261720809154, 47.5781371248886, 47.80831704195589, 46.86127295787446, 50.734611792024225, 47.18967333296314, 47.25397879211232, 46.75920808315277, 47.13363966695033, 47.42927079088986, 48.90912620886229, 47.344611999811605, 48.16151108406484], "adjoint": {"observable": "lattice regularized frozen-Sigma lattice term", "units": "Ry per supplied perturbation parameter", "geometry_derivatives": [2.0580091023649008], "explicit_potential_derivatives": [-1251.7952446711956], "induced_derivatives": [1126.490394452235], "stress_applied": false, "full_klein_functional": false, "baseline_subtracted": false, "adjoint": {"converged": true, "gmres_info": 0, "direction": "adjoint", "residual_norm": 5.792123750472528e-07, "threshold": 2.007939572449976e-06, "actions": 15, "inner_residual_history": [0.0347868904424965, 0.011636426838089641, 0.0041664134768329, 0.0006542535148196607, 0.0003194879146035647, 4.339879092898668e-05, 1.292566064750177e-05, 5.689609958309937e-06, 4.983637539091217e-07, 3.575654732200396e-08, 6.303457433584545e-09, 5.768618056711921e-10], "seconds": 721.4580292920582}}, "adjoint_Ry": [-123.24684111659576], "forward_adjoint_error_Ry": 7.44642397876305e-06, "residual_bound_Ry": 0.01003549844495297}
+FeSe full_bz DONE {'fd_Ry': -1249.7372339798924, 'error_Ry': 1.588943860042491e-06, 'relative_error': 1.2714223556916425e-09}

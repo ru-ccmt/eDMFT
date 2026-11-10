@@ -1,0 +1,91 @@
+--- /private/tmp/edmft_radial_all_l_20261108/wien/SRC_lapw1/atpar.F	2026-11-08 10:44:00
++++ /private/tmp/edmft_native_operator_20261108/native_probe/SRC_lapw1/atpar.F	2026-11-08 15:00:10
+@@ -439,7 +439,7 @@
+             endif
+             IF (DE .GT. 1.0D-9.and.(iapw.ne.2)) THEN
+                CALL SELECT(L,EI,DE,EMAIN,REL, &
+-                    VRB(1,JATOM),RNOT,DX,JRI,ZZ(JATOM),jatom,efermi)
++                    VR(1,JATOM),RNOT,DX,JRI,ZZ(JATOM),jatom,efermi)
+             ELSE
+                IF(myid.eq.0) WRITE (6,6010) l,jatom, L, EI
+                IF(myid.eq.0) WRITE (21,6010) l,jatom, L, EI
+@@ -516,6 +516,7 @@
+             L = J - 1
+             FL = L
+             basis_vr_solve(:)=VRB(:,JATOM)
++            if (JATOM.ne.1.or.L.ne.5) basis_vr_solve(:)=VR(:,JATOM)
+             ! Diagnostic: the alternate-basis L=0 operator restoration is
+             ! currently in HNS, whose orbital legs end at LNSMAX.  Freeze
+             ! all higher-l basis functions to remove the uncovered leg.
+@@ -579,7 +580,7 @@
+             PE(J,JATOM) = UVE + TRY*P(J,JATOM)
+             DPE(J,JATOM) = DUVE + TRY*DP(J,JATOM)
+             CALL RINT13(CFEIN1,CFEIN2,AE,BE,AE,BE,PEI(J,JATOM),JATOM)
+-            if (basis_restore_high_l.and.L.gt.LNSMAX) then
++            if (basis_restore_high_l.and.L.eq.5.and.JATOM.eq.1) then
+                ! VR is r*V in Hartree.  HAMILT is in Ry, so DeltaV is
+                ! 2*(VR-VRB)/r.  Do not multiply by sqrt(4*pi): HAMILT
+                ! already sums the normalized Y_lm products analytically.
+@@ -684,7 +685,7 @@
+ !end     
+ !     calculate second derivative at EI (5 point method)
+ !begin
+-                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
++                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,NODES &
+                                   ,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -696,7 +697,7 @@
+                      BPE(1:JRI) = -30.0d0*TRX*BP(1:JRI)
+ 
+                      E1 = EI - 2.0d0*DELES
+-                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
++                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
+                           NODEL,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -708,7 +709,7 @@
+                      BPE(1:JRI) = BPE(1:JRI)-TRX*BP(1:JRI)
+ 
+                      E1 = EI - DELES
+-                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
++                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVB,DUVB, &
+                           NODEL,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -720,7 +721,7 @@
+                      BPE(1:JRI) = BPE(1:JRI)+16.0d0*TRX*BP(1:JRI)
+ 
+                      E1 = EI + 2.0d0*DELES
+-                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
++                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
+                           NODEU,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -732,7 +733,7 @@
+                      BPE(1:JRI) = BPE(1:JRI)-TRX*BP(1:JRI)
+ 
+                      E1 = EI + DELES
+-                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
++                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,E1,FL,UVE,DUVE, &
+                           NODEU,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+                      TRX = 1.0D+0/SQRT(OVLP)
+@@ -760,7 +761,7 @@
+ !     
+ !     calculate function at EI
+ !     
+-                     CALL OUTWINB(REL,VRB(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,&
++                     CALL OUTWINB(REL,VR(1,JATOM),RNeT,DX,JRI,EI,FL,UV,DUV,&
+                                NODES,ZZ(JATOM))
+                      CALL RINT13(CFEIN1,CFEIN2,A,B,A,B,OVLP,JATOM)
+ 
+@@ -874,7 +875,7 @@
+ !           implementation for exactly such a spherical matrix element.
+ !           Adding it here makes H = T+VRB+(VR-VRB) while all matching
+ !           functions continue to be those generated from VRB.
+-            if (basis_vsp_enabled) then
++            if (.false.) then ! isolated atom1,l5 probe: no low-l change
+                LMMIN=0
+                LM(1,0,JATOM)=0
+                LM(2,0,JATOM)=0

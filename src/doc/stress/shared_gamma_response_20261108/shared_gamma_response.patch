@@ -1,0 +1,509 @@
+--- a/src/python/lapw_response_chain.py
++++ b/src/python/lapw_response_chain.py
+@@ -4,7 +4,9 @@
+ Hartree/XC, core, or basis-density response from band matrices alone, and never
+ replaces an absent adapter with a frozen approximation. The existing finite-
+ difference WIEN driver remains the production reference until these physical
+-adapters and six strain sources have passed native comparisons.
++adapters and geometry sources have passed native comparisons. Sources can be
++homogeneous strain or zone-center atomic displacement. This composition does
++not generate nuclear/boundary derivatives or finite-q momentum-transfer blocks.
+ """
+ 
+ from dataclasses import dataclass
+@@ -116,15 +118,32 @@
+         self.screened = ScreenedResponse(self.jacobian)
+ 
+     def explicit_source(
+-        self, band_source, basis_density_source, core_source, potential_source
++        self,
++        band_source,
++        basis_density_source,
++        core_source,
++        potential_source,
++        *,
++        normalization_source=None,
+     ):
+-        """Assemble ONE physical strain source; geometry is supplied by caller.
++        """Assemble a static q=0 source; geometry is supplied by the caller.
+ 
+         band_source includes explicit geometry changes of H/O/phi at fixed
+         potential. basis_density_source includes coordinate/volume transport
+         and explicit basis changes, core_source explicit core geometry, and
+         potential_source the explicit geometric Hartree/XC/ionic potential.
+-        No shape change or strain is manufactured by this composition layer.
++        normalization_source is the EXPLICIT derivative of output normalization
++        at fixed raw output coefficients. For strain or moving spheres the
++        charge-integration covectors themselves can change. This source is
++        already in normalized-output coordinates and must be added AFTER N:
++
++          b_A = N [R E s_band + s_basis + s_core
++                   + (R E B + D + C) s_potential] + s_normalization.
++
++        Passing None preserves the old fixed-normalization-geometry interface;
++        it is only physically valid when that explicit term vanishes or has
++        already been included consistently. No nuclear, sphere-boundary or
++        coordinate-transport derivative is manufactured by this layer.
+         """
+         direct = self.density.matvec(self.electronic.matvec(band_source))
+         for name, value in (("basis", basis_density_source), ("core", core_source)):
+@@ -134,11 +153,65 @@
+                 or value.shape != direct.shape
+                 or not np.all(np.isfinite(value))
+             ):
+-                raise ValueError(f"invalid {name} strain-density source")
++                raise ValueError(f"invalid {name} perturbation-density source")
+             direct = direct + value
+-        return self.normalization.matvec(direct) + self.charge_from_potential.matvec(
++        source = self.normalization.matvec(direct) + self.charge_from_potential.matvec(
+             potential_source
+         )
++        if normalization_source is not None:
++            value = np.asarray(normalization_source)
++            if (
++                np.iscomplexobj(value)
++                or value.shape != source.shape
++                or not np.all(np.isfinite(value))
++            ):
++                raise ValueError("invalid explicit normalization source")
++            source = source + value
++        return source
++
++    def solve_perturbation(
++        self,
++        band_source,
++        basis_density_source,
++        core_source,
++        potential_source,
++        *,
++        normalization_source,
++        **controls,
++    ):
++        """Screen ONE supplied strain/displacement source and reconstruct inputs.
++
++        The complete common J and all explicit sources must refer to the same
++        central state and coordinate conventions. This is a reusable solver
++        operation, not an automatic material phonon driver. Its required
++        normalization_source makes the geometry policy explicit; pass a zero
++        vector only when justified. Existing fixed-N/fixed-mu choices belong
++        to E; they are not selected independently here.
++        A displacement can break crystal/site symmetry even at q=0. Its
++        adapters must retain those response channels; this solver does not
++        expand a ground-state-only harmonic/star/equivalent-atom layout.
++
++        Return (dn, dV, joint_band, report), where
++          (I-J) dn = b_A,
++          dV = s_potential + K dn,
++          joint_band = s_band + B dV.
++        joint_band contains TOTAL dH/dO/dphi and can feed the electronic
++        response or inverse-Green-function readout. Do not add B dV twice.
++        Failure raises the existing ResponseConvergenceError.
++        """
++        if normalization_source is None:
++            raise ValueError("supply an explicit normalization source or zero vector")
++        source = self.explicit_source(
++            band_source,
++            basis_density_source,
++            core_source,
++            potential_source,
++            normalization_source=normalization_source,
++        )
++        density, report = self.screened.solve(source, **controls)
++        potential = np.asarray(potential_source) + self.potential.matvec(density)
++        band = np.asarray(band_source) + self.basis.matvec(potential)
++        return density, potential, band, report
+ 
+     def check_transposes(self, **controls):
+         """Check leaves as well as the complete chain; not a physics closure test."""
+--- a/src/python/frozen_sigma_tangent.py
++++ b/src/python/frozen_sigma_tangent.py
+@@ -33,6 +33,67 @@
+ def real_inner(a, b):
+     """Real Frobenius pairing, including every array index exactly once."""
+     return float(np.vdot(a, b).real)
++
++
++class InverseGreenResponse:
++    """Prepared static q=0 inverse-propagator derivative in moving coordinates.
++
++    Construct through CachedFrozenSigmaResponse.prepare_inverse_response.
++    H/O derivatives and the normalized covariant embedding U1 are prepared
++    once for ALL k points. block() only performs frequency-dependent small-rank
++    products. It does not build a density cache, invert G, or sum frequencies.
++
++    In this code U maps local orbitals to bands (P=U^dagger in the notes):
++      A = G^-1 = z O - H - U S U^dagger,  z=i*omega+mu,
++      A1 = z O1 - H1 - U1 S U^dagger - U S U1^dagger + mu1 I.
++    S is the stored, fixed local Sigma-minus-double-counting. It is generally
++    non-Hermitian on the positive Matsubara axis. Do not Hermitize A1, multiply
++    by spin/k weights, or insert Matsubara quadrature weights in this readout.
++
++    This is a coefficient-space derivative. A pure change of LAPW basis can
++    give nonzero A1 without any physical perturbation. The caller must apply
++    the appropriate basis connection before exporting a physical e-ph vertex.
++    No finite-q, finite bosonic-frequency, or impurity-vertex response is added.
++    """
++
++    def __init__(self, model, dh, do, du, dmu):
++        self.dh, self.do, self.du = dh, do, du
++        self.u, self.sigma = model.uc, model.sigma
++        self.z = model.meta.mu + 1j * model.meta.omega
++        self.dmu = float(dmu)
++        for a in (self.dh, self.do, self.du, self.z):
++            a.flags.writeable = False
++
++    def block(self, kpoint, frequency_indices):
++        """Return (nfrequency, nband, nband), using explicit zero-based indices.
++
++        frequency_indices is an integer, integer array, or slice into the
++        exported Matsubara mesh. Requiring it explicitly lets callers bound
++        output memory. These are kept frequencies, not interpolated points.
++        """
++        if (
++            not isinstance(kpoint, (int, np.integer))
++            or isinstance(kpoint, (bool, np.bool_))
++            or not 0 <= kpoint < len(self.u)
++        ):
++            raise ValueError("invalid k-point index")
++        if isinstance(frequency_indices, slice):
++            index = np.arange(len(self.z))[frequency_indices]
++        else:
++            index = np.atleast_1d(np.asarray(frequency_indices))
++        if (
++            index.ndim != 1
++            or not np.issubdtype(index.dtype, np.integer)
++            or not len(index)
++            or np.any(index < 0)
++            or np.any(index >= len(self.z))
++        ):
++            raise ValueError("invalid kept-frequency indices")
++        u, v, sigma = self.u[kpoint], self.du[kpoint], self.sigma[index]
++        result = self.z[index, None, None] * self.do[kpoint] - self.dh[kpoint]
++        result -= (v @ sigma) @ u.conj().T + (u @ sigma) @ v.conj().T
++        result += self.dmu * np.eye(u.shape[0])
++        return result
+ 
+ 
+ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
+@@ -548,6 +609,47 @@
+         self.prepare()
+         return self._central_density.copy()
+ 
++    def _generalized_inputs(self, dh, do, raw_derivative):
++        """The shared first-order symmetric-orthonormalization convention."""
++        dh = self._matrix(dh, "Hamiltonian derivative")
++        do = self._matrix(do, "overlap derivative")
++        raw = (
++            np.zeros_like(self.raw)
++            if raw_derivative is None
++            else self._raw_direction(raw_derivative)
++        )
++        effective_h = dh - 0.5 * (do * self.eps[:, None, :] + self.eps[:, :, None] * do)
++        effective_raw = raw - 0.5 * np.einsum("knm,kmic->knic", do, self.raw)
++        return dh, do, effective_h, effective_raw
++
++    def prepare_inverse_response(self, dh, do, raw_derivative=None, *, dmu=0.0):
++        """Prepare dG^-1 for any supplied static strain/displacement direction.
++
++        Use the SAME central-KS-gauge dH, dO and raw <basis|local> derivatives
++        as generalized_response. Window motion, k-summed symmetry and inverse-
++        square-root normalization are differentiated here exactly once.
++
++        Symmetric orthonormalization gives U_orth; covariant LAPW overlaps are
++        U_cov=O^(1/2) U_orth. Thus U1_cov=U1_orth+O1 U0/2. Omitting this last
++        metric leg would corrupt the self-energy part of dG^-1 even though the
++        orthonormal density response itself remained correct.
++
++        dmu=0 gives the fixed-mu readout. For fixed N pass the dmu returned by
++        generalized_response for this TOTAL screened direction. The global
++        number constraint must not be imposed separately at each k/frequency.
++        No impurity or double-counting derivative is inferred from dmu.
++        """
++        if (self.meta.mu, self.meta.temperature) != self._central_scalars:
++            raise ValueError(
++                "central mu/temperature changed; construct a new response context"
++            )
++        if np.ndim(dmu) != 0 or np.iscomplexobj(dmu) or not np.isfinite(dmu):
++            raise ValueError("chemical-potential derivative must be finite and real")
++        dh, do, h, raw = self._generalized_inputs(dh, do, raw_derivative)
++        du, _, _ = self.embedding_response(h, raw)
++        du += 0.5 * (do @ self.uc)
++        return InverseGreenResponse(self, dh, do, du, dmu)
++
+     def generalized_response(self, dh, do, raw_derivative=None, fixed_number=True):
+         """Moving-basis JVP (dH,dO,dphi) -> contravariant density coefficients.
+ 
+@@ -562,15 +664,9 @@
+         reconstruction adapter must ALSO differentiate the basis functions.
+         This API supplies no geometry, radial, energy-search or core source.
+         """
+-        dh = self._matrix(dh, "Hamiltonian derivative")
+-        do = self._matrix(do, "overlap derivative")
+-        raw = (
+-            np.zeros_like(self.raw)
+-            if raw_derivative is None
+-            else self._raw_direction(raw_derivative)
+-        )
+-        effective_h = dh - 0.5 * (do * self.eps[:, None, :] + self.eps[:, :, None] * do)
+-        effective_raw = raw - 0.5 * np.einsum("knm,kmic->knic", do, self.raw)
++        dh, do, effective_h, effective_raw = self._generalized_inputs(
++            dh, do, raw_derivative
++        )
+         result, info = self.response(
+             effective_h, fixed_number=fixed_number, raw_derivative=effective_raw
+         )
+--- a/src/python/tests/test_lapw_response_chain.py
++++ b/src/python/tests/test_lapw_response_chain.py
+@@ -194,6 +194,103 @@
+         expected += basis + core + c.basis_density.matvec(pot) + c.core.matvec(pot)
+         np.testing.assert_allclose(actual, expected, atol=2e-14)
+ 
++    def test_explicit_normalization_geometry_is_outside_density_derivative(self):
++        f = SpatialFixture()
++        c = f.chain
++        rng = np.random.default_rng(58)
++        band = rng.normal(size=f.coordinates.size) * 0.1
++        basis, core, pot = rng.normal(size=(3, f.ng)) * 0.1
++        # Independent nonlinear interstitial-only normalization, with changing
++        # integration weights. The toy spatial coordinates serve as radial/PW
++        # coordinates here; native MIXER quadrature has its own tests.
++        raw0 = 1.0 + rng.random(f.ng)
++        mt = np.r_[np.ones(7), np.zeros(f.ng - 7)]
++        ir = 1 - mt
++        ir1 = ir * 0.13
++        target = float((mt + ir) @ raw0) + 0.7
++        alpha = (target - mt @ raw0) / (ir @ raw0)
++        diag = mt + alpha * ir
++        p0 = raw0 * ir
++        ell = (mt + alpha * ir) / (ir @ raw0)
++        normalization = np.diag(diag) - np.outer(p0, ell)
++        c = ChargeResponseChain(
++            c.potential,
++            c.basis,
++            c.electronic,
++            c.density,
++            c.basis_density,
++            c.core,
++            dense_map(normalization, "nontrivial normalization"),
++        )
++        geometry = -p0 * alpha * (ir1 @ raw0) / (ir @ raw0)
++        actual = c.explicit_source(
++            band, basis, core, pot, normalization_source=geometry
++        )
++        raw1 = (
++            c.density.matvec(c.electronic.matvec(band + c.basis.matvec(pot)))
++            + basis
++            + core
++            + c.basis_density.matvec(pot)
++            + c.core.matvec(pot)
++        )
++
++        def endpoint(t):
++            raw = raw0 + t * raw1
++            out = raw.copy()
++            out[7:] *= (target - mt @ raw) / ((ir + t * ir1) @ raw)
++            return out
++
++        h = 1e-5
++        np.testing.assert_allclose(
++            actual, (endpoint(h) - endpoint(-h)) / (2 * h), rtol=1e-8, atol=1e-9
++        )
++        self.assertGreater(np.linalg.norm(geometry - normalization @ geometry), 0.1)
++
++    def test_screened_perturbation_reconstructs_total_potential_and_band_input(self):
++        f = SpatialFixture(True)
++        c = f.chain
++        rng = np.random.default_rng(91)
++        band = rng.normal(size=f.coordinates.size)
++        basis, core, pot, normal = rng.normal(size=(4, f.ng))
++        rhs = c.explicit_source(band, basis, core, pot, normalization_source=normal)
++        jac = np.column_stack([c.jacobian.matvec(e) for e in np.eye(f.ng)])
++        expected = np.linalg.solve(np.eye(f.ng) - jac, rhs)
++        dn, dv, total, report = c.solve_perturbation(
++            band, basis, core, pot, normalization_source=normal, rtol=1e-12, atol=1e-13
++        )
++        self.assertTrue(report["converged"])
++        np.testing.assert_allclose(dn, expected, rtol=1e-11, atol=1e-11)
++        np.testing.assert_allclose(
++            dv, pot + f.kernel @ expected, rtol=1e-11, atol=1e-11
++        )
++        np.testing.assert_allclose(total, band + c.basis.matvec(dv), atol=1e-13)
++        # Check the original one-step physical response equation, including
++        # all explicit sources, rather than just the Krylov residual report.
++        output = (
++            c.normalization.matvec(
++                c.density.matvec(c.electronic.matvec(total))
++                + basis
++                + core
++                + c.basis_density.matvec(dv)
++                + c.core.matvec(dv)
++            )
++            + normal
++        )
++        np.testing.assert_allclose(dn, output, atol=2e-11)
++
++    def test_normalization_geometry_policy_and_shape_are_explicit(self):
++        f = SpatialFixture()
++        c = f.chain
++        band = np.zeros(f.coordinates.size)
++        zero = np.zeros(f.ng)
++        with self.assertRaises(TypeError):
++            c.solve_perturbation(band, zero, zero, zero)
++        for bad in [np.zeros(f.ng - 1), zero + 0j, zero + np.nan]:
++            with self.assertRaisesRegex(ValueError, "normalization"):
++                c.explicit_source(band, zero, zero, zero, normalization_source=bad)
++        with self.assertRaises(ValueError):
++            c.solve_perturbation(band, zero, zero, zero, normalization_source=None)
++
+     def test_missing_coordinate_adapter_is_rejected(self):
+         f = SpatialFixture()
+         c = f.chain
+--- a/src/python/tests/test_generalized_sigma_response.py
++++ b/src/python/tests/test_generalized_sigma_response.py
+@@ -46,6 +46,119 @@
+             + 1j * rng.normal(size=self.model.raw.shape)
+         )
+ 
++    def inverse_endpoint(self, step, k, frequencies, dmu):
++        """Independent nonlinear overlap/window/normalization reconstruction."""
++        m = self.model
++        _, _, u = endpoint(m, self.h, self.o, self.raw, step)
++        metric = np.eye(m.eps.shape[1]) + step * self.o[k]
++        e, v = np.linalg.eigh(metric)
++        root = (v * np.sqrt(e)) @ v.conj().T
++        covariant_u = root @ u[k]
++        z = m.meta.mu + step * dmu + 1j * m.meta.omega[frequencies]
++        return (
++            z[:, None, None] * metric
++            - (np.diag(m.eps[k]) + step * self.h[k])
++            - (covariant_u @ m.sigma[frequencies]) @ covariant_u.conj().T
++        )
++
++    def test_inverse_green_endpoint_including_metric_and_normalization(self):
++        m = self.model
++        frequencies = np.array([0, 4, 17, 44])
++        dmu = 0.21
++        prepared = m.prepare_inverse_response(self.h, self.o, self.raw, dmu=dmu)
++        for k in range(len(m.eps)):
++            actual = prepared.block(k, frequencies)
++            # Sigma(iw) is not Hermitian. Projection onto Hermitian output
++            # would erase part of the overlap and dynamical embedding terms.
++            self.assertGreater(np.linalg.norm(actual - herm(actual)), 1.0)
++            errors = []
++            for h in [1e-4, 5e-5]:
++                plus = self.inverse_endpoint(h, k, frequencies, dmu)
++                minus = self.inverse_endpoint(-h, k, frequencies, dmu)
++                errors.append(np.linalg.norm((plus - minus) / (2 * h) - actual))
++            self.assertLess(errors[-1], 1e-5)
++            self.assertGreater(errors[0] / errors[1], 3.7)
++            center = self.inverse_endpoint(0.0, k, frequencies, dmu)
++            g = np.linalg.inv(center)
++            analytic_g = -g @ actual @ g
++            fd_g = (np.linalg.inv(plus) - np.linalg.inv(minus)) / (2 * h)
++            np.testing.assert_allclose(analytic_g, fd_g, rtol=2e-6, atol=2e-6)
++
++    def test_inverse_green_pure_basis_change_has_correct_covariance(self):
++        m = self.model
++        a = 0.3 * self.h + 0.2j * self.o
++        ad = a.swapaxes(-1, -2).conj()
++        dh = ad * m.eps[:, None, :] + m.eps[:, :, None] * a
++        do = ad + a
++        raw = np.einsum("knm,kmic->knic", ad, m.raw)
++        prepared = m.prepare_inverse_response(dh, do, raw)
++        frequencies = np.array([0, 9, 44])
++        for k, u in enumerate(m.uc):
++            z = m.meta.mu + 1j * m.meta.omega[frequencies]
++            central = (
++                z[:, None, None] * np.eye(len(m.eps[k]))
++                - np.diag(m.eps[k])
++                - (u @ m.sigma[frequencies]) @ u.conj().T
++            )
++            expected = ad[k] @ central + central @ a[k]
++            np.testing.assert_allclose(
++                prepared.block(k, frequencies), expected, rtol=2e-13, atol=2e-13
++            )
++            # Pulling A1 back to the original basis removes a pure coordinate
++            # change: no physical electron-phonon perturbation remains.
++            np.testing.assert_allclose(
++                prepared.block(k, frequencies) - expected, 0, atol=2e-13
++            )
++
++    def test_inverse_green_fixed_number_uniform_shift(self):
++        m = self.model
++        identity = np.broadcast_to(np.eye(5), self.h.shape)
++        _, info = m.generalized_response(
++            identity, np.zeros_like(self.o), fixed_number=True
++        )
++        readout = m.prepare_inverse_response(
++            identity, np.zeros_like(self.o), dmu=info["dmu"]
++        )
++        for k in range(len(m.eps)):
++            np.testing.assert_allclose(readout.block(k, slice(None)), 0, atol=3e-14)
++
++    def test_inverse_green_readout_is_prepared_once_and_does_not_invert(self):
++        m = self.model
++        h, o, raw = self.h.copy(), self.o.copy(), self.raw.copy()
++        with patch(
++            "frozen_sigma_tangent.eigh", side_effect=AssertionError("eigh in readout")
++        ), patch("numpy.linalg.inv", side_effect=AssertionError("inverse in readout")):
++            readout = m.prepare_inverse_response(h, o, raw)
++            expected = readout.block(0, slice(None))
++            # Caller-owned perturbations must not change a prepared readout.
++            h[:] = 0
++            o[:] = 0
++            raw[:] = 0
++            with patch.object(
++                m,
++                "embedding_response",
++                side_effect=AssertionError("repeated projector preparation"),
++            ):
++                actual = np.concatenate(
++                    [readout.block(0, slice(0, 20)), readout.block(0, slice(20, None))]
++                )
++        np.testing.assert_array_equal(actual, expected)
++        self.assertFalse(m._ready)  # No costly density-response cache needed.
++
++    def test_inverse_green_invalid_frequency_and_mu_are_rejected(self):
++        m = self.model
++        with self.assertRaises(ValueError):
++            m.prepare_inverse_response(self.h, self.o, dmu=1j)
++        prepared = m.prepare_inverse_response(self.h, self.o)
++        for index in [[], [-1], [45], [1.5], [[1, 2]]]:
++            with self.subTest(index=index), self.assertRaises(ValueError):
++                prepared.block(0, index)
++        with self.assertRaises(ValueError):
++            prepared.block(2, [0])
++        m.meta.mu += 0.1
++        with self.assertRaisesRegex(ValueError, "central mu"):
++            m.prepare_inverse_response(self.h, self.o)
++
+     def test_central_density_matches_full_resolvent_oracle(self):
+         np.testing.assert_allclose(
+             self.model.central_density(), self.model.density(), atol=2e-15
+--- a/src/doc/stress/stress_response_roadmap_20261108.txt
++++ b/src/doc/stress/stress_response_roadmap_20261108.txt
+@@ -160,6 +160,16 @@
+    complete automatic radial-correction path in the executor.
+ 
+ WHAT THE MOST RECENT TESTS ESTABLISH
++
++The shared q=0 source/readout increment has 169 passing tests, zero skips.
++ChargeResponseChain now accepts the explicit normalization geometry source
++AFTER the density normalization derivative, and solve_perturbation reconstructs
++the total screened potential and H/O/raw-projector input. A prepared stored-band
++G^-1 derivative reuses the normalized-projector chain and correctly restores
++the covariant overlap-metric leg. Independent nonlinear G^-1/G, basis-covariance,
++fixed-N gauge and source/screening tests pass. These are synthetic controls,
++not a native phonon calculation. The full-k valence loader remains the main
++next phase-2 task. See shared_gamma_response_20261108/REPORT.txt.
+ 
+ The charge-closure checkpoint has 161 passing tests, zero skips. It adds native
+ MIXER CHARGE/SETN/NORMAL endpoint comparisons, an exact normalization transpose,
+@@ -477,6 +487,7 @@
+   hartree_periodic_response_20261108/REPORT.txt
+   xc_core_response_20261108/REPORT.txt
+   charge_closure_20261108/REPORT.txt
++  shared_gamma_response_20261108/REPORT.txt
+ 
+ Older checkpoint notes describe their state at the time and may contain tasks
+ completed by later checkpoints. Use this roadmap for the current sequence and

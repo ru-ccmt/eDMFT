@@ -1,0 +1,90 @@
+--- a/SRC_lapw2/atpar.F
++++ b/SRC_lapw2/atpar.F
+@@ -31,7 +31,8 @@
+ !     local parameters
+       real*8    ::  vr_tmp(nrad), rnet(nrad), emist2(0:lomax,nloat)
+       integer   ::  m,i,idummy,j,idest,l,k,jrow,jcol,index,jr,jc,nodel,imax,&
+-           nodes,jlo,kappa,jlop,lp,node
++           nodes,jlo,kappa,jlop,lp,node,radial_dump_unit,radial_dump_status
++      character(len=512) :: radial_dump_path
+       real*8    ::  dele,delei,fl,ei,uvb,duvb,ovlp,trx,e1,uve,duve,uv,duv,&
+            cross,try,deles
+ !---------------------------------------------------------------------  
+@@ -470,6 +471,77 @@
+             enddo
+          enddo
+       enddo
++
++      ! Optional finite-strain radial-response dump.  This is deliberately
++      ! default-off and diagnostic only: it exposes the actual APW radial
++      ! functions generated from each converged strained potential so that
++      ! (u(+eps)-u(-eps))/(2 eps) can be inspected independently.  It does
++      ! not add a term to the stress.  In particular, a direct uniform-RMT
++      ! derivative is not the missing fixed-boundary stress correction.
++      !
++      ! Use a caller-selected filename so center/plus/minus calculations can
++      ! be kept separate:
++      !   WIEN_STRESS_RADIAL_DUMP=case.radial_fd x lapw2 -f case
++      !
++      ! Parallel atom/vector groups would concurrently append to one text
++      ! file and can own different atoms.  Require a serial diagnostic run;
++      ! normal production runs never enter this block.
++      radial_dump_path=''
++      call get_environment_variable('WIEN_STRESS_RADIAL_DUMP', &
++                                    radial_dump_path, &
++                                    status=radial_dump_status)
++      if(radial_dump_status.eq.0 .and. &
++         len_trim(radial_dump_path).gt.0) then
++         if(npe_atm.ne.1 .or. npe_vec.ne.1) then
++            write(6,*) 'WIEN_STRESS_RADIAL_DUMP requires serial LAPW2'
++            stop 'serial radial-response diagnostic required'
++         endif
++         if(jatom.eq.1) then
++            open(newunit=radial_dump_unit,file=trim(radial_dump_path), &
++                 status='replace',action='write')
++            write(radial_dump_unit,'(a)') &
++                 '# atom l ir r potential u_large u_small udot_large '// &
++                 'udot_small du_dr_large du_dr_small dudot_dr_large '// &
++                 'dudot_dr_small'
++         else
++            open(newunit=radial_dump_unit,file=trim(radial_dump_path), &
++                 status='old',position='append',action='write')
++         endif
++         do l=0,lmax2n
++            do m=1,jri(jatom)
++               write(radial_dump_unit, &
++                    '(a,3(1x,i0),10(1x,es24.16))') ':RADIAL_FD', &
++                    jatom,l,m,rnet(m),vr(m), &
++                    rrad1(m,l),rrad2(m,l),rade1(m,l),rade2(m,l), &
++                    radp1(m,l),radp2(m,l),radpe1(m,l),radpe2(m,l)
++            enddo
++         enddo
++         ! The bare local-orbital radial solution and the ABC coefficients
++         ! are required to reconstruct the response of the *complete* LO
++         ! basis function
++         !
++         !   L_j(r)=A_j u_l(r)+B_j udot_l(r)+C_j u_LO,j(r).
++         !
++         ! Dumping only u_LO would violate the zero-value/zero-slope
++         ! boundary constraints when center and strained structures are
++         ! differenced.  These records are still diagnostic-only and do not
++         ! alter any LAPW2 result.
++         do l=0,min(lomax,lmax2n)
++            do jlo=1,ilo(l)
++               write(radial_dump_unit, &
++                    '(a,4(1x,i0),4(1x,es24.16))') ':RADIAL_LO_COEFF', &
++                    jatom,l,jlo,merge(1,0,lapw(l)), &
++                    alo(l,jlo),blo(l,jlo),clo(l,jlo),elo(l,jlo)
++               do m=1,jri(jatom)
++                  write(radial_dump_unit, &
++                       '(a,4(1x,i0),5(1x,es24.16))') ':RADIAL_LO_FD', &
++                       jatom,l,jlo,m,rnet(m),a1lo(m,jlo,l), &
++                       b1lo(m,jlo,l),ap1lo(m,jlo,l),bp1lo(m,jlo,l)
++               enddo
++            enddo
++         enddo
++         close(radial_dump_unit)
++      endif
+       
+       IF( stress ) THEN
+          call val_corr_integrals(REL,rrad1,rrad2,rade1,rade2,a1lo,b1lo,jatom,JRI(JATOM),dx(jatom))

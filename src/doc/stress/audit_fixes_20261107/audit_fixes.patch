@@ -1,0 +1,2200 @@
+--- a/src/dmft2/cmp_dmft_weights.f90
++++ b/src/dmft2/cmp_dmft_weights.f90
+@@ -87,9 +87,9 @@
+        C0, sginf2, second_order_correction, fermi, matsuWeight, tailMoment2!, diff
+   INTEGER :: i, iom, num, num0, it, nomq_max, icix, j, ip, iq, iorb, &
+        ind, nloc, start_nipc
+-  LOGICAL :: Qforce, stressMomentDiagnostic, directCDiagnostic
+-  CHARACTER(len=64) :: diagnosticEnvironment, directCEnvironment
+-  INTEGER :: diagnosticStatus, directCStatus
++  LOGICAL :: Qforce, stressMomentDiagnostic, computeDirectC
++  CHARACTER(len=64) :: diagnosticEnvironment
++  INTEGER :: diagnosticStatus
+   REAL*8 :: directNorm, directResidual, directScale
+   complex*16 :: czero, cone
+   cone  = cmplx(1.d0,0.d0, 8)
+@@ -100,6 +100,7 @@
+   Qforce=.false.
+   if (nedim.eq.nbands) Qforce=.true.
+   projectorGradientDirect=czero
++  AEweight=czero
+ 
+   diagnosticEnvironment=''
+   CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_PROJECTOR_DIAG', &
+@@ -108,16 +109,11 @@
+        len_trim(diagnosticEnvironment).gt.0 .and. &
+        trim(diagnosticEnvironment).ne.'0'
+ 
+-  ! Direct construction of C=Sum_omega Sigma_loc U^+ G is intentionally a
+-  ! diagnostic, not an alternative production path.  With this environment
+-  ! variable unset (the default), the extra Matsubara products and all output
+-  ! below are skipped and projectorGradientDirect remains exactly zero.
+-  directCEnvironment=''
+-  CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_C_DIAG', &
+-       directCEnvironment,STATUS=directCStatus)
+-  directCDiagnostic=Qforce .and. matsubara .and. &
+-       directCStatus.eq.0 .and. len_trim(directCEnvironment).gt.0 .and. &
+-       trim(directCEnvironment).ne.'0'
++  ! Accumulate C=Sum Sigma_local U^dagger G for every derivative run.
++  ! U*C=rhoE-epsilon*rho does not determine ker(U) components of C;
++  ! reconstructing C with a pseudoinverse can therefore lose a real force.
++  ! Density-only runs still skip these rectangular matrix products.
++  computeDirectC=Qforce .and. matsubara
+ 
+   if (Qforce) then
+      allocate( WEsum(nedim,nedim) ) ! Unfortunately we need this for $OMP command to work.
+@@ -160,7 +156,7 @@
+      ! different estimates of Sigma_1.
+      Sigmaij=SigmaTail1
+ 
+-     if (directCDiagnostic) then
++     if (computeDirectC) then
+         allocate(CPair(maxdim,nbands,ncix), &
+              CStatic(maxdim,nbands,ncix), &
+              Uactive(nbands,maxdim,ncix), &
+@@ -295,7 +291,7 @@
+                 conjg(transpose(Gij)))
+            WSigPair=WSigPair+SigDirect+SigScratch
+         endif
+-        if (directCDiagnostic) then
++        if (computeDirectC) then
+            CALL BuildLocalSigmaMatrix(SigmaLocal,sigma(:,:,iom), &
+                 Sigind,cixdim,maxdim,maxsize,ncix)
+            CALL AccumulateDirectProjectorPair(CPair,Gij,Uactive, &
+@@ -456,7 +452,7 @@
+                 matsum_weight(iom)*SigmaTail1/(omn*omn)
+            WSigPair=WSigPair+SigDirect+SigScratch
+         endif
+-        if (directCDiagnostic) then
++        if (computeDirectC) then
+            CALL BuildLocalSigmaMatrix(SigmaLocal,sigma(:,:,iom), &
+                 Sigind,cixdim,maxdim,maxsize,ncix)
+            CALL AccumulateDirectProjectorPair(CPair,Gij,Uactive, &
+@@ -548,7 +544,7 @@
+         SigDirect=(0.5d0*wkp)*(WSigPair+SigDirect+SigScratch)
+      endif
+ 
+-     if (directCDiagnostic) then
++     if (computeDirectC) then
+         ! Complete precisely the same Matsubara construction as the
+         ! band-space Sigma*G diagnostic, but before multiplying by U.  The
+         ! result is the rectangular C conjugate to an explicit dU.
+@@ -668,7 +664,7 @@
+      deallocate( tmp2 )
+      deallocate( Sigma_inf )
+      deallocate( SigmaTail1 )
+-     if (directCDiagnostic) deallocate(CPair,CStatic,Uactive,SigmaLocal, &
++     if (computeDirectC) deallocate(CPair,CStatic,Uactive,SigmaLocal, &
+           SigmaInfLocal,SigmaTail1Local,CdiagUdagG,CdiagUdagGminus, &
+           CdiagProduct,CdiagProductMinus)
+ 
+@@ -677,12 +673,29 @@
+ 
+   if (.not. matsubara) then
+      Gdloc=0.0
++     if (Qforce) then
++        ! Real-axis counterpart: integrate the retarded/advanced difference
++        ! of Sigma U^dagger G with the same log-bin weights used for rho.
++        ! No projector pseudoinverse is needed on this branch either.
++        allocate(Uactive(nbands,maxdim,ncix))
++        Uactive=czero
++        do iorb=1,norbitals
++           icix=cix_orb(iorb)
++           if(icix.le.0) cycle
++           do ind=1,nindo(iorb)
++              Uactive(:,iSx(ind,iorb),icix)= &
++                   Uactive(:,iSx(ind,iorb),icix)+DMFTU(:,ind,iorb,1)
++           enddo
++        enddo
++        AEweight=czero
++     endif
+      Aweight(:,:)=0
+      logG=0
+      logGD=0
+      logG0=0
+-     !$OMP PARALLEL DO PRIVATE(Eij,zek,zal,zar,zw1,tmp,w1,w2,w3, i,fer,num,cc,gtc,tlogG,tlogG0,tlogGD,tdens)&
+-     !$OMP SHARED(gloc) SCHEDULE(STATIC,CHUNK) REDUCTION(+:Aweight,dens,logG,logG0,logGD)
++     !$OMP PARALLEL DO PRIVATE(Eij,zek,zal,zar,zw1,tmp,w1,w2,w3, i,fer,num,cc,gtc,tlogG,tlogG0,tlogGD,tdens, &
++     !$OMP& SigmaLocal,CPair,CdiagUdagG,CdiagUdagGminus,CdiagProduct,CdiagProductMinus,iorb,icix,ind,ip)&
++     !$OMP SHARED(gloc) SCHEDULE(STATIC,CHUNK) REDUCTION(+:Aweight,AEweight,projectorGradientDirect,dens,logG,logG0,logGD)
+      do iom=1,npomega
+         allocate(Eij(nbands,nbands),zek(nbands),zar(nbands,nbands),zal(nbands,nbands),tmp(nbands,nbands),zw1(nbands),w1(nbands,nbands),w2(nbands,nbands),w3(nbands,nbands))
+         ! Total hamiltonian (H+Sigma) in Kohn-Sham basis
+@@ -712,6 +725,35 @@
+         w3 = conjg(w2)
+         w2 = -(w1-w3)/(2*pi*IMAG)
+         Aweight(:,:) = Aweight(:,:) + w2(:,:)
++        if (Qforce) then
++           allocate(SigmaLocal(maxdim,maxdim,ncix),CPair(maxdim,nbands,ncix), &
++                CdiagUdagG(maxdim,nbands),CdiagUdagGminus(maxdim,nbands), &
++                CdiagProduct(maxdim,nbands),CdiagProductMinus(maxdim,nbands))
++           CALL BuildLocalSigmaMatrix(SigmaLocal,sigma(:,:,iom),Sigind, &
++                cixdim,maxdim,maxsize,ncix)
++           CPair=czero
++           CALL AccumulateDirectProjectorSpectral(CPair,w1,Uactive,SigmaLocal, &
++                cixdim,nbands,maxdim,ncix,CdiagUdagG,CdiagUdagGminus, &
++                CdiagProduct,CdiagProductMinus)
++           do iorb=1,norbitals
++              icix=cix_orb(iorb)
++              if(icix.le.0) cycle
++              do ind=1,nindo(iorb)
++                 ip=iSx(ind,iorb)
++                 projectorGradientDirect(:,ind,iorb)= &
++                      projectorGradientDirect(:,ind,iorb)+CPair(ip,:,icix)
++              enddo
++           enddo
++           ! zG-I = (epsilon+Sigma)G.  Apply the same piecewise-constant
++           ! Hamiltonian as the log-bin integral, then its advanced partner.
++           do num=1,nbands
++              tmp(:,num)=zar(:,num)*zw1(num)*zek(num)
++           enddo
++           w2=matmul(tmp,zal)
++           AEweight=AEweight-(w2-conjg(transpose(w2)))/(2*pi*IMAG)
++           deallocate(SigmaLocal,CPair,CdiagUdagG,CdiagUdagGminus,CdiagProduct,CdiagProductMinus)
++        endif
++
+         
+         gtc=0
+         do i=1,nbands
+@@ -729,6 +771,7 @@
+         deallocate( Eij, zek, zar, zal, tmp, zw1, w1, w2, w3)
+      enddo
+      !$OMP END PARALLEL DO
++     if(Qforce) deallocate(Uactive)
+   endif
+   if (stressMomentDiagnostic) deallocate(WSigPair,SigDirect,SigScratch)
+   deallocate(Wsum, WEsum, w0inf) 
+@@ -739,7 +782,7 @@
+ ! Expand the compact impurity self-energy labels into one dense local matrix
+ ! for every correlated block.  Keeping this operation in local space is much
+ ! cheaper than reconstructing the band-space embedded self-energy and is the
+-! central purpose of the direct-C diagnostic.
++! purpose of accumulating the direct functional gradient C.
+ SUBROUTINE BuildLocalSigmaMatrix(localSigma,compactSigma,Sigind,cixdim, &
+      maxdim,maxsize,ncix)
+   IMPLICIT NONE
+@@ -798,6 +841,38 @@
+           product(1:nloc,:)+productMinus(1:nloc,:)
+   enddo
+ END SUBROUTINE AccumulateDirectProjectorPair
++
++! Retarded/advanced contour pair, using the already integrated weighted G.
++SUBROUTINE AccumulateDirectProjectorSpectral(CPair,G,Uactive,localSigma, &
++     cixdim,nbands,maxdim,ncix,UdagG,UdagGminus,product,productMinus)
++  IMPLICIT NONE
++  INTEGER,intent(in) :: nbands,maxdim,ncix,cixdim(ncix)
++  COMPLEX*16,intent(in) :: G(nbands,nbands), &
++       Uactive(nbands,maxdim,ncix),localSigma(maxdim,maxdim,ncix)
++  COMPLEX*16,intent(inout) :: CPair(maxdim,nbands,ncix)
++  COMPLEX*16,intent(inout) :: UdagG(maxdim,nbands), &
++       UdagGminus(maxdim,nbands),product(maxdim,nbands), &
++       productMinus(maxdim,nbands)
++  INTEGER :: icix,nloc
++  COMPLEX*16,parameter :: cone=(1.d0,0.d0),czero=(0.d0,0.d0)
++
++  do icix=1,ncix
++     nloc=cixdim(icix)
++     if (nloc.le.0) cycle
++     CALL zgemm('C','N',nloc,nbands,nbands,cone, &
++          Uactive(1,1,icix),nbands,G,nbands,czero,UdagG,maxdim)
++     CALL zgemm('N','N',nloc,nbands,nloc,cone, &
++          localSigma(1,1,icix),maxdim,UdagG,maxdim,czero,product,maxdim)
++
++     CALL zgemm('C','C',nloc,nbands,nbands,cone, &
++          Uactive(1,1,icix),nbands,G,nbands,czero,UdagGminus,maxdim)
++     CALL zgemm('C','N',nloc,nbands,nloc,cone, &
++          localSigma(1,1,icix),maxdim,UdagGminus,maxdim,czero, &
++          productMinus,maxdim)
++     CPair(1:nloc,:,icix)=CPair(1:nloc,:,icix)+ &
++          -(product(1:nloc,:)-productMinus(1:nloc,:))/cmplx(0.d0,2.d0*acos(-1.d0),8)
++  enddo
++END SUBROUTINE AccumulateDirectProjectorSpectral
+ 
+ 
+ ! Determine the leading dynamic self-energy moment used by the Matsubara
+--- a/src/dmft2/Makefile
++++ b/src/dmft2/Makefile
+@@ -18,7 +18,7 @@
+ # These routines are tightly coupled, mostly through modules.f90
+ OBJSMOD =  modules.o structure.o stress_modules.o dmfts.o forces.o mod_mpi.o stress_mpi.o t3j.o rotdef.o w_atpar.o angle.o charge.o \
+            p_project.o csplit.o d5splt.o f7splt.o gtfnam.o \
+-           harmon.o kdelta.o lomain.o l2mainSubs.o alm_blm_clm.o \
++           harmon.o kdelta.o lomain.o l2mainSubs.o alm_blm_clm.o stress_g2_matrices.o \
+ 	   stress_integrals.o stress_kernels.o stress_rela.o stress_interstitial.o stress_symmetry.o \
+ 	   cmp_mt_density.o cmp_dmft_stress.o cmp_dmft_weights.o l2main.o dmft2.o init_energy_file.o lda_fermi.o \
+            latgen.o p3splt.o psplit.o recfil.o recpr.o \
+@@ -65,3 +65,8 @@
+ 
+ %.so : %.f90
+ 	$(CMP) -c $< -m $*
++
++# Module interfaces introduced by the complete local G2 implementation.
++stress_g2_matrices.o: modules.o structure.o w_atpar.o mod_mpi.o
++cmp_dmft_stress.o: stress_g2_matrices.o alm_blm_clm.o
++l2main.o: stress_g2_matrices.o
+--- a/src/dmft2/alm_blm_clm.f90
++++ b/src/dmft2/alm_blm_clm.f90
+@@ -323,7 +323,7 @@
+   ! is already present in a volume-compensated representation.
+   SUBROUTINE cmp_alm_blm_clm_strain(salm,sblm,sclm,alm,blm,clm, &
+        Aweight,latom,lfirst,jatom,n0,nnlo,is,DM_nemin,DM_nemax, &
+-       DM_nemaxx,nbands,nbandsx)
++       DM_nemaxx,nbands,nbandsx,first_band)
+     USE defs,ONLY: pi,imag
+     USE param,ONLY: lmax2,lomax,nume,nloat,iblock,nmat
+     USE xa,ONLY: fj,dfj
+@@ -344,6 +344,10 @@
+     INTEGER,intent(in) :: latom,lfirst,jatom,n0,nnlo,is,DM_nemin, &
+          DM_nemax,DM_nemaxx,nbands,nbandsx
+ 
++    ! Optional extension for occupied bands below the DMFT window.  They
++    ! use identity pseudo-band vectors but need the same physical derivative.
++    INTEGER,optional,intent(in) :: first_band
++    INTEGER :: base_band,base_count,offset
+     INTEGER,parameter :: strain_a(6)=(/1,2,3,2,1,1/), &
+          strain_b(6)=(/1,2,3,3,3,2/)
+     INTEGER :: lmfull,lmlo,ii,ibb,i,i3,l,m,index,index1,iq,ia,ib, &
+@@ -366,12 +370,17 @@
+     czero=cmplx(0.d0,0.d0,8)
+     nonzero_shft=sum(abs(shft(latom,:))).gt.1.d-10
+ 
++    base_band=DM_nemin
++    if(present(first_band)) base_band=first_band
++    if(base_band>DM_nemin.or.base_band<1) error stop 'Invalid strain coefficient range'
++    base_count=DM_nemax-base_band+1
++    offset=DM_nemin-base_band
+     salm=0.d0; sblm=0.d0; sclm=0.d0
+     allocate(yl((lmax2+2)*(lmax2+2)))
+     allocate(h_yl(lmfull,iblock),dh_yl(lmfull,iblock,6), &
+          dh_alyl(lmfull,iblock,6),dh_blyl(lmfull,iblock,6))
+-    allocate(salm0(lmfull,nbands,6),sblm0(lmfull,nbands,6), &
+-         sclm0(lmlo,nbands,nloat,6))
++    allocate(salm0(lmfull,base_count,6),sblm0(lmfull,base_count,6), &
++         sclm0(lmlo,base_count,nloat,6))
+     salm0=0.d0; sblm0=0.d0; sclm0=0.d0
+ 
+     do ii=1,n0-nnlo,iblock
+@@ -469,16 +478,16 @@
+        enddo
+ 
+        do iq=1,6
+-          call zgemm('N','N',lmfull,nbands,ibb,cone, &
+-               dh_alyl(:,:,iq),lmfull,As(ii,DM_nemin,is),nmat,cone, &
++          call zgemm('N','N',lmfull,base_count,ibb,cone, &
++               dh_alyl(:,:,iq),lmfull,As(ii,base_band,is),nmat,cone, &
+                salm0(:,:,iq),lmfull)
+-          call zgemm('N','N',lmfull,nbands,ibb,cone, &
+-               dh_blyl(:,:,iq),lmfull,As(ii,DM_nemin,is),nmat,cone, &
++          call zgemm('N','N',lmfull,base_count,ibb,cone, &
++               dh_blyl(:,:,iq),lmfull,As(ii,base_band,is),nmat,cone, &
+                sblm0(:,:,iq),lmfull)
+        enddo
+     enddo
+ 
+-    if (nlo.ne.0) call lomain_strain(rotloc(:,:,jatom),is,DM_nemin, &
++    if (nlo.ne.0) call lomain_strain(rotloc(:,:,jatom),is,base_band, &
+          DM_nemax,lfirst,latom,jatom,salm0,sblm0,sclm0,lmax2)
+ 
+     do l=0,lmax2
+@@ -489,12 +498,17 @@
+             sclm0(l*l+1:(l+1)**2,:,1:ilo(l),:)*cfac
+     enddo
+ 
++    if(offset>0) then
++       salm(:,base_band:DM_nemin-1,:)=salm0(:,:offset,:)
++       sblm(:,base_band:DM_nemin-1,:)=sblm0(:,:offset,:)
++       sclm(:,base_band:DM_nemin-1,:,:)=sclm0(:,:offset,:,:)
++    endif
+     allocate(tmp(lmfull,nbandsx))
+     do iq=1,6
+-       call zgemm('N','N',lmfull,nbandsx,nbands,cone,salm0(:,:,iq), &
++       call zgemm('N','N',lmfull,nbandsx,nbands,cone,salm0(:,offset+1:base_count,iq), &
+             lmfull,Aweight,nbands,czero,tmp,lmfull)
+        salm(:,DM_nemin:DM_nemaxx,iq)=tmp
+-       call zgemm('N','N',lmfull,nbandsx,nbands,cone,sblm0(:,:,iq), &
++       call zgemm('N','N',lmfull,nbandsx,nbands,cone,sblm0(:,offset+1:base_count,iq), &
+             lmfull,Aweight,nbands,czero,tmp,lmfull)
+        sblm(:,DM_nemin:DM_nemaxx,iq)=tmp
+     enddo
+@@ -504,7 +518,7 @@
+     do iq=1,6
+        do jlo=1,nloat
+           call zgemm('N','N',lmlo,nbandsx,nbands,cone, &
+-               sclm0(:,:,jlo,iq),lmlo,Aweight,nbands,czero,tmp,lmlo)
++               sclm0(:,offset+1:base_count,jlo,iq),lmlo,Aweight,nbands,czero,tmp,lmlo)
+           sclm(:,DM_nemin:DM_nemaxx,jlo,iq)=tmp
+        enddo
+     enddo
+@@ -513,15 +527,15 @@
+     ! Convert the volume-compensated derivative assembled above into the
+     ! derivative of the physical 1/sqrt(Omega)-normalized coefficients.
+     do iq=1,3
+-       salm(:,DM_nemin:DM_nemaxx,iq)= &
+-            salm(:,DM_nemin:DM_nemaxx,iq)-0.5d0* &
+-            alm(:,DM_nemin:DM_nemaxx)
+-       sblm(:,DM_nemin:DM_nemaxx,iq)= &
+-            sblm(:,DM_nemin:DM_nemaxx,iq)-0.5d0* &
+-            blm(:,DM_nemin:DM_nemaxx)
+-       sclm(:,DM_nemin:DM_nemaxx,:,iq)= &
+-            sclm(:,DM_nemin:DM_nemaxx,:,iq)-0.5d0* &
+-            clm(:,DM_nemin:DM_nemaxx,:)
++       salm(:,base_band:DM_nemaxx,iq)= &
++            salm(:,base_band:DM_nemaxx,iq)-0.5d0* &
++            alm(:,base_band:DM_nemaxx)
++       sblm(:,base_band:DM_nemaxx,iq)= &
++            sblm(:,base_band:DM_nemaxx,iq)-0.5d0* &
++            blm(:,base_band:DM_nemaxx)
++       sclm(:,base_band:DM_nemaxx,:,iq)= &
++            sclm(:,base_band:DM_nemaxx,:,iq)-0.5d0* &
++            clm(:,base_band:DM_nemaxx,:)
+     enddo
+ 
+     deallocate(yl,h_yl,dh_yl,dh_alyl,dh_blyl,salm0,sblm0,sclm0)
+--- a/src/dmft2/stress_kernels.f90
++++ b/src/dmft2/stress_kernels.f90
+@@ -467,7 +467,9 @@
+                                            !     buf_sph_val1_buf3(alpha,beta,num) = buf_sph_val1_buf3(alpha,beta,num) + & 
+                                                  gaunt1*gaunt2*conjg(c_am(alpha,t))*conjg(c_am(beta,u))*&
+                                                  conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
+-                                                 (elo(lp,jlop)-e(num))*jr3upu_22(jlo,jlop,l,lp)
++                                                 ! jr3upu_22 stores the derivative on its second index.
++                                                 ! G2 requires a differentiated bra, with the ket energy.
++                                                 (elo(lp,jlop)-e(num))*jr3upu_22(jlop,jlo,lp,l)
+                                               ENDIF
+                                            ENDDO                                           
+                                         ENDIF
+@@ -718,7 +720,8 @@
+      l=lpv(ih,jatom)
+      lp=lv(ih,jatom)
+      duplicate_radial_channel=.FALSE.
+-     IF (ih.GT.1 .AND. lpv(ih-1,jatom).EQ.l .AND. &
++     IF (ih.GT.1) THEN
++     IF (lpv(ih-1,jatom).EQ.l .AND. &
+           lv(ih-1,jatom).EQ.lp .AND. &
+           llv(ih-1,jatom).EQ.llv(ih,jatom) .AND. &
+           mmv(ih-1,jatom).EQ.mmv(ih,jatom)) THEN
+@@ -729,6 +732,7 @@
+         duplicate_radial_channel= &
+              channel_diff.LE.1.d-12*(1.d0+channel_scale)
+      ENDIF
++     ENDIF
+      IF (.NOT.duplicate_radial_channel) &
+           maxterm=maxterm+(2*l+1)*(2*lp+1)
+   ENDDO
+@@ -746,7 +750,8 @@
+      l=lpv(ih,jatom)
+      lp=lv(ih,jatom)
+      duplicate_radial_channel=.FALSE.
+-     IF (ih.GT.1 .AND. lpv(ih-1,jatom).EQ.l .AND. &
++     IF (ih.GT.1) THEN
++     IF (lpv(ih-1,jatom).EQ.l .AND. &
+           lv(ih-1,jatom).EQ.lp .AND. &
+           llv(ih-1,jatom).EQ.llv(ih,jatom) .AND. &
+           mmv(ih-1,jatom).EQ.mmv(ih,jatom)) THEN
+@@ -756,6 +761,7 @@
+              SUM(ABS(WPts(:,:,ih,jatom)))
+         duplicate_radial_channel= &
+              channel_diff.LE.1.d-12*(1.d0+channel_scale)
++     ENDIF
+      ENDIF
+      IF (duplicate_radial_channel) CYCLE
+ 
+@@ -786,8 +792,8 @@
+                              IF (ABS(gaunt_couple).LT.1.d-30) CYCLE
+                              DO beta=1,3
+                                 DO alpha=1,3
+-                                   radial_factor=conjg(c_am(alpha,t))* &
+-                                        conjg(c_am(beta,u))*gaunt1* &
++                                   radial_factor=c_am(alpha,t)* &
++                                        c_am(beta,u)*gaunt1* &
+                                         gaunt_pot*gaunt_couple
+                                    radial_geom(alpha,beta)= &
+                                         radial_geom(alpha,beta)+radial_factor
+@@ -802,7 +808,8 @@
+ 
+            angular_geom=zeroc
+            DO v=-1,1,2
+-              IF (l+v.LT.0 .OR. l+v.GT.lmax2n) CYCLE
++              ! l+1 is an intermediate harmonic even at the radial cutoff.
++              IF (l+v.LT.0) CYCLE
+               DO t=-1,1
+                  IF (mbra+t.LT.-(l+v) .OR. mbra+t.GT.l+v) CYCLE
+                  DO tp=-1,1
+--- a/src/dmft2/cmp_dmft_stress.f90
++++ b/src/dmft2/cmp_dmft_stress.f90
+@@ -5,20 +5,21 @@
+ !
+ !   -2 Tr[rho H_{,epsilon}] + 2 Tr[rhoE O_{,epsilon}],
+ !
++! in the stored WIEN convention for these one-sided local kernels; the
++! physical whole-matrix derivative is Re Tr(rho H'-rhoE O'). This is
+ ! not a derivative of the non-stationary total-energy expression.  rho and
+ ! rhoE are Hermitian matrices in the Kohn-Sham band window.  l2main
+ ! diagonalizes each matrix and passes its eigenvectors as Aweight/AEweight;
+-! the eigenvalues are weight/eweight.  Consequently the existing diagonal
+-! WIEN2k kernels can be used exactly, once for each pseudo-band set.
+-!
+-! VAL_CORR_STRESS is linear in the band energy e:
+-!
+-!       K(e) = H_epsilon - e O_epsilon.
+-!
+-! Evaluating the unchanged, well-tested kernel at e=0 gives H_epsilon, and
+-! K(0)-K(1) gives O_epsilon.  This algebraic split avoids manually editing
+-! hundreds of angular-momentum terms and is independently testable in the
+-! DFT limit, where rhoE=e*rho must recover the original WIEN2k result.
++! the eigenvalues are weight/eweight. Each scalar kernel must therefore be
++! the complete quadratic form on arbitrary complex vectors, not a formula
++! simplified with the on-shell KS equation. The local G2 matrices below
++! meet that requirement; the explicit metric/surface kernels are separate.
++!
++! The complete local G2 matrices are cached by stress_g2_matrices.
++! Each one-sided kernel is linear in the test band energy E, so K(0)-K(1)
++! extracts its overlap part exactly for arbitrary complex pseudo-bands.
++! Unlike the legacy diagonal-only expansion, this includes all LO primitives,
++! the shared LAPW/APW matching derivative, and strain-allowed V_ns channels.
+ 
+ subroutine cmp_dmft_stress(Aweight,AEweight,weight,zwe,nemin,nemax, &
+      DM_nemin,DM_nemax,DM_nemaxx,nbands,nbandsx,n0,nnlo, &
+@@ -30,7 +31,8 @@
+   use xa, only: E,fj,dfj
+   use xa3, only: bk3
+   use w_atpar, only: retrieve_w_atpar
+-  use alm_blm_clm, only: cmp_alm_blm_clm
++  use alm_blm_clm, only: cmp_alm_blm_clm,cmp_alm_blm_clm_strain
++  use stress_g2_matrices, only: evaluate_g2
+   use stress_kb, only: load_stress_integrals
+   use stress_pw, only: prepare_stress_pw
+   use dmft_stress, only: stress_val_corr,stress_kin_mt,stress_apw, &
+@@ -55,6 +57,7 @@
+   real*8 :: buf_rela_corr(3,3),buf_rela_surf(3,3)
+   real*8 :: buf_overlap(3,3)
+   real*8 :: g2_trace
++  complex*16,allocatable :: salm(:,:,:),sblm(:,:,:),sclm(:,:,:,:)
+   complex*16,allocatable :: alm(:,:),blm(:,:)
+   complex*16,allocatable :: clm_compact(:,:,:),clm_stress(:,:,:)
+   complex*16,allocatable :: aalm(:,:,:),bblm(:,:,:),cclm(:,:,:,:)
+@@ -70,6 +73,7 @@
+   lmlo=(lomax+1)*(lomax+1)
+   isize=n0-nnlo
+   allocate(alm(lmfull,nume),blm(lmfull,nume))
++  allocate(salm(lmfull,nume,6),sblm(lmfull,nume,6),sclm(lmlo,nume,nloat,6))
+   ! dmft2 stores local-orbital coefficients only through LOMAX, whereas the
+   ! historical WIEN2k stress kernels declare CLM with the full LMAX2 angular
+   ! leading dimension.  Fortran explicit-shape arrays use that leading
+@@ -114,6 +118,9 @@
+                 DM_nemax,DM_nemaxx,nbands,nbandsx,.false., &
+                 time_bl,time_bl_w,time_lo,time_lo_w)
+ 
++           call cmp_alm_blm_clm_strain(salm,sblm,sclm,alm,blm, &
++                clm_compact,Aweight,latom,lfirst,jatom,n0,nnlo,is, &
++                DM_nemin,DM_nemax,DM_nemaxx,nbands,nbandsx,first_band=nemin)
+            clm_stress=0.d0
+            clm_stress(1:lmlo,:,:)=clm_compact
+            call val_kinstrmt(nemin,DM_nemaxx,alm,blm,clm_stress,kkin,rmt(jatom))
+@@ -133,10 +140,9 @@
+ 
+            esave=E
+            E(nemin:DM_nemaxx)=0.d0
+-           call val_corr_stress(isize,isize,isize,nemin,DM_nemaxx, &
+-                alm,blm,clm_stress,kh,knsp_match,knsp_radial, &
+-                knsp_angular,ksph0,ksph1,ksph2,.true.,jatom, &
+-                rmt(jatom),latom,lfirst)
++           call evaluate_g2(jatom,nemin,DM_nemaxx,alm,blm,clm_compact, &
++                salm,sblm,sclm,E,kh,knsp_match,knsp_radial,knsp_angular, &
++                ksph0,ksph1,ksph2,.true.)
+            E=esave
+ 
+            buf_kin=0.d0; buf_corr=0.d0; buf_apw=0.d0
+@@ -186,6 +192,9 @@
+                 latom,lfirst,jatom,nemin,nemax,n0,nnlo,is,DM_nemin, &
+                 DM_nemax,DM_nemaxx,nbands,nbandsx,.false., &
+                 time_bl,time_bl_w,time_lo,time_lo_w)
++           call cmp_alm_blm_clm_strain(salm,sblm,sclm,alm,blm, &
++                clm_compact,AEweight,latom,lfirst,jatom,n0,nnlo,is, &
++                DM_nemin,DM_nemax,DM_nemaxx,nbands,nbandsx,first_band=nemin)
+            clm_stress=0.d0
+            clm_stress(1:lmlo,:,:)=clm_compact
+            if (radial_fd_enabled) call radial_fd_band_contraction( &
+@@ -193,15 +202,13 @@
+                 radial_pass)
+            esave=E
+            E(nemin:DM_nemaxx)=0.d0
+-           call val_corr_stress(isize,isize,isize,nemin,DM_nemaxx, &
+-                alm,blm,clm_stress,ke0,knsp_match,knsp_radial, &
+-                knsp_angular,ksph0,ksph1,ksph2,.false.,jatom, &
+-                rmt(jatom),latom,lfirst)
++           call evaluate_g2(jatom,nemin,DM_nemaxx,alm,blm,clm_compact, &
++                salm,sblm,sclm,E,ke0,knsp_match,knsp_radial,knsp_angular, &
++                ksph0,ksph1,ksph2,.false.)
+            E(nemin:DM_nemaxx)=1.d0
+-           call val_corr_stress(isize,isize,isize,nemin,DM_nemaxx, &
+-                alm,blm,clm_stress,ke1,knsp_match,knsp_radial, &
+-                knsp_angular,ksph0,ksph1,ksph2,.false.,jatom, &
+-                rmt(jatom),latom,lfirst)
++           call evaluate_g2(jatom,nemin,DM_nemaxx,alm,blm,clm_compact, &
++                salm,sblm,sclm,E,ke1,knsp_match,knsp_radial,knsp_angular, &
++                ksph0,ksph1,ksph2,.false.)
+            E=esave
+            do num=nemin,DM_nemaxx
+               do beta=1,3
+@@ -215,10 +222,9 @@
+            enddo
+ 
+            ! Keep every G2 component available for diagnostics, but include
+-           ! exactly one selected combination in the physical stress.  TRACE
+-           ! is invariant under the equivalent-atom rotation and is the
+-           ! current conservative default in patched WIEN2k-24.  FULL is the
+-           ! literal affine-coordinate formula (match+radial+angular).
++           ! exactly one selected combination in the physical stress. FULL
++           ! uses the complete G2 matrices; TRACE is retained as an explicit
++           ! historical approximation, never as an automatic shear filter.
+            select case(trim(stress_g2_mode))
+            case('NONE')
+               continue
+@@ -271,6 +277,7 @@
+      enddo
+   enddo
+ 
++  deallocate(salm,sblm,sclm)
+   deallocate(alm,blm,clm_compact,clm_stress,aalm,bblm,cclm, &
+        kh,ke0,ke1,ksph0,ksph1,ksph2,knsp_match,knsp_radial, &
+        knsp_angular,kkin,kapw, &
+@@ -934,6 +941,7 @@
+   use stress_pw, only: prepare_stress_pw
+   use dmft_stress, only: stress_coeff_fd_enabled, &
+        stress_coeff_analytic_enabled
++  use stress_g2_matrices,only: evaluate_g2
+   implicit none
+   integer,intent(in) :: nemin,nemax,DM_nemin,DM_nemax,DM_nemaxx
+   integer,intent(in) :: nbands,nbandsx,n0,nnlo
+@@ -972,7 +980,7 @@
+        kradial0(3,3,nume),kradial1(3,3,nume), &
+        kangular0(3,3,nume),kangular1(3,3,nume))
+   allocate(nsp0(3,3,nume),nsp1(3,3,nume),nsp2(3,3,nume))
+-  if (stress_coeff_analytic_enabled) allocate(salm(lmfull,nume,6), &
++  allocate(salm(lmfull,nume,6), &
+        sblm(lmfull,nume,6),sclm(lmlo,nume,nloat,6))
+ 
+   eweight=0.d0
+@@ -997,10 +1005,10 @@
+            clm_stress=0.d0
+            clm_stress(1:lmlo,:,:)=clm_compact
+ 
++           call cmp_alm_blm_clm_strain(salm,sblm,sclm,alm,blm, &
++                   clm_compact,moment_vectors,latom,lfirst,jatom,n0, &
++                   nnlo,is,DM_nemin,DM_nemax,DM_nemaxx,nbands,nbandsx,first_band=nemin)
+            if (stress_coeff_analytic_enabled) then
+-              call cmp_alm_blm_clm_strain(salm,sblm,sclm,alm,blm, &
+-                   clm_compact,moment_vectors,latom,lfirst,jatom,n0, &
+-                   nnlo,is,DM_nemin,DM_nemax,DM_nemaxx,nbands,nbandsx)
+               call sigma_overlap_coeff_analytic_atom(salm,sblm,sclm, &
+                    alm,blm,clm_compact,eweight,buf_coeff_analytic, &
+                    jatom,DM_nemin,DM_nemaxx)
+@@ -1021,13 +1029,13 @@
+ 
+            esave=E
+            E(nemin:DM_nemaxx)=0.d0
+-           call val_corr_stress(isize,isize,isize,nemin,DM_nemaxx, &
+-                alm,blm,clm_stress,ke0,nsp0,nsp1,nsp2,kmatch0, &
+-                kradial0,kangular0,.false.,jatom,rmt(jatom),latom,lfirst)
++           call evaluate_g2(jatom,nemin,DM_nemaxx,alm,blm,clm_compact, &
++                salm,sblm,sclm,E,ke0,nsp0,nsp1,nsp2,kmatch0, &
++                kradial0,kangular0,.false.)
+            E(nemin:DM_nemaxx)=1.d0
+-           call val_corr_stress(isize,isize,isize,nemin,DM_nemaxx, &
+-                alm,blm,clm_stress,ke1,nsp0,nsp1,nsp2,kmatch1, &
+-                kradial1,kangular1,.false.,jatom,rmt(jatom),latom,lfirst)
++           call evaluate_g2(jatom,nemin,DM_nemaxx,alm,blm,clm_compact, &
++                salm,sblm,sclm,E,ke1,nsp0,nsp1,nsp2,kmatch1, &
++                kradial1,kangular1,.false.)
+            E=esave
+ 
+            buf=0.d0; buf_match=0.d0; buf_radial=0.d0; buf_angular=0.d0
+--- a/src/dmft2/stress_modules.f90
++++ b/src/dmft2/stress_modules.f90
+@@ -423,18 +423,11 @@
+   real*8 :: stress_rela_setup_wall=0.d0,stress_rela_band_wall=0.d0
+   real*8 :: stress_val_corr(3,3),stress_kin_mt(3,3),stress_apw(3,3)
+   real*8 :: stress_kin_int(3,3),stress_projector(3,3)
+-  ! Diagnostic selector for the direct projector contraction before mixer.
+-  ! CURRENT preserves the historical dmft2 assembly (+1).  WIEN inserts the
+-  ! physical dGamma/depsilon with the opposite raw sign (-1), because mixer
+-  ! later reports sigma=-Tstress.  The default remains CURRENT until the
+-  ! finite-difference closure tests settle all compensating terms.
+-  real*8 :: stress_projector_raw_sign=1.d0
+-  ! Sign used only when the adjoint derivative of the global projector
+-  ! normalization is converted into WIEN's stored STR_VAL convention.
+-  ! CURRENT preserves the historical diagnostic implementation.  PHYSICAL
+-  ! reverses the two response matrices after the adjoint chain rule but
+-  ! leaves the independently validated explicit dX contraction untouched.
+-  ! Keep CURRENT as the default until all reference materials close.
++  ! Direct +dGamma/depsilon must enter raw STR_VAL with a minus sign,
++  ! since mixer reports -STR_VAL. CURRENT/+1 remains an explicit legacy test.
++  real*8 :: stress_projector_raw_sign=-1.d0
++  ! H'/O' response matrices already pass through CMP_DMFT_STRESS's WIEN sign
++  ! conversion. PHYSICAL therefore means +1; LEGACY_REVERSED is diagnostic.
+   real*8 :: stress_norm_response_sign=1.d0
+   ! Diagnostic copies of the two scalar-relativistic additions.  They are
+   ! already included in STRESS_KIN_MT; keeping them separate permits a
+@@ -443,12 +436,12 @@
+   real*8 :: stress_rela_corr(3,3),stress_rela_surf(3,3)
+   ! The three nonspherical lines of Blaha et al. Eq. (G2) are kept
+   ! separately for term-by-term comparison with LAPW2.  A selected
+-  ! combination is also included once in stress_val_corr.  TRACE is the
+-  ! conservative production default used by the patched WIEN2k-24 code;
+-  ! FULL/AFFINE exposes the complete, still more delicate deviatoric tensor.
++  ! combination is included once in stress_val_corr. FULL uses the complete
++  ! local matrices. TRACE remains available only as an explicit approximation
++  ! for comparing historical hydrostatic calculations.
+   real*8 :: stress_nsp_match(3,3),stress_nsp_radial(3,3)
+   real*8 :: stress_nsp_angular(3,3)
+-  character(len=16) :: stress_g2_mode='TRACE'
++  character(len=16) :: stress_g2_mode='FULL'
+   ! Part of the complementary-band response which enters through the
+   ! k-global normalization X=(sum_k w_k P_k^+P_k)^(-1/2).  This tensor is
+   ! also contained in the ordinary LAPW components after the second response
+@@ -574,7 +567,7 @@
+     stress_matrix_decomposition_enabled=.false.
+     stress_moving_band_enabled=.false.
+     stress_paired_assembly_enabled=.false.
+-    stress_projector_raw_sign=1.d0
++    stress_projector_raw_sign=-1.d0
+     stress_norm_response_sign=1.d0
+     stress_rela_setup_wall=0.d0; stress_rela_band_wall=0.d0
+     if (.not.allocated(apw_surface_coeff)) allocate(apw_surface_coeff(lmmax,nume))
+@@ -582,7 +575,7 @@
+ 
+     ! Share the mode name with the patched LAPW2 implementation so DFT and
+     ! eDMFT runs can be compared without translating input conventions.
+-    stress_g2_mode='TRACE'
++    stress_g2_mode='FULL'
+     env_value=''
+     call get_environment_variable('WIEN_STRESS_G2_MODE',env_value, &
+          status=env_status)
+@@ -698,23 +691,9 @@
+     env_value=''
+     call get_environment_variable('EDMFT_STRESS_PROJECTOR_SIGN',env_value, &
+          status=env_status)
+-    if (env_status.ne.0 .or. len_trim(env_value).eq.0) then
+-       ! The paired assembly uses the literal derivative of the Klein
+-       ! functional.  CMP_DMFT_STRESS, however, stores the negative of the
+-       ! one-particle derivative in WIEN's STR_VAL convention,
+-       !
+-       !   STR_VAL = -d Gamma_1p / d epsilon.
+-       !
+-       ! Therefore the direct +2 Re Tr[C dU] projector derivative must enter
+-       ! with the opposite raw sign in this opt-in assembly.  Preserve the
+-       ! historical sign in every default production run.  An explicitly
+-       ! supplied environment value still overrides either choice.
+-       if (stress_paired_assembly_enabled) then
+-          env_value='WIEN'
+-       else
+-          env_value='CURRENT'
+-       endif
+-    endif
++    ! The literal projector derivative enters STR_VAL with a minus sign;
++    ! mixer supplies the final minus sign for every assembly, not just PAIRED.
++    if (env_status.ne.0 .or. len_trim(env_value).eq.0) env_value='WIEN'
+     select case(trim(adjustl(env_value)))
+     case('CURRENT','current','PLUS','plus','+1')
+        stress_projector_raw_sign=1.d0
+@@ -730,14 +709,14 @@
+          env_value,status=env_status)
+     if (env_status.ne.0 .or. len_trim(env_value).eq.0) env_value='CURRENT'
+     select case(trim(adjustl(env_value)))
+-    case('CURRENT','current','PLUS','plus','+1')
++    case('CURRENT','current','PLUS','plus','+1','PHYSICAL','physical','WIEN','wien')
+        stress_norm_response_sign=1.d0
+-    case('PHYSICAL','physical','WIEN','wien','MINUS','minus','-1')
++    case('LEGACY_REVERSED','legacy_reversed','MINUS','minus','-1')
+        stress_norm_response_sign=-1.d0
+     case default
+        write(6,*) 'Unknown EDMFT_STRESS_NORM_RESPONSE_SIGN: ', &
+             trim(env_value)
+-       stop 'normalization response sign must be CURRENT or PHYSICAL'
++       stop 'normalization response sign must be PHYSICAL or LEGACY_REVERSED'
+     end select
+ 
+     ! BASE and NO_SIGMA need the isolated M_Sigma tensor in order to remove
+--- a/src/dmft2/l2mainSubs.f90
++++ b/src/dmft2/l2mainSubs.f90
+@@ -2328,7 +2328,7 @@
+ SUBROUTINE BuildWindowResponseMatrices(rhoResponse,eResponse, &
+      projectorGradient,DMFTUfull,Aweight,AEweight,E,nemin,nemax, &
+      DM_nemin,DM_nemax,nbands_full,nbands,maxdim2,norbitals,maxdim, &
+-     ncix,cix_orb,cixdim,nindo,iSx,Sigind)
++     ncix,cix_orb,cixdim,nindo,iSx,Sigind,gradientDirect,useDirectC)
+   USE com_mpi, ONLY: Qprint
+   IMPLICIT NONE
+   INTEGER, intent(in) :: nemin, nemax, DM_nemin, DM_nemax
+@@ -2341,6 +2341,11 @@
+   COMPLEX*16, intent(out) :: rhoResponse(nbands_full,nbands_full)
+   COMPLEX*16, intent(out) :: eResponse(nbands_full,nbands_full)
+   COMPLEX*16, intent(out) :: projectorGradient(nbands,maxdim2,norbitals)
++  ! Direct C retains components in ker(U) which cannot be reconstructed
++  ! from B=U*C.  The pseudoinverse below is retained as a diagnostic/fallback
++  ! for full-rank test callers, not as a definition of the gradient.
++  LOGICAL,intent(in) :: useDirectC
++  COMPLEX*16,intent(in) :: gradientDirect(nbands,maxdim2,norbitals)
+   INTEGER :: icix, ip, iq, iorb, ind, ia, iw, in, iw0, iw1, ja
+   INTEGER :: nactive, icolumn, info, lwork, lrwork, liwork, nsmall, ndegenerate
+   INTEGER, allocatable :: activeColumn(:,:), iwork(:)
+@@ -2467,11 +2472,42 @@
+           sourceNorm,reconstructionResidual,eigmax,smallestKept,nsmall
+      deallocate(reconstructedB)
+   endif
++  if (useDirectC) then
++     if (projectorDiagnostic .and. Qprint) then
++        sourceNorm=0.d0
++        reconstructionResidual=0.d0
++        do iorb=1,norbitals
++           icix=cix_orb(iorb)
++           if (icix.le.0) cycle
++           do ind=1,nindo(iorb)
++              icolumn=activeColumn(iSx(ind,iorb),icix)
++              if (icolumn.le.0) cycle
++              sourceNorm=sourceNorm+sum(abs(gradientDirect(:,ind,iorb))**2)
++              reconstructionResidual=reconstructionResidual+sum(abs( &
++                   gradientDirect(:,ind,iorb)-localPart(icolumn,:))**2)
++           enddo
++        enddo
++        WRITE(6,'(A,2ES22.12,I6)') ':DMFT_C_DIRECT_VS_PINV: ', &
++             sqrt(sourceNorm),sqrt(reconstructionResidual/max(sourceNorm,tiny(1.d0))),nsmall
++     endif
++     do iorb=1,norbitals
++        icix=cix_orb(iorb)
++        if (icix.le.0) cycle
++        do ind=1,nindo(iorb)
++           icolumn=activeColumn(iSx(ind,iorb),icix)
++           if (icolumn.gt.0) localPart(icolumn,:)=gradientDirect(:,ind,iorb)
++        enddo
++     enddo
++  else if (nsmall.gt.0) then
++     WRITE(6,*) 'ERROR: rank-deficient projector requires the direct functional gradient C.'
++     STOP 'A pseudoinverse cannot recover the null-space part of C'
++  endif
++
+   ! localPart(m,n)=sum_omega [Sigma U^+ G]_{m n}, including the
+   ! irreducible-k weight.  It is the one-particle gradient conjugate to the
+   ! explicit projector derivative: dGamma_proj=2 Re sum_mn C_mn dU_nm.
+-  ! This is an energy derivative.  WIEN2k's analytic stress uses the
+-  ! +dGamma/d(strain)/Omega convention, so l2main.f90 adds this contraction.
++  ! This is an energy derivative. l2main converts it to raw STR_VAL
++  ! with a minus sign; mixer reports +dGamma/d(strain)/Omega.
+   ! (The corresponding atomic force has the opposite sign.)
+   do iorb=1,norbitals
+      icix=cix_orb(iorb)
+@@ -2498,21 +2534,14 @@
+            cycle
+         endif
+         response=Kfull(ia,iw)/denominator
+-        ! Kfull(a,n) multiplies the Sternheimer numerator
+-        ! D(a,n)=<a|H_,q-e_n O_,q|n>.  Since a matrix trace contains
+-        ! rho(n,a) H(a,n), the response belongs in the (n,a) block.  The
+-        ! historical (a,n) assignment complex-conjugated the contraction at
+-        ! every non-time-reversal-invariant k point.  A coefficient-space
+-        ! finite-difference check gives, exactly,
+-        !
+-        !   2 Re sum(C*dU) = Tr(rhoResponse H_,q)
+-        !                    -Tr(eResponse O_,q)
+-        !
+-        ! only with this orientation.
+-        rhoResponse(in,ia)=response
+-        rhoResponse(ia,in)=conjg(response)
+-        eResponse(in,ia)=epsn*response
+-        eResponse(ia,in)=conjg(eResponse(in,ia))
++        ! U_nl=<psi_n|phi_l>; if |psi_n>'=sum_a |psi_a> R_an,
++        ! then U'_nl=sum_a conjg(R_an)*U_al.  Thus K_an multiplies
++        ! conjg(H'_an-e_n O'_an), and belongs in the (a,n) block.
++        ! Reversing these two entries violates arbitrary KS-phase invariance.
++        rhoResponse(ia,in)=response
++        rhoResponse(in,ia)=conjg(response)
++        eResponse(ia,in)=epsn*response
++        eResponse(in,ia)=conjg(eResponse(ia,in))
+      enddo
+   enddo
+ 
+@@ -3413,7 +3442,7 @@
+   allocate(Kfull(nbands_full,nbands))
+   Kfull=0.d0
+ 
+-  ! Diagnostic for a normalization term omitted by the original
++  ! Metric contribution omitted by the original
+   ! complementary-band construction.  The generalized LAPW eigenvectors
+   ! obey A_W^+ O A_W=1.  In parallel-transport gauge their within-window
+   ! response consequently contains
+@@ -3445,14 +3474,19 @@
+   ! opposite sign confuses the direct-functional convention with WIEN's
+   ! stored valence convention and applies the mixer sign twice.
+   !
+-  ! Keep this default-off until it has been checked independently against
+-  ! the central Sternheimer identity and finite-difference Klein stresses.
++  ! Include this connection in the fixed-coefficient derivative by default.
++  ! Independent generalized-eigenproblem and basis-change tests verify its
++  ! sign. It would be double-counted only if P' already included the moving
++  ! orthonormal-frame metric response; cmp_overlap does not include it.
+   metricEnvironment=''
+   CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_NORM_WINDOW_METRIC', &
+        metricEnvironment,STATUS=metricStatus)
+-  includeWindowMetric=metricStatus.eq.0 .and. &
+-       len_trim(metricEnvironment).gt.0 .and. &
+-       trim(metricEnvironment).ne.'0'
++  ! P' is constructed at fixed LAPW coefficients.  Its nonorthogonal
++  ! window metric must be differentiated as well: -P^dagger O'_WW P.
++  ! Set the diagnostic explicitly to 0 only to reproduce the old omission.
++  includeWindowMetric=.true.
++  if (metricStatus.eq.0 .and. trim(metricEnvironment).eq.'0') &
++       includeWindowMetric=.false.
+   CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_MOVING_BAND', &
+        metricEnvironment,STATUS=metricStatus)
+   ! A unitary rotation inside W cancels identically from
+@@ -3520,12 +3554,12 @@
+            cycle
+         endif
+         response=Kfull(ia,iw)/denominator
+-        ! Same trace orientation as BuildWindowResponseMatrices above:
+-        ! K(a,n)/(e_n-e_a) is rhoResponse(n,a), not rhoResponse(a,n).
+-        rhoResponse(in,ia)=response
+-        rhoResponse(ia,in)=conjg(response)
+-        eResponse(in,ia)=epsn*response
+-        eResponse(ia,in)=conjg(eResponse(in,ia))
++        ! Same covariant (a,n) orientation as the direct-projector response;
++        ! the derivative of the projector bra conjugates R_an.
++        rhoResponse(ia,in)=response
++        rhoResponse(in,ia)=conjg(response)
++        eResponse(ia,in)=epsn*response
++        eResponse(in,ia)=conjg(eResponse(ia,in))
+      enddo
+   enddo
+   if (includeWithinWindow) then
+@@ -3540,22 +3574,18 @@
+               cycle
+            endif
+            response=Kfull(ia,iw)/denominator
+-           rhoResponse(in,ia)=rhoResponse(in,ia)+response
+-           rhoResponse(ia,in)=rhoResponse(ia,in)+conjg(response)
+-           eResponse(in,ia)=eResponse(in,ia)+epsn*response
+-           eResponse(ia,in)=eResponse(ia,in)+conjg(epsn*response)
+-        enddo
+-     enddo
+-  endif
+-
+-  ! The adjoint construction above returns the physical direct-functional
+-  ! response 2 Re(Cnorm*dP).  CMP_DMFT_STRESS, however, accumulates WIEN's
+-  ! intermediate STR_VAL, which mixer subtracts from the physical tensor.
+-  ! The historical implementation passed the physical sign straight into
+-  ! STR_VAL.  EDMFT_STRESS_NORM_RESPONSE_SIGN=PHYSICAL reverses only this
+-  ! representation conversion.  It must be applied here, before the optional
+-  ! fixed-X response is fused below, so that the independent window branch
+-  ! retains its own convention and the diagnostic switch cannot change it.
++           rhoResponse(ia,in)=rhoResponse(ia,in)+response
++           rhoResponse(in,ia)=rhoResponse(in,ia)+conjg(response)
++           eResponse(ia,in)=eResponse(ia,in)+epsn*response
++           eResponse(in,ia)=eResponse(in,ia)+conjg(epsn*response)
++        enddo
++     enddo
++  endif
++
++  ! These are physical H'/O' response matrices. CMP_DMFT_STRESS already
++  ! supplies the WIEN intermediate minus sign and mixer reverses it once.
++  ! Consequently the physical response needs no further sign reversal.
++  ! The multiplier is retained only for explicit legacy diagnostics.
+   rhoResponse=stress_norm_response_sign*rhoResponse
+   eResponse=stress_norm_response_sign*eResponse
+   responseNorm=sqrt(sum(abs(rhoResponse)**2))
+--- a/src/dmft2/l2main.f90
++++ b/src/dmft2/l2main.f90
+@@ -1,5 +1,6 @@
+ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
+   USE defs,  ONLY: PI, ZERO
++  USE stress_g2_matrices, ONLY: prepare_g2_matrices,release_g2_matrices
+   USE param, ONLY: IBLOCK, LMAX2, LOMAX, NCOM, NLOAT, NRAD, NMAT, NUME, NSYM, NKPT, fh_vec, numkpt, filename_V_nsh, filename_V_vns, filename_V_sph, nwave, iff1, iff2, iff3, kmax!, NGAU
+   USE atspdt,ONLY: e_store!, EL, P, DP, PE, DPE, PEI
+   USE com,   ONLY: NAT, EMIN, EMAX, ELECN, XWT!, rel, NSPIN, NK, EF, NB, weigh, MAXWAV, MINWAV,  NBAND
+@@ -370,6 +371,7 @@
+   ! lines of the analytic stress Eq. (G2) use the extended V/W blocks too,
+   ! so STR (without FOR) must load exactly the same file.
+   if (Qforce .or. Qstress) CALL Read_nsh()
++  if (Qstress) CALL prepare_g2_matrices()
+   nip=1
+   if (Qforce) nip=4
+ 
+@@ -889,9 +891,8 @@
+         if (Qforce .or. Qstress) nedim=nbands
+         allocate( Aweight(nbands,nbands) )
+         allocate( AEweight(nedim,nedim) )
+-        ! C_direct is a default-off diagnostic.  cmp_dmft_weights2 leaves it
+-        ! identically zero unless EDMFT_STRESS_C_DIAG is set, so allocating
+-        ! this modest rectangular array does not alter the production path.
++        ! The exact rectangular projector gradient is accumulated whenever
++        ! forces or stress need it; no inversion of U^dagger U is required.
+         allocate( projectorGradientDirect(nbands,maxdim2,norbitals) )
+ 
+         CALL cmp_dmft_weights2(Aweight,gloc,logG,dens,Gdloc,Gdloc0, &
+@@ -1033,7 +1034,7 @@
+                 projectorGradient,DMFTUfull(:,:,:,1),Aweight,AEweight, &
+                 E,nemin,nemax,DM_nemin,DM_nemax,nbands_full,nbands, &
+                 maxdim2,norbitals,maxdim,ncix,cix_orb,cixdim,nindo, &
+-                iSx,Sigind)
++                iSx,Sigind,projectorGradientDirect,.true.)
+            ! Default-off binary oracle for checking that the band-space
+            ! matrices sent to the LAPW stress kernels are exactly the ones
+            ! implied by the central Sternheimer/projector contraction.  It
+@@ -1058,17 +1059,8 @@
+                 nemin,nemax,DM_nemin,DM_nemax,nmat,nume,k3,k3lo,bk3, &
+                 As,E,DMFTUfull(:,:,:,1),projectorGradient,nbands_full, &
+                 nbands,maxdim2,norbitals)
+-           if (Qstress .and. matsubara) then
+-              ! This routine is diagnostic only.  It compares the present
+-              ! Moore--Penrose reconstruction with the local-to-band matrix
+-              ! accumulated directly in the Matsubara loop, but never
+-              ! replaces projectorGradient or changes a production tensor.
+-              CALL CompareDirectProjectorGradientDiagnostic( &
+-                   projectorGradient,projectorGradientDirect, &
+-                   DMFTU(:,:,:,1), &
+-                   projector_strain(iw0:iw1,:,:,:),Aweight,AEweight, &
+-                   E,DM_nemin,nbands,maxdim2,norbitals,nindo,ikp)
+-           endif
++           ! The direct-C versus pseudoinverse comparison is now made
++           ! inside BuildWindowResponseMatrices before selecting direct C.
+            if (Qstress) then
+               ! Explicit one-particle projector contribution to the WIEN2k
+               ! stress.  projectorGradient=C=Sigma U^+G is already frequency-
+@@ -1076,13 +1068,9 @@
+               ! complete normalized derivative P_,q X+P X_,q.  Therefore
+               ! 2*Re sum(C*dU) is dGamma/d(strain).
+               !
+-              ! Do not copy the sign used by the orbital-force term ``forb``:
+-              ! a force is -dGamma/dR, whereas WIEN2k's analytic stress is
+-              ! compared with +dGamma/d(strain)/Omega (this is also the
+-              ! convention used by the fixed-G finite-difference regression).
+-              ! The projector contribution must consequently enter here with
+-              ! a plus sign.  The previous minus sign made the stress use the
+-              ! force convention and reversed this entire DMFT term.
++              ! This is dGamma/depsilon, but stress_projector enters raw
++              ! STR_VAL, which mixer negates.  The physical default is -1
++              ! here; the final reported stress is +dGamma/depsilon/Omega.
+               do iq=1,6
+                  ia1=stress_a(iq)
+                  ia2=stress_b(iq)
+@@ -2166,6 +2154,7 @@
+      call fini_stress_radial_fd
+      call deallocate_stress_integrals
+   endif
++  if (Qstress) CALL release_g2_matrices()
+   CALL w_deallocate1
+ 
+   if (Qrenormalize .and. abs(projector).le.5) then
+--- a/src/python/check_projector_sternheimer_fd.py
++++ b/src/python/check_projector_sternheimer_fd.py
+@@ -8,7 +8,7 @@
+ space operators to form
+ 
+     R[a,n] = <a|H_,q-e_n O_,q|n>/(e_n-e_a),
+-    U_,q[n] = sum(a outside W) R[a,n] U[a],
++    U_,q[n] = sum(a outside W) conj(R[a,n]) U[a],
+ 
+ then evaluates the exact fixed-normalization stationary contraction
+ 
+@@ -553,7 +553,7 @@
+                         dump.gradient[local_n],
+                         optimize=True,
+                     )
+-                    contributions = 2.0 * np.real(k_an * rotation)
++                    contributions = 2.0 * np.real(k_an * rotation.conj())
+                     pair_diagnostics.extend(
+                         (
+                             float(abs(den)),
+@@ -573,7 +573,7 @@
+                         )
+                     )
+                 response[local_n] = np.einsum(
+-                    "a,aij->ij", rotation, dump.projector[outside[valid]], optimize=True
++                    "a,aij->ij", rotation.conj(), dump.projector[outside[valid]], optimize=True
+                 )
+             inside = window[window != n]
+             inside_denominator = dump.energies[n] - dump.energies[inside]
+@@ -594,7 +594,7 @@
+                 )
+                 internal_response[local_n] = np.einsum(
+                     "a,aij->ij",
+-                    inside_numerator[inside_valid]
++                    inside_numerator[inside_valid].conj()
+                     / inside_denominator[inside_valid],
+                     dump.projector[inside[inside_valid]],
+                     optimize=True,
+@@ -637,14 +637,12 @@
+             )[:, 0]
+             value = k_an / denominator[valid]
+             rows = outside[valid]
+-            # Tr[rho H_q] contains rho[n,a] H_q[a,n].  The direct projector
+-            # contraction contains K[a,n] H_q[a,n]/(e_n-e_a), so K belongs
+-            # in the (n,a) block, not the (a,n) block.  This orientation is
+-            # invisible for real matrices but matters at a general k point.
+-            rho_response[n, rows] += value
+-            rho_response[rows, n] += np.conj(value)
+-            energy_response[n, rows] += dump.energies[n] * value
+-            energy_response[rows, n] += np.conj(dump.energies[n] * value)
++            # U differentiates a bra: K[a,n] multiplies conj(R[a,n]).
++            # Put K/denominator in (a,n), so Tr[rho H'] uses H'[n,a].
++            rho_response[rows, n] += value
++            rho_response[n, rows] += np.conj(value)
++            energy_response[rows, n] += dump.energies[n] * value
++            energy_response[n, rows] += np.conj(dump.energies[n] * value)
+         response_hamiltonian_total += float(
+             np.real(np.trace(rho_response @ dh_band))
+         )
+@@ -738,7 +736,7 @@
+                 if np.any(valid):
+                     raw_response[local_n] = np.einsum(
+                         "a,aij->ij",
+-                        numerator[valid] / denominator[valid],
++                        numerator[valid].conj() / denominator[valid],
+                         norm.projector[outside[valid]],
+                         optimize=True,
+                     )
+@@ -752,7 +750,7 @@
+                 if np.any(inside_valid):
+                     raw_internal_response[local_n] = np.einsum(
+                         "a,aij->ij",
+-                        inside_numerator[inside_valid]
++                        inside_numerator[inside_valid].conj()
+                         / inside_denominator[inside_valid],
+                         norm.projector[inside[inside_valid]],
+                         optimize=True,
+@@ -778,10 +776,10 @@
+                 )[:, 0]
+                 value = k_an / denominator[valid]
+                 rows = outside[valid]
+-                rho_norm[n, rows] += value
+-                rho_norm[rows, n] += np.conj(value)
+-                energy_norm[n, rows] += dump.energies[n] * value
+-                energy_norm[rows, n] += np.conj(dump.energies[n] * value)
++                rho_norm[rows, n] += value
++                rho_norm[n, rows] += np.conj(value)
++                energy_norm[rows, n] += dump.energies[n] * value
++                energy_norm[n, rows] += np.conj(dump.energies[n] * value)
+             normalization_hamiltonian_total += float(
+                 np.real(np.trace(rho_norm @ dh_band))
+             )
+@@ -917,7 +915,7 @@
+                 )
+                 rotation_window[local_n, local_n] = -0.5 * do_band[n, n]
+             b_rotation_total += 2.0 * float(
+-                np.real(np.sum(b_target * rotation_window))
++                np.real(np.sum(b_target * rotation_window.conj()))
+             )
+ 
+     print(f"k points                                      {len(paths)}")
+--- /dev/null
++++ b/src/dmft2/stress_g2_matrices.f90
+@@ -0,0 +1,467 @@
++! Complete local bilinear form of Blaha G2 for a general Hermitian density.
++!
++! No on-shell KS equation is used on the band coefficients.  A pseudo-band
++! may be any complex linear combination, and rhoE is independent of rho.
++! The cache includes u, udot and every genuine LO primitive.  Angular
++! quadrature is polynomial-exact for the retained harmonics; it is performed
++! once per atom, never inside a k/band/Matsubara loop.  This also generates
++! strain-allowed potential channels which are absent from case.nsh because
++! the ordinary Hamiltonian Gaunt coefficient is zero.
++module stress_g2_matrices
++  use iso_fortran_env, only: dp=>real64
++  implicit none
++  private
++  public :: prepare_g2_matrices, release_g2_matrices, evaluate_g2
++  public :: gauss_legendre_stress, g2_angular_tables
++  integer,parameter :: axis_a(6)=[1,2,3,2,1,1], axis_b(6)=[1,2,3,3,3,2]
++  complex(dp),parameter :: one=(1._dp,0._dp),zero=(0._dp,0._dp)
++  type local_g2
++     integer :: n=0
++     integer,allocatable :: ly(:),primitive(:),l(:),u_partner(:)
++     real(dp),allocatable :: energy(:)
++     complex(dp),allocatable :: s0(:,:),sr(:,:,:),sa(:,:,:)
++     complex(dp),allocatable :: v0(:,:),vr(:,:,:),va(:,:,:)
++  end type
++  type(local_g2),allocatable,save :: atoms(:)
++contains
++  subroutine gauss_legendre_stress(n,x,w)
++    integer,intent(in) :: n
++    real(dp),intent(out) :: x(n),w(n)
++    real(dp) :: z,old,p0,p1,p2,deriv,pi
++    integer :: i,j,it
++    pi=acos(-1._dp)
++    do i=1,(n+1)/2
++       z=cos(pi*(real(i,dp)-0.25_dp)/(real(n,dp)+0.5_dp))
++       do it=1,64
++          p0=1._dp; p1=z
++          do j=2,n
++             p2=((2*j-1)*z*p1-(j-1)*p0)/j
++             p0=p1; p1=p2
++          enddo
++          deriv=n*(z*p1-p0)/(z*z-1._dp)
++          old=z; z=old-p1/deriv
++          if(abs(z-old)<4*epsilon(z)) exit
++       enddo
++       x(i)=-z; x(n+1-i)=z
++       w(i)=2._dp/((1._dp-z*z)*deriv*deriv); w(n+1-i)=w(i)
++    enddo
++  end subroutine
++
++  subroutine g2_angular_tables(lmax,lpot,mpot,phase_plus,phase_minus,ag,ar,aa)
++    ! <Y_i|Vharm|Y_j>, <Y_i|n_a n_b Vharm|Y_j>, and
++    ! <A_ab Y_i|Vharm|Y_j>.  The derivative is on the BRA in the last
++    ! expression.  Keeping it as a scalar-product integral eliminates the
++    ! otherwise easy-to-miss complex conjugation in three-Gaunt recoupling.
++    integer,intent(in) :: lmax,lpot,mpot
++    complex(dp),intent(in) :: phase_plus,phase_minus
++    complex(dp),intent(out) :: ag((lmax+1)**2,(lmax+1)**2), &
++         ar((lmax+1)**2,(lmax+1)**2,6),aa((lmax+1)**2,(lmax+1)**2,6)
++    integer :: nt,np,nq,nh,lymax,it,ip,q,l,m,idx,jdx,v,t,iq,a,b
++    real(dp) :: phi,pi,nvec(3)
++    real(dp),allocatable :: x(:),w(:),xyz(:,:),qw(:)
++    complex(dp),allocatable :: y(:,:),dy(:,:,:),weighted(:,:),yl(:),vp(:)
++    complex(dp) :: ca(3,-1:1,-1:1)
++    pi=acos(-1._dp); nh=(lmax+1)**2
++    ! Products have degree at most 2*lmax+lpot+2.  The extra margin
++    ! also covers top-l angular derivatives; no lmax+1 intermediate is cut.
++    nt=2*lmax+lpot+4; np=2*(2*lmax+lpot+2)+1; nq=nt*np
++    lymax=max(lmax+1,lpot)
++    allocate(x(nt),w(nt),xyz(nq,3),qw(nq),y(nq,nh),dy(nq,nh,6), &
++         weighted(nq,nh),yl((lymax+1)**2),vp(nq))
++    call gauss_legendre_stress(nt,x,w)
++    dy=zero; q=0
++    do it=1,nt
++       do ip=1,np
++          q=q+1; phi=2*pi*(ip-1)/np
++          nvec=[sqrt(max(0._dp,1-x(it)**2))*cos(phi), &
++                sqrt(max(0._dp,1-x(it)**2))*sin(phi),x(it)]
++          xyz(q,:)=nvec; qw(q)=w(it)*2*pi/np
++          call YLM(nvec,lymax,yl,(lymax+1)**2)
++          y(q,:)=yl(:nh)
++          vp(q)=phase_plus*yl(lpot*(lpot+1)+mpot+1)
++          if(mpot/=0) vp(q)=vp(q)+phase_minus*yl(lpot*(lpot+1)-mpot+1)
++          do l=0,lmax
++             do m=-l,l
++                idx=l*(l+1)+m+1
++                call c_factor(l,m,ca)
++                do v=-1,1,2
++                   if(l+v<0) cycle
++                   do t=-1,1
++                      if(abs(m+t)>l+v) cycle
++                      jdx=(l+v)*(l+v+1)+m+t+1
++                      do iq=1,6
++                         a=axis_a(iq); b=axis_b(iq)
++                         dy(q,idx,iq)=dy(q,idx,iq)+ &
++                              0.5_dp*(nvec(a)*ca(b,v,t)+nvec(b)*ca(a,v,t))*yl(jdx)
++                      enddo
++                   enddo
++                enddo
++             enddo
++          enddo
++       enddo
++    enddo
++    do idx=1,nh
++       weighted(:,idx)=y(:,idx)*vp*qw
++    enddo
++    call zgemm('C','N',nh,nh,nq,one,y,nq,weighted,nq,zero,ag,nh)
++    do iq=1,6
++       call zgemm('C','N',nh,nh,nq,one,dy(:,:,iq),nq,weighted,nq,zero,aa(:,:,iq),nh)
++    enddo
++    do iq=1,6
++       do idx=1,nh
++          weighted(:,idx)=y(:,idx)*vp*qw*xyz(:,axis_a(iq))*xyz(:,axis_b(iq))
++       enddo
++       call zgemm('C','N',nh,nh,nq,one,y,nq,weighted,nq,zero,ar(:,:,iq),nh)
++    enddo
++    ! Numerical integration of exactly vanishing coefficients produces tiny
++    ! noise; remove only roundoff, not physically small radial amplitudes.
++    where(abs(ag)<2.e-13_dp) ag=zero
++    where(abs(ar)<2.e-13_dp) ar=zero
++    where(abs(aa)<2.e-13_dp) aa=zero
++    deallocate(x,w,xyz,qw,y,dy,weighted,yl,vp)
++  end subroutine
++
++  subroutine prepare_g2_matrices()
++    use param,only: nrad,nloat,lmax2,lomax,ncom,filename_V_vns
++    use com,only: nat,rel
++    use com_mpi,only: myrank,master
++    use structure,only: jri,r0,dx,iatnr
++    use lo,only: ilo,loor,elo
++    use atspdt,only: el
++    use w_atpar,only: w_rrad1,w_rrad2,w_rade1,w_rade2,w_a1lo,w_b1lo, &
++         w_radp1,w_radp2,w_radpe1,w_radpe2,w_ap1lo,w_bp1lo,w_lm,w_lmmax, &
++         ri_mat,retrieve_w_atpar,Vts,lpv,lv,mpv,mv,Nhmx
++    use readPotential,only: init_V_vns,read_V_vns,close_V_vns
++    integer :: jatom,nr,nh,n,l,m,p,i,j,iq,ilm,lpot,mpot,lfirst,lmmax, &
++         ri,nradial,ir,ih,idx,jdx,lns
++    integer,allocatable :: rad_id(:,:),rl(:),rp(:),rid(:)
++    real(dp),allocatable :: f(:,:),g(:,:),rfp(:,:),rgp(:,:),r(:), &
++         vraw(:,:),potential(:,:),srad(:,:),drad(:,:),vmat(:,:),wmat(:,:),tmp1(:),tmp2(:)
++    complex(dp),allocatable :: ag(:,:),ar(:,:,:),aa(:,:,:),vreference(:,:)
++    complex(dp) :: pp,pm
++    real(dp) :: denom,angular_trace
++    real(dp),external :: rint13n
++    if(allocated(atoms)) return
++    allocate(atoms(nat)); nh=(lmax2+1)**2
++    allocate(ag(nh,nh),ar(nh,nh,6),aa(nh,nh,6))
++    call init_V_vns(filename_V_vns,9929)
++    do jatom=1,nat
++       call retrieve_w_atpar(jatom,lfirst,lmmax)
++       nr=jri(jatom)
++       ! The represented nonspherical Hamiltonian has its own angular
++       ! cutoff (LNSMAX in lapw1). Preserve it; completing strain-allowed
++       ! triples must not silently add Hamiltonian channels above that cutoff.
++       lns=lmax2
++       if(Nhmx(jatom)>0) lns=min(lmax2,max(maxval(lpv(:Nhmx(jatom),jatom)), &
++            maxval(lv(:Nhmx(jatom),jatom))))
++       allocate(rad_id(2+nloat,0:lmax2));rad_id=0
++       nradial=0; n=0
++       do l=0,lmax2
++          do p=1,2+nloat
++             if(p>2) then
++                if(l>lomax) cycle
++                if(p-2>ilo(l)) cycle
++                if(.not.loor(p-2,l)) cycle
++             endif
++             nradial=nradial+1;rad_id(p,l)=nradial;n=n+(2*l+1)
++          enddo
++       enddo
++       atoms(jatom)%n=n
++       allocate(atoms(jatom)%ly(n),atoms(jatom)%primitive(n),atoms(jatom)%l(n), &
++            atoms(jatom)%u_partner(n),atoms(jatom)%energy(n),rid(n),rl(nradial),rp(nradial))
++       allocate(f(nr,nradial),g(nr,nradial),rfp(nr,nradial),rgp(nr,nradial), &
++            r(nr),vraw(nrad,0:ncom-1),potential(nrad,ncom),srad(nradial,nradial), &
++            drad(nradial,nradial),vmat(nradial,nradial),wmat(nradial,nradial),tmp1(nr),tmp2(nr))
++       do ir=1,nr
++          r(ir)=r0(jatom)*exp((ir-1)*dx(jatom))
++       enddo
++       n=0
++       do l=0,lmax2
++          do p=1,2+nloat
++             ri=rad_id(p,l)
++             if(ri==0) cycle
++             rl(ri)=l;rp(ri)=p
++             select case(p)
++             case(1)
++                f(:,ri)=w_rrad1(:nr,l,jatom);g(:,ri)=w_rrad2(:nr,l,jatom)
++                rfp(:,ri)=r*w_radp1(:nr,l,jatom);rgp(:,ri)=r*w_radp2(:nr,l,jatom)
++             case(2)
++                f(:,ri)=w_rade1(:nr,l,jatom);g(:,ri)=w_rade2(:nr,l,jatom)
++                rfp(:,ri)=r*w_radpe1(:nr,l,jatom);rgp(:,ri)=r*w_radpe2(:nr,l,jatom)
++             case default
++                f(:,ri)=w_a1lo(:nr,p-2,l,jatom);g(:,ri)=w_b1lo(:nr,p-2,l,jatom)
++                rfp(:,ri)=r*w_ap1lo(:nr,p-2,l,jatom);rgp(:,ri)=r*w_bp1lo(:nr,p-2,l,jatom)
++             end select
++             do m=-l,l
++                n=n+1;rid(n)=ri
++                atoms(jatom)%ly(n)=l*(l+1)+m+1
++                atoms(jatom)%primitive(n)=p;atoms(jatom)%l(n)=l
++                atoms(jatom)%energy(n)=el(l)
++                if(p>2) atoms(jatom)%energy(n)=elo(l,p-2)
++             enddo
++          enddo
++       enddo
++       atoms(jatom)%u_partner=0
++       do i=1,n
++          if(atoms(jatom)%primitive(i)/=2) cycle
++          do j=1,n
++             if(atoms(jatom)%primitive(j)/=1) cycle
++             if(atoms(jatom)%ly(i)==atoms(jatom)%ly(j)) atoms(jatom)%u_partner(i)=j
++          enddo
++       enddo
++       do j=1,nradial
++          do i=1,nradial
++             srad(i,j)=rint13n(nr,f(:,i),g(:,i),f(:,j),g(:,j),r0(jatom),dx(jatom),rel)
++             ! rfp=r^2*u'_bra; the derivative is never inferred by transposing.
++             drad(i,j)=rint13n(nr,rfp(:,i),rgp(:,i),f(:,j),g(:,j),r0(jatom),dx(jatom),rel)
++          enddo
++       enddo
++       allocate(atoms(jatom)%s0(n,n),atoms(jatom)%sr(n,n,6),atoms(jatom)%sa(n,n,6), &
++            atoms(jatom)%v0(n,n),atoms(jatom)%vr(n,n,6),atoms(jatom)%va(n,n,6))
++       atoms(jatom)%s0=zero;atoms(jatom)%v0=zero;atoms(jatom)%vr=zero;atoms(jatom)%va=zero
++       ! Vharm=1 gives both spherical strain angular tables.
++       call g2_angular_tables(lmax2,0,0,cmplx(sqrt(4*acos(-1._dp)),0._dp,dp),zero,ag,ar,aa)
++       do j=1,n
++          do i=1,n
++             idx=atoms(jatom)%ly(i);jdx=atoms(jatom)%ly(j)
++             if(idx==jdx) atoms(jatom)%s0(i,j)= &
++                  ri_mat(atoms(jatom)%primitive(i),atoms(jatom)%primitive(j),atoms(jatom)%l(i),jatom)
++             atoms(jatom)%sr(i,j,:)=drad(rid(i),rid(j))*ar(idx,jdx,:)
++             atoms(jatom)%sa(i,j,:)=srad(rid(i),rid(j))*aa(idx,jdx,:)
++          enddo
++       enddo
++       call read_V_vns(vraw,jatom,nrad,nr,w_lmmax(jatom))
++       potential=0._dp
++       potential(:,2:w_lmmax(jatom))=vraw(:,1:w_lmmax(jatom)-1)
++       if(iatnr(jatom)>0) call cubic_potential_components(potential,w_lm(:,:,jatom),nr,w_lmmax(jatom))
++       do ilm=2,w_lmmax(jatom)
++          if(maxval(abs(potential(:nr,ilm)))==0._dp) cycle
++          lpot=abs(w_lm(1,ilm,jatom));mpot=w_lm(2,ilm,jatom)
++          call potential_phases(w_lm(1,ilm,jatom),mpot,iatnr(jatom)>0,pp,pm)
++          call g2_angular_tables(lmax2,lpot,mpot,pp,pm,ag,ar,aa)
++          do i=1,nradial
++             tmp1=f(:,i)*potential(:nr,ilm);tmp2=g(:,i)*potential(:nr,ilm)
++             do j=1,nradial
++                vmat(i,j)=rint13n(nr,tmp1,tmp2,f(:,j),g(:,j),r0(jatom),dx(jatom),rel)
++             enddo
++             tmp1=rfp(:,i)*potential(:nr,ilm);tmp2=rgp(:,i)*potential(:nr,ilm)
++             do j=1,nradial
++                wmat(i,j)=rint13n(nr,tmp1,tmp2,f(:,j),g(:,j),r0(jatom),dx(jatom),rel)
++             enddo
++          enddo
++          do j=1,n
++             if(atoms(jatom)%l(j)>lns) cycle
++             do i=1,n
++                if(atoms(jatom)%l(i)>lns) cycle
++                idx=atoms(jatom)%ly(i);jdx=atoms(jatom)%ly(j)
++                atoms(jatom)%v0(i,j)=atoms(jatom)%v0(i,j)+vmat(rid(i),rid(j))*ag(idx,jdx)
++                atoms(jatom)%vr(i,j,:)=atoms(jatom)%vr(i,j,:)+wmat(rid(i),rid(j))*ar(idx,jdx,:)
++                atoms(jatom)%va(i,j,:)=atoms(jatom)%va(i,j,:)+vmat(rid(i),rid(j))*aa(idx,jdx,:)
++             enddo
++          enddo
++       enddo
++       ! Independently reconstruct the ordinary Hamiltonian matrix from
++       ! its .nsh records.  This checks real/cubic harmonic phases, radial
++       ! normalization and compatibility with the vectors that supplied E_l.
++       allocate(vreference(n,n));vreference=zero
++       do ih=1,Nhmx(jatom)
++          do j=1,n
++             if(atoms(jatom)%ly(j)/=lv(ih,jatom)*(lv(ih,jatom)+1)+mv(ih,jatom)+1) cycle
++             do i=1,n
++                if(atoms(jatom)%ly(i)/=lpv(ih,jatom)*(lpv(ih,jatom)+1)+mpv(ih,jatom)+1) cycle
++                vreference(i,j)=vreference(i,j)+ &
++                     Vts(atoms(jatom)%primitive(i),atoms(jatom)%primitive(j),ih,jatom)
++             enddo
++          enddo
++       enddo
++       denom=sqrt(sum(abs(vreference)**2))
++       if(denom>1.e-20_dp.and.myrank==master) write(6,'(A,I6,2ES18.8)') &
++            ':DMFT_G2_NSH_CHECK: ',jatom,denom, &
++            sqrt(sum(abs(atoms(jatom)%v0-vreference)**2))/denom
++       deallocate(vreference)
++       angular_trace=maxval(abs(sum(atoms(jatom)%sa(:,:,1:3),dim=3)))+ &
++            maxval(abs(sum(atoms(jatom)%va(:,:,1:3),dim=3)))
++       if(angular_trace>1.e-9_dp) error stop 'G2 angular trace identity failed'
++       if(myrank==master) write(6,'(A,3I6,2ES18.8)') ':DMFT_G2_COMPLETE_CACHE: ',jatom,n,lns, &
++            angular_trace,maxval(abs(atoms(jatom)%v0-conjg(transpose(atoms(jatom)%v0))))
++       deallocate(rad_id,rl,rp,rid,f,g,rfp,rgp,r,vraw,potential,srad,drad,vmat,wmat,tmp1,tmp2)
++    enddo
++    call close_V_vns()
++    deallocate(ag,ar,aa)
++  end subroutine
++
++  subroutine potential_phases(signed_l,m,cubic,pp,pm)
++    integer,intent(in) :: signed_l,m
++    logical,intent(in) :: cubic
++    complex(dp),intent(out) :: pp,pm
++    integer :: parity
++    parity=1
++    if(mod(m,2)/=0) parity=-1
++    pp=one;pm=one
++    if(cubic) then
++       if(any(abs(signed_l)==[3,7,9])) then
++          pp=cmplx(0._dp,-1._dp,dp);pm=-pp
++       endif
++    else if(m/=0) then
++       if(signed_l<0) then
++          pp=cmplx(0._dp,-real(parity,dp),dp)/sqrt(2._dp)
++          pm=cmplx(0._dp,1._dp,dp)/sqrt(2._dp)
++       else
++          pp=real(parity,dp)/sqrt(2._dp);pm=1._dp/sqrt(2._dp)
++       endif
++    endif
++  end subroutine
++
++  subroutine cubic_potential_components(v,lm,nr,nlm)
++    ! WIEN cubic harmonics are constrained real-harmonic combinations.
++    ! Transform their radial coefficients once to the complex-Y convention.
++    ! Coefficients match dftKS CBCOMB; the .nsh file itself remains unchanged.
++    real(dp),intent(inout) :: v(:,:)
++    integer,intent(in) :: lm(:,:),nr,nlm
++    real(dp) :: c(0:10,0:10),a(3),factor,total(nr)
++    integer :: i,j,count,l,m
++    c=0._dp
++    c(0,0)=1; c(3,2)=1
++    c(4,0)=sqrt(7._dp/3)/2;c(4,4)=sqrt(5._dp/3)/2
++    c(6,0)=sqrt(.5_dp)/2;c(6,2)=sqrt(11._dp)/4
++    c(6,4)=-sqrt(7._dp/2)/2;c(6,6)=-sqrt(5._dp)/4
++    c(7,2)=sqrt(13._dp/6)/2;c(7,6)=sqrt(11._dp/6)/2
++    c(8,0)=sqrt(33._dp)/8;c(8,4)=sqrt(7._dp/3)/4;c(8,8)=sqrt(65._dp/3)/8
++    c(9,2)=sqrt(3._dp)/4;c(9,4)=sqrt(17._dp/6)/2
++    c(9,6)=-sqrt(13._dp)/4;c(9,8)=-sqrt(7._dp/6)/2
++    c(10,0)=sqrt(65._dp/6)/8;c(10,2)=sqrt(247._dp/6)/8
++    c(10,4)=-sqrt(11._dp/2)/4;c(10,6)=sqrt(19._dp/3)/16
++    c(10,8)=-sqrt(187._dp/6)/8;c(10,10)=-sqrt(85._dp)/16
++    i=1
++    do while(i<=nlm)
++       l=abs(lm(1,i));m=lm(2,i)
++       select case(l)
++       case(0)
++          i=i+1;cycle
++       case(3)
++          v(:nr,i)=v(:nr,i)/sqrt(2._dp);i=i+1;cycle
++       case(4,6,7,9)
++          count=2
++       case(8,10)
++          count=3
++       case default
++          error stop 'Unsupported cubic harmonic in complete G2'
++       end select
++       if(i+count-1>nlm) error stop 'Incomplete cubic harmonic group'
++       total=0._dp
++       do j=1,count
++          a(j)=c(l,m+4*(j-1));total=total+a(j)*v(:nr,i+j-1)
++       enddo
++       do j=1,count
++          factor=sqrt(2._dp)
++          if(j==1.and.m==0) factor=1._dp
++          v(:nr,i+j-1)=total*a(j)/factor
++       enddo
++       i=i+count
++    enddo
++  end subroutine
++
++  subroutine evaluate_g2(jatom,first,last,alm,blm,clm,salm,sblm,sclm,band_energy, &
++       spherical,nsp_match,nsp_radial,nsp_angular,sph_match,sph_radial,sph_angular,with_nsp)
++    use structure,only: rotloc
++    integer,intent(in) :: jatom,first,last
++    complex(dp),intent(in) :: alm(:,:),blm(:,:),clm(:,:,:),salm(:,:,:),sblm(:,:,:),sclm(:,:,:,:)
++    real(dp),intent(in) :: band_energy(:)
++    complex(dp),intent(out) :: spherical(:,:,:),nsp_match(:,:,:),nsp_radial(:,:,:),nsp_angular(:,:,:), &
++         sph_match(:,:,:),sph_radial(:,:,:),sph_angular(:,:,:)
++    logical,intent(in) :: with_nsp
++    complex(dp),allocatable :: c(:,:),d(:,:,:),hc(:,:),tmp(:,:)
++    complex(dp) :: tensor(3,3),local_tensor(3,3),value
++    integer :: n,nb,i,j,ly,p,iq,a,b,k,band
++    if(.not.allocated(atoms)) error stop 'G2 cache not prepared'
++    n=atoms(jatom)%n;nb=last-first+1
++    allocate(c(n,nb),d(n,nb,6),hc(n,nb),tmp(n,nb))
++    do i=1,n
++       ly=atoms(jatom)%ly(i);p=atoms(jatom)%primitive(i)
++       select case(p)
++       case(1)
++          c(i,:)=alm(ly,first:last);d(i,:,:)=salm(ly,first:last,:)
++       case(2)
++          c(i,:)=blm(ly,first:last);d(i,:,:)=sblm(ly,first:last,:)
++       case default
++          c(i,:)=clm(ly,first:last,p-2);d(i,:,:)=sclm(ly,first:last,p-2,:)
++       end select
++       ! The shared builder returns physical s.  Blaha D=s+gamma*A/2.
++       do iq=1,3
++          d(i,:,iq)=d(i,:,iq)+0.5_dp*c(i,:)
++       enddo
++       ! Matching derivatives arrive in the reference Cartesian axes;
++       ! all G2 integral tables use the local harmonic axes.  Convert here
++       ! before symmetry_stress_rotij later converts the complete tensor back.
++       do k=1,nb
++          do iq=1,6
++             a=axis_a(iq);b=axis_b(iq);tensor(a,b)=d(i,k,iq);tensor(b,a)=d(i,k,iq)
++          enddo
++          local_tensor=matmul(rotloc(:,:,jatom),matmul(tensor,transpose(rotloc(:,:,jatom))))
++          do iq=1,6
++             d(i,k,iq)=local_tensor(axis_a(iq),axis_b(iq))
++          enddo
++       enddo
++       hc(i,:)=atoms(jatom)%energy(i)*c(i,:)
++    enddo
++    do i=1,n
++       j=atoms(jatom)%u_partner(i)
++       if(j>0) hc(j,:)=hc(j,:)+c(i,:)
++    enddo
++    do k=1,nb
++       hc(:,k)=hc(:,k)-band_energy(first+k-1)*c(:,k)
++    enddo
++    spherical=zero;sph_match=zero;sph_radial=zero;sph_angular=zero
++    nsp_match=zero;nsp_radial=zero;nsp_angular=zero
++    call zgemm('N','N',n,nb,n,one,atoms(jatom)%s0,n,hc,n,zero,tmp,n)
++    do iq=1,6
++       a=axis_a(iq);b=axis_b(iq)
++       do k=1,nb
++          band=first+k-1;value=sum(conjg(d(:,k,iq))*tmp(:,k))
++          sph_match(a,b,band)=value;sph_match(b,a,band)=value
++       enddo
++    enddo
++    do iq=1,6
++       a=axis_a(iq);b=axis_b(iq)
++       call zgemm('N','N',n,nb,n,one,atoms(jatom)%sr(:,:,iq),n,hc,n,zero,tmp,n)
++       do k=1,nb
++          band=first+k-1;value=sum(conjg(c(:,k))*tmp(:,k))
++          sph_radial(a,b,band)=value;sph_radial(b,a,band)=value
++       enddo
++       call zgemm('N','N',n,nb,n,one,atoms(jatom)%sa(:,:,iq),n,hc,n,zero,tmp,n)
++       do k=1,nb
++          band=first+k-1;value=sum(conjg(c(:,k))*tmp(:,k))
++          sph_angular(a,b,band)=value;sph_angular(b,a,band)=value
++       enddo
++    enddo
++    spherical=sph_match+sph_radial+sph_angular
++    if(with_nsp) then
++       call zgemm('N','N',n,nb,n,one,atoms(jatom)%v0,n,c,n,zero,tmp,n)
++       do iq=1,6
++          a=axis_a(iq);b=axis_b(iq)
++          do k=1,nb
++             band=first+k-1;value=sum(conjg(d(:,k,iq))*tmp(:,k))
++             nsp_match(a,b,band)=value;nsp_match(b,a,band)=value
++          enddo
++       enddo
++       do iq=1,6
++          a=axis_a(iq);b=axis_b(iq)
++          call zgemm('N','N',n,nb,n,one,atoms(jatom)%vr(:,:,iq),n,c,n,zero,tmp,n)
++          do k=1,nb
++             band=first+k-1;value=sum(conjg(c(:,k))*tmp(:,k))
++             nsp_radial(a,b,band)=value;nsp_radial(b,a,band)=value
++          enddo
++          call zgemm('N','N',n,nb,n,one,atoms(jatom)%va(:,:,iq),n,c,n,zero,tmp,n)
++          do k=1,nb
++             band=first+k-1;value=sum(conjg(c(:,k))*tmp(:,k))
++             nsp_angular(a,b,band)=value;nsp_angular(b,a,band)=value
++          enddo
++       enddo
++    endif
++    deallocate(c,d,hc,tmp)
++  end subroutine
++
++  subroutine release_g2_matrices()
++    if(allocated(atoms)) deallocate(atoms)
++  end subroutine
++end module stress_g2_matrices
+--- /dev/null
++++ b/src/dmft2/tests/README.txt
+@@ -0,0 +1,40 @@
++Independent regression tests for the 7 November 2026 stress audit fixes
++=====================================================================
++Requirements: Python with NumPy and SciPy (sph_harm_y), a Fortran compiler,
++and BLAS/LAPACK. macOS uses Accelerate; Linux uses -llapack -lblas.
++FC may select a compiler. No WIEN material data are required.
++
++Run from any directory, using the paths below relative to this file:
++
++  export EDMFT_STRESS_TEST_DIR=$(mktemp -d)
++  export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
++  python build_stress_harness.py
++  python check_stress_formulas.py
++  python check_rank_deficient_gradient.py
++  python check_complete_g2.py
++
++The build scripts extract the actual production routines, without changing
++source, and compile temporary copies with bounds checking. The full G2 test
++uses the complete production module with a small radial/atomic fixture; only
++private-cache visibility is changed in its test copy. All generated files and
++results go to EDMFT_STRESS_TEST_DIR, never the source tree.
++
++Tests and independent references:
++* Fixed-index window response: exact small Hamiltonian endpoint diagonalization,
++  generalized overlap, arbitrary complex KS phase changes, and functional FD.
++* Global normalization: endpoint inverse square roots, Frechet/adjoint identity,
++  and selected generalized-eigenvector span with its within-window metric.
++* Direct C: finite log-determinant derivatives on Matsubara and real-frequency
++  contours; a rank-deficient projector whose physical gradient contains a
++  component invisible to the embedded B=U*C matrix.
++* Old and new angular kernels: independent SciPy spherical harmonics and
++  numerical angular derivatives, including the largest-l intermediate and
++  the strain-allowed s/s/Y20 channel absent from an ordinary .nsh record list.
++* Complete G2: exact gamma-function radial integrals, u/udot and two genuine
++  LO radial functions per l, independent angular quadrature, arbitrary complex
++  pseudo-bands, a nonidentity local-axis rotation, and all six contractions.
++
++These tests establish the implemented matrix algebra and local integrals.
++They do not certify a complete material stress against charge-relaxed frozen-
++Sigma endpoints, the frozen-radial approximation, all RELA contributions,
++changing R_MT, or a fixed-index window cut through a degeneracy.
+--- /dev/null
++++ b/src/dmft2/tests/build_stress_harness.py
+@@ -0,0 +1,131 @@
++from pathlib import Path
++import re, subprocess, hashlib, json
++
++ROOT=Path(__file__).resolve().parents[3]
++import os,tempfile
++OUT=Path(os.environ.get('EDMFT_STRESS_TEST_DIR',tempfile.mkdtemp(prefix='edmft_stress_test_')))
++OUT.mkdir(parents=True,exist_ok=True)
++
++
++def routine(file,name):
++    text=(ROOT/file).read_text()
++    pat=rf'^\s*SUBROUTINE\s+{name}\s*\(.*?^\s*END SUBROUTINE\s+{name}\s*$'
++    match=re.search(pat,text,re.M|re.S|re.I)
++    if not match: raise RuntimeError(name)
++    return match.group(0)+'\n'
++
++stubs='''module fact
++real*8 :: fct(100)
++end module
++module com_mpi
++logical :: Qprint=.false.
++integer :: myrank=1,master=0
++end module
++module dmft_stress
++real*8 :: stress_norm_response_sign=1d0
++end module
++module param
++integer,parameter :: lmax2n=8
++end module
++module defs
++complex*16,parameter :: zeroc=(0d0,0d0)
++end module
++module w_atpar
++type cache_t
++ logical :: ready=.false.
++ integer :: nterm=0
++ integer,allocatable :: ih(:),ibra(:),iket(:)
++ complex*16,allocatable :: radial(:,:,:),angular(:,:,:)
++end type
++type(cache_t) :: nsp_geometry(1)
++complex*16 :: VPts(2,2,1,1),WPts(2,2,1,1)
++! Match production one-based bounds, including the first-record test.
++integer :: lpv(1,1)=0,lv(1,1)=0,llv(1,1)=0,mmv(1,1)=0,Nhmx(1)
++end module
++'''
++names=['BuildWindowResponseMatrices','ComputeNormalizationDerivative',
++       'BuildNormalizationAdjoint','BuildNormalizationWindowResponseMatrices']
++sources=stubs+'\n'.join(routine('src/dmft2/l2mainSubs.f90',n) for n in names)
++for n in ['AccumulateDirectProjectorPair','AccumulateDirectProjectorSpectral']:
++    sources+=routine('src/dmft2/cmp_dmft_weights.f90',n)
++for n in ['c_alpha_m','C_factor','build_nsp_geometry']:
++    sources+=routine('src/dmft2/stress_kernels.f90',n)
++sources+='''
++subroutine init_audit_fact()
++use fact
++implicit none
++integer :: i
++fct=0d0
++fct(1)=1d0
++do i=3,99,2
++ fct(i)=fct(i-2)*dble((i-1)/2)
++enddo
++end subroutine
++subroutine angular_probe(lb,mb,lk,mk,lp,mp,rad,ang)
++use w_atpar
++implicit none
++integer,intent(in) :: lb,mb,lk,mk,lp,mp
++complex*16,intent(out) :: rad(3,3),ang(3,3)
++integer :: it
++if (allocated(nsp_geometry(1)%ih)) deallocate(nsp_geometry(1)%ih, &
++ nsp_geometry(1)%ibra,nsp_geometry(1)%iket,nsp_geometry(1)%radial, &
++ nsp_geometry(1)%angular)
++nsp_geometry(1)%ready=.false.
++lpv(1,1)=lb;lv(1,1)=lk;llv(1,1)=lp;mmv(1,1)=mp;Nhmx(1)=1
++VPts=1d0;WPts=1d0
++call build_nsp_geometry(1)
++rad=0d0;ang=0d0
++do it=1,nsp_geometry(1)%nterm
++ if(nsp_geometry(1)%ibra(it)/=lb*(lb+1)+mb+1) cycle
++ if(nsp_geometry(1)%iket(it)/=lk*(lk+1)+mk+1) cycle
++ rad=nsp_geometry(1)%radial(:,:,it)
++ ang=nsp_geometry(1)%angular(:,:,it)
++enddo
++end subroutine
++'''
++g2=(ROOT/'src/dmft2/stress_g2_matrices.f90').read_text()
++newmodule='''module g2_angular_test_module
++use iso_fortran_env,only: dp=>real64
++implicit none
++integer,parameter :: axis_a(6)=[1,2,3,2,1,1],axis_b(6)=[1,2,3,3,3,2]
++complex(dp),parameter :: one=(1._dp,0._dp),zero=(0._dp,0._dp)
++contains
++'''
++for name in ['gauss_legendre_stress','g2_angular_tables']:
++    match=re.search(rf'^  subroutine {name}\(.*?^  end subroutine$',g2,re.M|re.S|re.I)
++    if not match:raise RuntimeError(name)
++    newmodule+=match.group(0)+'\n'
++sources=newmodule+'end module\n'+sources
++sources+='''
++subroutine quadrature_probe(lb,mb,lk,mk,lp,mp,rad,ang)
++use g2_angular_test_module
++implicit none
++integer,intent(in) :: lb,mb,lk,mk,lp,mp
++complex(dp),intent(out) :: rad(3,3),ang(3,3)
++complex(dp),allocatable :: ag(:,:),ar(:,:,:),aa(:,:,:)
++integer :: lmax,nh,i,j,q,a,b
++lmax=max(lb,lk);nh=(lmax+1)**2
++allocate(ag(nh,nh),ar(nh,nh,6),aa(nh,nh,6))
++call g2_angular_tables(lmax,lp,mp,one,zero,ag,ar,aa)
++i=lb*(lb+1)+mb+1;j=lk*(lk+1)+mk+1
++rad=zero;ang=zero
++do q=1,6
++ a=axis_a(q);b=axis_b(q)
++ rad(a,b)=ar(i,j,q);rad(b,a)=ar(i,j,q)
++ ang(a,b)=aa(i,j,q);ang(b,a)=aa(i,j,q)
++enddo
++deallocate(ag,ar,aa)
++end subroutine
++'''
++(OUT/'extracted_routines.f90').write_text(sources)
++files=[ROOT/'src/dmft2'/x for x in ['gaunt.f90','t3j.f90','notri.f90','ylm.f90']]
++import shutil,sys
++compiler=os.environ.get('FC',shutil.which('gfortran') or 'gfortran')
++cmd=[compiler,'-O0','-g','-fcheck=all','-ffree-line-length-none',
++     '-shared','-fPIC',str(OUT/'extracted_routines.f90'),*map(str,files),
++     *(['-framework','Accelerate'] if sys.platform=='darwin' else ['-llapack','-lblas']),'-o',str(OUT/'audit_routines.dylib')]
++subprocess.run(cmd,cwd=OUT,check=True)
++manifest={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in
++          [ROOT/'src/dmft2/l2mainSubs.f90',ROOT/'src/dmft2/stress_kernels.f90',ROOT/'src/dmft2/stress_g2_matrices.f90',ROOT/'src/dmft2/cmp_dmft_weights.f90',*files]}
++(OUT/'source_hashes.json').write_text(json.dumps(manifest,indent=2)+'\n')
++print('Compiled current production routines with bounds checking in',OUT)
+--- /dev/null
++++ b/src/dmft2/tests/check_complete_g2.py
+@@ -0,0 +1,78 @@
++"""Validate actual cached G2 matrices and contractions with independent integrals.
++Requires NumPy/SciPy and a Fortran compiler. Writes only to EDMFT_STRESS_TEST_DIR.
++"""
++from pathlib import Path
++import os,sys,subprocess,shutil,re,json
++import numpy as np
++from scipy.special import sph_harm_y,gamma,gammainc
++HERE=Path(__file__).resolve().parent
++SRC=HERE.parent
++OUT=Path(os.environ['EDMFT_STRESS_TEST_DIR']);OUT.mkdir(exist_ok=True,parents=True)
++# Only expose the cache to this test program; all production arithmetic is unchanged.
++s=(SRC/'stress_g2_matrices.f90').read_text().replace('  private\n','  private\n  public :: atoms\n',1)
++(OUT/'g2_under_test.f90').write_text(s)
++s=(SRC/'stress_kernels.f90').read_text()
++m=re.search(r'^\s*subroutine C_factor\(.*?^\s*end subroutine C_factor',s,re.M|re.S|re.I)
++(OUT/'c_factor.f90').write_text(m.group(0))
++compiler=os.environ.get('FC',shutil.which('gfortran') or 'gfortran')
++cmd=[compiler,'-O0','-g','-fcheck=all','-ffree-line-length-none',str(HERE/'g2_fixture.f90'),str(OUT/'g2_under_test.f90'),str(OUT/'c_factor.f90'),str(SRC/'ylm.f90'),str(SRC/'atpar/rint13.f90'),str(HERE/'g2_fixture_main.f90'),*(['-framework','Accelerate'] if sys.platform=='darwin' else ['-llapack','-lblas']),'-o',str(OUT/'g2_fixture')]
++subprocess.run(cmd,cwd=OUT,check=True)
++subprocess.run([str(OUT/'g2_fixture')],cwd=OUT,check=True)
++with (OUT/'g2_fixture.bin').open('rb') as h:
++ def read(dtype,shape):return np.fromfile(h,dtype=dtype,count=int(np.prod(shape))).reshape(shape,order='F')
++ n,nb,nrad=read('i4',(3,));r0,dx=read('f8',(2,));rot=read('f8',(3,3))
++ ly=read('i4',(n,))-1;l=read('i4',(n,));p=read('i4',(n,));e=read('f8',(n,));partner=read('i4',(n,))-1
++ mats={}
++ for key,shape in [('s0',(n,n)),('sr',(n,n,6)),('sa',(n,n,6)),('v0',(n,n)),('vr',(n,n,6)),('va',(n,n,6))]:mats[key]=read('c16',shape)
++ a=read('c16',(9,nb));b=read('c16',(9,nb));c=read('c16',(9,nb,2))
++ da=read('c16',(9,nb,6));db=read('c16',(9,nb,6));dc=read('c16',(9,nb,2,6));eb=read('f8',(nb,))
++ kernels=[read('c16',(3,3,nb)) for _ in range(6)]
++ assert not h.read(1)
++alpha=.7+.2*p;beta=alpha[:,None]+alpha[None,:];power=l[:,None]+l[None,:]+2
++R=r0*np.exp((nrad-1)*dx)
++def integral(power):return gamma(power+1)*gammainc(power+1,beta*R)/beta**(power+1)
++radS=integral(power);radD=l[:,None]*radS-alpha[:,None]*integral(power+1)
++radV=.31*integral(power+2);radW=.31*(l[:,None]*integral(power+2)-alpha[:,None]*integral(power+3))
++x,w=np.polynomial.legendre.leggauss(32);phi=np.arange(64)*2*np.pi/64
++x,phi=np.meshgrid(x,phi,indexing='ij');w=np.repeat(w,64)*2*np.pi/64
++v=np.stack([np.sqrt(1-x*x)*np.cos(phi),np.sqrt(1-x*x)*np.sin(phi),x],axis=-1).reshape(-1,3)
++m=ly-l*(l+1)
++def harmon(vec):
++ th=np.arccos(np.clip(vec[:,2]/np.linalg.norm(vec,axis=1),-1,1));ph=np.arctan2(vec[:,1],vec[:,0])
++ return sph_harm_y(l[None,:],m[None,:],th[:,None],ph[:,None])
++y=harmon(v);vp=sph_harm_y(2,0,np.arccos(v[:,2]),np.arctan2(v[:,1],v[:,0]))
++axes=[(0,0),(1,1),(2,2),(1,2),(0,2),(0,1)]
++refs={'s0':radS*(ly[:,None]==ly[None,:]),'v0':radV*(y.conj().T@((w*vp)[:,None]*y))}
++for key in ['sr','sa','vr','va']:refs[key]=np.zeros((n,n,6),complex)
++for q,(aa,bb) in enumerate(axes):
++ gen=np.zeros((3,3));gen[aa,bb]+=.5;gen[bb,aa]+=.5
++ dy=(harmon(v@(np.eye(3)+1e-6*gen))-harmon(v@(np.eye(3)-1e-6*gen)))/(2e-6)
++ refs['sr'][:,:,q]=radD*(y.conj().T@((w*v[:,aa]*v[:,bb])[:,None]*y))
++ refs['sa'][:,:,q]=radS*(dy.conj().T@(w[:,None]*y))
++ refs['vr'][:,:,q]=radW*(y.conj().T@((w*vp*v[:,aa]*v[:,bb])[:,None]*y))
++ refs['va'][:,:,q]=radV*(dy.conj().T@((w*vp)[:,None]*y))
++errors={key:float(np.max(abs(mats[key]-ref))) for key,ref in refs.items()}
++for key,value in errors.items():assert value<2e-7,(key,value)
++coef=np.empty((n,nb),complex);deriv=np.empty((n,nb,6),complex)
++for i in range(n):
++ if p[i]==1:coef[i]=a[ly[i]];deriv[i]=da[ly[i]]
++ elif p[i]==2:coef[i]=b[ly[i]];deriv[i]=db[ly[i]]
++ else:coef[i]=c[ly[i],:,p[i]-3];deriv[i]=dc[ly[i],:,p[i]-3,:]
++deriv[:,:,:3]+=.5*coef[:,:,None]
++D=np.zeros((n,nb,3,3),complex)
++for q,(aa,bb) in enumerate(axes):D[:,:,aa,bb]=deriv[:,:,q];D[:,:,bb,aa]=deriv[:,:,q]
++D=np.einsum('ai,nkij,bj->nkab',rot,D,rot)
++HC=e[:,None]*coef
++for i,j in enumerate(partner):
++ if j>=0:HC[j]+=coef[i]
++HC-=coef*eb[None,:]
++expected=[]
++for q,(aa,bb) in enumerate(axes):
++ expect=[np.sum(D[:,:,aa,bb].conj()*(refs['s0']@HC),axis=0),np.sum(coef.conj()*(refs['sr'][:,:,q]@HC),axis=0),np.sum(coef.conj()*(refs['sa'][:,:,q]@HC),axis=0),np.sum(D[:,:,aa,bb].conj()*(refs['v0']@coef),axis=0),np.sum(coef.conj()*(refs['vr'][:,:,q]@coef),axis=0),np.sum(coef.conj()*(refs['va'][:,:,q]@coef),axis=0)]
++ for row,(actual,target) in enumerate(zip(kernels,expect)):
++  error=float(np.max(abs(actual[aa,bb]-target)))
++  assert error<2e-6,(q,row,error)
++  expected.append(error)
++result={'primitive_count':int(n),'two_LO_energies_per_l':True,'complex_pseudo_bands':int(nb),'nonidentity_local_axes':True,'matrix_max_errors':errors,'six_G2_contractions_max_error':max(expected)}
++(OUT/'complete_g2_results.json').write_text(json.dumps(result,indent=2)+'\n')
++print(json.dumps(result,indent=2));print('PASS: complete all-LO radial matrices and all six complex G2 contractions')
+--- /dev/null
++++ b/src/dmft2/tests/check_rank_deficient_gradient.py
+@@ -0,0 +1,29 @@
++"""Actual reconstruction routine on a rank-deficient U_W with exact static moments."""
++import ctypes as ct,json
++from pathlib import Path
++import numpy as np
++from scipy.linalg import eigh
++import os
++p=Path(os.environ['EDMFT_STRESS_TEST_DIR']);lib=ct.CDLL(str(p/'audit_routines.dylib'))
++F=lambda a:np.asfortranarray(a);I=lambda x:F(np.array([x],np.int32));Z=lambda s:np.zeros(s,complex,order='F')
++nb,nw,nc=6,3,2;energies=np.array([-1.4,-.9,-.25,.4,1.1,1.8])
++rng=np.random.default_rng(214);u=(rng.normal(size=(nb,nc))+1j*rng.normal(size=(nb,nc)))*.25
++u[:nw,1]=0;sig=np.array([[.3,.2+.1j],[.2-.1j,-.1]])
++eff=np.diag(energies[:nw])+u[:nw]@sig@u[:nw].conj().T
++val,v=eigh(eff);temp=.23;mu=-.5;rho=(v/(1+np.exp((val-mu)/temp)))@v.conj().T;rhoe=eff@rho
++cdirect=sig@u[:nw].conj().T@rho
++rr=Z((nb,nb));er=Z((nb,nb));g=Z((nw,nc,1))
++args=[rr,er,g,F(u[:,:,None]),F(rho),F(rhoe),F(energies),*[I(x) for x in [1,nb,1,nw,nb,nw,nc,1,nc,1]],I(1),I(nc),I(nc),F(np.arange(1,nc+1,dtype=np.int32)[:,None]),F(np.ones((nc,nc,1),np.int32)),F(cdirect.T[:,:,None]),I(1)]
++lib.buildwindowresponsematrices_(*[a.ctypes.data_as(ct.c_void_p) for a in args])
++cfit=g[:,:,0].T;dh=Z((nb,nb));dh[nw:,:nw]=(rng.normal(size=(nb-nw,nw))+1j*rng.normal(size=(nb-nw,nw)))*.2;dh[:nw,nw:]=dh[nw:,:nw].conj().T
++rot=dh[nw:,:nw]/(energies[:nw][None,:]-energies[nw:,None]);du=rot.conj().T@u[nw:]
++def fun(t):
++ en,vv=eigh(np.diag(energies)+t*dh);pp=vv[:,:nw].conj().T@u
++ vals=eigh(np.diag(en[:nw])+pp@sig@pp.conj().T,eigvals_only=True)
++ return -temp*np.logaddexp(0,-(vals-mu)/temp).sum()
++r={'rank_U_window':int(np.linalg.matrix_rank(u[:nw])),'orbital_dimension':nc,'B_reconstruction_residual':float(np.max(abs(u[:nw]@cfit-(rhoe-np.diag(energies[:nw])@rho)))),'C_error':float(np.max(abs(cfit-cdirect))),'functional_fd':float((fun(1e-5)-fun(-1e-5))/2e-5),'direct_C_contraction':float(2*np.trace(cdirect@du).real),'production_C_contraction':float(2*np.trace(cfit@du).real)}
++(p/'rank_deficient_C.json').write_text(json.dumps(r,indent=2)+'\n');print(json.dumps(r,indent=2))
++
++assert r['C_error']<1e-12,r
++assert abs(r['production_C_contraction']-r['functional_fd'])<1e-9,r
++print('PASS: direct C retains the rank-deficient null-space component')
+--- /dev/null
++++ b/src/dmft2/tests/check_stress_formulas.py
+@@ -0,0 +1,205 @@
++"""Regression checks using production Fortran and independent functional oracles."""
++import ctypes as ct
++import json
++from pathlib import Path
++import numpy as np
++from scipy.linalg import eigh
++from scipy.special import sph_harm_y
++
++import os
++HERE=Path(os.environ['EDMFT_STRESS_TEST_DIR'])
++lib=ct.CDLL(str(HERE/'audit_routines.dylib'))
++lib.init_audit_fact_()
++F=lambda x: np.asfortranarray(x)
++I=lambda x: np.asfortranarray(x,dtype=np.int32)
++Z=lambda shape: np.zeros(shape,complex,order='F')
++def call(name,*args):
++    getattr(lib,name+'_')(*[a.ctypes.data_as(ct.c_void_p) for a in args])
++def herm(a):return (a+a.conj().T)/2
++def invsqrt(a):
++    d,v=eigh(a);return (v/np.sqrt(d))@v.conj().T
++rng=np.random.default_rng(61037)
++def rand(*shape):return rng.normal(size=shape)+1j*rng.normal(size=shape)
++report={}
++
++# Verify matrix-square-root derivative against independently diagonalized endpoints.
++a=rand(3,3);s=a.conj().T@a+np.eye(3);ds=herm(rand(3,3));x=invsqrt(s)
++dxrel=Z((3,3,1,1));si=I(np.ones((3,3,1)))
++call('computenormalizationderivative',dxrel,F(ds[:,:,None,None]),F(x[:,:,None]),
++     si,I([3]),I([3]),I([1]),I([0]),I([1]))
++h=1e-5
++dxfd=(invsqrt(s+h*ds)-invsqrt(s-h*ds))/(2*h)
++dx=x@dxrel[:,:,0,0]
++report['normalization_sylvester']={'absolute_error':float(np.max(abs(dx-dxfd))),
++ 'hermiticity_error':float(np.max(abs(dx-dx.conj().T)))}
++
++# Adjoint identity with an independently computed Frechet derivative.
++m=rand(3,3);qbar=Z((3,3,1))
++call('buildnormalizationadjoint',qbar,F(m[:,:,None]),F(x[:,:,None]),si,I([3]),I([3]),I([1]))
++lhs=2*np.real(np.sum(m@np.eye(3)*np.linalg.solve(x,dxfd)))
++rhs=2*np.real(np.sum(qbar[:,:,0]*ds))
++report['normalization_adjoint']={'direct_fd':float(lhs),'adjoint':float(rhs),'error':float(abs(lhs-rhs))}
++
++# Exact finite-dimensional fixed-X projector example, no degeneracies.
++nb,nw,nc=6,3,2
++energies=np.array([-1.4,-.9,-.25,.4,1.1,1.8])
++u=rand(nb,nc)*.3;sig=herm(rand(nc,nc))*.35
++dH=np.zeros((nb,nb),complex);dH[nw:,:nw]=rand(nb-nw,nw)*.3;dH[:nw,nw:]=dH[nw:,:nw].conj().T
++eff=np.diag(energies[:nw])+u[:nw]@sig@u[:nw].conj().T
++ev,v=eigh(eff);temp=.23;chem=-.5;ff=1/(1+np.exp((ev-chem)/temp))
++rho=(v*ff)@v.conj().T;rhoe=eff@rho;c=sig@u[:nw].conj().T@rho
++rot=dH[nw:,:nw]/(energies[:nw][None,:]-energies[nw:,None])
++du=rot.conj().T@u[nw:]
++direct=2*np.real(np.trace(c@du))
++
++def window_code(u,rho,rhoe,dh):
++    rr=Z((nb,nb));er=Z((nb,nb));grad=Z((nw,nc,1))
++    call('buildwindowresponsematrices',rr,er,grad,F(u[:,:,None]),F(rho),F(rhoe),F(energies),
++         *[I([q]) for q in [1,nb,1,nw,nb,nw,nc,1,nc,1]],
++         I([1]),I([nc]),I([nc]),I(np.arange(1,nc+1)[:,None]),I(np.ones((nc,nc,1))),F((sig@u[:nw].conj().T@rho).T[:,:,None]),I([1]))
++    return float(np.trace(rr@dh).real),float(np.max(abs(grad[:,:,0].T-(sig@u[:nw].conj().T@rho)))),rr,er
++code,cerr,rr,er=window_code(u,rho,rhoe,dH)
++
++def endpoint(t):
++    en,vv=eigh(np.diag(energies)+t*dH)
++    # Set each near-identity KS state to positive overlap with the reference.
++    vv=vv*np.exp(-1j*np.angle(np.diag(vv)))[None,:]
++    pp=vv[:,:nw].conj().T@u
++    en2=eigh(np.diag(en[:nw])+pp@sig@pp.conj().T,eigvals_only=True)
++    return -temp*np.logaddexp(0,-(en2-chem)/temp).sum(),pp
++fd=(endpoint(1e-5)[0]-endpoint(-1e-5)[0])/2e-5
++dufd=(endpoint(1e-5)[1]-endpoint(-1e-5)[1])/2e-5
++phase=np.exp(1j*np.array([.23,-.8,1.2,.6,-1.5,.9]));q=np.diag(phase);qw=q[:nw,:nw]
++codephase,_,_,_=window_code(q.conj().T@u,qw.conj().T@rho@qw,qw.conj().T@rhoe@qw,q.conj().T@dH@q)
++corrected_rr=rr.conj()
++report['fixed_X_window']={'functional_fd':float(fd),'correct_projector_derivative':float(direct),
++ 'production_matrix_pair':code,'production_after_band_rephase':codephase,
++ 'legacy_transposed_matrix_pair':float(np.trace(corrected_rr@dH).real),
++ 'projector_derivative_fd_error':float(np.max(abs(du-dufd))),
++ 'C_reconstruction_error':cerr}
++
++# The same outside-window orientation in the global-normalization branch.
++qb=herm(rand(nc,nc));rrn=Z((nb,nb));ern=Z((nb,nb));gn=Z((nw,nc,1));wg=.37
++call('buildnormalizationwindowresponsematrices',rrn,ern,gn,F(u[:,:,None]),
++     F(qb.conj()[:,:,None]),F([wg]),F(energies),
++     *[I([q]) for q in [1,nb,1,nw,nb,nw,nc,1,nc,1]],
++     I([1]),I([nc]),I([nc]),I(np.arange(1,nc+1)[:,None]))
++ds=wg*(du.conj().T@u[:nw]+u[:nw].conj().T@du)
++normal_direct=2*np.real(np.trace(qb@ds))
++normal_fd=2*np.real(np.trace(qb@(wg*(endpoint(1e-5)[1].conj().T@endpoint(1e-5)[1]-endpoint(-1e-5)[1].conj().T@endpoint(-1e-5)[1])/2e-5)))
++report['normalization_window']={'direct_derivative':float(normal_direct),'finite_difference':float(normal_fd),
++ 'gradient_contraction':float(2*np.real(np.sum(gn[:,:,0]*du))),
++ 'production_matrix_pair':float(np.trace(rrn@dH).real),
++ 'legacy_transposed_matrix_pair':float(np.trace(rrn.conj()@dH).real)}
++
++# Direct angular quadrature, independent of the Gaunt summation in the code.
++cth,ww=np.polynomial.legendre.leggauss(32);ph=np.arange(64)*2*np.pi/64
++cth,ph=np.meshgrid(cth,ph,indexing='ij');ww=np.repeat(ww,64)*2*np.pi/64
++vec=np.stack([np.sqrt(1-cth**2)*np.cos(ph),np.sqrt(1-cth**2)*np.sin(ph),cth],axis=-1).reshape((-1,3))
++def ylm(l,m,vec):
++    theta=np.arccos(np.clip(vec[:,2]/np.linalg.norm(vec,axis=1),-1,1))
++    phi=np.arctan2(vec[:,1],vec[:,0]);return sph_harm_y(l,m,theta,phi)
++angular_rows=[]
++quadrature_rows=[]
++for lb,mb,lk,mk,lp,mp in [(1,1,1,0,2,1),(1,1,1,-1,2,0),(2,1,2,-1,2,0),
++                           (2,0,2,0,2,0),(4,0,4,0,2,0),(8,0,8,0,2,0),(8,1,8,1,2,0),(0,0,0,0,2,0)]:
++    rad=Z((3,3));ang=Z((3,3))
++    call('angular_probe',*[I([q]) for q in [lb,mb,lk,mk,lp,mp]],rad,ang)
++    radref=Z((3,3));angref=Z((3,3))
++    yb=ylm(lb,mb,vec);yk=ylm(lk,mk,vec);yp=ylm(lp,mp,vec)
++    for aa in range(3):
++        for bb in range(3):
++            gen=np.zeros((3,3));gen[aa,bb]+=.5;gen[bb,aa]+=.5
++            eps=1e-6
++            dy=(ylm(lb,mb,vec@(np.eye(3)+eps*gen))-ylm(lb,mb,vec@(np.eye(3)-eps*gen)))/(2*eps)
++            radref[aa,bb]=np.sum(ww*yb.conj()*vec[:,aa]*vec[:,bb]*yp*yk)
++            angref[aa,bb]=np.sum(ww*dy.conj()*yp*yk)
++    radquad=Z((3,3));angquad=Z((3,3))
++    call('quadrature_probe',*[I([q]) for q in [lb,mb,lk,mk,lp,mp]],radquad,angquad)
++    quadrature_rows.append({'channel':[lb,mb,lk,mk,lp,mp],'radial_max_error':float(np.max(abs(radquad-radref))),'angular_max_error':float(np.max(abs(angquad-angref)))})
++    angular_rows.append({'channel':[lb,mb,lk,mk,lp,mp],
++      'radial_max_error':float(np.max(abs(rad-radref))),
++      'angular_max_error':float(np.max(abs(ang-angref))),
++      'radial_xy':[str(rad[0,1]),str(radref[0,1])],
++      'radial_yz':[str(rad[1,2]),str(radref[1,2])],
++      'angular_trace':[str(np.trace(ang)),str(np.trace(angref))]})
++report['nonspherical_geometry']=angular_rows
++report['complete_G2_angular_integrals']=quadrature_rows
++# General nonsingular basis change: stationarity cancels all coefficient terms.
++t=rand(nw,nw)*.1
++hprime=t.conj().T@np.diag(energies[:nw])+np.diag(energies[:nw])@t
++oprime=t.conj().T+t
++uprime=t.conj().T@u[:nw]
++oneparticle=np.trace(rho@hprime-rhoe@oprime).real
++projector=2*np.trace(c@uprime).real
++report['basis_connection_cancellation']={'oneparticle':float(oneparticle),'projector':float(projector),'sum':float(oneparticle+projector)}
++# Normalization in a nonorthogonal band frame: the metric is indispensable.
++praw=u[:nw]
++ds_naive=uprime.conj().T@praw+praw.conj().T@uprime
++ds_metric=ds_naive-praw.conj().T@oprime@praw
++report['normalization_metric_identity']={'naive_derivative_norm':float(np.linalg.norm(ds_naive)),'metric_complete_derivative_norm':float(np.linalg.norm(ds_metric))}
++
++# Generalized Hermitian eigenproblem: validate both H' and O' blocks.
++dO=np.zeros((nb,nb),complex);dO[nw:,:nw]=rand(nb-nw,nw)*.1;dO[:nw,nw:]=dO[nw:,:nw].conj().T
++rg=(dH[nw:,:nw]-dO[nw:,:nw]*energies[:nw][None,:])/(energies[:nw][None,:]-energies[nw:,None])
++dug=rg.conj().T@u[nw:]
++def generalized_endpoint(t):
++    en,vv=eigh(np.diag(energies)+t*dH,np.eye(nb)+t*dO)
++    pp=vv[:,:nw].conj().T@u
++    vals=eigh(np.diag(en[:nw])+pp@sig@pp.conj().T,eigvals_only=True)
++    return -temp*np.logaddexp(0,-(vals-chem)/temp).sum()
++report['generalized_window_H_and_O']={'functional_fd':float((generalized_endpoint(1e-5)-generalized_endpoint(-1e-5))/2e-5),'direct_projector':float(2*np.trace(c@dug).real),'production_H_minus_O':float(np.trace(rr@dH-er@dO).real),'legacy_transposed_H_minus_O':float(np.trace(rr.conj()@dH-er.conj()@dO).real)}
++# Default normalization response must include the within-window metric,
++# not just the complementary-band rotation.  Differentiate the selected
++# generalized-eigenvector span at independent endpoints, including O'_WW.
++metric_change=herm(np.arange(nb*nb).reshape(nb,nb)*.0007+1j*dH*.21)
++metric_change[:nw,:nw]+=np.diag([.07,-.03,.05])
++def normalization_endpoint(t):
++    _,vv=eigh(np.diag(energies)+t*dH,np.eye(nb)+t*metric_change)
++    pw=vv[:,:nw].conj().T@u
++    return 2*wg*np.trace(qb@pw.conj().T@pw).real
++norm_metric_fd=(normalization_endpoint(1e-5)-normalization_endpoint(-1e-5))/2e-5
++norm_metric_actual=np.trace(rrn@dH-ern@metric_change).real
++report['normalization_window_metric']={
++    'functional_fd':float(norm_metric_fd),
++    'production_H_minus_O':float(norm_metric_actual),
++    'absolute_error':float(abs(norm_metric_actual-norm_metric_fd))}
++assert abs(norm_metric_actual-norm_metric_fd)<1e-9,report['normalization_window_metric']
++print(json.dumps(report,indent=2))
++(HERE/'results.json').write_text(json.dumps(report,indent=2)+'\n')
++
++# These are independent physical/algebraic oracles, not snapshots of the code.
++assert report['normalization_sylvester']['absolute_error']<1e-9
++assert report['normalization_adjoint']['error']<1e-9
++w=report['fixed_X_window']
++assert abs(w['production_matrix_pair']-w['functional_fd'])<1e-9,w
++assert abs(w['production_after_band_rephase']-w['functional_fd'])<1e-9,w
++assert w['C_reconstruction_error']<1e-10,w
++w=report['normalization_window']
++assert abs(w['production_matrix_pair']-w['finite_difference'])<1e-9,w
++w=report['generalized_window_H_and_O']
++assert abs(w['production_H_minus_O']-w['functional_fd'])<1e-9,w
++for table in ['nonspherical_geometry','complete_G2_angular_integrals']:
++ for row in report[table]:
++  assert row['radial_max_error']<1e-9,row
++  assert row['angular_max_error']<1e-8,row
++assert abs(report['basis_connection_cancellation']['sum'])<1e-12
++assert report['normalization_metric_identity']['metric_complete_derivative_norm']<1e-12
++print('PASS: complex window, generalized H/O, phase covariance, normalization, and G2 angular identities')
++
++# The production direct-C accumulators must differentiate the log determinant,
++# including the ordered advanced/negative-frequency factor for complex Sigma.
++uc=rand(4,2)*.2;su=herm(rand(2,2))*.2-1j*np.eye(2)*.11
++h0=np.diag([-1.2,-.3,.4,1.1]);z=.15+.31j;uuprime=rand(4,2)*.1
++g=np.linalg.inv(z*np.eye(4)-h0-uc@su@uc.conj().T)
++for routine,kind in [('accumulatedirectprojectorpair','matsubara'),('accumulatedirectprojectorspectral','real_axis')]:
++ cp=Z((2,4,1));work=[Z((2,4)) for _ in range(4)]
++ call(routine,cp,F(g),F(uc[:,:,None]),F(su[:,:,None]),I([2]),I([4]),I([2]),I([1]),*work)
++ def functional(t):
++  v=uc+t*uuprime
++  ld=np.log(np.linalg.det(z*np.eye(4)-h0-v@su@v.conj().T))
++  return -2*ld.real if kind=='matsubara' else ld.imag/np.pi
++ fd=(functional(1e-5)-functional(-1e-5))/2e-5
++ predicted=2*np.trace(cp[:,:,0]@uuprime).real
++ assert abs(fd-predicted)<1e-9,(kind,fd,predicted)
++ print('PASS: direct C',kind,'log-determinant derivative',fd,predicted)
+--- /dev/null
++++ b/src/dmft2/tests/g2_fixture.f90
+@@ -0,0 +1,66 @@
++! Small all-channel fixture: real radial functions with exact gamma-function
++! integrals, two distinct LO energies for every l, and a Y20 potential.
++module param
++ integer,parameter :: nrad=801,nloat=2,lmax2=2,lomax=2,ncom=2
++ character(180) :: filename_V_vns='unused'
++end module
++module com
++ integer,parameter :: nat=1
++ logical :: rel=.false.
++end module
++module com_mpi
++ integer :: myrank=0,master=0
++end module
++module structure
++ use param
++ integer :: jri(1)=[nrad],iatnr(1)=[-1]
++ real(8) :: r0(1),dx(1)=[0.012d0],rotloc(3,3,1)
++end module
++module lo
++ use param
++ integer :: ilo(0:lmax2)=nloat
++ logical :: loor(nloat,0:lomax)=.true.
++ real(8) :: elo(0:lomax,nloat)
++end module
++module atspdt
++ use param
++ real(8) :: el(0:lmax2)
++end module
++module w_atpar
++ use param
++ real(8) :: w_rrad1(nrad,0:lmax2,1),w_rrad2(nrad,0:lmax2,1), &
++ w_rade1(nrad,0:lmax2,1),w_rade2(nrad,0:lmax2,1), &
++ w_radp1(nrad,0:lmax2,1),w_radp2(nrad,0:lmax2,1), &
++ w_radpe1(nrad,0:lmax2,1),w_radpe2(nrad,0:lmax2,1), &
++ w_a1lo(nrad,nloat,0:lomax,1),w_b1lo(nrad,nloat,0:lomax,1), &
++ w_ap1lo(nrad,nloat,0:lomax,1),w_bp1lo(nrad,nloat,0:lomax,1), &
++ ri_mat(2+nloat,2+nloat,0:lmax2,1)
++ integer :: w_lm(2,ncom,1),w_lmmax(1)=[2],Nhmx(1)=[0]
++ integer :: lpv(1,1),lv(1,1),mpv(1,1),mv(1,1)
++ complex(8) :: Vts(2+nloat,2+nloat,1,1)
++contains
++ subroutine retrieve_w_atpar(jatom,lfirst,lmmax)
++ integer,intent(in) :: jatom
++ integer,intent(out) :: lfirst,lmmax
++ lfirst=1;lmmax=2
++ end subroutine
++end module
++module readPotential
++ use structure,only: r0,dx
++contains
++ subroutine init_V_vns(fname,unit)
++ character(*),intent(in) :: fname
++ integer,intent(in) :: unit
++ end subroutine
++ subroutine close_V_vns()
++ end subroutine
++ subroutine read_V_vns(v,jatom,nrad,nr,nlm)
++ integer,intent(in) :: jatom,nrad,nr,nlm
++ real(8),intent(out) :: v(nrad,0:nlm-1)
++ integer :: i
++ v=0
++ do i=1,nr
++ v(i,1)=0.31d0*(r0(1)*exp((i-1)*dx(1)))**2
++ enddo
++ end subroutine
++end module
+--- /dev/null
++++ b/src/dmft2/tests/g2_fixture_main.f90
+@@ -0,0 +1,72 @@
++program test_complete_g2
++ use param
++ use structure
++ use lo
++ use atspdt
++ use w_atpar
++ use stress_g2_matrices
++ implicit none
++ integer,parameter :: nb=3,nh=(lmax2+1)**2
++ integer :: i,j,l,p,ir,n,unit,iq
++ real(8) :: r(nrad),f(nrad,4,0:lmax2),deriv(nrad,4,0:lmax2),z(nrad),alpha
++ real(8) :: benergy(nb)
++ real(8),external :: rint13n
++ complex(8) :: a(nh,nb),b(nh,nb),c(nh,nb,nloat),sa(nh,nb,6),sb(nh,nb,6),sc(nh,nb,nloat,6)
++ complex(8) :: sph(3,3,nb),ns0(3,3,nb),nsr(3,3,nb),nsa(3,3,nb)
++ complex(8) :: sp0(3,3,nb),spr(3,3,nb),spa(3,3,nb)
++ r0(1)=2.1d0*exp(-(nrad-1)*dx(1));z=0
++ rotloc=0;do i=1,3;rotloc(i,i,1)=1;enddo
++ ! A nontrivial local frame also tests the Cartesian-to-local matching map.
++ rotloc(1,1,1)=cos(.37d0);rotloc(2,2,1)=cos(.37d0)
++ rotloc(1,2,1)=-sin(.37d0);rotloc(2,1,1)=sin(.37d0)
++ do ir=1,nrad;r(ir)=r0(1)*exp((ir-1)*dx(1));enddo
++ w_lm(:,1,1)=[0,0];w_lm(:,2,1)=[2,0]
++ w_rrad2=0;w_rade2=0;w_b1lo=0;w_radp2=0;w_radpe2=0;w_bp1lo=0
++ do l=0,lmax2
++ el(l)=.3d0+.11d0*l
++ do p=1,4
++ alpha=.7d0+.2d0*p
++ f(:,p,l)=r**(l+1)*exp(-alpha*r)
++ deriv(:,p,l)=(l-alpha*r)*f(:,p,l)/r
++ enddo
++ w_rrad1(:,l,1)=f(:,1,l);w_rade1(:,l,1)=f(:,2,l)
++ w_radp1(:,l,1)=deriv(:,1,l);w_radpe1(:,l,1)=deriv(:,2,l)
++ do p=1,nloat
++ w_a1lo(:,p,l,1)=f(:,p+2,l);w_ap1lo(:,p,l,1)=deriv(:,p+2,l)
++ elo(l,p)=1.3d0+.21d0*l+.6d0*p
++ enddo
++ do i=1,4
++ do j=1,4
++ ri_mat(i,j,l,1)=rint13n(nrad,f(:,i,l),z,f(:,j,l),z,r0(1),dx(1),.false.)
++ enddo
++ enddo
++ enddo
++ call prepare_g2_matrices()
++ n=atoms(1)%n
++ open(newunit=unit,file='g2_fixture.bin',access='stream',form='unformatted',status='replace')
++ write(unit) n,nb,nrad,r0(1),dx(1),rotloc(:,:,1)
++ write(unit) atoms(1)%ly,atoms(1)%l,atoms(1)%primitive,atoms(1)%energy,atoms(1)%u_partner
++ write(unit) atoms(1)%s0,atoms(1)%sr,atoms(1)%sa,atoms(1)%v0,atoms(1)%vr,atoms(1)%va
++ do i=1,nh
++ do j=1,nb
++ a(i,j)=cmplx(sin(.17d0*i*j),cos(.13d0*(i+j)),8)
++ b(i,j)=cmplx(cos(.19d0*i*j),sin(.31d0*(i+j)),8)*.3d0
++ do p=1,nloat
++ c(i,j,p)=cmplx(cos(.11d0*(i+j+p)),sin(.23d0*i*j*p),8)*.2d0
++ enddo
++ do iq=1,6
++ sa(i,j,iq)=a(i,j)*cmplx(.1d0*iq,.03d0*(i-j),8)
++ sb(i,j,iq)=b(i,j)*cmplx(.07d0*iq,.02d0*(j-i),8)
++ do p=1,nloat
++ sc(i,j,p,iq)=c(i,j,p)*cmplx(.05d0*(p+iq),.01d0*(j-i),8)
++ enddo
++ enddo
++ enddo
++ enddo
++ benergy=[-.4d0,.2d0,1.1d0]
++ call evaluate_g2(1,1,nb,a,b,c,sa,sb,sc,benergy,sph,ns0,nsr,nsa,sp0,spr,spa,.true.)
++ write(unit) a,b,c,sa,sb,sc,benergy
++ write(unit) sp0,spr,spa,ns0,nsr,nsa
++ close(unit)
++ call release_g2_matrices()
++end program

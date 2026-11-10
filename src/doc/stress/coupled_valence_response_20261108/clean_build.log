@@ -1,0 +1,5 @@
+/opt/homebrew/bin/gfortran -O3 -fPIC -fopenmp -ffree-line-length-none -c outwin.f90
+/opt/homebrew/bin/gfortran -O3 -fPIC -fopenmp -ffree-line-length-none -c outwin_response.f90
+/opt/homebrew/bin/gfortran -O3 -fPIC -fopenmp -ffree-line-length-none -c lapw_radial_response.f90
+/opt/homebrew/bin/gfortran -O3 -fPIC -fopenmp -ffree-line-length-none -c lapw_radial_capi.f90
+/opt/homebrew/bin/gfortran -shared -fopenmp -o liblapw_response.so outwin.o outwin_response.o lapw_radial_response.o lapw_radial_capi.o

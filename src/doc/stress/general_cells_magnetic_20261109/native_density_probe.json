@@ -1,0 +1,30 @@
+{
+  "MnTe": {
+    "analytic_Ry": -342.2385219101505,
+    "charge_direction": -2.040034807748725e-15,
+    "endpoints": {
+      "0.001": {
+        "finite_difference_Ry": -342.2385249996296,
+        "error_Ry": -3.0894790938873484e-06
+      },
+      "0.0005": {
+        "finite_difference_Ry": -342.2385199992277,
+        "error_Ry": 1.910922776460211e-06
+      }
+    }
+  },
+  "MnO": {
+    "analytic_Ry": -27.207294289658087,
+    "charge_direction": 4.2327252813834093e-16,
+    "endpoints": {
+      "0.001": {
+        "finite_difference_Ry": -27.207295000039267,
+        "error_Ry": -7.103811796582704e-07
+      },
+      "0.0005": {
+        "finite_difference_Ry": -27.207300000100076,
+        "error_Ry": -5.710441989492665e-06
+      }
+    }
+  }
+}

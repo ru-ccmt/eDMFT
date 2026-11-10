@@ -1,0 +1,203 @@
+FULL TANGENT-FUNCTIONAL POTENTIAL PROBE: FIXED VERSUS REBUILT PROJECTOR
+SrVO3, 7 November 2026
+
+Result
+======
+The independent full trace-log endpoint calculation confirms the previously
+predicted finite-window projector contribution. At h=3e-5, for a perturbation
+of t Ry in the interstitial and zero in every muffin tin:
+
+  Fixed physical embedding, tangent-functional slope   0.00000129010 Ry
+  Rebuilt window and normalization, slope              0.02120707012 Ry
+  Difference                                          0.02120578002 Ry
+  Analytic projector prediction                        0.02120593565 Ry
+
+The difference agrees to 1.56e-7 Ry, approximately 7.3 parts per million.
+Unlike the preceding probe, the endpoint values here are full nonlinear
+trace-log evaluations, not just projector differences contracted with a
+central gradient. The reference density counterterm uses the computed
+central lattice density, removing ordinary SCF charge mismatch by construction.
+
+This confirms a potential-dependent finite-window functional gradient in
+the specified fixed-basis, frozen-self-energy, stored-band setting. It does
+not determine a pressure correction or establish the source of the entire
+analytic-versus-numerical stress discrepancy.
+
+What 'window motion' means
+==========================
+The window indices remain [12,31] at all endpoints. No band crosses a boundary.
+The smallest inside/outside energy gap is 0.05642 Ry, safely larger than the
+test amplitudes. The spectral projector is
+
+  Pi_W(t) = sum_(n=12)^31 |psi_n(t)><psi_n(t)|.
+
+The span of these eigenvectors can change although their indices do not.
+At first order,
+
+  delta Pi_W = sum_(n in W,a outside W)
+      |a><a|delta V|n><n|/(epsilon_n-epsilon_a) + Hermitian conjugate.
+
+Rotations within W cancel in Pi_W. Only couplings between W and its
+complement enter. This is a change of subspace, not an energy-cutoff crossing
+and not an arbitrary phase/gauge choice for KS eigenvectors.
+
+The interstitial-only constant is not a uniform potential shift:
+
+  <a|delta V|n> = t Ry integral_interstitial psi_a^* psi_n.
+
+Orthogonality sets the integral over the entire cell to zero for a!=n;
+it does not set the interstitial integral alone to zero. Thus this bounded,
+local potential perturbation can mix selected and excluded states. A truly
+uniform potential shift has delta V_an=t Ry delta_an and does not change Pi_W.
+
+The physical localized orbital used in the finite-window embedding is
+
+  Phi_W(t) = Pi_W(t) phi X(t),
+
+with phi fixed and X the symmetry-averaged global normalization. Changing
+Pi_W changes the real-space truncated orbital and generally X as well.
+Holding the numerical projector matrix fixed in a changing KS basis would
+NOT hold this physical embedding fixed.
+
+Functional and two paths
+========================
+All calculations use the original central KS basis as one fixed orthonormal
+Hilbert space of 43 stored bands at 75 irreducible k points. Geometry, radial
+basis, local orbitals, linearization energies, effective self-energy and mu
+are fixed. The potential has no change inside MT spheres, so it does not
+require changing the spherical radial input. There is no charge iteration,
+impurity solve, source change, or change of original material inputs.
+
+Let M_k be the interstitial characteristic-function matrix. Set
+
+  H_k(t)=diag(epsilon_k)+t M_k.
+  B_0k = central normalized projector in W, zero outside W.
+
+Path A: B_k(t)=B_0k in the original central Hilbert space. Therefore the
+physical operator B_0 Sigma(iw) B_0^dagger is fixed even though H changes.
+
+Path B: diagonalize H_k(t), form Pi_W(t), project the same full stored raw
+orbital coefficients q_k, and rebuild the global normalization:
+
+  Q_k(t)=Pi_W(t) q_k,
+  S(t)=Sym sum_k w_k Q_k(t)^dagger Q_k(t),
+  B_k(t)=Q_k(t) S(t)^(-1/2).
+
+The active local space is xz,yz,xy. For the P4mm reference, the forward orbital
+average replaces the xz/yz block by their mean times the identity, preserves
+the xy diagonal, and removes forbidden off-diagonals. The central saved X
+differs from the fresh inverse square root by only ~1e-8 in the normalized
+metric. To compare exactly at the saved central state, S(t) is anchored with
+a constant offset Ssaved-S(0), norm 6.51e-9. A separate completely fresh-X
+endpoint check changes the reported slope by less than 1e-9 Ry.
+
+For each path, evaluate the lattice grand trace-log F_sp(t). The frozen-Sigma
+impurity tangent cancels the -Tr(Sigma g) term. The density, Hxc energy and
+ionic terms are fixed in this potential-direction probe; their only
+t-dependent contribution is the density-potential counterterm. Therefore
+
+  K_test(t)-K_test(0) = F_sp(t)-F_sp(0)
+                         -t sum_k Tr(rho_0k M_k).
+
+rho_0k is exported from production dmft2 and already includes spin/k weights.
+This is the full frozen-Sigma tangent-functional difference along this
+fixed-density, fixed-geometry potential direction, within the stored basis.
+It is not the full impurity functional away from its tangent reference.
+
+The ordinary density slope is 6.39106216025 Ry per unit t. Path A F_sp itself
+is NOT flat: it has this ordinary first-order potential energy. It is the
+counterterm-subtracted K_test that should be stationary for a fixed physical
+projector. Path B additionally varies the physical correlated embedding.
+
+Independent numerical evaluation
+================================
+The Python evaluator uses Hermitian eigendecomposition of
+
+  H_inf=H+B Sigma_inf B^dagger
+
+and the determinant lemma to evaluate the dynamical trace-log through a
+3-by-3 determinant at every retained Matsubara frequency:
+
+  F_sp = -T sum_j log[1+exp(-(E_inf,j-mu)/T)]
+    -2T sum_(w>0) weight_w log|det[1-g_inf,loc(iw) DeltaSigma(iw)]|
+    + the production high-frequency completion.
+
+g_inf,loc=B^dagger(iw+mu-H_inf)^(-1)B. k weights and spin degeneracy are
+included once. The self-energy is the frozen sig.inp1, with its last sentinel
+record defining Sigma_inf. Its three GOOD tail moments are independently
+refitted from the final24 points. The 500 retained-frequency quadrature
+covers2387 consecutive positive frequencies, with200 dense points and cubic
+cardinal weights in inverse frequency afterwards. Generated weights match
+the printed production extrema and sum. The rational-pole tail completion
+uses the same C0=1 Ry convention as cmp_dmft_weights.f90.
+
+Central scalar validation:
+  Independent F_sp+mu*N = -27.9573399088952 Ry
+  Production :VSUM     = -27.957339909     Ry
+  Difference            = 1.05e-10 Ry, within printed precision.
+
+Centered finite-difference slopes in Ry per unit perturbation t:
+
+  h        K_fixed'        K_rebuilt'      rebuilt-minus-fixed
+  1e-3     1.07780e-6      0.02120686609   0.02120578829
+  3e-4     1.27116e-6      0.02120705205   0.02120578089
+  1e-4     1.28827e-6      0.02120706842   0.02120578016
+  3e-5     1.29010e-6      0.02120707012   0.02120578002
+
+The small fixed-embedding residual has been retained, not forced to zero.
+At the smallest step its value is almost exactly the derivative of the
+free-energy tail completion (1.29025e-6 Ry). The ordinary production density
+does not include that same derivative. Finite-step and frequency-completion
+differences therefore limit exact finite-quadrature stationarity, but are
+much smaller than the 0.0212 Ry projector signal. No tail source change was
+made in this test. The ~1.6e-7 Ry analytic-versus-FD projector discrepancy
+should likewise not be advertised as roundoff agreement.
+
+Controls explaining the effect
+==============================
+1. Spatially uniform potential shift: rebuilt-minus-fixed slope is below
+   6e-12 Ry. Physical projector change is below3.6e-15. Its total fixed-path
+   residual includes the same finite-step/tail issues described above.
+
+2. Remove all W-to-complement matrix elements of the interstitial perturbation:
+   rebuilt-minus-fixed slope is zero at printed double precision.
+
+3. Retain ONLY those W-to-complement matrix elements:
+   rebuilt-minus-fixed slope is0.02120578017 Ry, reproducing the full local
+   perturbation's first-order extra slope. Controls2/3 are algebraic band
+   matrix separations, not separately asserted to be local potentials.
+
+4. Enlarge the window to the entire retained43-band space, rebuilding the
+   corresponding reference normalized orbitals: Pi_W=identity in this
+   finite space. Rebuilt-minus-fixed slope is3.6e-11 Ry, numerical noise.
+   This is an algebraic control with a different correlated embedding, not
+   a converged material calculation and not the complete infinite Hilbert
+   space. Merely adding outside bands to a response sum is different from
+   enlarging the DMFT embedding window itself.
+
+Conclusion and next unresolved question
+======================================
+For this probe the extra functional slope is caused by changes in the
+selected spectral subspace and its normalization. It survives perfect
+ordinary charge consistency in the fixed-reference construction, and its
+predicted derivative is independently verified by the full trace-log test.
+
+It is not established that the same term dominates the hydrostatic stress
+error. The physical strain-induced Hxc potential derivative still has to be
+measured, with explicit geometry/basis terms separated to avoid double
+counting. Paired radial responses, omitted complementary bands and other
+stress approximations remain separate issues. The result motivates a
+consistent projector/functional treatment, not an empirical pressure offset.
+
+Reproduction
+============
+The accompanying full_functional.py is a standalone NumPy/SciPy diagnostic.
+Its bundled inputs, weights, central density and band-matrix evidence permit
+re-evaluation without dmft2, LAPW1, an impurity solver or source changes.
+Run a copied directory if preserving the original results.json is desired:
+
+  python full_functional.py
+
+The complete endpoint/control evaluation takes approximately4 seconds on this
+laptop after the central matrices are available. Those came from the21-second
+isolated dmft2 pass documented in ../projector_stationarity_probe_20261107/.

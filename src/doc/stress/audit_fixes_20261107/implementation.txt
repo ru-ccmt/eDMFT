@@ -1,0 +1,226 @@
+IMPLEMENTATION OF THE 7 NOVEMBER 2026 eDMFT STRESS AUDIT FIXES
+===========================================================
+
+Scope
+-----
+The demonstrated defects in the Eq. (13) -> Eq. (20) -> generalized G2 audit
+are corrected in src/dmft2. This is not a claim that all remaining material
+stress errors are solved. The preceding audit is AUDIT.txt in this bundle;
+its statements about the "current" code describe the PRE-FIX implementation.
+The changes here were made on top of the existing working tree, preserving
+its earlier changes. audit_fixes.patch records only this task's changes.
+pre_fix_sources.tar.gz preserves the exact replaced sources, including files
+that were not yet tracked in git. No user material directory was overwritten.
+
+1. Functional conventions and corrected window response
+-------------------------------------------------------
+U[n,l]=<psi_n|phi_l> is the normalized band-by-orbital projector. Sigma includes
+the double-counting subtraction. With the same convergent frequency quadrature
+and high-frequency completion used in the density and energy-density matrices,
+
+  C = T sum_z Sigma(z) U^dagger G(z),
+  B_L = rhoE - epsilon rho = U C,
+  D_1p = Re Tr[rho H' - rhoE O'],
+  D_proj = 2 Re Tr[C U'].
+
+For an included band n and an excluded stored band a,
+
+  R_an = (H'_an - epsilon_n O'_an)/(epsilon_n-epsilon_a),
+  U'_nl = sum_a R_an^* U_al.
+
+The code now puts K_an/(epsilon_n-epsilon_a), K=U_all C, in response(a,n),
+with its conjugate in response(n,a). The energy response has the same ordering
+and an extra epsilon_n. The global-normalization response and its independent
+Python checker use the same corrected bra derivative. This affects the shared
+finite-window force correction too, not just stress.
+
+C is now accumulated directly for force/stress runs. The pseudoinverse remains
+an independent diagnostic but no longer defines the production gradient. It
+cannot recover components in ker(U), even when its U*C residual is small.
+The existing Matsubara accumulator is enabled in production; real-frequency
+integration now supplies the corresponding rectangular C and rhoE using the
+same retarded/advanced log-bin integration as its density calculation.
+Density-only runs do not add these matrix products (except the existing
+one-band nedim convention, which also requests the energy moment).
+
+2. Normalization and signs
+--------------------------
+For the fixed-coefficient projector derivative, the window metric contributes
+
+  S' = sum_k w_k [P'^dagger P + P^dagger P' - P^dagger O'_WW P],
+  X = S^(-1/2),
+  X^(-1) X' + X' X^(-1) = -X S' X.
+
+The inverse-square-root calculus was already correct. The missing within-window
+metric term is now enabled by default. It must occur exactly once; the direct
+cmp_overlap coefficient derivative does not already include it.
+
+WIEN's final mixer stress negates raw STR_VAL. Consequently direct +D_proj
+enters STR_VAL with a minus sign. H'/O' response matrices already pass through
+cmp_dmft_stress's WIEN sign conversion, so their physical multiplier is +1.
+Changing both signs together would be incorrect.
+
+Legacy reproduction switches remain explicit:
+  EDMFT_STRESS_PROJECTOR_SIGN=CURRENT     old direct-projector raw sign
+  EDMFT_STRESS_NORM_WINDOW_METRIC=0        omit the metric connection
+  EDMFT_STRESS_NORM_RESPONSE_SIGN=LEGACY_REVERSED  old reversed response
+  WIEN_STRESS_G2_MODE=TRACE               trace-projected nonspherical tensor
+
+The defaults are now the physical direct sign, included metric connection,
+physical response sign, and FULL G2. PHYSICAL and WIEN are aliases for +1 in
+the normalization-response selector. The labels apply to different stages of
+the assembly and must not be interpreted as a universal sign convention.
+
+3. Complete local G2 matrices
+----------------------------
+The new stress_g2_matrices.f90 constructs cached primitive-space integrals.
+A primitive is u_l Y_lm, udot_l Y_lm, or any genuine LO radial function times
+Y_lm. No KS eigenvalue equation is imposed on an arbitrary pseudo-band.
+
+  f_i = u_i(r) Y_i(n),
+  g_i^0 = f_i,
+  g_i^r = r u_i'(r) n_alpha n_beta Y_i(n),
+  g_i^a = u_i(r) A_alpha_beta Y_i(n),
+  S^x_ij = <g_i^x|f_j>,
+  H^x_ij = <g_i^x|H_sph f_j>,
+  V^x_ij = <g_i^x|V_ns f_j>.
+
+The derivative in S^r and V^r is on the BRA. A is the coefficient vector,
+and D is the volume-compensated matching derivative. For each pseudo-band,
+the six one-sided rows, completed by 2 Re and the appropriate density, are
+
+  D^dagger (H^0-E S^0) A,
+  A^dagger (H^r-E S^r) A,
+  A^dagger (H^a-E S^a) A,
+  D^dagger V^0 A,
+  A^dagger V^r A,
+  A^dagger V^a A.
+
+The spherical action uses H_sph u_j=E_j u_j and the udot inhomogeneous term.
+The existing separate scalar-relativistic metric/flux additions are retained;
+the NREL radial identity alone is not an independent derivation of all RELA
+terms. Their complete physical validation remains open.
+
+The shared LAPW/APW matching derivative includes lomain_strain and all LO
+coefficient types. It now also handles occupied bands below the DMFT window.
+It returns physical s; G2 uses D=s+gamma A/2 and rotates its tensor into local
+harmonic axes before the existing equivalent-atom symmetry transformation.
+
+All required radial products are constructed from the stored radial functions,
+the OUTWIN derivative arrays, and V_ns. In particular, strain-allowed angular
+triples absent from the ordinary Hamiltonian .nsh list are included. The
+Hamiltonian's LNSMAX cutoff is retained. The ordinary potential matrix is
+independently checked against .nsh. No .nsh file-format change is necessary.
+
+Angular tables use sufficiently high Gauss-Legendre x azimuthal quadrature for
+the finite harmonic expansion. They are cached once per atom, outside all
+k-point, band, and Matsubara loops. The top-l angular derivative includes its
+l+1 intermediate. FULL includes deviatoric and shear contributions; TRACE is
+now only an explicit historical approximation.
+
+The legacy G2 routine is also repaired: nonspherical Cartesian-y conjugation,
+the angular upper-cutoff error, the first-record Fortran bounds assumption,
+and the LO-LO bra/ket radial derivative indexing. Production main and overlap
+contractions use the complete matrices instead of that incomplete expansion.
+
+4. Source map
+-------------
+stress_g2_matrices.f90       new complete local matrix cache and contractions
+alm_blm_clm.f90              common matching derivative, including lower bands
+cmp_dmft_stress.f90          main and overlap contractions use complete G2
+cmp_dmft_weights.f90         direct C; real-axis C and energy density
+l2mainSubs.f90               conjugations, direct-C selection, metric connection
+l2main.f90                   cache lifecycle and production direct-C wiring
+stress_kernels.f90           legacy geometry/bounds/LO radial fixes
+stress_modules.f90           physical signs and FULL default
+Makefile                    new object and module dependencies
+../python/check_projector_sternheimer_fd.py  independent response convention
+src/dmft2/tests/             reusable regression tests and instructions
+
+5. Validation
+-------------
+A clean build, including the radial library, succeeds with Homebrew gfortran/
+mpif90 and the existing project flags. Existing compiler warnings are retained
+in clean_build.log. Sources were also tested with bounds-checking harnesses.
+
+Passed independent checks:
+* Complex fixed-window functional finite difference and arbitrary KS rephasing.
+* Generalized H'/O' finite difference, including normalization's O'_WW term
+  (normalization metric contraction error 3.35e-11 in the synthetic test).
+* Matrix inverse-square-root derivative and normalization adjoint.
+* Direct C on Matsubara and real-frequency contours versus log-determinant FD.
+* Rank-deficient U: exact C retained; functional derivative error 2.0e-11.
+* Angular integrals versus independent spherical harmonics and angular FD.
+* Full G2 with two LO radial functions per l, complex pseudo-bands and rotated
+  local axes: maximum matrix error 2.43e-8, six-row contraction error 8.77e-8.
+
+Four-rank isolated material runs completed for SrVO3 NREL and FeSe RELA.
+V^0 reconstructed from V_ns agrees with .nsh to 3.76e-7 relative or better.
+Their full-rank direct C versus pseudoinverse differences are about 1e-14.
+A fresh clean-build executable reproduces the incremental SrVO3 stress exactly
+at printed precision. All test results and executable hash are in validation.json.
+
+SrVO3 was run with identical input files using the pre-fix and corrected code:
+  mean analytic stress:   9.416398 -> 5.222992 GPa
+  total force sum z:      0.0836979 -> 0.0532118 mRy/Bohr
+  maximum charge-file change: 1.0e-14
+  reported charge, chemical potential, band energy and functional sums unchanged.
+The IEEE invalid/divide-by-zero flags at shutdown occur in BOTH executables;
+no nonfinite output was found in the checked result files. They are not claimed
+as fixed by this audit patch.
+
+Corrected FeSe RELA analytic diagonal: (2.586102, 2.586102, -6.644308) GPa,
+mean -0.490701 GPa. These final stresses are assembled from the newly computed
+STR_VAL and copied matching STR_CORE/STR_DENS, using the mixer's sign and units.
+No user mixer, density, or stored material output was overwritten.
+
+6. Why the saved finite-difference comparisons are provisional
+-------------------------------------------------------------
+Re-reading the existing endpoint files with frozen_sigma_klein.py gives
+  FeSe:  dK/d(eps)/Omega = -3.147312 GPa, or mean -1.049104 GPa;
+  SrVO3: dK/d(eps)/Omega = 13.852189 GPa, or mean 4.617396 GPa.
+All three lattice lengths were scaled, so the script reports the TRACE of
+stress. Divide by three to compare to a mean pressure/stress. Those apparent
+mean residuals (~0.558 and ~0.606 GPa) are NOT certified residual errors.
+
+CORRECTION AFTER CHECKING THE MPI FILE PROVENANCE
+The earlier band-count objection in this report was incorrect. It came from
+reading stale unsuffixed case.energy files, rather than the rank-sharded files
+used by the completed MPI calculation. In dmft2.def, the suffix _x is a marker:
+add_xend substitutes the rank suffix, selecting case.energy_0, case.energy_1,
+etc. Band counts are obtained from the vector headers in INIT_ENERGY_FILE.
+The completed dmft2_info.out records also report the expected fixed counts.
+
+The newest complete shard generations give:
+  SrVO3: 75 k points, 43 bands at every k, in center, minus, and plus.
+  FeSe: 140 k points, 66 bands at every k, in center, minus, and plus.
+The k points, weights, band counts, and LAPW matrix dimensions agree exactly
+between each triplet. This checks matrix dimensions, not individual G labels.
+The saved files include obsolete rank files from earlier processor layouts;
+those must not be included when combining the latest generation. The current
+mpi_prefix.dat alone is not a record of a previous calculation's rank count.
+
+DM_nemaxx is the retained pseudo-band extent after diagonalizing the density
+matrix. It does not change the selected KS projector window [DM_nemin,DM_nemax].
+For example [12,31] remains the 20-band SrVO3 projector window when
+DM_nemaxx=26; the density contraction retains 15 pseudo-bands in that example.
+
+The arithmetic comparison quoted above (about 0.606 GPa in SrVO3 and 0.558 GPa
+in FeSe) is unchanged. It must NOT be dismissed or declared invalid on the
+basis of the previously asserted band-count mismatch. This correction does
+not independently certify every other convergence/integration condition.
+The active-file evidence is in band_provenance_correction.json. Original
+endpoint_checks.json entries for unsuffixed files are historical observations
+of stale files and are explicitly marked as superseded for band validation.
+No program source, executable, or material calculation was changed by this
+provenance correction.
+
+7. Explicitly unresolved physics
+-------------------------------
+The audit established no extra standalone boundary term solely from a projector
+being finite at R_MT. Frozen radial/projector response, all RELA terms, and
+transport of constrained diagonal local self-energies still require their own
+derivations and controlled tests. No isolated Tr(M_Sigma) volume correction was
+added: the basis-frame cancellation and Eq. (13) Jacobian cancellation must
+remain intact. Exact degeneracies cut by the fixed-index window also remain a
+limitation; enlarging the window to contain the multiplet is still required.

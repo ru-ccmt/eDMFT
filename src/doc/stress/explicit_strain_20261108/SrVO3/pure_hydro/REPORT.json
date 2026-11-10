@@ -1,0 +1,68 @@
+{
+  "case": "SrVO3",
+  "scope": "analytic hydrostatic potential source, no total stress",
+  "seconds": 0.23892737505957484,
+  "central_relative": 7.023466210637142e-14,
+  "explicit_projector_potential_Ry": 0.6357997491817873,
+  "steps": {
+    "0.00025": {
+      "relative": 3.5463978157832955e-08,
+      "sectors": {
+        "spherical": {
+          "relative": 2.8837074691265533e-08,
+          "absolute": 1.0005737983109569e-05
+        },
+        "nonspherical": {
+          "relative": 4.149140315636996e-07,
+          "absolute": 7.069007616677607e-06
+        },
+        "interstitial": {
+          "relative": 2.019253424232226e-06,
+          "absolute": 1.302142682658598e-06
+        }
+      },
+      "scalar_native_Ry": 0.6357997494776151,
+      "scalar_error_Ry": -2.9582752230105353e-10
+    },
+    "0.000125": {
+      "relative": 9.122804919111823e-09,
+      "sectors": {
+        "spherical": {
+          "relative": 7.524450680382867e-09,
+          "absolute": 2.6107946784868246e-06
+        },
+        "nonspherical": {
+          "relative": 1.0370268470000604e-07,
+          "absolute": 1.7668114429530196e-06
+        },
+        "interstitial": {
+          "relative": 5.048102608001664e-07,
+          "absolute": 3.2553389183123156e-07
+        }
+      },
+      "scalar_native_Ry": 0.6357997491303493,
+      "scalar_error_Ry": 5.143818580319112e-11
+    }
+  },
+  "timings": [
+    {
+      "endpoint": "-0.00025",
+      "seconds": 1.0361866250168532
+    },
+    {
+      "endpoint": "0.00025",
+      "seconds": 0.7635497089941055
+    },
+    {
+      "endpoint": "-0.000125",
+      "seconds": 0.7699166249949485
+    },
+    {
+      "endpoint": "0.000125",
+      "seconds": 0.7584229591302574
+    }
+  ],
+  "richardson_relative": 3.2062889997946973e-09,
+  "richardson_scalar_error_Ry": 1.6719341869355746e-10,
+  "native_binary_sha256": "434b9dbb3f981196dfcfc03f6b40b98f1cce610289bb58dff01d19f7edbe7627"
+}

@@ -1,0 +1,16 @@
+--- a/SRC_lapw0/xcpot3.F
++++ b/SRC_lapw0/xcpot3.F
+@@ -1040,7 +1040,12 @@
+ !=====================exc_vxc============================================
+          DO J = 1, NKK   
+             RHOKSP(J,1)=VKEXC(J,1)-VKVXC(J,1)
+-            RHOKSP(J,2)=VKEXC(J,2)-VKVXC(J,1)            
++!           The second spin channel must use its own V_xc coefficient.
++!           The old VKVXC(J,1) reference silently mixed the spin-up
++!           potential into the spin-down interstitial (E_xc-rho*V_xc)
++!           contribution.  This block is stress-only, so total energies
++!           were unaffected, but spin-polarized analytic stresses were not.
++            RHOKSP(J,2)=VKEXC(J,2)-VKVXC(J,2)            
+          ENDDO
+          CALL SETFFT(NKK,IFFT1,IFFT2,IFFT3,RHOKSP,UFFT)              
+ 

@@ -1,0 +1,5 @@
+[MacBook-Pro-148][[19459,0],0][btl_tcp_component.c:1021:mca_btl_tcp_component_create_listen] bind() failed: Operation not permitted (1)
+nargs= 1
+argi=dmft2.def
+ OpeningSrVO3.outputdmf2                                                                                                                                                                    
+STOP  DMFT2 END

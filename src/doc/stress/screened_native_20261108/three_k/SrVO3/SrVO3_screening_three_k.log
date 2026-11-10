@@ -1,0 +1,51 @@
+SrVO3 three_k valence prepared 7.047201291890815
+SrVO3 screening prepared {"fixed_number": true, "target_charge": 85.0, "normalization_enabled": true, "normalization_alpha": 0.4248159433567168, "central_valence_relative_error": 1.502648756790679e-12, "central_core_relative_error": 8.834279468104743e-14, "central_fixed_point_residual_norm": 18.58726951701712, "kpoints": 3, "retained_bands": 43, "matrix_quadrature": "wien2k24", "stress_applied": false}
+SrVO3 forward 1 seconds 0.9673326669726521
+SrVO3 forward 2 seconds 0.9200283749960363
+SrVO3 forward 3 seconds 0.8830646669957787
+SrVO3 forward 4 seconds 0.8962065828964114
+SrVO3 forward 5 seconds 0.9132714590523392
+SrVO3 forward 6 seconds 0.9275401250924915
+SrVO3 forward 7 seconds 0.9206588340457529
+SrVO3 forward 8 seconds 0.9048072909936309
+SrVO3 forward 9 seconds 0.9072803328745067
+SrVO3 forward 10 seconds 0.9016174168791622
+SrVO3 forward 11 seconds 0.9788514161482453
+SrVO3 forward 12 seconds 0.9681059999857098
+SrVO3 forward 13 seconds 0.9744667080231011
+SrVO3 forward 14 seconds 0.9871203331276774
+SrVO3 FORWARD SOLVED {"converged": true, "gmres_info": 0, "direction": "forward", "residual_norm": 1.2134458010331322e-05, "threshold": 3.0315341323408394e-05, "actions": 14, "inner_residual_history": [0.42844790759149665, 0.24136103273508333, 0.1563372268099371, 0.03882203868978931, 0.009000923791009974, 0.0019623798378240174, 0.0006664933429788175, 3.890540998102802e-05, 5.349497759236422e-06, 4.069500633250889e-07, 5.204601526217432e-08, 8.005493091500955e-09], "seconds": 13.054989625001326, "fixed_number": true, "target_charge": 85.0, "normalization_enabled": true, "normalization_alpha": 0.4248159433567168, "central_valence_relative_error": 1.502648756790679e-12, "central_core_relative_error": 8.834279468104743e-14, "central_fixed_point_residual_norm": 18.58726951701712, "kpoints": 3, "retained_bands": 43, "matrix_quadrature": "wien2k24", "stress_applied": false, "source_charge": -3.510791657390655e-11, "response_charge": -3.5191402660313485e-11}
+SrVO3 verify_p_1e-05 native completed
+SrVO3 verify_m_1e-05 native completed
+SrVO3 NATIVE RESIDUAL 1e-05 {'norm': 4.3275893440801446e-05, 'relative_to_source': 2.8550490643749005e-08, 'jacobian_relative': 6.720685896366608e-08}
+SrVO3 verify_p_5e-06 native completed
+SrVO3 verify_m_5e-06 native completed
+SrVO3 NATIVE RESIDUAL 5e-06 {'norm': 4.085238462216549e-05, 'relative_to_source': 2.6951624384727465e-08, 'jacobian_relative': 6.263057535510928e-08}
+SrVO3 adjoint 1 seconds 1.187882750062272
+SrVO3 adjoint 2 seconds 1.1928250829223543
+SrVO3 adjoint 3 seconds 1.1610805420204997
+SrVO3 adjoint 4 seconds 1.1636046250350773
+SrVO3 adjoint 5 seconds 1.1518653749953955
+SrVO3 adjoint 6 seconds 1.1414771669078618
+SrVO3 adjoint 7 seconds 1.1588857078459114
+SrVO3 adjoint 8 seconds 1.1799820840824395
+SrVO3 adjoint 9 seconds 1.179732791846618
+SrVO3 adjoint 10 seconds 1.1753893750719726
+SrVO3 adjoint 11 seconds 1.1582677499391139
+SrVO3 adjoint 12 seconds 1.18833400006406
+SrVO3 adjoint 13 seconds 1.2508786250837147
+SrVO3 adjoint 14 seconds 1.2602131669409573
+SrVO3 adjoint 15 seconds 1.309181584045291
+SrVO3 adjoint 16 seconds 1.2915966669097543
+SrVO3 adjoint 17 seconds 1.2768110828474164
+SrVO3 ADJOINT SOLVED {"converged": true, "gmres_info": 0, "direction": "adjoint", "residual_norm": 5.05145216585589e-10, "threshold": 4.162703442094964e-09, "actions": 17, "inner_residual_history": [0.999823772086536, 0.9980923734324462, 0.98896888575489, 0.9743051096563291, 0.1959489703131211, 0.06945443278757622, 0.011641035860148564, 0.002615298539241405, 0.00015219478199440052, 2.4982322158202498e-05, 1.4242688462763952e-05, 1.0906231170318712e-06, 1.2351596119271323e-07, 2.3351927933313314e-08, 2.427667556012458e-09], "seconds": 20.434581875102594, "observable": "MT electron number on atom 1 including its multiplicity", "forward_contraction": 1.7420600266322923, "adjoint_contraction": 1.742059616675249, "absolute_difference": 4.0995704342350336e-07}
+SrVO3 forward 15 seconds 1.027249500155449
+SrVO3 forward 16 seconds 1.0106989170890301
+SrVO3 forward 17 seconds 1.0161941670812666
+SrVO3 forward 18 seconds 1.0188707909546793
+SrVO3 forward 19 seconds 1.0499496250413358
+SrVO3 forward 20 seconds 1.086635542102158
+SrVO3 forward 21 seconds 1.027374249882996
+SrVO3 forward 22 seconds 1.0282372499350458
+SrVO3 forward 23 seconds 1.0124810829292983
+SrVO3 completed

@@ -800,12 +800,12 @@ For $a\notin W$ and $n\in W$, the code builds auxiliary Hermitian response
 matrices
 
 \begin{align}
- (\rho^{\rm resp})_{an}
+ (\rho^{\rm resp})_{na}
  &=\frac{(K_{\rm full})_{an}}{\epsilon_n-\epsilon_a},
- & (\rho^{\rm resp})_{na}&=(\rho^{\rm resp})_{an}^*,\\
- (\rho_E^{\rm resp})_{an}
- &=\epsilon_n(\rho^{\rm resp})_{an},
- & (\rho_E^{\rm resp})_{na}&=(\rho_E^{\rm resp})_{an}^*.
+ & (\rho^{\rm resp})_{an}&=(\rho^{\rm resp})_{na}^*,\\
+ (\rho_E^{\rm resp})_{na}
+ &=\epsilon_n(\rho^{\rm resp})_{na},
+ & (\rho_E^{\rm resp})_{an}&=(\rho_E^{\rm resp})_{na}^*.
  \label{eq:responsematrices}
 \end{align}
 
@@ -820,6 +820,10 @@ The corresponding response is evaluated by reusing the LAPW kernels,
 
 with the source's calibrated sign convention.  The response matrices are a
 contraction device; they must not be added to the physical charge density.
+The order of the two band indices in Eq.~\eqref{eq:responsematrices} is
+essential at a complex $\kb$ point: the trace contains
+$(\rho^{\rm resp})_{na}(H_{,\nu})_{an}$.  Storing $K_{an}$ in the opposite
+block silently complex-conjugates the Sternheimer contraction.
 Near cross-window degeneracies, ordinary denominators are not reliable and a
 degenerate spectral-projector treatment is ultimately preferable.
 

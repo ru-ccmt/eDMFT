@@ -1,0 +1,1106 @@
+diff --git a/src/dmft2/atpar/Makefile b/src/dmft2/atpar/Makefile
+--- a/src/dmft2/atpar/Makefile
++++ b/src/dmft2/atpar/Makefile
+@@ -1,8 +1,9 @@
+ include ../../Makefile.in
+ 
+-# The discrete radial tangent/adjoint is opt-in; ordinary ATPARN still calls
+-# OUTWIN directly. Keep the response module available to future native workers.
+-objs = outwin.o  outwin_response.o  rint13.o  abc.o  diracout.o  dergl.o  inouh.o  inth.o
++# The discrete radial and complete LAPW/APW+lo tangents/adjoints are opt-in;
++# ordinary ATPARN still calls OUTWIN directly. Native response workers can
++# reuse these modules without changing the production stress path.
++objs = outwin.o  outwin_response.o  lapw_radial_response.o  rint13.o  abc.o  diracout.o  dergl.o  inouh.o  inth.o
+ #LIBOPT = -dynamiclib
+ 
+ libatpar.a : $(objs) atpar.o readPot.o
+@@ -23,3 +24,6 @@
+ %.o : %.f90
+ 	$(PF90) $(PIC) $(FFLAGS) -c $< -o $@
+ 
++# The .mod file must exist before compiling its consumer, also under make -j.
++lapw_radial_response.o : outwin_response.o
++
+diff --git a/src/dmft2/atpar/lapw_radial_response.f90 b/src/dmft2/atpar/lapw_radial_response.f90
+new file mode 100644
+--- /dev/null
++++ b/src/dmft2/atpar/lapw_radial_response.f90
+@@ -0,0 +1,255 @@
++module lapw_radial_response
++  ! Assemble the discrete radial tangent into the ACTUAL LAPW/APW+lo basis.
++  ! One context represents one atom/l channel. Complex angular/phase factors
++  ! and KS coefficients are external linear maps; this module handles their
++  ! real radial factors and can be pulled back through those maps unchanged.
++  !
++  ! The LAPW matching amplitudes are those used in ALM_BLM_CLM, including the
++  ! RMT**2 prefactor. Do not replace their derivative by a boundary repair
++  ! using an exact Wronskian inverse: ATPARN's finite udot stencil and RELA
++  ! convention need not obey the continuous Wronskian identity exactly.
++  !
++  ! Input potentials are r*V_spherical in Ry, energies are Ry. The radial
++  ! grid, RMT, ell, Z, and interstitial matching data are fixed. Ordinary LOs
++  ! and all three ABC branches are included. DIRACOUT p1/2 LOs are rejected;
++  ! their separate tangent has not been implemented. Energy derivatives are
++  ! supplied by the caller, not inferred from an automatic energy search.
++  use iso_fortran_env, only: real64
++  use outwin_response
++  implicit none
++  private
++  integer,parameter :: dp=real64
++  public :: radial_basis_context, prepare_radial_basis
++  public :: radial_basis_value, radial_basis_action, radial_basis_pullback
++  public :: radial_basis_forms, radial_basis_forms_action, radial_basis_forms_pullback
++
++  type :: radial_basis_context
++     type(radial_pair_context) :: pair
++     type(radial_context),allocatable :: local(:)
++     integer :: n=0,nlo=0
++     logical :: lapw=.true.,rel=.false.
++     real(dp) :: rmt=0
++     real(dp),allocatable :: primitive(:,:,:),coefficient(:,:),abc_jac(:,:,:)
++     real(dp),allocatable :: overlap_metric(:,:),projector_metric(:,:)
++  end type
++
++contains
++
++  subroutine prepare_radial_basis(ctx,rel,potential,r0,dx,rmt,energy,lo_energy,lapw,ell,charge,dirac_lo)
++    type(radial_basis_context),intent(out) :: ctx
++    logical,intent(in) :: rel,lapw
++    logical,intent(in),optional :: dirac_lo(:)
++    real(dp),intent(in) :: potential(:),r0,dx,rmt,energy,lo_energy(:),ell,charge
++    real(dp) :: x(10)
++    integer :: j
++    if(present(dirac_lo)) then
++       if(size(dirac_lo)/=size(lo_energy)) error stop 'DIRACOUT flag dimensions disagree'
++       if(any(dirac_lo)) error stop 'DIRACOUT LO radial response is not implemented'
++    endif
++    if(rmt<=0) error stop 'invalid RMT in radial basis response'
++    ctx%n=size(potential);ctx%nlo=size(lo_energy);ctx%rmt=rmt
++    ctx%lapw=lapw;ctx%rel=rel
++    call prepare_radial_pair(ctx%pair,rel,potential/2,r0,dx,energy/2,ell,charge)
++    allocate(ctx%local(ctx%nlo),ctx%primitive(ctx%n,4,2+ctx%nlo))
++    allocate(ctx%coefficient(3,ctx%nlo),ctx%abc_jac(3,10,ctx%nlo))
++    ctx%primitive=0
++    ctx%primitive(:,:,1:2)=radial_pair_value(ctx%pair)
++    ctx%overlap_metric=ctx%pair%center%metric
++    ctx%projector_metric=ctx%overlap_metric
++    ! p_cmp_rixmat uses Rint13n: unlike ATPARN's RINT13 it omits the NREL
++    ! small component altogether. Preserve that convention in BOTH actions.
++    if(.not.rel) ctx%projector_metric(:,2)=0
++    do j=1,ctx%nlo
++       if(lapw.or.j>1) then
++          call prepare_radial(ctx%local(j),rel,potential/2,r0,dx,lo_energy(j)/2,ell,charge)
++          ctx%primitive(:,:,2+j)=radial_value(ctx%local(j),.true.)
++       endif
++       call abc_inputs(ctx,j,x)
++       call local_orbital_coefficients(lapw,j,x,ctx%coefficient(:,j),ctx%abc_jac(:,:,j))
++    enddo
++  end subroutine
++
++  subroutine abc_inputs(ctx,j,x)
++    type(radial_basis_context),intent(in) :: ctx
++    integer,intent(in) :: j
++    real(dp),intent(out) :: x(10)
++    integer :: n
++    n=ctx%n
++    x(1:4)=[ctx%primitive(n,1,1),ctx%primitive(n,3,1), &
++            ctx%primitive(n,1,2),ctx%primitive(n,3,2)]/ctx%rmt
++    x(5)=sum(ctx%overlap_metric*ctx%primitive(:,:,2)**2)
++    x(6:7)=[ctx%primitive(n,1,2+j),ctx%primitive(n,3,2+j)]/ctx%rmt
++    x(8)=sum(ctx%overlap_metric*ctx%primitive(:,:,1)*ctx%primitive(:,:,2+j))
++    x(9)=sum(ctx%overlap_metric*ctx%primitive(:,:,2)*ctx%primitive(:,:,2+j))
++    x(10)=ctx%rmt
++  end subroutine
++
++  subroutine matching(ctx,boundary,amplitude)
++    type(radial_basis_context),intent(in) :: ctx
++    real(dp),intent(in) :: boundary(:,:)
++    real(dp),intent(out) :: amplitude(2,size(boundary,2))
++    real(dp) :: p,slope,pe,slope_e,r
++    r=ctx%rmt
++    p=ctx%primitive(ctx%n,1,1)/r;slope=ctx%primitive(ctx%n,3,1)/r
++    pe=ctx%primitive(ctx%n,1,2)/r;slope_e=ctx%primitive(ctx%n,3,2)/r
++    if(size(boundary,1)/=2) error stop 'boundary data must be (value,radial derivative)'
++    if(ctx%lapw) then
++       amplitude(1,:)=r*r*(boundary(2,:)*pe-boundary(1,:)*slope_e)
++       amplitude(2,:)=r*r*(boundary(1,:)*slope-boundary(2,:)*p)
++    else
++       if(abs(p)<tiny(1.0_dp)) error stop 'zero APW matching value'
++       amplitude(1,:)=boundary(1,:)/p;amplitude(2,:)=0
++    endif
++  end subroutine
++
++  function radial_basis_value(ctx,boundary) result(value)
++    type(radial_basis_context),intent(in) :: ctx
++    real(dp),intent(in) :: boundary(:,:)
++    real(dp) :: value(ctx%n,4,size(boundary,2)+ctx%nlo),amplitude(2,size(boundary,2))
++    integer :: j,np
++    call matching(ctx,boundary,amplitude)
++    np=size(boundary,2)
++    do j=1,np
++       value(:,:,j)=amplitude(1,j)*ctx%primitive(:,:,1)+amplitude(2,j)*ctx%primitive(:,:,2)
++    enddo
++    do j=1,ctx%nlo
++       value(:,:,np+j)=ctx%coefficient(1,j)*ctx%primitive(:,:,1) &
++            +ctx%coefficient(2,j)*ctx%primitive(:,:,2)+ctx%coefficient(3,j)*ctx%primitive(:,:,2+j)
++    enddo
++  end function
++
++  subroutine radial_basis_action(ctx,boundary,dv,de,delo,derivative)
++    type(radial_basis_context),intent(in) :: ctx
++    real(dp),intent(in) :: boundary(:,:),dv(ctx%n),de,delo(ctx%nlo)
++    real(dp),intent(out) :: derivative(ctx%n,4,size(boundary,2)+ctx%nlo)
++    real(dp) :: primitive_dot(ctx%n,4,2+ctx%nlo),amplitude(2,size(boundary,2)),da(2,size(boundary,2))
++    real(dp) :: xdot(10),cdot(3),r,p
++    integer :: j,n,np
++    n=ctx%n;np=size(boundary,2);r=ctx%rmt
++    primitive_dot=0
++    call radial_pair_action(ctx%pair,dv/2,de/2,primitive_dot(:,:,1:2))
++    do j=1,ctx%nlo
++       if(ctx%lapw.or.j>1) call radial_action(ctx%local(j),dv/2,delo(j)/2,primitive_dot(:,:,2+j),.true.)
++    enddo
++    call matching(ctx,boundary,amplitude)
++    if(ctx%lapw) then
++       da(1,:)=r*(boundary(2,:)*primitive_dot(n,1,2)-boundary(1,:)*primitive_dot(n,3,2))
++       da(2,:)=r*(boundary(1,:)*primitive_dot(n,3,1)-boundary(2,:)*primitive_dot(n,1,1))
++    else
++       p=ctx%primitive(n,1,1)/r
++       da(1,:)=-boundary(1,:)*primitive_dot(n,1,1)/(r*p*p);da(2,:)=0
++    endif
++    do j=1,np
++       derivative(:,:,j)=amplitude(1,j)*primitive_dot(:,:,1)+amplitude(2,j)*primitive_dot(:,:,2) &
++            +da(1,j)*ctx%primitive(:,:,1)+da(2,j)*ctx%primitive(:,:,2)
++    enddo
++    do j=1,ctx%nlo
++       xdot=0
++       xdot(1:4)=[primitive_dot(n,1,1),primitive_dot(n,3,1), &
++                  primitive_dot(n,1,2),primitive_dot(n,3,2)]/r
++       xdot(5)=2*sum(ctx%overlap_metric*ctx%primitive(:,:,2)*primitive_dot(:,:,2))
++       xdot(6:7)=[primitive_dot(n,1,2+j),primitive_dot(n,3,2+j)]/r
++       xdot(8)=sum(ctx%overlap_metric*(primitive_dot(:,:,1)*ctx%primitive(:,:,2+j) &
++                                     +ctx%primitive(:,:,1)*primitive_dot(:,:,2+j)))
++       xdot(9)=sum(ctx%overlap_metric*(primitive_dot(:,:,2)*ctx%primitive(:,:,2+j) &
++                                     +ctx%primitive(:,:,2)*primitive_dot(:,:,2+j)))
++       cdot=matmul(ctx%abc_jac(:,:,j),xdot)
++       derivative(:,:,np+j)=ctx%coefficient(1,j)*primitive_dot(:,:,1) &
++            +ctx%coefficient(2,j)*primitive_dot(:,:,2)+ctx%coefficient(3,j)*primitive_dot(:,:,2+j) &
++            +cdot(1)*ctx%primitive(:,:,1)+cdot(2)*ctx%primitive(:,:,2)+cdot(3)*ctx%primitive(:,:,2+j)
++    enddo
++  end subroutine
++
++  subroutine radial_basis_pullback(ctx,boundary,covector,dv_bar,de_bar,delo_bar)
++    type(radial_basis_context),intent(in) :: ctx
++    real(dp),intent(in) :: boundary(:,:),covector(ctx%n,4,size(boundary,2)+ctx%nlo)
++    real(dp),intent(out) :: dv_bar(ctx%n),de_bar,delo_bar(ctx%nlo)
++    real(dp) :: gp(ctx%n,4,2+ctx%nlo),amplitude(2,size(boundary,2))
++    real(dp) :: ga,gb,gc(3),gx(10),tmp(ctx%n),te,r,p
++    integer :: j,n,np
++    gp=0;n=ctx%n;np=size(boundary,2);r=ctx%rmt
++    call matching(ctx,boundary,amplitude)
++    do j=1,np
++       gp(:,:,1)=gp(:,:,1)+amplitude(1,j)*covector(:,:,j)
++       gp(:,:,2)=gp(:,:,2)+amplitude(2,j)*covector(:,:,j)
++       ga=sum(covector(:,:,j)*ctx%primitive(:,:,1))
++       gb=sum(covector(:,:,j)*ctx%primitive(:,:,2))
++       if(ctx%lapw) then
++          gp(n,1,2)=gp(n,1,2)+ga*r*boundary(2,j)
++          gp(n,3,2)=gp(n,3,2)-ga*r*boundary(1,j)
++          gp(n,3,1)=gp(n,3,1)+gb*r*boundary(1,j)
++          gp(n,1,1)=gp(n,1,1)-gb*r*boundary(2,j)
++       else
++          p=ctx%primitive(n,1,1)/r
++          gp(n,1,1)=gp(n,1,1)-ga*boundary(1,j)/(r*p*p)
++       endif
++    enddo
++    do j=1,ctx%nlo
++       gp(:,:,1)=gp(:,:,1)+ctx%coefficient(1,j)*covector(:,:,np+j)
++       gp(:,:,2)=gp(:,:,2)+ctx%coefficient(2,j)*covector(:,:,np+j)
++       gp(:,:,2+j)=gp(:,:,2+j)+ctx%coefficient(3,j)*covector(:,:,np+j)
++       gc=[sum(covector(:,:,np+j)*ctx%primitive(:,:,1)), &
++           sum(covector(:,:,np+j)*ctx%primitive(:,:,2)),sum(covector(:,:,np+j)*ctx%primitive(:,:,2+j))]
++       gx=matmul(transpose(ctx%abc_jac(:,:,j)),gc)
++       gp(n,1,1)=gp(n,1,1)+gx(1)/r;gp(n,3,1)=gp(n,3,1)+gx(2)/r
++       gp(n,1,2)=gp(n,1,2)+gx(3)/r;gp(n,3,2)=gp(n,3,2)+gx(4)/r
++       gp(:,:,2)=gp(:,:,2)+2*gx(5)*ctx%overlap_metric*ctx%primitive(:,:,2)
++       gp(n,1,2+j)=gp(n,1,2+j)+gx(6)/r;gp(n,3,2+j)=gp(n,3,2+j)+gx(7)/r
++       gp(:,:,1)=gp(:,:,1)+gx(8)*ctx%overlap_metric*ctx%primitive(:,:,2+j)
++       gp(:,:,2)=gp(:,:,2)+gx(9)*ctx%overlap_metric*ctx%primitive(:,:,2+j)
++       gp(:,:,2+j)=gp(:,:,2+j)+ctx%overlap_metric*(gx(8)*ctx%primitive(:,:,1)+gx(9)*ctx%primitive(:,:,2))
++    enddo
++    call radial_pair_pullback(ctx%pair,gp(:,:,1:2),dv_bar,de_bar)
++    delo_bar=0
++    do j=1,ctx%nlo
++       if(.not.ctx%lapw.and.j==1) cycle
++       call radial_pullback(ctx%local(j),gp(:,:,2+j),tmp,te,.true.)
++       dv_bar=dv_bar+tmp;delo_bar(j)=te/2
++    enddo
++    dv_bar=dv_bar/2;de_bar=de_bar/2
++  end subroutine
++
++  subroutine radial_basis_forms(ctx,value,projector,overlap,projection)
++    ! Radial overlap and raw projector-5 factors. The finite projector may be
++    ! nonzero at RMT; no boundary value is discarded. Angular, Bloch, window
++    ! selection, k-sum, and normalization are later operations.
++    type(radial_basis_context),intent(in) :: ctx
++    real(dp),intent(in) :: value(:,:,:),projector(ctx%n,2)
++    real(dp),intent(out) :: overlap(size(value,3),size(value,3)),projection(size(value,3))
++    integer :: i,j
++    do i=1,size(value,3)
++       projection(i)=sum(ctx%projector_metric(:,1:2)*value(:,1:2,i)*projector)
++       do j=1,size(value,3)
++          overlap(i,j)=sum(ctx%overlap_metric*value(:,:,i)*value(:,:,j))
++       enddo
++    enddo
++  end subroutine
++
++  subroutine radial_basis_forms_action(ctx,value,derivative,projector,overlap_dot,projection_dot)
++    type(radial_basis_context),intent(in) :: ctx
++    real(dp),intent(in) :: value(:,:,:),derivative(:,:,:),projector(ctx%n,2)
++    real(dp),intent(out) :: overlap_dot(size(value,3),size(value,3)),projection_dot(size(value,3))
++    integer :: i,j
++    do i=1,size(value,3)
++       projection_dot(i)=sum(ctx%projector_metric(:,1:2)*derivative(:,1:2,i)*projector)
++       do j=1,size(value,3)
++          overlap_dot(i,j)=sum(ctx%overlap_metric*(derivative(:,:,i)*value(:,:,j)+value(:,:,i)*derivative(:,:,j)))
++       enddo
++    enddo
++  end subroutine
++
++  subroutine radial_basis_forms_pullback(ctx,value,projector,overlap_bar,projection_bar,basis_bar)
++    type(radial_basis_context),intent(in) :: ctx
++    real(dp),intent(in) :: value(:,:,:),projector(ctx%n,2)
++    real(dp),intent(in) :: overlap_bar(size(value,3),size(value,3)),projection_bar(size(value,3))
++    real(dp),intent(out) :: basis_bar(size(value,1),size(value,2),size(value,3))
++    integer :: i,j
++    basis_bar=0
++    do i=1,size(value,3)
++       basis_bar(:,1:2,i)=projection_bar(i)*ctx%projector_metric(:,1:2)*projector
++       do j=1,size(value,3)
++          basis_bar(:,:,i)=basis_bar(:,:,i)+(overlap_bar(i,j)+overlap_bar(j,i))*ctx%overlap_metric*value(:,:,j)
++       enddo
++    enddo
++  end subroutine
++end module lapw_radial_response
+diff --git a/src/dmft2/tests/test_lapw_radial_response.f90 b/src/dmft2/tests/test_lapw_radial_response.f90
+new file mode 100644
+--- /dev/null
++++ b/src/dmft2/tests/test_lapw_radial_response.f90
+@@ -0,0 +1,146 @@
++program test_lapw_radial_response
++  ! Independent endpoint oracle: ATPARN, ABC, RINT13 and Rint13n. No endpoint
++  ! invokes the new assembly module. Test both primitive and complete LO
++  ! factors, all bras/kets of O, raw projector factors, and their transpose.
++  use iso_fortran_env, only: real64
++  use lapw_radial_response
++  implicit none
++  integer,parameter :: dp=real64,np=3
++  type(radial_basis_context) :: ctx
++  integer :: n,mode,ell,lapw_flag,nlo,m,i,j,k,it,unit
++  real(dp) :: r0,dx,rmt,energy,z,step,r,de,be,left,right,t0,t1,t2
++  real(dp) :: central_error,fd_error,form_error,adj_error,chain_error,wronskian,wronskian_dot
++  real(dp),allocatable :: v(:),dv(:),elo(:),delo(:),bev(:),belo(:),projector(:,:),boundary(:,:)
++  real(dp),allocatable :: value(:,:,:),reference(:,:,:),plus(:,:,:),minus(:,:,:),derivative(:,:,:),bar(:,:,:)
++  real(dp),allocatable :: ov(:,:),proj(:),dov(:,:),dproj(:),op(:,:),om(:,:),pp(:),pm(:),ob(:,:),pb(:)
++  real(dp),external :: RINT13,Rint13n
++  character(1024) :: path
++  call get_command_argument(1,path)
++  open(newunit=unit,file=trim(path),status='old')
++  read(unit,*) n,mode,ell,lapw_flag,nlo
++  read(unit,*) r0,dx,rmt,energy,z
++  m=np+nlo
++  allocate(v(n),dv(n),elo(nlo),delo(nlo),bev(n),belo(nlo),projector(n,2),boundary(2,np))
++  allocate(value(n,4,m),reference(n,4,m),plus(n,4,m),minus(n,4,m),derivative(n,4,m),bar(n,4,m))
++  allocate(ov(m,m),proj(m),dov(m,m),dproj(m),op(m,m),om(m,m),pp(m),pm(m),ob(m,m),pb(m))
++  if(nlo>0) read(unit,*) elo
++  read(unit,*) boundary
++  read(unit,*) v
++  read(unit,*) projector
++  close(unit)
++  do i=1,n
++     r=r0*exp(dx*(i-1))
++     dv(i)=.07_dp*r*sin(1.3_dp*r)
++     do j=1,4
++        do k=1,m
++           bar(i,j,k)=sin(.2_dp*i+j+.4_dp*k)*exp(-r)
++        enddo
++     enddo
++  enddo
++  de=.03_dp
++  do i=1,nlo
++     delo(i)=.023_dp*cos(real(i,dp))
++  enddo
++  do i=1,m
++     pb(i)=sin(real(i,dp))
++     do j=1,m
++        ob(i,j)=cos(2.3_dp*i+.7_dp*j) ! deliberately nonsymmetric covector
++     enddo
++  enddo
++  call prepare_radial_basis(ctx,mode==1,v,r0,dx,rmt,energy,elo,lapw_flag==1,real(ell,dp),z)
++  value=radial_basis_value(ctx,boundary)
++  call endpoint(v,energy,elo,reference)
++  central_error=sqrt(sum((reference-value)**2)/sum(reference**2))
++  call radial_basis_forms(ctx,value,projector,ov,proj)
++  call reference_forms(reference,op,pp)
++  central_error=max(central_error,sqrt(sum((ov-op)**2)/sum(op**2)),sqrt(sum((proj-pp)**2)/sum(pp**2)))
++  call radial_basis_action(ctx,boundary,dv,de,delo,derivative)
++  call radial_basis_pullback(ctx,boundary,bar,bev,be,belo)
++  left=sum(bar*derivative);right=sum(dv*bev)+de*be+sum(delo*belo)
++  adj_error=abs(left-right)/max(1.0_dp,abs(left),abs(right))
++  call radial_basis_forms_action(ctx,value,derivative,projector,dov,dproj)
++  call radial_basis_forms_pullback(ctx,value,projector,ob,pb,bar)
++  call radial_basis_pullback(ctx,boundary,bar,bev,be,belo)
++  left=sum(ob*dov)+sum(pb*dproj);right=sum(dv*bev)+de*be+sum(delo*belo)
++  chain_error=abs(left-right)/max(1.0_dp,abs(left),abs(right))
++  ! Probe three steps: energy-stencil cancellation eventually sets a floor.
++  fd_error=huge(1.0_dp);form_error=huge(1.0_dp)
++  do it=1,3
++     step=.004_dp/(2**it)
++     call endpoint(v+step*dv,energy+step*de,elo+step*delo,plus)
++     call endpoint(v-step*dv,energy-step*de,elo-step*delo,minus)
++     call reference_forms(plus,op,pp);call reference_forms(minus,om,pm)
++     fd_error=min(fd_error,sqrt(sum(((plus-minus)/(2*step)-derivative)**2)/sum(derivative**2)))
++     form_error=min(form_error,max(sqrt(sum(((op-om)/(2*step)-dov)**2)/sum(dov**2)), &
++                                  sqrt(sum(((pp-pm)/(2*step)-dproj)**2)/sum(dproj**2))))
++  enddo
++  ! In LAPW the boundary factor is W=R^2(dp*pe-p*dpe), not an
++  ! exact algebraic inverse. The actual derivative need not vanish there.
++  wronskian=ctx%primitive(n,3,1)*ctx%primitive(n,1,2)-ctx%primitive(n,1,1)*ctx%primitive(n,3,2)
++  wronskian_dot=0
++  if(lapw_flag==1) wronskian_dot=derivative(n,1,1)/(rmt*boundary(1,1))
++  call cpu_time(t0)
++  do it=1,200
++     call radial_basis_action(ctx,boundary,dv,de,delo,derivative)
++  enddo
++  call cpu_time(t1)
++  do it=1,200
++     call radial_basis_pullback(ctx,boundary,bar,bev,be,belo)
++  enddo
++  call cpu_time(t2)
++  write(*,'(9ES24.15)') central_error,fd_error,form_error,adj_error,chain_error, &
++       wronskian,wronskian_dot,(t1-t0)/200,(t2-t1)/200
++  if(central_error>2e-10_dp.or.fd_error>2e-5_dp.or.form_error>3e-5_dp) error stop 'radial assembly FD failed'
++  if(max(adj_error,chain_error)>2e-9_dp) error stop 'radial assembly adjoint failed'
++contains
++  subroutine endpoint(vr,e,elocal,result)
++    real(dp),intent(in) :: vr(n),e,elocal(nlo)
++    real(dp),intent(out) :: result(n,4,m)
++    integer :: nl,j,nt
++    real(dp) :: al,bl
++    real(dp),allocatable :: u(:,:),du(:,:),b(:,:),db(:,:),up(:,:),dup(:,:),bp(:,:),dbp(:,:)
++    real(dp),allocatable :: ul(:,:,:),bul(:,:,:),upl(:,:,:),bpl(:,:,:),p(:,:),s(:,:),ri(:,:,:)
++    real(dp),allocatable :: ca(:,:),cb(:,:),cc(:,:),es(:),els(:,:)
++    integer :: ilo(0:ell)
++    logical,allocatable :: loor(:,:),rlo(:,:),lapw(:)
++    nl=max(nlo,1)
++    allocate(u(n,0:ell),du(n,0:ell),b(n,0:ell),db(n,0:ell),up(n,0:ell),dup(n,0:ell),bp(n,0:ell),dbp(n,0:ell))
++    allocate(ul(n,nl,0:ell),bul(n,nl,0:ell),upl(n,nl,0:ell),bpl(n,nl,0:ell))
++    allocate(p(nl+2,0:ell),s(nl+2,0:ell),ri(nl+2,nl+2,0:ell),ca(0:ell,nl),cb(0:ell,nl),cc(0:ell,nl))
++    allocate(es(0:ell),els(0:ell,nl),loor(nl,0:ell),rlo(nl,0:ell),lapw(0:ell))
++    es=e;els=999;els(ell,:nlo)=elocal
++    loor=.false.;loor(:nlo,ell)=.true.;rlo=.false.;lapw=.true.;lapw(ell)=lapw_flag==1
++    if(.not.lapw(ell)) loor(1,ell)=.false.
++    ilo=0;ilo(ell)=nlo
++    nt=nlo*(2*ell+1)
++    call ATPARN(u,du,b,db,up,dup,bp,dbp,ul,bul,upl,bpl,p,s,ri,ca,cb,cc, &
++         vr,n,es,els,loor,rlo,lapw,0,nt,0,ilo,mode==1,z,.false.,n,r0,dx,rmt,ell,ell,nl,n)
++    do j=1,np
++       if(lapw(ell)) then
++          al=rmt*rmt*(boundary(2,j)*p(2,ell)-boundary(1,j)*s(2,ell))
++          bl=rmt*rmt*(boundary(1,j)*s(1,ell)-boundary(2,j)*p(1,ell))
++       else
++          al=boundary(1,j)/p(1,ell);bl=0
++       endif
++       result(:,1,j)=al*u(:,ell)+bl*du(:,ell);result(:,2,j)=al*b(:,ell)+bl*db(:,ell)
++       result(:,3,j)=al*up(:,ell)+bl*dup(:,ell);result(:,4,j)=al*bp(:,ell)+bl*dbp(:,ell)
++    enddo
++    do j=1,nlo
++       result(:,1,np+j)=ca(ell,j)*u(:,ell)+cb(ell,j)*du(:,ell)+cc(ell,j)*ul(:,j,ell)
++       result(:,2,np+j)=ca(ell,j)*b(:,ell)+cb(ell,j)*db(:,ell)+cc(ell,j)*bul(:,j,ell)
++       result(:,3,np+j)=ca(ell,j)*up(:,ell)+cb(ell,j)*dup(:,ell)+cc(ell,j)*upl(:,j,ell)
++       result(:,4,np+j)=ca(ell,j)*bp(:,ell)+cb(ell,j)*dbp(:,ell)+cc(ell,j)*bpl(:,j,ell)
++    enddo
++  end subroutine
++  subroutine reference_forms(f,o,p)
++    real(dp),intent(in) :: f(n,4,m)
++    real(dp),intent(out) :: o(m,m),p(m)
++    integer :: i,j
++    do i=1,m
++       p(i)=Rint13n(n,f(:,1,i),f(:,2,i),projector(:,1),projector(:,2),r0,dx,mode==1)
++       do j=1,m
++          o(i,j)=RINT13(mode==1,f(:,1,i),f(:,2,i),f(:,1,j),f(:,2,j),n,dx,n,r0)
++       enddo
++    enddo
++  end subroutine
++end program
+diff --git a/src/dmft2/tests/check_lapw_radial_response.py b/src/dmft2/tests/check_lapw_radial_response.py
+new file mode 100644
+--- /dev/null
++++ b/src/dmft2/tests/check_lapw_radial_response.py
+@@ -0,0 +1,269 @@
++#!/usr/bin/env python3
++"""Independent ATPARN endpoint and adjoint checks of radial basis assembly.
++
++Only scratch build files are written. Material tests use spherical potentials,
++linearization energies/APW flags/ordinary LO slots from the energy-file header,
++and the on-disk projector where present. Header energies have file precision
++(usually five decimal places); vector files are not needed. These tests do not
++compute stresses. Spherical Bessel matching data are sampled at three qR values.
++"""
++from pathlib import Path
++import argparse
++import hashlib
++import json
++import math
++import re
++import shutil
++import subprocess
++import sys
++
++import numpy as np
++from scipy.special import spherical_jn
++
++
++def run(root, module, tests, work, compiler, directories):
++    atpar = root / "src/dmft2/atpar"
++    sources = [
++        atpar / (s + ".f90")
++        for s in [
++            "outwin",
++            "outwin_response",
++            "atpar",
++            "rint13",
++            "abc",
++            "diracout",
++            "dergl",
++            "inouh",
++            "inth",
++        ]
++    ]
++    sources += [module, tests / "test_lapw_radial_response.f90"]
++    executable = work / "test_lapw_radial_response"
++    build = subprocess.run(
++        [
++            compiler,
++            "-O2",
++            "-fcheck=bounds,pointer,mem,do",
++            "-ffpe-trap=invalid,zero,overflow",
++            *map(str, sources),
++            "-o",
++            str(executable),
++        ],
++        cwd=work,
++        capture_output=True,
++        text=True,
++    )
++    (work / "build.log").write_text(build.stdout + build.stderr)
++    build.check_returncode()
++    cases = []
++    n = 401
++    r0, rmt, z = 1e-4, 2.1, 26.0
++    dx = math.log(rmt / r0) / (n - 1)
++    r = r0 * np.exp(dx * np.arange(n))
++    # LAPW with two ordinary LOs and APW+lo with/without a higher LO.
++    for mode in (0, 1):
++        for lapw, energies in [
++            (True, []),
++            (True, [-1.2, 0.8]),
++            (False, [0.34]),
++            (False, [0.34, -1.2]),
++        ]:
++            cases.append(
++                dict(
++                    name=f"synthetic_{mode}_{int(lapw)}_{len(energies)}",
++                    mode=mode,
++                    ell=2,
++                    lapw=lapw,
++                    energy=0.34,
++                    elo=energies,
++                    z=z,
++                    r0=r0,
++                    rmt=rmt,
++                    dx=dx,
++                    potential=-2 * z * np.exp(-r) + 0.3 * r * r,
++                    projector=np.column_stack((r**3 * np.exp(-r), r * r * np.exp(-r))),
++                    projector_source="synthetic; finite at RMT",
++                )
++            )
++    provenance = {}
++    sys.path.insert(0, str(root / "src/python"))
++    from wstruct import Struct
++
++    for directory in directories:
++        structures = list(directory.glob("*.struct"))
++        if len(structures) != 1:
++            raise ValueError("need exactly one structure in " + str(directory))
++        structure = structures[0]
++        case = structure.stem
++        s = Struct()
++        s.ReadStruct(str(structure))
++        mode = int("RELA" in structure.read_text().splitlines()[2])
++        energy_file = directory / (case + ".energy")
++        if not energy_file.is_file():
++            energy_file = directory / (case + ".energy_0")
++        lines = energy_file.read_text().splitlines()
++        vsp = directory / (case + ".vsp")
++        blocks = re.split(r"ATOMNUMBER\s*=\s*\d+", vsp.read_text())[1:]
++        projectors = {}
++        projector_file = directory / "projectorw.dat"
++        if projector_file.is_file():
++            with projector_file.open() as stream:
++                count = int(stream.readline().split()[1])
++                for _ in range(count):
++                    nr, nr0, atom, ell = map(int, stream.readline().split()[1:])
++                    rows = np.array(
++                        [list(map(float, stream.readline().split())) for _ in range(nr)]
++                    )
++                    projectors[(atom - 1, ell)] = rows[:nr0, 1:3]
++        for path in [structure, energy_file, vsp, projector_file]:
++            if path.is_file():
++                provenance[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
++        for atom, n in enumerate(s.jrj):
++            header = [
++                float(lines[2 * atom][i : i + 9])
++                for i in range(0, len(lines[2 * atom]), 9)
++            ]
++            lo = [
++                float(lines[2 * atom + 1][i : i + 9])
++                for i in range(0, len(lines[2 * atom + 1]), 9)
++            ]
++            # Standard energy header: lomax=3, three LO slots; the final
++            # slot denotes DIRACOUT. Refuse active special LOs explicitly.
++            if len(lo) != 12:
++                raise ValueError("unsupported energy-header LO shape")
++            lo = np.array(lo).reshape(3, 4)
++            data = re.split(r"VLM\(R\)\s+FOR L\s+0\s+M=\s*0", blocks[atom])[1]
++            values = re.findall(r"[-+]?\d+\.\d+[DE][-+]\d+", data)[:n]
++            potential = np.array([float(v.replace("D", "E")) for v in values])
++            r0, rmt, z = s.r0[atom], s.rmt[atom], s.Znuc[atom]
++            dx = math.log(rmt / r0) / (n - 1)
++            r = r0 * np.exp(dx * np.arange(n))
++            for ell in range(4):
++                if lo[-1, ell] < 995:
++                    raise ValueError("DIRACOUT response not supported")
++                selected = lo[:, ell][lo[:, ell] < 995].tolist()
++                if any(lo[j, ell] >= 995 for j in range(len(selected))):
++                    raise ValueError("noncompact LO slots")
++                lapw = header[ell] <= 150
++                actual = (atom, ell) in projectors
++                projector = projectors.get(
++                    (atom, ell),
++                    np.column_stack((r ** (ell + 1) * np.exp(-r), r**ell * np.exp(-r))),
++                )
++                if projector.shape != (n, 2):
++                    raise ValueError("projector radial dimensions differ")
++                cases.append(
++                    dict(
++                        name=f"{case}_atom{atom+1}_l{ell}",
++                        mode=mode,
++                        ell=ell,
++                        lapw=lapw,
++                        energy=header[ell] - (0 if lapw else 200),
++                        elo=selected,
++                        z=z,
++                        r0=r0,
++                        rmt=rmt,
++                        dx=dx,
++                        potential=potential,
++                        projector=projector,
++                        projector_source=(
++                            str(projector_file)
++                            if actual
++                            else "synthetic; finite at RMT"
++                        ),
++                    )
++                )
++    rows = []
++    keys = [
++        "central_relative",
++        "basis_fd_relative",
++        "forms_fd_relative",
++        "basis_adjoint_relative",
++        "forms_adjoint_relative",
++        "wronskian",
++        "wronskian_directional_derivative",
++        "forward_seconds",
++        "adjoint_seconds",
++    ]
++    for case in cases:
++        n = len(case["potential"])
++        x = np.array([0.5, 1.4, 2.8])
++        boundary = np.array(
++            [
++                spherical_jn(case["ell"], x),
++                spherical_jn(case["ell"], x, derivative=True) * x / case["rmt"],
++            ]
++        )
++        path = work / (case["name"] + ".input")
++        with path.open("w") as f:
++            f.write(
++                f"{n} {case['mode']} {case['ell']} {int(case['lapw'])} {len(case['elo'])}\n"
++            )
++            f.write(
++                " ".join(
++                    format(case[k], ".17g") for k in ["r0", "dx", "rmt", "energy", "z"]
++                )
++                + "\n"
++            )
++            if case["elo"]:
++                f.write(" ".join(format(e, ".17g") for e in case["elo"]) + "\n")
++            for a in [boundary, case["potential"], case["projector"]]:
++                np.savetxt(f, np.asarray(a).ravel(order="F"), fmt="%.17g")
++        result = subprocess.run(
++            [str(executable), str(path)], cwd=work, capture_output=True, text=True
++        )
++        (work / (case["name"] + ".log")).write_text(result.stdout + result.stderr)
++        result.check_returncode()
++        values = list(map(float, result.stdout.split()))
++        if len(values) != len(keys):
++            raise RuntimeError("unexpected native test output")
++        rows.append(
++            {k: v for k, v in case.items() if k not in ["potential", "projector"]}
++            | dict(zip(keys, values))
++        )
++    report = dict(
++        rows=rows,
++        source_sha256={
++            str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources
++        },
++        material_sha256=provenance,
++    )
++    (work / "report.json").write_text(json.dumps(report, indent=2) + "\n")
++    return {
++        "cases": len(rows),
++        "maximum_errors": {k: max(r[k] for r in rows) for k in keys[:5]},
++        "maximum_action_seconds": max(r["forward_seconds"] for r in rows),
++        "report": str(work / "report.json"),
++    }
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument(
++        "--root", type=Path, default=Path(__file__).resolve().parents[3]
++    )
++    parser.add_argument("--module", type=Path)
++    parser.add_argument("--work", type=Path, required=True)
++    parser.add_argument("--compiler", default=shutil.which("gfortran"))
++    parser.add_argument("--case-directory", type=Path, action="append", default=[])
++    args = parser.parse_args()
++    args.work = args.work.resolve()
++    args.work.mkdir(parents=True, exist_ok=False)
++    module = args.module or args.root / "src/dmft2/atpar/lapw_radial_response.f90"
++    print(
++        json.dumps(
++            run(
++                args.root.resolve(),
++                module.resolve(),
++                Path(__file__).resolve().parent,
++                args.work,
++                args.compiler,
++                args.case_directory,
++            ),
++            indent=2,
++        )
++    )
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/src/python/frozen_sigma_tangent.py b/src/python/frozen_sigma_tangent.py
+--- a/src/python/frozen_sigma_tangent.py
++++ b/src/python/frozen_sigma_tangent.py
+@@ -2,9 +2,12 @@
+ """Cached forward/adjoint of the frozen-Sigma, stored-band density map.
+ 
+ The nonlinear endpoint implementation in frozen_sigma_response is deliberately
+-kept independent as an oracle. This module differentiates that SAME map: the
+-central LAPW basis is fixed and the complement contains only exported bands.
+-It is not a substitute for radial, core, geometry, or potential response.
++kept independent as an oracle. This module differentiates that SAME stored-band
++map. response() works in an orthonormal representation; generalized_response()
++also accepts explicit changes of the overlap metric and raw orbital overlaps.
++All inputs are in the central KS gauge and the complement contains only
++exported bands. This module does not construct radial, core, geometry, or
++spatial-potential perturbations; native adapters must supply those separately.
+ 
+ All adjoints below use Re sum(conj(y)*x), with no implicit k, spin, orbital,
+ or Matsubara weights. The output density already contains the 2*w_k factor.
+@@ -104,13 +107,28 @@
+         ).real
+         return result.reshape(y.shape, order="F")
+ 
+-    def embedding_response(self, dh):
++    def _raw_direction(self, derivative):
++        """Unnormalized orbital overlaps, in the central coefficient gauge."""
++        value = np.asarray(derivative, dtype=complex)
++        if value.shape != self.raw.shape or not np.all(np.isfinite(value)):
++            raise ValueError("invalid raw-projector derivative")
++        return value
++
++    def embedding_response(self, dh, raw_derivative=None):
++        """Differentiate Pi_W(H) phi X, including an explicit dphi if supplied.
++
++        dPi_W phi and Pi_W dphi are separate terms. Only the W rows of dphi
++        survive the central Pi_W; adding its Q rows would double count window
++        motion. The same symmetrized k-sum and dX act on their sum.
++        """
+         W, Q = self.W, self.Q
+         dq = np.zeros_like(self.raw)
+         for k, denominator in enumerate(self._denominators):
+             a = dh[k][np.ix_(Q, W)] / denominator
+             dq[k, Q] = np.einsum("an,nic->aic", a, self.raw[k, W])
+             dq[k, W] = np.einsum("na,aic->nic", a.conj().T, self.raw[k, Q])
++        if raw_derivative is not None:
++            dq[:, W] += self._raw_direction(raw_derivative)[:, W]
+         ds = self.meta.sym(
+             np.einsum("k,knic,knjc->ijc", self.kw, self.raw[:, W].conj(), dq[:, W])
+             + np.einsum("k,knic,knjc->ijc", self.kw, dq[:, W].conj(), self.raw[:, W])
+@@ -120,8 +138,8 @@
+         du[:, W] += self.apply_x(self.raw[:, W], dx)
+         return self.meta.compact(du), ds, dx
+ 
+-    def embedding_adjoint(self, y):
+-        """Pull a projector covector back to a Hermitian band-potential matrix.
++    def embedding_pullback(self, y):
++        """Return covectors of (dH, dphi) for embedding_response.
+ 
+         Reverse compacting, U=P X, dX, symmetry, the weighted k sum, and
+         finally dPi_W. The 1/2 in the last Hermitian projection is necessary:
+@@ -147,7 +165,13 @@
+             a_bar = np.einsum("aic,nic->an", dq_bar[k, Q], self.raw[k, W].conj())
+             a_bar += np.einsum("aic,nic->an", self.raw[k, Q], dq_bar[k, W].conj())
+             result[k][np.ix_(Q, W)] = a_bar / denominator
+-        return herm(result)
++        raw_bar = np.zeros_like(self.raw)
++        raw_bar[:, W] = dq_bar[:, W]
++        return herm(result), raw_bar
++
++    def embedding_adjoint(self, y):
++        """Compatibility interface: potential covector with dphi held zero."""
++        return self.embedding_pullback(y)[0]
+ 
+     @staticmethod
+     def _divided_difference(e, temperature):
+@@ -187,15 +211,18 @@
+                 )
+             )
+         mu = []
++        density = []
+         projector_gradient = np.zeros_like(self.uc)
+         for k in range(len(self.eps)):
+             dm = self._fermi(k, -np.eye(self.eps.shape[1]))
+             _, e, v, _, _, _ = self._static[k]
+             u = self.uc[k]
+             rho_inf = (v * expit(-e / self.meta.temperature)) @ v.conj().T
++            rho = rho_inf.copy()
+             projector_local = 2 * rho_inf @ u @ self.sinf
+             for a, stop, gw, gq, giw in self._chunks(k):
+                 weights = 2 * self.meta.temperature * self.meta.weights[a:stop]
++                rho[np.ix_(W, W)] += np.einsum("w,wij->ij", weights, herm(gw - giw))
+                 dm[np.ix_(W, W)] += np.einsum(
+                     "w,wij->ij", weights, herm(-gw @ gw + giw @ giw)
+                 )
+@@ -208,6 +235,7 @@
+                 )
+                 projector_local[W] += np.einsum("w,wia->ia", weights, part)
+             mu.append(2 * self.kw[k] * herm(dm))
++            density.append(2 * self.kw[k] * herm(rho))
+             projector_gradient[k] = 2 * self.kw[k] * projector_local
+             if self.precontract:
+                 self._prepare_contraction(k)
+@@ -216,7 +244,11 @@
+         self.compressibility = float(
+             np.trace(self.mu_response, axis1=1, axis2=2).real.sum()
+         )
+-        self._projector_potential_gradient = self.embedding_adjoint(projector_gradient)
++        self._central_density = np.asarray(density)
++        self._central_density.flags.writeable = False
++        self._projector_potential_gradient, self._projector_raw_gradient = (
++            self.embedding_pullback(projector_gradient)
++        )
+         self._ready = True
+         self._prepare_seconds = time.monotonic() - started
+ 
+@@ -408,12 +440,17 @@
+                 "ill-conditioned fixed-N response; select fixed mu explicitly"
+             )
+ 
+-    def response(self, dh, fixed_number=True, embedding=True):
+-        """JVP dH -> weighted d(rho); no central eigensystem is recomputed."""
++    def response(self, dh, fixed_number=True, embedding=True, raw_derivative=None):
++        """JVP (dH, dphi) -> weighted d(rho), in an orthonormal representation.
++
++        raw_derivative is the EXPLICIT unnormalized orbital-overlap change;
++        window motion and normalization are applied here, not by the caller.
++        Use generalized_response for a changing overlap metric.
++        """
+         started = time.monotonic()
+         dh = self._matrix(dh, "potential")
+         self.prepare()
+-        du, ds, dx = self.embedding_response(dh)
++        du, ds, dx = self.embedding_response(dh, raw_derivative)
+         if not embedding:
+             du[:] = 0
+         result = []
+@@ -453,8 +490,11 @@
+             cache=self.cache_info(),
+         )
+ 
+-    def adjoint(self, y, fixed_number=True, embedding=True):
++    def adjoint(self, y, fixed_number=True, embedding=True, return_raw=False):
+         """VJP of response, including the nonlocal projector-normalization chain.
++
++        With return_raw=True, return (H_bar,phi_bar); otherwise retain the
++        original potential-only interface. embedding=False freezes U entirely.
+ 
+         For fixed N, response = (I - b a^T/(a^T b)) response_mu, where b is
+         d(rho)/dmu and a^T extracts the total trace. Its transpose is NOT the
+@@ -495,9 +535,80 @@
+             answer[k] += di_bar
+             du_bar[k] += 2 * di_bar @ u @ self.sinf
+         answer = herm(answer)
++        raw_bar = np.zeros_like(self.raw)
+         if embedding:
+-            answer += self.embedding_adjoint(du_bar)
++            h_bar, raw_bar = self.embedding_pullback(du_bar)
++            answer += h_bar
++        if return_raw:
++            return herm(answer), raw_bar
+         return herm(answer)
++
++    def central_density(self):
++        """Same weighted central density as the independent endpoint oracle."""
++        self.prepare()
++        return self._central_density.copy()
++
++    def generalized_response(self, dh, do, raw_derivative=None, fixed_number=True):
++        """Moving-basis JVP (dH,dO,dphi) -> contravariant density coefficients.
++
++        All inputs are in the SAME central KS gauge, O0=I, H0=diag(eps).
++        phi is the raw overlap <basis|local orbital>. At first order the
++        symmetric orthonormalization O^-1/2 gives
++          h = dH - {dO,H0}/2,  phi1 = dphi - dO phi/2.
++        Apply the existing normalized-window response to (h,phi1), then
++        undo the moving orthonormalization of the density coefficients:
++          rho1_coeff = rho1_orth - {dO,rho0}/2.
++        Its trace alone is NOT dN: dN=Tr(rho1_coeff + rho0 dO). A density
++        reconstruction adapter must ALSO differentiate the basis functions.
++        This API supplies no geometry, radial, energy-search or core source.
++        """
++        dh = self._matrix(dh, "Hamiltonian derivative")
++        do = self._matrix(do, "overlap derivative")
++        raw = (
++            np.zeros_like(self.raw)
++            if raw_derivative is None
++            else self._raw_direction(raw_derivative)
++        )
++        effective_h = dh - 0.5 * (do * self.eps[:, None, :] + self.eps[:, :, None] * do)
++        effective_raw = raw - 0.5 * np.einsum("knm,kmic->knic", do, self.raw)
++        result, info = self.response(
++            effective_h, fixed_number=fixed_number, raw_derivative=effective_raw
++        )
++        result -= 0.5 * (do @ self._central_density + self._central_density @ do)
++        info = dict(
++            info,
++            coefficient_trace=float(np.trace(result, axis1=1, axis2=2).real.sum()),
++            metric_charge=real_inner(self._central_density, do),
++        )
++        info["dN"] = info["coefficient_trace"] + info["metric_charge"]
++        return herm(result), info
++
++    def generalized_adjoint(self, y, fixed_number=True):
++        """Exact real-Frobenius transpose of generalized_response.
++
++        Return (H_bar,O_bar,phi_bar). The density metric term uses the original
++        y, before the fixed-N projection; projecting it again breaks covariance.
++        """
++        y = self._matrix(y, "density covector")
++        hbar, rawbar = self.adjoint(y, fixed_number=fixed_number, return_raw=True)
++        obar = -0.5 * (hbar * self.eps[:, None, :] + self.eps[:, :, None] * hbar)
++        obar -= 0.5 * herm(np.einsum("knic,kmic->knm", rawbar, self.raw.conj()))
++        obar -= 0.5 * (y @ self._central_density + self._central_density @ y)
++        return hbar, herm(obar), rawbar
++
++    def projector_gradients(self):
++        """(H_bar,phi_bar) of the extra normalized-projector lattice term.
++
++        Contains no direct Tr(rho dH). Input phi_bar is before window selection
++        and normalization, suitable for reversing the native radial adapter.
++        The scalar is the regularized lattice scalar, not the total Klein
++        functional; no new total-stress term is installed by this method.
++        """
++        self.prepare()
++        return (
++            self._projector_potential_gradient.copy(),
++            self._projector_raw_gradient.copy(),
++        )
+ 
+     def projector_potential_gradient(self):
+         """Common band-potential gradient of the normalized-projector term.
+diff --git a/src/python/tests/test_generalized_sigma_response.py b/src/python/tests/test_generalized_sigma_response.py
+new file mode 100644
+--- /dev/null
++++ b/src/python/tests/test_generalized_sigma_response.py
+@@ -0,0 +1,162 @@
++"""Independent nonlinear endpoints and moving-basis covariance controls."""
++
++import unittest
++from unittest.mock import patch
++
++import numpy as np
++
++from frozen_sigma_response import herm, invsqrt
++from frozen_sigma_tangent import real_inner
++from test_frozen_sigma_tangent import complex_model
++
++
++def endpoint(model, dh, do, draw, step):
++    """Nonlinear Loewdin endpoint, independently rediagonalized and normalized."""
++    nb = model.eps.shape[1]
++    transform = np.array([invsqrt(np.eye(nb) + step * o) for o in do])
++    h = transform @ (np.array([np.diag(e) for e in model.eps]) + step * dh) @ transform
++    raw = np.einsum("knm,kmic->knic", transform, model.raw + step * draw)
++    q = np.zeros_like(raw)
++    for k in range(len(h)):
++        _, v = np.linalg.eigh(h[k])
++        window = v[:, model.W]
++        q[k] = np.einsum("nm,mic->nic", window @ window.conj().T, raw[k])
++    overlap = model.overlap(q) + model.offset
++    x = np.zeros_like(model.X)
++    for c, n in enumerate(model.meta.dimensions):
++        x[:n, :n, c] = np.eye(n)
++        active = np.flatnonzero(model.meta.active[:n, c])
++        ix = np.ix_(active, active)
++        x[:, :, c][ix] = invsqrt(overlap[:, :, c][ix])
++    u = model.meta.compact(model.apply_x(q, x))
++    delta = h - np.array([np.diag(e) for e in model.eps])
++    density = model.density(delta, 1.0, u)
++    return transform @ density @ transform, delta, u
++
++
++class GeneralizedResponseTests(unittest.TestCase):
++    def setUp(self):
++        self.model = complex_model()
++        rng = np.random.default_rng(386)
++        self.h = herm(rng.normal(size=(2, 5, 5)) + 1j * rng.normal(size=(2, 5, 5)))
++        self.o = herm(rng.normal(size=(2, 5, 5)) + 1j * rng.normal(size=(2, 5, 5)))
++        self.y = herm(rng.normal(size=(2, 5, 5)) + 1j * rng.normal(size=(2, 5, 5)))
++        self.raw = 0.2 * (
++            rng.normal(size=self.model.raw.shape)
++            + 1j * rng.normal(size=self.model.raw.shape)
++        )
++
++    def test_central_density_matches_full_resolvent_oracle(self):
++        np.testing.assert_allclose(
++            self.model.central_density(), self.model.density(), atol=2e-15
++        )
++
++    def test_explicit_raw_endpoint_and_pullback(self):
++        m = self.model
++        forward, _ = m.response(self.h, fixed_number=False, raw_derivative=self.raw)
++        zero = np.zeros_like(self.o)
++        h = 1e-5
++        plus, _, _ = endpoint(m, self.h, zero, self.raw, h)
++        minus, _, _ = endpoint(m, self.h, zero, self.raw, -h)
++        np.testing.assert_allclose(
++            (plus - minus) / (2 * h), forward, atol=2e-7, rtol=2e-7
++        )
++        for fixed_number in (False, True):
++            f, _ = m.response(
++                self.h, fixed_number=fixed_number, raw_derivative=self.raw
++            )
++            hb, rb = m.adjoint(self.y, fixed_number=fixed_number, return_raw=True)
++            np.testing.assert_allclose(
++                real_inner(self.y, f),
++                real_inner(hb, self.h) + real_inner(rb, self.raw),
++                atol=1e-11,
++            )
++
++    def test_outside_window_explicit_raw_is_projected_out(self):
++        raw = self.raw.copy()
++        raw[:, self.model.W] = 0
++        f, _, _ = self.model.embedding_response(np.zeros_like(self.h), raw)
++        np.testing.assert_array_equal(f, 0)
++
++    def test_generalized_nonlinear_endpoint_quadratic_convergence(self):
++        m = self.model
++        f, _ = m.generalized_response(self.h, self.o, self.raw, fixed_number=False)
++        errors = []
++        for h in (1e-4, 5e-5):
++            plus, _, _ = endpoint(m, self.h, self.o, self.raw, h)
++            minus, _, _ = endpoint(m, self.h, self.o, self.raw, -h)
++            errors.append(np.linalg.norm((plus - minus) / (2 * h) - f))
++        self.assertLess(errors[-1], 1e-5)
++        self.assertGreater(errors[0] / errors[1], 3.8)
++
++    def test_generalized_adjoint_both_ensembles_and_cache_modes(self):
++        for cache_mb in (0, 0.0035, 4):
++            m = complex_model(cache_mb=cache_mb)
++            for fixed_number in (False, True):
++                f, info = m.generalized_response(self.h, self.o, self.raw, fixed_number)
++                hb, ob, rb = m.generalized_adjoint(self.y, fixed_number)
++                np.testing.assert_allclose(
++                    real_inner(self.y, f),
++                    real_inner(hb, self.h)
++                    + real_inner(ob, self.o)
++                    + real_inner(rb, self.raw),
++                    atol=2e-11,
++                    rtol=2e-12,
++                )
++                if fixed_number:
++                    self.assertLess(abs(info["dN"]), 1e-13)
++                    self.assertGreater(abs(info["coefficient_trace"]), 1e-3)
++
++    def test_pure_basis_change_cancels_physical_density(self):
++        m = self.model
++        # Any complex A gives B(t)=B(0)(I+tA). This changes coefficients,
++        # overlap, Hamiltonian, and raw projector, but no physical operator.
++        a = 0.3 * self.h + 0.2j * self.o
++        ad = a.swapaxes(-1, -2).conj()
++        dh = ad * m.eps[:, None, :] + m.eps[:, :, None] * a
++        do = ad + a
++        draw = np.einsum("knm,kmic->knic", ad, m.raw)
++        rho = m.central_density()
++        for fixed_number in (False, True):
++            f, info = m.generalized_response(dh, do, draw, fixed_number)
++            np.testing.assert_allclose(f + a @ rho + rho @ ad, 0, atol=2e-13)
++            self.assertLess(abs(info["dN"]), 2e-13)
++            self.assertLess(abs(info["dmu"]), 2e-13)
++
++    def test_generalized_warm_action_has_no_eigensolve(self):
++        m = self.model
++        m.prepare()
++        with patch(
++            "frozen_sigma_tangent.eigh",
++            side_effect=AssertionError("eigh in warm action"),
++        ), patch(
++            "numpy.linalg.inv", side_effect=AssertionError("inverse in warm action")
++        ):
++            m.generalized_response(self.h, self.o, self.raw)
++            m.generalized_adjoint(self.y)
++
++    def test_common_projector_gradient_includes_explicit_raw(self):
++        m = self.model
++        hb, rb = m.projector_gradients()
++        h = 1e-5
++        _, _, up = endpoint(m, self.h, np.zeros_like(self.o), self.raw, h)
++        _, _, um = endpoint(m, self.h, np.zeros_like(self.o), self.raw, -h)
++        difference = (m.lattice_scalar(u=up) - m.lattice_scalar(u=um)) / (2 * h)
++        np.testing.assert_allclose(
++            difference,
++            real_inner(hb, self.h) + real_inner(rb, self.raw),
++            atol=1e-8,
++            rtol=1e-7,
++        )
++
++    def test_bad_raw_derivative_rejected(self):
++        with self.assertRaisesRegex(ValueError, "raw-projector"):
++            self.model.response(self.h, raw_derivative=self.raw[..., 0])
++        raw = self.raw.copy()
++        raw[0, 0, 0, 0] = np.nan
++        with self.assertRaisesRegex(ValueError, "raw-projector"):
++            self.model.generalized_response(self.h, self.o, raw)
++
++
++if __name__ == "__main__":
++    unittest.main()

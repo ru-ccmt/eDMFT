@@ -1,0 +1,13 @@
+test_complete_spatial_nonlinear_response (test_lapw_response_chain.ChainTests.test_complete_spatial_nonlinear_response) ... ok
+test_explicit_source_includes_each_path_once (test_lapw_response_chain.ChainTests.test_explicit_source_includes_each_path_once) ... ok
+test_full_chain_transpose_both_ensembles (test_lapw_response_chain.ChainTests.test_full_chain_transpose_both_ensembles) ... ok
+test_joint_coordinates_pairing (test_lapw_response_chain.ChainTests.test_joint_coordinates_pairing) ... ok
+test_missing_coordinate_adapter_is_rejected (test_lapw_response_chain.ChainTests.test_missing_coordinate_adapter_is_rejected) ... ok
+test_screened_chain_matches_dense_reference_and_one_adjoint (test_lapw_response_chain.ChainTests.test_screened_chain_matches_dense_reference_and_one_adjoint) ... ok
+test_central_band_gauge_covariance (test_lapw_response_assembly.AssemblyTests.test_central_band_gauge_covariance) ... ok
+test_native_order_and_transpose (test_lapw_response_assembly.AssemblyTests.test_native_order_and_transpose) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.046s
+
+OK

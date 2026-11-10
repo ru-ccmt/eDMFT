@@ -1,0 +1,50 @@
+"""Reconstruct complete generalized H/O in fixed coefficient coordinates.
+
+With all eigenvectors C saved, O=C^{-H}C^{-1}, H=C^{-H} e C^{-1}.
+Project to central stored C0 through T=C^{-1}C0. No phase matching between
+independently diagonalized eigenvectors is needed. This is a diagnostic, not
+a proposed production implementation.
+"""
+from run_tests import *
+from scipy.linalg import solve
+sys.path.insert(0,'/private/tmp/projector_cross_material_20261107')
+from analyze_cases import vectors
+from step_check import interpolate
+
+def run(case,kind,scale='1'):
+    scale=float(scale);label='' if scale==1 else '_small'
+    root=ROOT/(case+'_'+kind);c=root/'center'
+    cstruct=(c/(case+'.struct')).read_text().splitlines();nat=int(cstruct[1][27:30])
+    unit5=next(l for l in (c/'lapw1.def').read_text().splitlines() if l.split(',')[0].strip()=='5')
+    suffix='in1c' if 'in1c' in unit5 else 'in1';exe='lapw1c' if suffix=='in1c' else 'lapw1'
+    arrays={}
+    for sign in ['minus','plus']:
+        d=root/(sign+'_complete'+label);clone(c,d,case)
+        shutil.copy2(c/'lapw1.fixgvec',d/'lapw1.fixgvec');(d/'lapw1.fixgvec.read').touch()
+        if scale==1:shutil.copy2(root/sign/'basis.vsp',d/'basis.vsp')
+        else:interpolate(c/(case+'.vsp'),root/sign/'basis.vsp',d/'basis.vsp',scale)
+        p=d/(case+'.'+suffix);a=p.read_text().splitlines();a[-1]='K-VECTORS FROM UNIT:4   -9.0       1.0e10   0';p.write_text('\n'.join(a)+'\n')
+        execute(d,'lapw1',[str(WIEN/exe),'lapw1.def'],{'WIEN_LAPW1_BASIS_VSP':str(d/'basis.vsp')})
+        h,o,eps=[],[],[]
+        for (e,v,g,_),(e0,v0,g0,_) in zip(vectors(d/(case+'.vector'),nat),vectors(c/(case+'.vector'),nat)):
+            assert v.shape[0]==v.shape[1] and np.array_equal(g,g0),(v.shape,g.shape,g0.shape)
+            t=solve(v,v0,check_finite=False)
+            h.append(t.conj().T@(e[:,None]*t));o.append(t.conj().T@t);eps.append(e[:len(e0)])
+        arrays['h_'+sign]=np.array(h);arrays['o_'+sign]=np.array(o);arrays['e_'+sign]=np.array(eps)
+    s=json.loads((root/'summary.json').read_text());step=s['step']*scale
+    dh=(arrays['h_plus']-arrays['h_minus'])/(2*step);do=(arrays['o_plus']-arrays['o_minus'])/(2*step)
+    np.savez_compressed(root/('radial_HO_matrices'+label+'.npz'),dh=dh,do=do,**arrays)
+    weights=[];energies=[]
+    for line in (c/(case+'.weight')).read_text().splitlines():
+        a=line.split()
+        if len(a)==4 and a[0].isdigit() and a[1].isdigit():
+            energies.append(float(a[2]));weights.append(float(a[3]))
+    e=np.array(energies).reshape(dh.shape[:2]);w=np.array(weights).reshape(dh.shape[:2])
+    th=float(np.sum(w*np.diagonal(dh,axis1=1,axis2=2)).real)
+    to=float(np.sum(w*e*np.diagonal(do,axis1=1,axis2=2)).real)
+    result={'H_Ry':th,'rhoE_O_Ry':to,'H_minus_O_Ry':th-to,'fixed_DFT_weights_GPa':(th-to)*14710.507641078/(3*s['volume'])}
+    result['step']=step
+    result['fixed_weights_eigenvalue_fd_GPa']=float(np.sum(w*(arrays['e_plus']-arrays['e_minus']))/(2*step)*14710.507641078/(3*s['volume']))
+    (root/('matrix_control'+label+'.json')).write_text(json.dumps(result,indent=2)+'\n');print(result,flush=True)
+
+if __name__=='__main__':run(*sys.argv[1:])

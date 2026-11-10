@@ -1,0 +1,16 @@
+{
+  "material": "FeSe",
+  "kpoints": 3,
+  "bands": 66,
+  "central_native_relative": 7.844469936199003e-13,
+  "joint_reassembly_maximum": 8.326672684688674e-17,
+  "reverse_relative": 1.0757230476992271e-15,
+  "timing": {
+    "setup_seconds": 0.11474637500941753,
+    "fixed_basis_action_seconds": 0.13256091601215303,
+    "moving_basis_action_seconds": 0.16322737489826977,
+    "fixed_basis_reverse_seconds": 0.12574791721999645,
+    "complete_reverse_seconds": 0.1524543750565499
+  },
+  "scope": "3-k native density reconstruction, not complete screening or stress"
+}

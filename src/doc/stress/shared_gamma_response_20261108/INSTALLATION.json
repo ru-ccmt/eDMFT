@@ -1,0 +1,16 @@
+{
+  "status": "installed",
+  "time_utc": "2026-11-09T01:15:30.070775+00:00",
+  "payload_files": 13,
+  "authorization": "User: You can apply the changes.",
+  "source_root": "/Users/haule/projects/eDMFT_new",
+  "helpers": "/Users/haule/dbin",
+  "all_hashes_verified": true,
+  "native_executable_replaced": false,
+  "post_install_tests": {
+    "repository": 169,
+    "dbin": 169,
+    "skips": 0
+  },
+  "post_install_hashes_verified": true
+}

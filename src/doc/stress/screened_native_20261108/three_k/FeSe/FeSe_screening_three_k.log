@@ -1,0 +1,50 @@
+FeSe three_k valence prepared 3.9256232499610633
+FeSe screening prepared {"fixed_number": true, "target_charge": 120.0, "normalization_enabled": true, "normalization_alpha": 1.2225760157655772, "central_valence_relative_error": 9.508517861672094e-13, "central_core_relative_error": 1.0474802877471612e-13, "central_fixed_point_residual_norm": 2.5520947851647175, "kpoints": 3, "retained_bands": 66, "matrix_quadrature": "wien2k24", "stress_applied": false}
+FeSe forward 1 seconds 0.9274866660125554
+FeSe forward 2 seconds 0.8996881667990237
+FeSe forward 3 seconds 0.9308509160764515
+FeSe forward 4 seconds 0.9565672921016812
+FeSe forward 5 seconds 0.9376859590411186
+FeSe forward 6 seconds 0.9190328328404576
+FeSe forward 7 seconds 0.879221040988341
+FeSe forward 8 seconds 0.9117643749341369
+FeSe forward 9 seconds 1.023541749920696
+FeSe forward 10 seconds 1.0032775839790702
+FeSe forward 11 seconds 0.9816577918827534
+FeSe forward 12 seconds 0.9662028329912573
+FeSe forward 13 seconds 1.0046544999349862
+FeSe FORWARD SOLVED {"converged": true, "gmres_info": 0, "direction": "forward", "residual_norm": 1.2906947135221068e-05, "threshold": 3.745105277201869e-05, "actions": 13, "inner_residual_history": [0.69311555054255, 0.2956433739186995, 0.0255788888584311, 0.007374036446074382, 0.0012876502176349823, 0.0002057088983861764, 1.610414466683721e-05, 1.5918653597547713e-06, 2.9037623825776356e-07, 4.8223345434387435e-08, 6.892688732448222e-09], "seconds": 12.344542041886598, "fixed_number": true, "target_charge": 120.0, "normalization_enabled": true, "normalization_alpha": 1.2225760157655772, "central_valence_relative_error": 9.508517861672094e-13, "central_core_relative_error": 1.0474802877471612e-13, "central_fixed_point_residual_norm": 2.5520947851647175, "kpoints": 3, "retained_bands": 66, "matrix_quadrature": "wien2k24", "stress_applied": false, "source_charge": 7.66249286243692e-11, "response_charge": 7.656451883582477e-11}
+FeSe verify_p_1e-05 native completed
+FeSe verify_m_1e-05 native completed
+FeSe NATIVE RESIDUAL 1e-05 {'norm': 0.00023344034664264212, 'relative_to_source': 1.2466423737869154e-07, 'jacobian_relative': 1.8984280052949708e-07}
+FeSe verify_p_5e-06 native completed
+FeSe verify_m_5e-06 native completed
+FeSe NATIVE RESIDUAL 5e-06 {'norm': 6.734238982039158e-05, 'relative_to_source': 3.596288212795235e-08, 'jacobian_relative': 5.441774367135728e-08}
+FeSe adjoint 1 seconds 1.225643791956827
+FeSe adjoint 2 seconds 1.1789057499263436
+FeSe adjoint 3 seconds 1.204859625082463
+FeSe adjoint 4 seconds 1.1682456249836832
+FeSe adjoint 5 seconds 1.1487254579551518
+FeSe adjoint 6 seconds 1.1315948329865932
+FeSe adjoint 7 seconds 1.1098213330842555
+FeSe adjoint 8 seconds 1.1958694579079747
+FeSe adjoint 9 seconds 1.211435457924381
+FeSe adjoint 10 seconds 1.1630778331309557
+FeSe adjoint 11 seconds 1.151039417134598
+FeSe adjoint 12 seconds 1.1743632920552045
+FeSe adjoint 13 seconds 1.286864709109068
+FeSe adjoint 14 seconds 1.2214201670140028
+FeSe adjoint 15 seconds 1.2673936248756945
+FeSe adjoint 16 seconds 1.316114999819547
+FeSe adjoint 17 seconds 1.2538786248769611
+FeSe ADJOINT SOLVED {"converged": true, "gmres_info": 0, "direction": "adjoint", "residual_norm": 1.1354930679859165e-09, "threshold": 7.56040587758006e-09, "actions": 17, "inner_residual_history": [0.9999884726011982, 0.9988354548865728, 0.9944865103523242, 0.8471659967226335, 0.306556299104733, 0.10887426496979431, 0.014692930272439864, 0.004376137756270776, 0.001331344408214921, 0.00027967534767008923, 6.04686853495076e-05, 3.6300268403675246e-06, 3.776536845910047e-07, 3.340561021979812e-08, 3.0149520609722155e-09], "seconds": 20.414003249956295, "observable": "MT electron number on atom 1 including its multiplicity", "forward_contraction": 2.5926153512026855, "adjoint_contraction": 2.5926157411113273, "absolute_difference": 3.89908641817982e-07}
+FeSe forward 14 seconds 1.0440477500669658
+FeSe forward 15 seconds 1.050240834010765
+FeSe forward 16 seconds 1.0594584590289742
+FeSe forward 17 seconds 1.0344846670050174
+FeSe forward 18 seconds 1.0965557920280844
+FeSe forward 19 seconds 1.163193583022803
+FeSe forward 20 seconds 1.0295539998915046
+FeSe forward 21 seconds 1.0473141248803586
+FeSe forward 22 seconds 1.0682993340305984
+FeSe completed

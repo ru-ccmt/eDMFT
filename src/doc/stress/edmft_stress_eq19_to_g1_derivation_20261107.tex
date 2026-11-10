@@ -1,0 +1,365 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath,amssymb,bm,booktabs,longtable,array,hyperref,xcolor}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,microtype,needspace}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\allowdisplaybreaks
+\newcommand{\Tr}{\operatorname{Tr}}
+\newcommand{\Rea}{\operatorname{Re}}
+\newcommand{\dd}{\mathrm d}
+\newcommand{\ii}{\mathrm i}
+\newcommand{\MT}{\mathrm{MT}}
+\newcommand{\KS}{\mathrm{KS}}
+\newcommand{\Id}{\mathbb I}
+\title{From Eq. (19) to Eq. (G1):\\The LAPW kinetic stress and its full DFT+eDMFT matrix form}
+\author{Derivation and implementation audit for the eDMFT project}
+\date{7 November 2026}
+\begin{document}
+\maketitle
+\begin{abstract}
+This note derives the four muffin-tin rows and the interstitial row of Eq. (G1) of Belbase, Tr\"oster, and Blaha, Phys. Rev. B \textbf{104}, 174113 (2021), directly from Eq. (19). Every row is first derived as an operator acting on an arbitrary augmented function, before any diagonal Kohn--Sham occupation is introduced. The resulting bilinear matrix is contracted with the full DMFT density matrix. An independent Cartesian-polynomial test of the actual Fortran loops exposes two traceless implementation errors: an earlier introduced factor $1/2$ incorrectly removes a product-rule term, and a separate LO--LO factor of two double counts part of the contraction. A radial derivative also uses an uninitialized parity flag. These findings do not establish that the remaining hydrostatic discrepancy is solved. The distinction between a local strong Hessian, a globally Hermitian kinetic form, and the APW surface correction is kept explicit.
+\end{abstract}
+\setcounter{tocdepth}{1}
+{\small\tableofcontents}
+\newpage
+
+\section{Scope, conventions, and every index}
+We keep the unstrained cell volume $\Omega$, atom centers $\bm\tau_a$, muffin-tin radii $R_a$, and fractional $\bm k$-point weights $w_k$ explicit. The weights are constant under the strain derivative. Indices $\alpha,\beta\in\{x,y,z\}$ denote Cartesian components; $a$ labels atoms; $m,n$ label KS bands. $L=(l,m_l)$ is an angular channel, with $m_l$ a magnetic quantum number, not a band index. $\lambda$ labels a radial primitive: $u_l$, its energy derivative $\dot u_l$, or an additional local-orbital radial solution. An actual LO is the corresponding linear combination of these primitives; its coefficients are included in the expansion below. The dagger means conjugate transpose.
+
+The radial coordinate $r=|\bm r-\bm\tau_a|$ and direction $\bm n=(\bm r-\bm\tau_a)/r$ are local to atom $a$. Complex spherical harmonics use the normalized Condon--Shortley convention, $\int Y_{L'}^*Y_L\dd\bm n=\delta_{L'L}$. Radial primes mean $\dd/\dd r$; a strain derivative is written $\partial_\mu$. We use Hartree atomic units in the derivation. A separate section explains the Rydberg conversion in the code.
+
+For the symmetric strain component $\mu=(\alpha\beta)$ define
+\begin{equation}
+ E^{\alpha\beta}_{ij}=\tfrac12(\delta_{i\alpha}\delta_{j\beta}+\delta_{i\beta}\delta_{j\alpha}),\qquad F(t)=\Id+t E^{\alpha\beta}.
+\end{equation}
+For $\alpha\ne\beta$, this convention sets both tensor shear entries to $t/2$. If instead both entries are set to $t$, the derivative is twice the component written here. For isotropic strain $F=(1+t)\Id$, the energy derivative is $\Omega\Tr\bm\sigma$, not $\Omega\Tr\bm\sigma/3$.
+
+\section{Why Eq. (19) is the kinetic operator derivative}
+Under the affine pullback to unstrained coordinates, the kinetic operator is
+\begin{equation}
+ \hat T(t)=-\tfrac12\partial_i\big[(F^{-1}F^{-T})_{ij}\partial_j\big].
+\end{equation}
+The coefficients are spatially constant. Since $\partial_t(F^{-1}F^{-T})|_0=-2E^{\alpha\beta}$,
+\begin{equation}\label{eq:K}
+ \boxed{\partial_\mu\hat T=\hat K_{\alpha\beta}
+ =\tfrac12(\partial_\alpha\partial_\beta+\partial_\beta\partial_\alpha).}
+\end{equation}
+On smooth functions the two derivatives commute. Retaining their symmetric form makes the tensor convention explicit. The Jacobian and the wavefunction normalization are handled in the pulled-back Hilbert-space representation; they must not be inserted a second time into this explicit operator derivative.
+
+For diagonal DFT occupations $f_{nk}$, Eq. (19) is exactly
+\begin{equation}\label{eq:19}
+ \sigma^{\mathrm{val,kin}}_{\alpha\beta}
+ =\frac1\Omega\sum_{kn}w_k f_{nk}
+ \langle\psi_{nk}|\hat K_{\alpha\beta}|\psi_{nk}\rangle.
+\end{equation}
+The paper absorbs the appropriate $k$ weights in its occupation convention. Equation \eqref{eq:19} is one contribution to the total stress. It is not a claim that kinetic stress alone is stationary, or that a muffin-tin piece alone has vanishing boundary terms.
+
+\section{The full DMFT contraction, before a basis expansion}
+At the stationary DFT+eDMFT Klein functional, the one-particle variation can be organized as
+\begin{equation}\label{eq:klein}
+ \partial_\mu\Gamma\big|_{\mathrm{1p}}=
+ \sum_k w_k\Rea\Tr\big[\rho_k H'_{k,\mu}-\rho^E_k O'_{k,\mu}\big]
+ +2\sum_k w_k\Rea\Tr[C_k U'_{k,\mu}],
+\end{equation}
+with the remaining electrostatic, exchange-correlation, core, and local-functional contributions assembled consistently. This equation specifies the relevant part of the variation, not the complete value of $\Gamma$. Here $H$ and $O$ are Hamiltonian and overlap matrices in the moving basis, $\rho$ is the density matrix, and $\rho^E$ is its energy moment. More explicitly, in the band frame,
+\[\rho_k=[T\sum_{\omega}G_k(\ii\omega)]_{\rm reg},\qquad \rho_k^E=[T\sum_{\omega}(\ii\omega+\mu)G_k(\ii\omega)]_{\rm reg}.\]
+Here $\mu$ is the chemical potential, $\omega=(2j+1)\pi T$ is a fermionic Matsubara frequency, and reg denotes the convergent contour/high-frequency prescription, including removal of the constant contact term in the energy moment. These are definitions, not a prescription to sum a divergent unregularized series. In the central orthonormal band frame $O=\Id$, but generally $O'\ne0$.
+
+The normalized projector is $U_k=P_kX$, with band-by-orbital $P_k$ and orbital normalization $X=S^{-1/2}$. $S$ is the Brillouin-zone summed, appropriately symmetrized projector metric in the implemented convention. Both $P'$ and $X'$ contribute to $U'$; no projector normalization is omitted by calling $U$ a projector. The rectangular conjugate quantity is
+\begin{equation}
+ C_k=T\sum_{\omega} \Sigma_{\mathrm{eff}}(\ii\omega)U_k^\dagger G_k(\ii\omega),
+\end{equation}
+with the code's convergent frequency completion understood. $\Sigma_{\mathrm{eff}}$ includes the double-counting subtraction, and $T$ here is temperature in energy units, not the kinetic matrix. This convention fixes the matrix dimensions in $\Tr(CU')$.
+
+The explicit kinetic-operator part of $H'$ in Eq. \eqref{eq:klein} gives
+\begin{align}
+ T^{\alpha\beta}_{mn,k}&=\langle\psi_{mk}|\hat K_{\alpha\beta}|\psi_{nk}\rangle,\label{eq:tmn}\\
+ \boxed{\sigma^{G1}_{\alpha\beta}=\frac1\Omega\sum_k w_k\Rea\Tr[\rho_k T^{\alpha\beta}_k].}\label{eq:dmft}
+\end{align}
+The real part and boundary qualifications are explained below. No commutation of $\rho_k$ with the diagonal KS energy matrix is assumed. No new $\rho^E$ or $C$ term is inserted \emph{inside this explicit kinetic block}; their contributions remain in the other blocks of Eq. \eqref{eq:klein}. Stationarity removes implicit Green-function/self-energy response from the first derivative of the full functional; it does not remove basis, metric, window, or normalized-projector derivatives.
+
+\section{The product rule that generates all four rows of G1}
+Define the tangential derivative on the unit sphere and multiplication by its normal:
+\begin{equation}
+ \mathcal D_\alpha=(\delta_{\alpha j}-n_\alpha n_j)\frac{\partial}{\partial n_j},\qquad
+ N_\alpha f=n_\alpha f,\qquad
+ \partial_\alpha=n_\alpha\partial_r+r^{-1}\mathcal D_\alpha.
+\end{equation}
+In particular,
+\begin{equation}\label{eq:product}
+ \mathcal D_\beta n_\alpha=\delta_{\alpha\beta}-n_\alpha n_\beta,\qquad
+ \mathcal D_\beta(n_\alpha Y)=(\delta_{\alpha\beta}-n_\alpha n_\beta)Y+n_\alpha\mathcal D_\beta Y.
+\end{equation}
+For one arbitrary radial primitive $u(r)Y_L(\bm n)$, the first derivative is
+\begin{equation}
+ \partial_\alpha(uY_L)=n_\alpha u'Y_L+\frac{u}{r}\mathcal D_\alpha Y_L.
+\end{equation}
+\Needspace{12\baselineskip}
+Apply $\partial_\beta=n_\beta\partial_r+r^{-1}\mathcal D_\beta$ to \emph{both} terms. The four results are
+\begin{subequations}\label{eq:four}
+\begin{align}
+ \partial_\beta\partial_\alpha(uY_L)
+ ={}&n_\beta n_\alpha u''Y_L\label{eq:foura}\\*
+ &+\frac{u'}r\mathcal D_\beta(n_\alpha Y_L)\label{eq:fourb}\\*
+ &+\left(\frac{u'}r-\frac{u}{r^2}\right)n_\beta\mathcal D_\alpha Y_L\label{eq:fourc}\\*
+ &+\frac{u}{r^2}\mathcal D_\beta\mathcal D_\alpha Y_L.\label{eq:fourd}
+\end{align}
+\end{subequations}
+The derivative of $1/r$ produces the minus sign in Eq. \eqref{eq:fourc}. The derivative in Eq. \eqref{eq:fourb} acts on the product $n_\alpha Y_L$, \emph{not only on $n_\alpha$}. Symmetrizing $\alpha,\beta$ gives the four rows of the printed G1. All factors of $1/2$ arise from that Cartesian symmetrization.
+
+If the product in Eq. \eqref{eq:fourb} is expanded using Eq. \eqref{eq:product}, the same Hessian becomes
+\begin{align}\label{eq:regroup}
+ \hat K_{\alpha\beta}(uY_L)={}&u''N_\alpha N_\beta Y_L
+ +\frac{u'}r(\delta_{\alpha\beta}-N_\alpha N_\beta)Y_L\nonumber\\
+ &+\left(\frac{2u'}r-\frac{u}{r^2}\right)
+ \frac{N_\alpha\mathcal D_\beta+N_\beta\mathcal D_\alpha}{2}Y_L
+ +\frac{u}{r^2}\frac{\mathcal D_\beta\mathcal D_\alpha+\mathcal D_\alpha\mathcal D_\beta}{2}Y_L.
+\end{align}
+\textbf{The coefficient is $2u'/r-u/r^2$.} One copy of $u'/r$ comes from Eq. \eqref{eq:fourb}, the other from Eq. \eqref{eq:fourc}. This is the source-level distinction that the earlier factor-$1/2$ correction missed.
+
+\section{Primitive matrices: explicit off-diagonal G1}
+Let $i=(L',\lambda')$ denote a bra primitive and $j=(L,\lambda)$ a ket primitive on one atom. Define radial matrices
+\begin{align}
+ R^{(2)}_{ij}&=\int_0^{R_a}r^2 u_i^*(r)u_j''(r)\dd r,\\
+ R^{(1)}_{ij}&=\int_0^{R_a}r u_i^*(r)u_j'(r)\dd r,\\
+ R^{(0)}_{ij}&=\int_0^{R_a}u_i^*(r)u_j(r)\dd r.
+\end{align}
+Unlike the $G2$ bra derivative, these derivatives act on the \emph{ket}. The radial functions are normally real; the conjugation is retained to state the bilinear convention unambiguously.
+
+Use the following angular operators, with matrix elements between $Y_{L'}$ and $Y_L$:
+\begin{align}
+ A_1^{\alpha\beta}&=\tfrac12(N_\beta N_\alpha+N_\alpha N_\beta),\\
+ A_2^{\alpha\beta}&=\tfrac12(\mathcal D_\beta N_\alpha+\mathcal D_\alpha N_\beta),\\
+ A_3^{\alpha\beta}&=\tfrac12(N_\beta\mathcal D_\alpha+N_\alpha\mathcal D_\beta),\\
+ A_4^{\alpha\beta}&=\tfrac12(\mathcal D_\beta\mathcal D_\alpha+\mathcal D_\alpha\mathcal D_\beta).
+\end{align}
+Products mean operator composition, including differentiation of everything to their right. The primitive strong matrix is
+\begin{equation}\label{eq:primitive}
+ \boxed{K^{a,\alpha\beta}_{ij}=R^{(2)}_{ij}(A_1)_{L'L}
+ +R^{(1)}_{ij}(A_2)_{L'L}
+ +(R^{(1)}_{ij}-R^{(0)}_{ij})(A_3)_{L'L}
+ +R^{(0)}_{ij}(A_4)_{L'L}.}
+\end{equation}
+No Kronecker delta in the band labels was used. Expanding
+\begin{equation}
+ \psi_{nk}^{a}(\bm r)=\sum_i A^a_{in k}u_i(r)Y_i(\bm n),
+\end{equation}
+gives the exact off-diagonal local matrix
+\begin{equation}\label{eq:offdiag}
+ T^{a,\alpha\beta}_{mn,k}=\sum_{ij}(A^a_{im k})^*K^{a,\alpha\beta}_{ij}A^a_{jn k}.
+\end{equation}
+Here $A^a$ collectively denotes the usual ALM, BLM, and CLM coefficients. There is no additional factor of two for a pair of LO primitives. Ordered bra--ket pairs already occur in the double sum.
+
+The product rule implies
+\begin{equation}
+ A_2=\delta_{\alpha\beta}\Id-A_1+A_3.
+\end{equation}
+Consequently the grouping actually used by the existing F1--F4 code is
+\begin{equation}\label{eq:code}
+ \boxed{K=R^{(2)}A_1+R^{(1)}(\delta_{\alpha\beta}\Id-A_1)
+ +(2R^{(1)}-R^{(0)})A_3+R^{(0)}A_4.}
+\end{equation}
+Equations \eqref{eq:primitive} and \eqref{eq:code} are identical, but their second and third rows cannot be compared individually without the product-rule rearrangement.
+
+\section{Recovering the printed Gaunt sums, row by row}
+Define the Gaunt integral with its conjugated first harmonic:
+\begin{equation}
+ \mathcal G^{M,m_1,m_2}_{J,l_1,l_2}
+ =\int Y_{JM}^*Y_{l_1m_1}Y_{l_2m_2}\dd\bm n.
+\end{equation}
+Define coefficients $c_{\alpha t}$ and $d_\alpha^{st}(l,m_l)$ by
+\begin{align}
+ n_\alpha&=\sum_{t=-1}^1c_{\alpha t}Y_{1t},\\
+ \mathcal D_\alpha Y_{lm_l}&=\sum_{s=\pm1}\sum_{t=-1}^1d_\alpha^{st}(l,m_l)Y_{l+s,m_l+t}.
+\end{align}
+The paper calls the second coefficient $c_\alpha^{st}$; we call it $d$ to avoid confusing two different objects. These equations (or projection onto the outgoing harmonic) define every coefficient. Explicitly,
+\begin{equation}
+ c_{x,-1}=\sqrt{2\pi/3},\quad c_{x,1}=-\sqrt{2\pi/3},\quad
+ c_{y,\pm1}=\ii\sqrt{2\pi/3},\quad c_{z,0}=\sqrt{4\pi/3},
+\end{equation}
+with all unlisted entries zero. Invalid magnetic indices and negative angular momenta give zero.
+
+\Needspace{22\baselineskip}
+In the following formulas $L'=(l',m')$, $L=(l,m)$, where $m,m'$ are magnetic indices only. $J,M$ are intermediate angular indices. Each displayed $A_q$ already contains the $1/2$ which is outside the entire muffin-tin sum in printed G1:
+\begin{align}
+ (A_1)_{L'L}={}&\tfrac12\sum_{tt'}(c_{\alpha t}c_{\beta t'}+c_{\beta t}c_{\alpha t'})
+ \sum_{JM}\mathcal G^{M,t,m}_{J,1,l}\mathcal G^{m',t',M}_{l',1,J},\label{eq:a1}\\*
+ (A_2)_{L'L}={}&\tfrac12\sum_{tt'JM}\sum_{s'=\pm1}\mathcal G^{M,t,m}_{J,1,l}
+ [c_{\alpha t}d_\beta^{s't'}(J,M)+c_{\beta t}d_\alpha^{s't'}(J,M)]\nonumber\\*
+ &\hspace{32mm}\times\delta_{l',J+s'}\delta_{m',M+t'},\label{eq:a2}\\*
+ (A_3)_{L'L}={}&\tfrac12\sum_{s=\pm1}\sum_{tt'}
+ [d_\alpha^{st}(l,m)c_{\beta t'}+d_\beta^{st}(l,m)c_{\alpha t'}]
+ \mathcal G^{m',t',m+t}_{l',1,l+s},\label{eq:a3}\\*
+ (A_4)_{L'L}={}&\tfrac12\sum_{s,s'=\pm1}\sum_{tt'}
+ [d_\alpha^{st}(l,m)d_\beta^{s't'}(l+s,m+t)\nonumber\\*
+ &\hspace{18mm}+d_\beta^{st}(l,m)d_\alpha^{s't'}(l+s,m+t)]
+ \delta_{l',l+s+s'}\delta_{m',m+t+t'}.\label{eq:a4}
+\end{align}
+Multiplying these rows respectively by $R^{(2)}$, $R^{(1)}$, $R^{(1)}-R^{(0)}$, and $R^{(0)}$, and then by $(A_{imk})^*A_{jnk}$ gives G1 before diagonal occupation contraction. Setting $m=n$ in the band labels and contracting with $w_k f_{nk}$ recovers the paper. Replacing that diagonal contraction by Eq. \eqref{eq:dmft} gives DMFT.
+
+The second derivative coefficient in \emph{both} terms of Eq. \eqref{eq:a4} is evaluated at $(l+s,m+t)$. Inspection of the original PDF confirms this: no typo in that argument is claimed. Products of $c$ on the ket side are not arbitrarily conjugated; the bra conjugation is already fixed by $\mathcal G$ and $(A_{imk})^*$. Intermediate $l+1$ channels must be retained even at the largest retained radial $l$.
+
+\section{The interstitial row and its off-diagonal form}
+Let $\bm q_G=\bm k+\bm G$ and
+\begin{equation}
+ \psi_{nk}^{I}=\Omega^{-1/2}\sum_Gc_{Gn k}e^{\ii\bm q_G\cdot\bm r},\qquad
+ \theta_{GG'}=\Omega^{-1}\int_I e^{\ii(\bm q_{G'}-\bm q_G)\cdot\bm r}\dd^3r.
+\end{equation}
+$\theta$ is Hermitian. Since $\hat K_{\alpha\beta}e^{\ii\bm q\cdot\bm r}=-q_\alpha q_\beta e^{\ii\bm q\cdot\bm r}$, define the diagonal plane-wave matrix $(Q_{\alpha\beta})_{GG'}=\delta_{GG'}q_{G\alpha}q_{G\beta}$ and obtain
+\begin{equation}\label{eq:interstitial}
+ T^{I,\mathrm{ket}}_{\alpha\beta}=-c^\dagger\theta Q_{\alpha\beta}c.
+\end{equation}
+This is the first row of printed G1. Some code contractions place $q_\alpha q_\beta$ on the bra instead, giving $-c^\dagger Q_{\alpha\beta}\theta c=(T^{I,\mathrm{ket}})^\dagger$. For any Hermitian $\rho$,
+\begin{equation}
+ \Rea\Tr(\rho T^{I,\mathrm{ket}})=\Rea\Tr(\rho T^{I,\mathrm{bra}})
+ =-\tfrac12\Tr[\rho c^\dagger\{\theta,Q_{\alpha\beta}\}c].
+\end{equation}
+Thus that placement alone is not an off-diagonal DMFT error. The equality needs the real Hermitian-density contraction; it is not an equality of the unsymmetrized matrices themselves.
+
+\section{Boundary terms: what may and may not be Hermitized}
+A single muffin-tin integral of $\psi_m^*\partial_\alpha\partial_\beta\psi_n$ need not be Hermitian. Integration by parts leaves its surface term. For a continuous periodic augmented function, define
+\begin{align}
+ Q^{\alpha\beta}_{mn}&=\tfrac12\int_\Omega[(\partial_\alpha\psi_m)^*\partial_\beta\psi_n
+ +(\partial_\beta\psi_m)^*\partial_\alpha\psi_n]\dd^3r,\\
+ B^{\alpha\beta}_{mn}&=\sum_a R_a^2\int\dd\bm n\,n_\alpha n_\beta\psi_m^*(R_a,\bm n)
+ [\partial_r\psi_n^{\MT}-\partial_r\psi_n^I]_{R_a}.
+\end{align}
+The sum $K_{\mathrm{reg}}$ of the regular, separately evaluated MT and interstitial Hessians satisfies
+\begin{equation}
+ K_{\mathrm{reg}}=-Q+B,\qquad T_{\mathrm{weak}}=K_{\mathrm{reg}}-B=-Q.
+\end{equation}
+For a differentiably matched LAPW function the jump vanishes. For APW+lo it does not generally vanish; the dedicated APW kinetic surface correction is required. In practice finite harmonic truncations also require the same boundary bookkeeping used in the basis representation. One cannot replace just the MT Hessian by minus its gradient integral and silently discard the boundary.
+
+The full DMFT form uses the same bilinear surface expression with $m,n$ independent. Taking the Hermitian part of a matrix is harmless inside $\Rea\Tr(\rho K)$ for Hermitian $\rho$; dropping the surface term is a different operation and is not justified by Hermiticity.
+
+\section{Why density pseudo-bands are exact for G1}
+Diagonalize a Hermitian matrix $\rho=V d V^\dagger$. Define transformed coefficients $\widetilde A=AV$ and $\widetilde c=cV$. Then
+\begin{equation}
+ \Tr(\rho T)=\sum_s d_s\langle\widetilde\psi_s|\hat K|\widetilde\psi_s\rangle,
+ \qquad \widetilde\psi_s=\sum_n\psi_n V_{ns}.
+\end{equation}
+This is an exact change of contraction basis, including complex off-diagonal densities and signed eigenvalues for response matrices. No KS eigenvalue equation for $\widetilde\psi_s$ is required. G1 contains no band energy multiplying its Hessian. That is why its off-diagonal extension is simpler than G2, where the distinction between $\rho$ and $\rho^E$ is essential. Numerical truncation of small density eigenvalues is a separate approximation, not part of this identity.
+
+\section{Trace checks and a decisive counterexample}
+On the sphere,
+\begin{equation}
+ \sum_\alpha(A_1)_{\alpha\alpha}=\Id,\quad
+ \sum_\alpha(A_2)_{\alpha\alpha}=2\Id,\quad
+ \sum_\alpha(A_3)_{\alpha\alpha}=\bm n\cdot\bm{\mathcal D}=0,\quad
+ \sum_\alpha(A_4)_{\alpha\alpha}=\Delta_{S^2}.
+\end{equation}
+Therefore
+\begin{equation}
+ \sum_\alpha K^{\alpha\alpha}_{ij}=\delta_{L'L}
+ [R^{(2)}_{ij}+2R^{(1)}_{ij}-l(l+1)R^{(0)}_{ij}].
+\end{equation}
+Any error proportional only to $A_3$ is traceless. A hydrostatic finite difference cannot detect it. Cubic symmetry can further hide it by projecting a traceless tensor to zero.
+
+Choose $\psi=rY_{10}=\sqrt{3/(4\pi)}z$ in a ball of radius $R$. Its Cartesian Hessian vanishes identically. With the earlier default $\texttt{g1\_deriv\_scale}=1/2$, the actual code instead gives
+\begin{equation}
+ K_{\mathrm{wrong}}=\operatorname{diag}(R^3/15,R^3/15,-2R^3/15).
+\end{equation}
+For $R=1.3$, the diagonal is $(0.146466667,0.146466667,-0.292933333)$. Restoring the missing product-rule term gives zero to machine precision. This operator test does not assume that $z$ is a physical KS eigenfunction. It tests the asserted local differential identity directly.
+
+\section{Source audit and corrections}
+\subsection{F3 product-rule coefficient}
+Both \texttt{SRC\_lapw2/val\_kinstrmt.F} and \texttt{src/dmft2/stress\_kernels.f90} group the second row as a derivative of the unit vector only. Their F3 row must therefore carry $(2R^{(1)}-R^{(0)})A_3$, as in Eq. \eqref{eq:code}. The earlier change to \texttt{g1\_deriv\_scale=0.5} was wrong. Restoring scale one is an algebraic correction, not a fitted adjustment. An apparently improved material finite difference did not validate the earlier change; compensating errors can improve a result.
+
+\subsection{Independent LO--LO doubling}
+The F3 LO--LO radial accumulation has an additional factor two in both its $R^{(1)}$ and $R^{(0)}$ products. Ordered LO indices already sum all pairs. Those two extra factors must be removed. Simply selecting the old \texttt{WIEN\_STRESS\_G1\_LEGACY=1} branch is not sufficient, because it restores the product rule but leaves this separate LO error.
+
+\subsection{Undefined origin continuation in radial integrals}
+In \texttt{kin\_str\_integrals.F} and its dmft2 counterpart \texttt{stress\_integrals.f90}, the assignments to logical \texttt{IsEven} were commented out, but that variable was passed to the spline derivative routine. The callee actually reads it to construct positive/negative-$r$ continuation. This is undefined state. LO paths instead hard-code even continuation, also for a second derivative of a first derivative.
+
+A physical all-electron radial function need not have an even or odd continuation: Coulomb cusps and scalar-relativistic powers make such an assumption particularly inappropriate. The bounded repair adopted for this audit differentiates the cubic spline on the positive radial mesh only, using its existing one-sided endpoint rule. It removes the undefined state without modifying the generic radial routines used for density or forces. Applying that derivative twice retains the existing numerical second-derivative strategy. This is still a numerical approximation; it is not an analytic derivative of the self-consistent radial basis with respect to strain. Stored OUTWIN slopes and radial differential equations remain a possible later precision improvement.
+
+\subsection{Units and signs}
+WIEN stores energies in Ry. The explicit Hartree result must be multiplied by two for the Ry convention, independently of any spin multiplicity already included in occupation weights. In the present assembly the raw kinetic valence buffer has the sign $-2w\Rea K_{\mathrm{reg}}$, and the dedicated surface buffer has $+2w\Rea B$. Mixer negates \texttt{STR\_VAL}, so the physical contribution is $2w\Rea(K_{\mathrm{reg}}-B)/\Omega$. Spin weighting must be included exactly once. Final total stress is assembled as \texttt{STR\_DENS - STR\_CORE - STR\_VAL}.
+
+\section{Independent checks and their limits}
+The audit extracts the actual Fortran G1 loops from both programs and compiles them with bounds checking. Exact radial tables are injected, separating the angular contraction from numerical radial differentiation. The oracle constructs complex solid harmonics times polynomials in Cartesian coordinates, differentiates those polynomials exactly, and integrates their products independently. It includes $u$, $\dot u$, two LO channels, arbitrary complex amplitudes, and a complex off-diagonal density.
+
+\begin{center}\small
+\begin{tabular}{lrrr}\toprule
+Case & Earlier default error & Scale one only & Both angular fixes\\\midrule
+$u$ only & $7.05\,10^{-2}$ & $<10^{-12}$ & $<10^{-10}$\\
+$u,\dot u$ & $2.25\,10^{-1}$ & $<10^{-12}$ & $<10^{-10}$\\
+LO only & $7.79\,10^{-2}$ & $3.48\,10^{-1}$ & $<10^{-10}$\\
+All primitives & $1.23\,10^{-1}$ & $1.26\,10^{-1}$ & $<10^{-10}$\\\bottomrule
+\end{tabular}
+\end{center}
+The first two columns show maximum real tensor error in the synthetic normalization; the corrected pass criterion applies to the full complex matrix contraction. The two programs agree on the erroneous results as well: agreement between ports alone was not a sufficient test. All these angular errors have trace near machine precision. The independent pseudo-band identity error is $4.0\,10^{-15}$.
+
+An additional test of the actual interstitial step-function and kinetic contractions, with complex plane waves, an off-center sphere, and a signed off-diagonal density, agrees with the independent Fourier matrix to $4.5\,10^{-15}$ in both codes. The positive-mesh radial helper reproduces constant through cubic polynomials with weighted second-derivative error below $1.5\,10^{-12}$; cusp and fractional-power tests converge under mesh refinement.
+
+These checks establish the local NREL operator algebra. They do not prove convergence in RKMAX, radial mesh, charge, Matsubara integration, or projector window. They also do not independently rederive every scalar-relativistic correction. The existing RELA code adds a flux/mass correction to the baseline kinetic block, so correctness of its baseline remains necessary.
+
+\section{Material verification protocol}
+Use isolated copies with identical saved vectors and potentials to compare old and corrected executable outputs. Test DFT first, then DMFT, for SrVO3 and FeSe. Report individual diagonal tensor components and their mean. Confirm that charge, chemical potential, ordinary forces, and functional energy records remain unchanged when only these stress kernels change. Compare to the existing consistent $\pm0.001$ isotropic triplets only after stating their provenance and basis checks.
+
+For these triplets the finite-difference mean stress is
+\begin{equation}
+ \overline\sigma_{\rm FD}=\frac{K(+h)-K(-h)}{2h\,3\Omega_0},\qquad h=0.001.
+\end{equation}
+$K$ is the appropriate charge-relaxed frozen-self-energy Klein comparison quantity in DMFT, and the DFT energy in DFT. The factor three is already present. The signed quantity reported here follows the existing WIEN stress output; thermodynamic compressive pressure has the opposite sign. Detailed observed results, executable hashes, and tests are recorded in the accompanying audit directory and in the following implementation addendum.
+
+\section{Implementation and material results}
+
+All three repairs described above were implemented in both programs. Real and complex lapw2 and MPI dmft2 were rebuilt and installed, retaining source and executable backups. The diagnostic \texttt{WIEN\_STRESS\_G1\_PREAUDIT=1} reproduces the two previous angular defects only; it is off by default. No original material directory was overwritten.
+
+\subsection{Mean stress comparison}
+
+The following are mean stresses in GPa, already divided by three. The numerical values use existing charge-converged isotropic triplets: the prior isolated DFT tests and a fresh read of the prepared frozen-self-energy DMFT records. New strained SCF calculations were not required for this stress-only change; density and functional outputs are unchanged. These comparisons retain the existing convergence limitations.
+
+\begin{center}\small\begin{tabular}{lrrrr}\toprule
+
+Case & Before & Corrected & Numerical & Difference\\\midrule
+
+DFT SrVO3 & 8.514780 & 8.516855 & 10.115115 & -1.598260\\
+
+DFT FeSe & 12.002165 & 11.995096 & 12.138195 & -0.143099\\
+
+DMFT SrVO3 & 5.222996 & 5.223963 & 4.617396 & +0.606567\\
+
+DMFT FeSe & -0.490702 & -0.488870 & -1.049104 & +0.560234\\
+
+\bottomrule\end{tabular}\end{center}
+
+SrVO3 uses NREL with RKMAX 7; FeSe uses RELA with RKMAX 8, in both DFT and DMFT. The central vectors contain 75 k points and 43 bands for SrVO3, and 140 k points and 66 bands for FeSe. The earlier DFT G2 TRACE default and DMFT FULL default were preserved.
+
+\subsection{Tensor components and isolated effects}
+
+\begin{center}\small\begin{tabular}{lrrr}\toprule
+
+Case & Corrected $\sigma_{xx}=\sigma_{yy}$ & Corrected $\sigma_{zz}$ & Radial change in mean\\\midrule
+
+DFT SrVO3 & 8.507292 & 8.535979 & +0.002075\\
+
+DFT FeSe & 13.192014 & 9.601259 & -0.007069\\
+
+DMFT SrVO3 & 5.223759 & 5.224372 & +0.000968\\
+
+DMFT FeSe & 4.097618 & -9.661847 & +0.001831\\
+
+\bottomrule\end{tabular}\end{center}
+
+The old/radial-only/corrected comparisons separate the angular repair from the radial derivative policy. The angular change has zero mean within printed precision. It substantially changes the FeSe anisotropy, so this repair matters even though it leaves the hydrostatic mismatch. The remaining anisotropic total stress has not been certified by a new component-strain finite difference in this audit.
+
+\subsection{Regression evidence and reproducibility}
+
+Charge files are byte-identical before and after in all four tests. Ordinary SCF2 records, including available forces, chemical potential, band sums, and DMFT functional sums, are identical. Fresh DFT SCF merging and mixer runs reproduce the reconstructed corrected stresses within output rounding. Existing MPI floating-point shutdown flags occur in both old and new dmft2 runs; no nonfinite checked output was found, and those flags are not claimed fixed.
+
+The accompanying \texttt{g1\_audit\_20261107} directory contains before/after source snapshots, portable patches, unit checks, material inputs/outputs, build logs, and hashes. The changes were made on top of the pre-existing working tree, without reverting unrelated work. The current result is a corrected kinetic block, not a solution of the remaining hydrostatic error.
+
+
+\section{What this establishes and what remains open}
+The G1 off-diagonal matrix follows directly from Eq. (19); no band-diagonal assumption is needed anywhere in its derivation. Two real implementation errors were found by retaining the full product rule and all primitive pairs. Both are invisible to the hydrostatic trace test. The undefined radial derivative flag is a separate implementation defect whose measured mean-stress effects are small in these four tests.
+
+A future weak-form implementation could construct first-gradient primitive matrices directly and combine the MT and interstitial gradient integrals, removing only the corresponding dedicated kinetic jump term. That route is attractive because it avoids numerical second derivatives. It must be validated as an equivalence of the complete kinetic block, including boundaries, before replacing the current representation. It is not silently included in the present repair. Missing physical radial response under strain, finite basis convergence, projector-window response, and the complete RELA extension remain separate questions. No additional isolated $M_\Sigma$ term is inferred from this G1 audit.
+
+\begin{thebibliography}{9}
+\bibitem{blaha} K. Belbase, A. Tr\"oster, and P. Blaha, ``Stress tensor in the linearized augmented plane wave method,'' Phys. Rev. B \textbf{104}, 174113 (2021). Local supplied PDF: \texttt{Blahas\_stress\_tensor.pdf}; especially Eqs. (19), (20), Appendix C, and Eq. (G1).
+\bibitem{g2} Project working note, \emph{eDMFT stress: Eq. (13) to G2 derivation}, 6 November 2026, \texttt{edmft\_stress\_eq13\_to\_g2\_derivation\_20261106.tex}. The present note audits the distinct explicit kinetic block.
+\end{thebibliography}
+\end{document}

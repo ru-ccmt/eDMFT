@@ -1,0 +1,298 @@
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c stress_modules.f90 -o stress_modules.o
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c l2mainSubs.f90 -o l2mainSubs.o
+l2mainSubs.f90:1269:28:
+
+ 1269 |              phi_jl(i,iind)=Romb(jlp,Nri,dri(iind))
+      |                            1
+......
+ 1514 |      REAL*8 Function Romb(y,N,dx)
+      |                         2   
+Warning: Shape mismatch in argument 'y' between (1) and (2)
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c alm_blm_clm.f90 -o alm_blm_clm.o
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c stress_g2_matrices.f90 -o stress_g2_matrices.o
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c stress_integrals.f90 -o stress_integrals.o
+stress_integrals.f90:110:47:
+
+   81 |     DO l = 0, lmax2n
+      |                    2                           
+......
+  110 |              CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dul(1),dus(1),TC,jatom)
+      |                                               1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:110:61:
+
+   81 |     DO l = 0, lmax2n
+      |                    2                                         
+......
+  110 |              CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dul(1),dus(1),TC,jatom)
+      |                                                             1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:112:47:
+
+   81 |     DO l = 0, lmax2n
+      |                    2                           
+......
+  112 |              CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dudl(1),duds(1),TC,jatom)
+      |                                               1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:112:61:
+
+   81 |     DO l = 0, lmax2n
+      |                    2                                         
+......
+  112 |              CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dudl(1),duds(1),TC,jatom)
+      |                                                             1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:126:37:
+
+  120 |     DO lp = 0, lmax2n
+      |                     2                
+......
+  126 |                 UCL(i) = a1lo(i,jlop,lp)/r1(i)                         !large comp of LO fun ul(e2)
+      |                                     1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:127:37:
+
+  120 |     DO lp = 0, lmax2n
+      |                     2                
+......
+  127 |                 UCS(i) = b1lo(i,jlop,lp)/r1(i)                         !small comp of LO fun us(e2)
+      |                                     1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:279:40:
+
+  239 |     DO l = 0, lmax2n
+      |                            2            
+......
+  279 |                    UCLP(i) = a1lo(i,jlo,l)/r1(i)                         !large comp of LO fun ul(e2)
+      |                                        1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:280:40:
+
+  239 |     DO l = 0, lmax2n
+      |                            2            
+......
+  280 |                    UCSP(i) = b1lo(i,jlo,l)/r1(i)                         !small comp of LO fun us(e2)
+      |                                        1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:282:40:
+
+  240 |        DO lp = 0, lmax2n
+      |                                  2      
+......
+  282 |                    UCL(i) = a1lo(i,jlop,lp)/r1(i)                         !large comp of LO fun ul(e2)
+      |                                        1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:283:40:
+
+  240 |        DO lp = 0, lmax2n
+      |                                  2      
+......
+  283 |                    UCS(i) = b1lo(i,jlop,lp)/r1(i)                         !small comp of LO fun us(e2)
+      |                                        1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:300:41:
+
+  240 |        DO lp = 0, lmax2n
+      |                                  2       
+......
+  300 |                    UAA(I) = (a1lo(i,jlop,lp)*a1lo(i,jlo,l) + CIN*b1lo(i,jlop,lp)*b1lo(i,jlo,l))/r1(i)/r1(i)
+      |                                         1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:300:56:
+
+  239 |     DO l = 0, lmax2n
+      |                            2                            
+......
+  300 |                    UAA(I) = (a1lo(i,jlop,lp)*a1lo(i,jlo,l) + CIN*b1lo(i,jlop,lp)*b1lo(i,jlo,l))/r1(i)/r1(i)
+      |                                                        1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:300:77:
+
+  240 |        DO lp = 0, lmax2n
+      |                                  2                                           
+......
+  300 |                    UAA(I) = (a1lo(i,jlop,lp)*a1lo(i,jlo,l) + CIN*b1lo(i,jlop,lp)*b1lo(i,jlo,l))/r1(i)/r1(i)
+      |                                                                             1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:300:92:
+
+  239 |     DO l = 0, lmax2n
+      |                            2                                                                
+......
+  300 |                    UAA(I) = (a1lo(i,jlop,lp)*a1lo(i,jlo,l) + CIN*b1lo(i,jlop,lp)*b1lo(i,jlo,l))/r1(i)/r1(i)
+      |                                                                                            1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:315:33:
+
+  311 |     DO l = 0, lmax2n
+      |                    2             
+......
+  315 |              UCL(i) = a1lo(i,jlo,l)/r1(i)                         !large comp of LO fun ul(e2)
+      |                                 1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:316:33:
+
+  311 |     DO l = 0, lmax2n
+      |                    2             
+......
+  316 |              UCS(i) = b1lo(i,jlo,l)/r1(i)                         !small comp of LO fun us(e2)
+      |                                 1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:332:46:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                          
+......
+  332 |             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),uppl2(1,lp),upps2(1,lp),  juddu_20(jlo,l,lp),jatom)     !integral u times double radia derivative
+      |                                              1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:332:60:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                                        
+......
+  332 |             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),uppl2(1,lp),upps2(1,lp),  juddu_20(jlo,l,lp),jatom)     !integral u times double radia derivative
+      |                                                            1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:333:46:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                          
+......
+  333 |             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),udppl2(1,lp),udpps2(1,lp),juddu_21(jlo,l,lp),jatom)
+      |                                              1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:333:60:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                                        
+......
+  333 |             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),udppl2(1,lp),udpps2(1,lp),juddu_21(jlo,l,lp),jatom)
+      |                                                            1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:335:46:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                          
+......
+  335 |             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dul(1),dus(1),  judu_20(jlo,l,lp),jatom)
+      |                                              1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:335:60:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                                        
+......
+  335 |             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dul(1),dus(1),  judu_20(jlo,l,lp),jatom)
+      |                                                            1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:336:46:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                          
+......
+  336 |             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dudl(1),duds(1),judu_21(jlo,l,lp),jatom)
+      |                                              1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:336:60:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                                        
+......
+  336 |             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dudl(1),duds(1),judu_21(jlo,l,lp),jatom)
+      |                                                            1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:339:36:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                
+......
+  339 |                UAA(I) = (a1lo(i,jlo,l)*rrad1(i,lp) + CIN*b1lo(i,jlo,l)*rrad2(i,lp))/r1(i)/r1(i)
+      |                                    1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:339:68:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                                                
+......
+  339 |                UAA(I) = (a1lo(i,jlo,l)*rrad1(i,lp) + CIN*b1lo(i,jlo,l)*rrad2(i,lp))/r1(i)/r1(i)
+      |                                                                    1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:345:36:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                
+......
+  345 |                UAA(I) = (a1lo(i,jlo,l)*rade1(i,lp) + CIN*b1lo(i,jlo,l)*rade2(i,lp))/r1(i)/r1(i)
+      |                                    1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:345:68:
+
+  311 |     DO l = 0, lmax2n
+      |                    2                                                
+......
+  345 |                UAA(I) = (a1lo(i,jlo,l)*rade1(i,lp) + CIN*b1lo(i,jlo,l)*rade2(i,lp))/r1(i)/r1(i)
+      |                                                                    1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:361:34:
+
+  357 |     DO lp = 0, lmax2n
+      |                     2             
+......
+  361 |              UCL(i) = a1lo(i,jlop,lp)/r1(i)                         !large comp of LO fun ul(e2)
+      |                                  1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:362:34:
+
+  357 |     DO lp = 0, lmax2n
+      |                     2             
+......
+  362 |              UCS(i) = b1lo(i,jlop,lp)/r1(i)                         !small comp of LO fun us(e2)
+      |                                  1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:389:37:
+
+  357 |     DO lp = 0, lmax2n
+      |                     2                
+......
+  389 |                UAA(I) = (a1lo(i,jlop,lp)*rrad1(i,l) + CIN*b1lo(i,jlop,lp)*rrad2(i,l))/r1(i)/r1(i)
+      |                                     1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:389:70:
+
+  357 |     DO lp = 0, lmax2n
+      |                     2                                                 
+......
+  389 |                UAA(I) = (a1lo(i,jlop,lp)*rrad1(i,l) + CIN*b1lo(i,jlop,lp)*rrad2(i,l))/r1(i)/r1(i)
+      |                                                                      1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:394:37:
+
+  357 |     DO lp = 0, lmax2n
+      |                     2                
+......
+  394 |                UAA(I) = (a1lo(i,jlop,lp)*rade1(i,l) + CIN*b1lo(i,jlop,lp)*rade2(i,l))/r1(i)/r1(i)
+      |                                     1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+stress_integrals.f90:394:70:
+
+  357 |     DO lp = 0, lmax2n
+      |                     2                                                 
+......
+  394 |                UAA(I) = (a1lo(i,jlop,lp)*rade1(i,l) + CIN*b1lo(i,jlop,lp)*rade2(i,l))/r1(i)/r1(i)
+      |                                                                      1
+Warning: Array reference at (1) out of bounds (8 > 3) in loop beginning at (2)
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c stress_kernels.f90 -o stress_kernels.o
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c cmp_dmft_stress.f90 -o cmp_dmft_stress.o
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c cmp_dmft_weights.f90 -o cmp_dmft_weights.o
+cmp_dmft_weights.f90:1434:28:
+
+   62 |      REAL*8 Function ProductTrace(Sigmaij,Gij,nbands)
+      |                                 2
+......
+ 1434 | REAL*8 Function ProductTrace(Sigmaij,Gij,nbands)
+      |                            1
+Warning: INTENT mismatch in argument 'nbands' between (1) and (2)
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -I./atpar -c l2main.f90 -o l2main.o
+/opt/homebrew/bin/mpif90 -O3 -fallow-argument-mismatch -ffpe-summary=invalid,zero,overflow  -ffree-form -ffree-line-length-none -fopenmp  -I/opt/homebrew/include -o dmft2 cputim.o zeroin.o romb.o splines.o spline.o reallocate.o zinv.o c3fft.o ifflim.o ffts.o deter.o dvbes1.o gaunt.o fermi.o notri.o errclr.o errflg.o outerr.o sphbes.o ylm.o stern.o sortag.o readselfenergy.o eigsys.o dfrad.o sorttodiag.o inverss.o modules.o structure.o stress_modules.o dmfts.o forces.o mod_mpi.o stress_mpi.o t3j.o rotdef.o w_atpar.o angle.o charge.o p_project.o csplit.o d5splt.o f7splt.o gtfnam.o harmon.o kdelta.o lomain.o l2mainSubs.o alm_blm_clm.o stress_g2_matrices.o stress_integrals.o stress_kernels.o stress_rela.o stress_interstitial.o stress_symmetry.o cmp_mt_density.o cmp_dmft_stress.o cmp_dmft_weights.o l2main.o dmft2.o init_energy_file.o lda_fermi.o latgen.o p3splt.o psplit.o recfil.o recpr.o spin_rotate.o cmp_log_gdloc.o print_pre_atpar.o fomai3.o symmetrize.o  -L/opt/homebrew/lib  -lfftw3_omp -lfftw3  -framework Accelerate  -L./atpar -latpar

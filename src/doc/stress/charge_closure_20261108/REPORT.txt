@@ -1,0 +1,257 @@
+PHASE 2: NATIVE OUTPUT-CHARGE NORMALIZATION AND POTENTIAL/CORE STATE
+8 November 2026
+
+STATUS
+
+This checkpoint completes another phase-2 substep. It does not complete the
+full-k valence loader, the screened material solve (phase 3), or the final
+corrected stress tensor. Ordinary dmft2 stress has no new GPa result here.
+
+Implemented:
+  * MIXER-compatible output-charge integration and normalization, with an
+    exact derivative and transpose, prepared once per central output.
+  * The slow reference and older derivative adapter now use the same native
+    integration by default; historical spline quadrature is explicitly retained.
+  * A versioned, self-contained central-data archive for Hartree/XC and core.
+    Loading prepares in-memory operators without launching native programs.
+  * Native finite-difference and adjoint tests, including FeSe and SrVO3.
+
+The latest selected suite has 161 tests, all passing, with zero skips and the
+three native reference libraries plus the radial response library supplied.
+The physical material probes remain first-k response diagnostics, not full
+Brillouin-zone calculations and not strain derivatives.
+
+1. WHAT IS NORMALIZED
+
+The density entering LAPW0 and the raw output of dmft2+lcore are different
+objects. Let q0 be the CENTRAL RAW OUTPUT, already assembled as
+
+  q0 = q_valence + q_core.
+
+All coefficients must be in CLMSUM units. In particular,
+  c_00(r) = 4*pi*r^2*n_spherical(r),
+  c_lm(r) = r^2*n_lm(r) for nonspherical harmonics.
+The .clmval reader converts its spherical convention to CLMSUM. The .clmcor
+reader is already in that convention. Add core once before normalizing.
+Interstitial coefficients are star sums, packed as real and imaginary parts.
+
+Let m and i be real covectors for integrated muffin-tin and interstitial charge:
+
+  M(q) = m^T q,     I(q) = i^T q.
+
+M contains the atom multiplicities and native MIXER CHARGE weights. I contains
+all equivalent-site sphere masks:
+
+  I(q) = Re sum_G conj(Theta_G) rho_G,
+  Theta_G = Omega*delta_G0
+            - sum_sites 4*pi*R_MT^3*j1(|G|R_MT)/(|G|R_MT)
+                        * exp(-i G.R_site).
+
+Here G is physical reciprocal wavevector in Bohr^-1; j1(x)/x -> 1/3 at zero.
+No extra star size or sqrt(4*pi) factor is needed. Native real-field selection
+requires the -I symmetry operation with each translation component below 1e-5
+in magnitude. A shifted inversion centre and an empty in1c file are not the
+same criterion. For native real fields SETN discards the imaginary mask part.
+
+For the default MIXER settings, CHARGE uses the extended Simpson rule on
+log(r), with dr=r*dlog(r). At >=8 grid points its endpoint coefficients are
+(17,59,43,49)/48 on either side and unity in the interior. There is no added
+origin correction. This is also LAPW0's default CHARGE rule; CoulInt's radial
+Green-function quadrature is different. Alternate SIMP/LDMNORM branches are
+not implemented by this adapter.
+
+The previous slow-response reference used not-a-knot spline integration for
+M. In the two actual central raw outputs, native minus legacy integrated
+charge is 1.9463e-7 electrons in FeSe and 3.1536e-7 in SrVO3. This is small,
+but matching the discrete map is necessary before comparing derivatives.
+It is not claimed to explain the previous pressure discrepancy.
+
+2. DERIVATIVE AND TRANSPOSE
+
+MIXER NORMAL with normalization enabled changes only interstitial coefficients.
+For fixed target electron count Q and geometry,
+
+  F(q) = (c, alpha(q)*p),   alpha(q) = [Q-M(q)]/I(q),
+
+where c denotes all radial coefficients and p all interstitial coefficients.
+At q0 define M0=m^Tq0, I0=i^Tq0, alpha0=(Q-M0)/I0, and p0 equal to q0 with
+its radial entries set to zero. Then
+
+  ell = (m + alpha0*i)/I0,
+  D   = diag(1_radial, alpha0_interstitial),
+  N x = D x - p0*(ell^T x),
+  N^T y = D y - ell*(p0^T y).
+
+This remains valid when alpha0 differs from one. Preparing N after already
+normalizing q0 gives the wrong derivative for the actual upstream operation.
+The implementation checks positive interstitial charge and normalization.
+NORM=NO is an explicit identity map, not an inferred special case.
+
+Charge closure follows exactly:
+
+  (m+i)^T N x = 0.
+
+At fixed geometry, normalizing again after the first normalization is
+redundant, including for its derivative. Under strain there is an additional
+explicit geometry term. At fixed coefficient vector q0, supplied geometry
+changes M_geom=(partial_nu m)^Tq0 and I_geom=(partial_nu i)^Tq0 give
+
+  source_N = p0 * [Q_nu - M_geom - alpha0*I_geom]/I0.
+
+The helper takes those contractions explicitly; it does not invent the six
+strain sources. A fixed-RMT cell perturbation is independently tested.
+
+With the existing potential, electronic, basis and core maps, the complete
+unmixed charge Jacobian has the schematic form
+
+  J = N [R E B + D_basis + C] K_Hxc.
+
+K_Hxc maps input charge to KS potential. B maps that potential to joint H/O/
+raw-projector perturbations, including the native potential-coordinate adapter.
+E is the fixed-local-Sigma electronic response with the normalized-projector
+chain and empty complement. R reconstructs the density-matrix contribution;
+D_basis reconstructs direct basis changes; C is the core response. N acts on
+their total output. The MIXER mixing/history algorithm is not part of J.
+
+3. INDEPENDENT NATIVE TESTS
+
+The new small native library calls unmodified WIEN2k_24 MIXER CHARGE, SETN and
+NORMAL. Reference modules supply default options; a scratch output unit and a
+local ZDSCAL loop avoid dependencies on the full mixer executable. Production
+MIXER source and executable are not modified. The wrapper's IsVresp setting
+only suppresses leakage warnings for synthetic target charges.
+
+Synthetic checks include native real/complex masks, multiplicities, central
+normalization away from alpha0=1, directional finite differences, exact
+transpose, charge closure, geometry and target sources, NORM=NO, redundant
+second normalization, and fourth-order quadrature convergence of a constant
+density's total charge. The continuum integral is not confused with an exact
+finite-grid quadrature identity.
+
+Material checks use the independently produced endpoints from the preceding
+XC/core checkpoint. Apply native NORMAL to raw native dmft2+lcore endpoints,
+and compare their centered difference with N applied to the already validated
+analytic raw derivative. This checkpoint does not regenerate the native
+LAPW0/LAPW1/dmft2/lcore endpoints. Both h values below are density-perturbation
+amplitudes, NOT strains.
+
+                       h=.001          h=.0005
+  FeSe, fixed-mu E     3.28796e-6       8.28932e-7
+  FeSe, fixed-N E      2.88969e-6       6.98735e-7
+  SrVO3, fixed-mu E    8.70942e-7       2.68163e-7
+  SrVO3, fixed-N E     1.02644e-7       4.99296e-7
+
+Entries are relative full spatial derivative errors. 'Fixed-mu E' describes
+the inner electronic step; output NORMAL still has a fixed target Q, just as
+in the native comparison. It is not a new fixed-mu screened-driver mode.
+The small-step SrVO3 fixed-N result is at the previously recorded endpoint
+precision floor; it is not monotonic truncation-error convergence.
+
+  FeSe alpha0  = 1.0000866448692032
+  SrVO3 alpha0 = 1.0000106666279647
+
+These targets are the one-k central band number plus full core occupations,
+not integer physical full-BZ electron counts. Do not copy them to real runs.
+Absolute integrated analytic derivative after normalization is <=1.43e-14
+electrons per unit test amplitude. Normalization transpose defects are below
+3.6e-18. The normalization action alone costs about 0.07--0.12 ms in these
+probes; this is not an end-to-end stress speedup.
+
+4. PORTABLE POTENTIAL/CORE PREPARATION
+
+lapw_potential_core_state.py saves numeric arrays and scalar JSON in a
+versioned NPZ archive. It uses allow_pickle=False, validates physical policies
+and layouts, rejects incompatible versions, and publishes the file atomically
+only after successful preparation. A failed save leaves the old file intact.
+
+It records:
+  * Structure, symmetry, local frames, log radial grids, signed harmonic labels,
+    Fourier representatives, FFT shape and central input charge.
+  * Native angular quadrature and the PBE angular-derivative tables.
+  * Central spherical potential in r*V Ry, fixed case.inc shifts, occupied
+    core energies in Hartree, kappa, occupations and zero-based match/end indices.
+  * NREL/RELA, unpolarized LDA/PBE, point nucleus, fixed RMT/local axes and
+    fixed radial-energy policy, native default quadrature and XC conventions.
+  * SHA256 fingerprints of caller-named inputs. The execution snapshot must
+    provide expected_fingerprints to reject stale data; diagnostic standalone
+    loading can explicitly use the recorded state without an external snapshot.
+
+Load returns PreparedPotentialCore with potential_operator (=K_Hxc), core,
+hartree and xc maps, structure, input_density and metadata. Its normalization
+method REQUIRES the separate raw total output density and target Q. It does
+not accidentally normalize the input charge instead of the output charge.
+
+The caller must supply native angular and matching data from one consistent
+central calculation. This is not yet a generic native exporter, a valence/KS
+matrix archive, or the full-k/MPI loader. Nonorthogonal/nonprimitive cells,
+compressed cubic harmonics, spin response, SOC, finite-nucleus core, metaGGA
+and automatic radial-energy searches remain outside the validated scope.
+
+Actual native FeSe and SrVO3 contexts were saved and reloaded, then compared
+with the previous independently constructed diagnostic contexts:
+
+                         FeSe RELA/PBE       SrVO3 NREL/LDA
+  Archive size          159799 bytes         335776 bytes
+  Load+prepare time     4.76 s               0.56 s
+  Hxc forward error     7.71e-13             2.56e-16
+  Hxc transpose error*  3.48e-11             9.94e-16
+  Core forward error    1.31e-13             4.03e-14
+  Core reverse error    5.68e-15             1.21e-13
+
+* Here 'transpose error' means relative comparison of two reverse actions,
+  not failure of the adjoint identity. Loaded-map adjoint defects are below
+  5.6e-17. Tiny differences arise from reconstructing log grids from STRUCT.
+
+Fresh processes also loaded each archive and applied Hxc/core without any
+material-specific diagnostic imports or native programs. Preparation is paid
+once; response actions reuse the prepared arrays.
+
+5. SOURCE AND EXECUTION CHANGES
+
+New helpers:
+  src/python/lapw_charge_response.py
+  src/python/lapw_potential_core_state.py
+
+Updated helpers:
+  wien_frozen_sigma_response.py: native integration default, explicit saved
+    charge_integration choice, legacy_spline option.
+  wien_response_operators.py: the same native/legacy convention in the older
+    response derivative adapter.
+  dmft2_step.py: validates/persists solver.charge_integration and fingerprints
+    the newly used charge-integration dependencies.
+  lapw_hartree_periodic.py: quadrature documentation clarified only.
+
+The corresponding helpers are installed in ~/dbin along with source updates.
+No Fortran executable is rebuilt or replaced in this checkpoint. STRT/STRFT
+remain reference-response requests, and run_dmft still schedules only its final
+response pass. No incomplete fast tensor is published; stress_applied=false
+remains the integrated driver's policy.
+
+To reproduce older reference normalization, set in case.stress_response.json:
+  {"solver": {"charge_integration": "legacy_spline"}}
+The default is "native". New reference runs record the resolved selection.
+Do not compare a native fast Jacobian to legacy_spline endpoints unknowingly.
+
+6. WHAT REMAINS BEFORE PHASE 3
+
+Complete reusable native valence preparation with the central matrix-only
+worker; test several k points and then the full weighted sum. Preserve global
+projector normalization/symmetry and global fixed-N chemical-potential response.
+Avoid retaining dense QQ blocks for every k point. Profile preparation, action,
+reverse and memory before MPI integration. Complete material gauge controls and
+explicit radial-energy policy tests.
+
+Then assemble the full native J and compare the screened solution
+  (I-J) delta q_nu = b_nu
+with the isolated slow reference on FeSe and SrVO3. The solver algebra already
+exists. A trustworthy physical J, six strain sources, the complete correction
+functional gradient and final stress publication are separate remaining work.
+
+EVIDENCE
+
+full_tests.log; normalized_material.json/log; state_material.json/log;
+standalone_load.log; check_normalized_material.py; check_state_material.py;
+FeSe_potential_core.npz; SrVO3_potential_core.npz; native reference sources.
+The preceding native endpoints and raw derivative evidence are preserved under
+src/doc/stress/xc_core_response_20261108/ and its compact_native_evidence.tar.gz.
+Installation manifest/backups and post-install tests document the exact files.

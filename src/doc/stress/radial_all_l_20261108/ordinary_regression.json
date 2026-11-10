@@ -1,0 +1,12 @@
+{
+  "SrVO3": {
+    "vector": true,
+    "energy": true,
+    "nsh": true
+  },
+  "FeSe": {
+    "vector": true,
+    "energy": true,
+    "nsh": true
+  }
+}

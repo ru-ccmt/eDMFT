@@ -1,0 +1,63 @@
+{
+  "scope": "consistent native central state; fixed-mu first-k complete-complement valence + core + Hartree/XC; unnormalized; no screened stress",
+  "preparation_seconds": 9.273481416050345,
+  "forward_seconds": 2.034787500044331,
+  "transpose": 1.707104078268844e-17,
+  "transpose_seconds": 4.351009292062372,
+  "fixed_n_transpose": 4.09216727878472e-15,
+  "steps": {
+    "0.01": {
+      "relative": 8.502403190489996e-05,
+      "maximum": 0.0004582601956846233
+    },
+    "0.005": {
+      "relative": 2.117366196053888e-05,
+      "maximum": 0.00011412764505092099
+    },
+    "0.001": {
+      "relative": 8.709319871093727e-07,
+      "maximum": 4.6998738509884674e-06
+    },
+    "0.0005": {
+      "relative": 2.680950866419089e-07,
+      "maximum": 1.4698110462063596e-06
+    }
+  },
+  "fixed_n_steps": {
+    "0.001": {
+      "relative": 9.698947953288928e-08,
+      "maximum": 1.7635838963129223e-08
+    },
+    "0.0005": {
+      "relative": 4.949659338138315e-07,
+      "maximum": 2.0916416169187383e-07
+    }
+  },
+  "matrix_steps": {
+    "0.001": {
+      "H_relative": 7.922000495539778e-08,
+      "O_relative": 1.356680391732624e-07
+    },
+    "0.0005": {
+      "H_relative": 2.7586966365425912e-08,
+      "O_relative": 3.41758578577197e-08
+    }
+  },
+  "central_density_relative": 1.3551608849303565e-12,
+  "native_potential_steps": {
+    "spherical": {
+      "relative": 2.619631115172702e-07,
+      "maximum": 9.904118144154431e-09
+    },
+    "nonspherical": {
+      "relative": 3.422315770434222e-08,
+      "maximum": 4.6507509388754587e-10
+    },
+    "interstitial": {
+      "relative": 2.8054768284765397e-08,
+      "maximum": 1.8093355156137414e-11
+    }
+  },
+  "H_with_native_potential_relative": 2.3558735733128428e-08,
+  "fixed_n_with_native_HO_relative": 2.2850716543606478e-07
+}

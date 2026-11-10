@@ -1,0 +1,14 @@
+{
+  "case": "SrVO3",
+  "volume_Bohr3": 382.70904262161486,
+  "correction_GPa": -2.986727948239503,
+  "correction_from_relaxed_reference_GPa": -2.9867588495,
+  "difference_from_reference_correction_GPa": 3.090126049709596e-05,
+  "baseline_GPa": 5.67688415,
+  "corrected_GPa": 2.690156201760497,
+  "numeric_GPa": 2.933836407,
+  "corrected_minus_numeric_GPa": -0.24368020523950262,
+  "reference_density_error_norm": 0.015041946031065949,
+  "convention": "hydrostatic mean tensile stress, already divided by 3",
+  "fixed_G": true
+}

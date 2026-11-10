@@ -1,0 +1,35 @@
+{
+  "/Users/haule/wien2k_24/SRC_lapw2/val_kinstrmt.F": {
+    "before_sha256": "0e837b9c4bce8d2f4bb374a41c3884cc0712cfb368793a783ffaf0557a7135e9",
+    "after_sha256": "bab5e87420c71ecb15a101615aa84731e163153917906a000e93874a79c53c1d",
+    "prepared": "/private/tmp/edmft_g1_audit_20261107/prepared/lapw2/val_kinstrmt.F",
+    "backup": "/private/tmp/edmft_g1_audit_20261107/before/lapw2/val_kinstrmt.F",
+    "installed_backup": "/Users/haule/wien2k_24/SRC_lapw2/val_kinstrmt.F.before_g1_audit_20261107"
+  },
+  "/Users/haule/wien2k_24/SRC_lapw2/kin_str_integrals.F": {
+    "before_sha256": "af5f1ed97dd4c5611d63621dfd230f0c235e6a2adaa5e2d6f8623a6f411a0535",
+    "after_sha256": "01dad803312e4f9be614e7aca8c04f61fa699df36e281b10280531bc62bacfaa",
+    "prepared": "/private/tmp/edmft_g1_audit_20261107/prepared/lapw2/kin_str_integrals.F",
+    "backup": "/private/tmp/edmft_g1_audit_20261107/before/lapw2/kin_str_integrals.F",
+    "installed_backup": "/Users/haule/wien2k_24/SRC_lapw2/kin_str_integrals.F.before_g1_audit_20261107"
+  },
+  "/Users/haule/projects/eDMFT_new/src/dmft2/stress_kernels.f90": {
+    "before_sha256": "b5be90188d00e4178cb3ccc7d824bbdb9fcff689ae34287b4ae70b20bb5957d7",
+    "after_sha256": "674e7c6531aed7a12c6818fcee5bd5bd2d8e0dedc5a0c78ffeb228f2d10ed935",
+    "prepared": "/private/tmp/edmft_g1_audit_20261107/prepared/dmft2/stress_kernels.f90",
+    "backup": "/private/tmp/edmft_g1_audit_20261107/before/dmft2/stress_kernels.f90",
+    "installed_backup": "/Users/haule/projects/eDMFT_new/src/dmft2/stress_kernels.f90.before_g1_audit_20261107"
+  },
+  "/Users/haule/projects/eDMFT_new/src/dmft2/stress_integrals.f90": {
+    "before_sha256": "1ab6af4fc3e352a8556c0065ba2fd0bdf537c1204a2138d8242fcc822182b12d",
+    "after_sha256": "ce33137d8607b7bbf9db9eaa04989a06108d0ca9802bd52cc51b6ddbd0177439",
+    "prepared": "/private/tmp/edmft_g1_audit_20261107/prepared/dmft2/stress_integrals.f90",
+    "backup": "/private/tmp/edmft_g1_audit_20261107/before/dmft2/stress_integrals.f90",
+    "installed_backup": "/Users/haule/projects/eDMFT_new/src/dmft2/stress_integrals.f90.before_g1_audit_20261107"
+  },
+  "binary_backups": [
+    "/Users/haule/wien2k_24/lapw2.before_g1_audit_20261107",
+    "/Users/haule/wien2k_24/lapw2c.before_g1_audit_20261107",
+    "/Users/haule/dbin/dmft2.before_g1_audit_20261107"
+  ]
+}

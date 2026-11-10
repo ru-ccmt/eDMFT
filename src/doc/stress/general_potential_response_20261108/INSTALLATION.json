@@ -1,0 +1,236 @@
+{
+  "status": "installed after explicit user approval",
+  "policy": "Verify all before hashes before writing. Save backups of existing targets. Copy source/helpers/tests/docs only. No native executable replacement.",
+  "files": [
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/lapw_spherical_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_spherical_response.py",
+      "before_sha256": "58ff2c10972ac0909f6e65c34ee57d3e5f448746469373d09eab5b87ff6437e3",
+      "after_sha256": "0e924e66b99d9ae2927b3278c87228a21f0097fd5cf442bf89f37eec1bdfe870",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/before_installation/Users/haule/projects/eDMFT_new/src/python/lapw_spherical_response.py",
+      "installed_sha256": "0e924e66b99d9ae2927b3278c87228a21f0097fd5cf442bf89f37eec1bdfe870"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/lapw_spherical_response.py",
+      "destination": "/Users/haule/dbin/lapw_spherical_response.py",
+      "before_sha256": "58ff2c10972ac0909f6e65c34ee57d3e5f448746469373d09eab5b87ff6437e3",
+      "after_sha256": "0e924e66b99d9ae2927b3278c87228a21f0097fd5cf442bf89f37eec1bdfe870",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/before_installation/Users/haule/dbin/lapw_spherical_response.py",
+      "installed_sha256": "0e924e66b99d9ae2927b3278c87228a21f0097fd5cf442bf89f37eec1bdfe870"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/lapw_nonspherical_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_nonspherical_response.py",
+      "before_sha256": "dd9135a783b72c61ffda361cb667995da810ac0ad8a7295ab3fcd4c4fdb22b53",
+      "after_sha256": "47c16c9f838532273ef359ec34351c63f5f428cfd39af951c73dddfa9f7e2512",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/before_installation/Users/haule/projects/eDMFT_new/src/python/lapw_nonspherical_response.py",
+      "installed_sha256": "47c16c9f838532273ef359ec34351c63f5f428cfd39af951c73dddfa9f7e2512"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/lapw_nonspherical_response.py",
+      "destination": "/Users/haule/dbin/lapw_nonspherical_response.py",
+      "before_sha256": "dd9135a783b72c61ffda361cb667995da810ac0ad8a7295ab3fcd4c4fdb22b53",
+      "after_sha256": "47c16c9f838532273ef359ec34351c63f5f428cfd39af951c73dddfa9f7e2512",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/before_installation/Users/haule/dbin/lapw_nonspherical_response.py",
+      "installed_sha256": "47c16c9f838532273ef359ec34351c63f5f428cfd39af951c73dddfa9f7e2512"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/lapw_potential_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/lapw_potential_response.py",
+      "before_sha256": null,
+      "after_sha256": "43133420c99927ceb3232e96203ac18cc9c058daa390c0d50b0da0f10bf2899f",
+      "installed_sha256": "43133420c99927ceb3232e96203ac18cc9c058daa390c0d50b0da0f10bf2899f"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/lapw_potential_response.py",
+      "destination": "/Users/haule/dbin/lapw_potential_response.py",
+      "before_sha256": null,
+      "after_sha256": "43133420c99927ceb3232e96203ac18cc9c058daa390c0d50b0da0f10bf2899f",
+      "installed_sha256": "43133420c99927ceb3232e96203ac18cc9c058daa390c0d50b0da0f10bf2899f"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/test_lapw_general_potential.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_general_potential.py",
+      "before_sha256": null,
+      "after_sha256": "895cd1a294707130e29dd1f57274458b38f3ddfdbd5b2edab9454c9ea8229d4d",
+      "installed_sha256": "895cd1a294707130e29dd1f57274458b38f3ddfdbd5b2edab9454c9ea8229d4d"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/stress_response_roadmap_20261108.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+      "before_sha256": "f13d4b13c1c5ef226737046835b8af859bbc36b8fd8577a040fec65dc6bedb7d",
+      "after_sha256": "0e9ed407b03f1d9c2d6999e70b7f80c493e10c0d1e6b974b6456a3511bee5e0a",
+      "backup": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/before_installation/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+      "installed_sha256": "0e9ed407b03f1d9c2d6999e70b7f80c493e10c0d1e6b974b6456a3511bee5e0a"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/REPORT.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/REPORT.txt",
+      "before_sha256": null,
+      "after_sha256": "f66a249a26e8e8b1dd03eead0a0c6d0cede359f5a3d686045c6e93ab953f8e8a",
+      "installed_sha256": "bb1c817beaaef5a50f6da0c1e93aeaece5bf6c14a82bd8f61b7ff3d1768fa24b"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/TIMINGS.txt",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/TIMINGS.txt",
+      "before_sha256": null,
+      "after_sha256": "8824370a7f07b258cc6f6d85ad73961e8200529d9e8cae6880eb9a8e464b4485",
+      "installed_sha256": "8824370a7f07b258cc6f6d85ad73961e8200529d9e8cae6880eb9a8e464b4485"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/expected.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/expected.json",
+      "before_sha256": null,
+      "after_sha256": "3c43bcf668a5999e0be2f0fac67f17c1e43d2e82d208b591e03b5fae2457d564",
+      "installed_sha256": "3c43bcf668a5999e0be2f0fac67f17c1e43d2e82d208b591e03b5fae2457d564"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/FeSe_general_potential.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/FeSe_general_potential.json",
+      "before_sha256": null,
+      "after_sha256": "ee51e4078fe13232f122d74cba48391d06cebb4a38d61bc84b181a069dc0fc06",
+      "installed_sha256": "ee51e4078fe13232f122d74cba48391d06cebb4a38d61bc84b181a069dc0fc06"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/SrVO3_general_potential.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/SrVO3_general_potential.json",
+      "before_sha256": null,
+      "after_sha256": "830dcb5b9f1aa2a49510395afceecf677eb0074d62b32460116f0502c22a0572",
+      "installed_sha256": "830dcb5b9f1aa2a49510395afceecf677eb0074d62b32460116f0502c22a0572"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/FeSe_before_fourier_fix.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/FeSe_before_fourier_fix.json",
+      "before_sha256": null,
+      "after_sha256": "c2d1b3563bafef52aad383179a6be153e01a48f6d261886a9160795881047d8d",
+      "installed_sha256": "c2d1b3563bafef52aad383179a6be153e01a48f6d261886a9160795881047d8d"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/SrVO3_before_fourier_fix.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/SrVO3_before_fourier_fix.json",
+      "before_sha256": null,
+      "after_sha256": "b363af126260b4f95612c067e4b22b9a27792f20959bd8400245e2bc45fb329e",
+      "installed_sha256": "b363af126260b4f95612c067e4b22b9a27792f20959bd8400245e2bc45fb329e"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/staged_tests.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/staged_tests.log",
+      "before_sha256": null,
+      "after_sha256": "8fd6b878a93ef7e06807852375ef8354cc43d50a59af3fb8d38ebc3ede6ce662",
+      "installed_sha256": "8fd6b878a93ef7e06807852375ef8354cc43d50a59af3fb8d38ebc3ede6ce662"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/helper_tests.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/helper_tests.log",
+      "before_sha256": null,
+      "after_sha256": "2471a95d7f3539afbb7ac0591bebd9269f4f54c857691e8ed659d6931e6dce94",
+      "installed_sha256": "2471a95d7f3539afbb7ac0591bebd9269f4f54c857691e8ed659d6931e6dce94"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/FeSe_benchmark_baseline.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/FeSe_benchmark_baseline.json",
+      "before_sha256": null,
+      "after_sha256": "368e4692cdcd32db34ccb4d2f48c075d80f170e94fb5e5e6009dfd8d0cdff987",
+      "installed_sha256": "368e4692cdcd32db34ccb4d2f48c075d80f170e94fb5e5e6009dfd8d0cdff987"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/FeSe_benchmark_optimized.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/FeSe_benchmark_optimized.json",
+      "before_sha256": null,
+      "after_sha256": "147aa17b6e96a9bbe0ec16cca83da9728967018ec41e76212fe2874f031efa7d",
+      "installed_sha256": "147aa17b6e96a9bbe0ec16cca83da9728967018ec41e76212fe2874f031efa7d"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/SrVO3_benchmark_baseline.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/SrVO3_benchmark_baseline.json",
+      "before_sha256": null,
+      "after_sha256": "ae6ba0067ccf0ef874e4f1fa1fe3eba569c93316a6d117f3e55d8ce59feee6a0",
+      "installed_sha256": "ae6ba0067ccf0ef874e4f1fa1fe3eba569c93316a6d117f3e55d8ce59feee6a0"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/SrVO3_benchmark_optimized.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/SrVO3_benchmark_optimized.json",
+      "before_sha256": null,
+      "after_sha256": "5a101ab4c17e670cfe9ca4269e258a5ae452ebe52748aa4db1c7d682d47e986a",
+      "installed_sha256": "5a101ab4c17e670cfe9ca4269e258a5ae452ebe52748aa4db1c7d682d47e986a"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/lapw_spherical_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/source/lapw_spherical_response.py",
+      "before_sha256": null,
+      "after_sha256": "0e924e66b99d9ae2927b3278c87228a21f0097fd5cf442bf89f37eec1bdfe870",
+      "installed_sha256": "0e924e66b99d9ae2927b3278c87228a21f0097fd5cf442bf89f37eec1bdfe870"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/lapw_nonspherical_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/source/lapw_nonspherical_response.py",
+      "before_sha256": null,
+      "after_sha256": "47c16c9f838532273ef359ec34351c63f5f428cfd39af951c73dddfa9f7e2512",
+      "installed_sha256": "47c16c9f838532273ef359ec34351c63f5f428cfd39af951c73dddfa9f7e2512"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/lapw_potential_response.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/source/lapw_potential_response.py",
+      "before_sha256": null,
+      "after_sha256": "43133420c99927ceb3232e96203ac18cc9c058daa390c0d50b0da0f10bf2899f",
+      "installed_sha256": "43133420c99927ceb3232e96203ac18cc9c058daa390c0d50b0da0f10bf2899f"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/stage/test_lapw_general_potential.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/source/test_lapw_general_potential.py",
+      "before_sha256": null,
+      "after_sha256": "895cd1a294707130e29dd1f57274458b38f3ddfdbd5b2edab9454c9ea8229d4d",
+      "installed_sha256": "895cd1a294707130e29dd1f57274458b38f3ddfdbd5b2edab9454c9ea8229d4d"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/setup_endpoints.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/test_drivers/setup_endpoints.py",
+      "before_sha256": null,
+      "after_sha256": "e39460292e1368f561a45ba593e218814aa12e8d59986c3101c8f245d7ad09b4",
+      "installed_sha256": "e39460292e1368f561a45ba593e218814aa12e8d59986c3101c8f245d7ad09b4"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/check_material.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/test_drivers/check_material.py",
+      "before_sha256": null,
+      "after_sha256": "e4803f69fbcc5efbc14afc7a4879260aa6a14a1cd8fcdf02daf6f832bbd16c4c",
+      "installed_sha256": "e4803f69fbcc5efbc14afc7a4879260aa6a14a1cd8fcdf02daf6f832bbd16c4c"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/benchmark_spherical.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/test_drivers/benchmark_spherical.py",
+      "before_sha256": null,
+      "after_sha256": "969e348c5e9620c3b0497c1773f2fecc7a55ee77a13e8b0fc2526ace7f1325ac",
+      "installed_sha256": "969e348c5e9620c3b0497c1773f2fecc7a55ee77a13e8b0fc2526ace7f1325ac"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/debug_ir.py",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/test_drivers/debug_ir.py",
+      "before_sha256": null,
+      "after_sha256": "4848715029f5ad08d894af93654c1e2059d3721fb07e4fb2235eb87d38668b34",
+      "installed_sha256": "4848715029f5ad08d894af93654c1e2059d3721fb07e4fb2235eb87d38668b34"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/MATERIAL_FINGERPRINTS.json",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/MATERIAL_FINGERPRINTS.json",
+      "before_sha256": null,
+      "after_sha256": "f14ed30a790cc75225af7eb3ddad51f89eb4d4e1e86c56b29594c27b99fcacf7",
+      "installed_sha256": "f14ed30a790cc75225af7eb3ddad51f89eb4d4e1e86c56b29594c27b99fcacf7"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/debug_ir.log",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/debug_ir.log",
+      "before_sha256": null,
+      "after_sha256": "15983550dd91234880850a4e4e13247a8e56cea8991fb67ffdd743dbbf11059b",
+      "installed_sha256": "15983550dd91234880850a4e4e13247a8e56cea8991fb67ffdd743dbbf11059b"
+    },
+    {
+      "source": "/private/tmp/edmft_general_potential_response_20261108/general_potential_response.patch",
+      "destination": "/Users/haule/projects/eDMFT_new/src/doc/stress/general_potential_response_20261108/general_potential_response.patch",
+      "before_sha256": null,
+      "after_sha256": "0e7299dfb106e9dc75feb989c0a4045bf8a74720268f4c501b17dc3e2c908d1e",
+      "installed_sha256": "0e7299dfb106e9dc75feb989c0a4045bf8a74720268f4c501b17dc3e2c908d1e"
+    }
+  ],
+  "installed_utc": "2026-11-08T23:05:25.236150+00:00"
+}

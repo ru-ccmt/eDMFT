@@ -1,0 +1,124 @@
+--- a/SRC_lapw0/energy.F
++++ b/SRC_lapw0/energy.F
+@@ -60,19 +60,38 @@
+       REAL*8   ::  PI,SQ4PII,ETOTAL,EKVOL1,EINT,sqfp
+       REAL*8   ::  ekinint,excint,ekin,exc2,etot_bg,e_bg_int
+       REAL*8   ::  SUM,SUMKIN,SUMXC,SUM_BG,bufetotal,bufekin,bufexc,bufe_bg
++      REAL*8   ::  buf_esphere,buf_econst,buf_efield
++      REAL*8   ::  e_esphere,e_econst,e_efield
+       INTEGER :: imode, ifourier
+       REAL*8  :: z, tmp1, backget
+       CHARACTER*5 :: switch3
++      CHARACTER*32 :: stress_debug_env
++      INTEGER :: stress_debug_status
++      LOGICAL :: stress_debug
+ 
+       PI=ACOS(-1.D0)                                                
+       sq4pii=1.d0/sqrt(4.d0*pi)
+       sqfp=sqrt(4.d0*pi)
+       ETOTAL=0.d0                                                         
+       bufetotal=0.d0                                                         
++      buf_esphere=0.d0
++      buf_econst=0.d0
++      buf_efield=0.d0
+ !      bufNELEC =0.d0                                                         
+ !      NELEC =0.d0                                                         
+       bufe_bg=0.d0
+       etot_bg=0.d0
++
++!     Optional decomposition used to validate the analytic stress against
++!     finite differences of precisely the same LAPW0 energy functional.
++!     Keep production output byte-for-byte unchanged unless the general
++!     stress diagnostic switch is explicitly enabled.
++      stress_debug_env = ''
++      call get_environment_variable('WIEN_STRESS_DEBUG',stress_debug_env, &
++                                    status=stress_debug_status)
++      stress_debug = stress_debug_status.eq.0 .and. &
++                     len_trim(stress_debug_env).gt.0 .and. &
++                     trim(stress_debug_env).ne.'0'
+ 
+       if (abs(delcc) .gt. 1.d-14) then
+         allocate(e_bg(nat),VALUE4(NRAD))
+@@ -295,6 +314,7 @@
+  55      CONTINUE                                                       
+ 
+          bufETOTAL = bufETOTAL + SUM
++         buf_esphere = buf_esphere + SUM
+          if (switch3 .eq. 'YES') then
+            bufEKIN = bufEKIN + SUMKIN
+            bufEXC = bufEXC + SUMXC
+@@ -328,7 +348,10 @@
+       DO JATOM=NSTART(myid),NSTOP(myid)
+ !         bufNELEC=bufNELEC + nint(ZZ(JATOM))*MULT(JATOM)               
+          WRITE(6,1100)  JATOM,ANAME(JATOM),ECONST(JATOM)                
+-         if(EX_SWITCH.ne.'EX_GRR') bufETOTAL=bufETOTAL+ECONST(JATOM)
++         if(EX_SWITCH.ne.'EX_GRR') then
++            bufETOTAL=bufETOTAL+ECONST(JATOM)
++            buf_econst=buf_econst+ECONST(JATOM)
++         endif
+ !        Include here the core term for an Efield
+          if(abs(iefeld) .gt. 0)then
+             INDEX=1
+@@ -343,6 +366,7 @@
+               *ZZ(JATOM)*MULT(JATOM)
+             write(6,1101)tmp1
+             bufETOTAL=bufETOTAL+tmp1
++            buf_efield=buf_efield+tmp1
+          endif
+       ENDDO
+ 
+@@ -350,6 +374,12 @@
+ !      call MPI_ALLREDUCE(bufnelec,nelec,1,MPI_INTEGER,            &
+ !        MPI_SUM,comm_coul,ierr)
+       call MPI_ALLREDUCE(bufETOTAL,etotal,1,MPI_DOUBLE_PRECISION, &
++        MPI_SUM,comm_coul,ierr)
++      call MPI_ALLREDUCE(buf_esphere,e_esphere,1,MPI_DOUBLE_PRECISION, &
++        MPI_SUM,comm_coul,ierr)
++      call MPI_ALLREDUCE(buf_econst,e_econst,1,MPI_DOUBLE_PRECISION, &
++        MPI_SUM,comm_coul,ierr)
++      call MPI_ALLREDUCE(buf_efield,e_efield,1,MPI_DOUBLE_PRECISION, &
+         MPI_SUM,comm_coul,ierr)
+       if (switch3 .eq. 'YES') then
+         call MPI_ALLREDUCE(bufEKIN,ekin,1,MPI_DOUBLE_PRECISION, &
+@@ -365,6 +395,9 @@
+ #else
+ !      nelec=bufnelec
+       etotal=bufetotal
++      e_esphere=buf_esphere
++      e_econst=buf_econst
++      e_efield=buf_efield
+       if (switch3 .eq. 'YES') then
+         ekin=bufekin
+         exc2=bufexc
+@@ -375,6 +408,19 @@
+ #endif
+         etot_bg=etot_bg + e_bg_int
+       ETOTAL=ETOTAL+EKVOL1*(-0.5d0) + etot_bg 
++
++!     All ENERGY internals above are Hartrees, while :DEN and all other
++!     SCF energies are Rydbergs.  Emit each term in Rydbergs so a central
++!     finite difference can be compared without hidden factors of two.
++!     The components sum exactly to DBG_EN_DEN_TOTAL (up to formatting).
++      if(myid.eq.0 .and. stress_debug) then
++         write(21,1130) 2.d0*e_esphere
++         write(21,1131) 2.d0*e_econst
++         write(21,1132) -EKVOL1
++         write(21,1133) 2.d0*e_efield
++         write(21,1134) 2.d0*etot_bg
++         write(21,1135) 2.d0*ETOTAL
++      endif
+ 
+       WRITE(6,1120) ETOTAL
+       ETOTAL=ETOTAL*2.D0                                                
+@@ -405,5 +451,11 @@
+  1100 FORMAT(9X,'SPHERE',I3,3X,A10,'  =',F13.6)                        
+  1101 FORMAT(21X,'EField      =',F13.6)
+  1120 FORMAT(3X,80(1H-),/,/,3X,'TOTAL VALUE =',F14.6,5X,'(H)')          
++ 1130 FORMAT(':DBG_EN_DEN_SPHERE:',1X,ES23.15)
++ 1131 FORMAT(':DBG_EN_DEN_CONST:',1X,ES23.15)
++ 1132 FORMAT(':DBG_EN_DEN_PW:',1X,ES23.15)
++ 1133 FORMAT(':DBG_EN_DEN_EFIELD:',1X,ES23.15)
++ 1134 FORMAT(':DBG_EN_DEN_BACKGROUND:',1X,ES23.15)
++ 1135 FORMAT(':DBG_EN_DEN_TOTAL:',1X,ES23.15)
+ 
+       END

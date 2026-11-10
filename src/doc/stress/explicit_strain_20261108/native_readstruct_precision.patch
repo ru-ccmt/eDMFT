@@ -1,0 +1,32 @@
+--- a/readstruct.f
++++ b/readstruct.f
+@@ -8,7 +8,8 @@
+   implicit real*8 (a-h,o-z)
+   REAL*8              :: test,ninety,postest(3)
+   CHARACTER*80    WSPACE
+-  LOGICAL there
++  LOGICAL there, response_scale_exists
++  REAL*8 response_scale
+   TEST=1.D-5
+   NINETY=90.0D0
+   
+@@ -22,6 +23,19 @@
+   ALLOCATE (pos(3,48*nat) )
+   !     READ IN LATTICE CONSTANTS                                         
+   READ(20,1020) aa,bb,cc,alpha(1),alpha(2),alpha(3)
++  ! Diagnostic only: avoid 6-decimal lattice rounding in strain finite differences.
++  ! RMT, fractional sites, axes and native potential algorithms are unchanged.
++  inquire(file='lapw0.strain_scale',exist=response_scale_exists)
++  if(response_scale_exists)then
++     open(994,file='lapw0.strain_scale',status='old',action='read')
++     read(994,*)response_scale
++     close(994)
++     if(.not.(response_scale.gt.0.d0))error stop 'invalid diagnostic strain scale'
++     aa=aa*response_scale
++     bb=bb*response_scale
++     cc=cc*response_scale
++     write(6,'(A,ES24.16)')'DIAGNOSTIC uniform lattice scale: ',response_scale
++  endif
+   a(1)=aa
+   a(2)=bb
+   a(3)=cc

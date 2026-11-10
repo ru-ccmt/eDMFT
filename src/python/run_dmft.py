@@ -20,6 +20,7 @@ import ctqmc#, oca
 import bctqmc
 from imp2lattc import ImpurityLatticeConnection, SimplifySiginds, iSigindDropNegative, ConvertFromLatticeToImp, Connect_ImpurityProjector
 import builtins
+import dmft2_step
 
 utime = '/usr/bin/time'  # This time function is compatible with w2k timing
 
@@ -220,7 +221,7 @@ def lcore(fday, case, WIEN, wopt, fh_info):
 def mixer(fday, case, WIEN, fh_info):
     AStep(fday, case, 'mixer', 'inm', WIEN, '', fh_info)
 
-def dmft2(fday, case, fh_info, dmfe, m_extn=''):
+def dmft2(fday, case, fh_info, dmfe, m_extn='', response_phase='defer'):
     inp_name = 'indmf2'+m_extn
     name = 'dmft2'+m_extn
     if not os.path.isfile(case+'.'+inp_name):
@@ -236,18 +237,13 @@ def dmft2(fday, case, fh_info, dmfe, m_extn=''):
     with open(':log', 'a') as fl:
         print(time.strftime("%a %b %d %I:%M:%S %p %Z %Y")+'>     '+name, file=fl)
     
-    #cmd = utime+' '+dmfe.MPI2+' '+dmfe.ROOT+'/dmft2 '+name+'.def >> dmft2_info.out '
-    cmd = dmfe.MPI2+' '+dmfe.ROOT+'/dmft2 '+name+'.def >> dmft2_info.out '
-    print(('#<'+name+'>: '), cmd, file=fh_info)
-    fh_info.flush()
-    
-    info=subprocess.call(cmd,shell=True,stdout=fh_info,stderr=sys.stderr)
-    
-    for fe in glob.glob(name+'.error*'):
-        if getsize(fe) !=0:
-            print('ERROR in '+fe+' from file:', open(fe,'r').readlines())
-            #sys.exit(1)
-    
+    # Input preparation and sigma splitting have already happened. Keep
+    # user edits intact. Intermediate calls ALWAYS defer response, including
+    # EF-only calls; the one final measurement below opts into phase='final'.
+    with open('dmft2_info.out', 'a') as output:
+        dmft2_step.execute(case, dmfe.ROOT, dmfe.MPI2, name+'.def',
+                           phase=response_phase, output=output)
+
     dat = open(case+'.scf2').readlines()
     dEF=0
     for line in dat:
@@ -257,6 +253,28 @@ def dmft2(fday, case, fh_info, dmfe, m_extn=''):
     
     return dEF
     
+def final_response_pass(fday, case, fh_info, dmfe, WIEN, wopt):
+    """Measure response once, after the outer loop has actually terminated.
+
+    Convergence is decided after mixer, so it cannot be predicted reliably
+    before the last ordinary dmft2 call. The loop leaves final lapw0/lapw1
+    outputs ready; use those in one final pass with no impurity solve and no
+    regenerated inputs. A failed response raises before lcore or mixer.
+    The executor detects both DMFT channels, establishes their common mu,
+    averages charge once and computes one shared complete stress tensor.
+    """
+    if not dmft2_step.requested(case):
+        return False
+    print('Final dmft2 -> response -> lcore -> SCF -> mixer pass', file=fh_info, flush=True)
+    dmft2(fday, case, fh_info, dmfe, response_phase='final')
+    lcore(fday, case, WIEN, wopt, fh_info)
+    scf(case, wopt)
+    scf1(fday, case, WIEN)
+    mixer(fday, case, WIEN, fh_info)
+    scfm(fday, case, WIEN)
+    fday.flush()
+    return True
+
 def scf1(fday, case, WIEN):
     for i in ['clmsum','vsp','vns','vrespsum','vspdn','vnsdn','vspup','vnsup','clmup','clmdn']:
         name = case+'.'+i
@@ -286,7 +304,9 @@ def Diff(fday, case, dEF, diff_nimp, ddiff_nimp):
         dene = abs(DEne[-1]-DEne[-2])
     else:
         dene = 1.0
-    if dene==0: dene = 1.0    
+    # Equal printed SCF energies are a valid zero change at output precision.
+    # Keep it zero: the caller also requires the charge residual to converge.
+    # Insufficient energy history is handled by the fallback above.
     print(':ENERGY convergence: '+str(dene), file=fday)
     print(':CHARGE convergence: '+str(drho), file=fday)
     print(':EF     convergence: '+str(dEF),  file=fday)
@@ -1142,6 +1162,9 @@ if __name__ == '__main__':
             # impurity occupation is not changing much anymore, and charge and energy is converged, hence we can safely stop if structure is not relaxing.
             break
         
+    if istep0 > 0:
+        final_response_pass(fday, w2k.case, fh_info, dmfe, w2k.WIENROOT, wopt)
+
     toclean = glob.glob('dmft[1|2].error*')+glob.glob('*.broyd*')+glob.glob('dmft')+glob.glob('dmft2')+glob.glob('_processes*')+glob.glob('lapw1')+glob.glob('*.output1_*')+glob.glob('*.vector_*')+glob.glob('*.scf1_*')+glob.glob('lapw1_*.[def|error]')
     for f in toclean: os.remove(f)
 

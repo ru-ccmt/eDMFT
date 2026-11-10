@@ -1,0 +1,33 @@
+--- a/SRC_lapw2/atpar.F
++++ b/SRC_lapw2/atpar.F
+@@ -516,6 +516,30 @@
+                     radp1(m,l),radp2(m,l),radpe1(m,l),radpe2(m,l)
+             enddo
+          enddo
++         ! The bare local-orbital radial solution and the ABC coefficients
++         ! are required to reconstruct the response of the *complete* LO
++         ! basis function
++         !
++         !   L_j(r)=A_j u_l(r)+B_j udot_l(r)+C_j u_LO,j(r).
++         !
++         ! Dumping only u_LO would violate the zero-value/zero-slope
++         ! boundary constraints when center and strained structures are
++         ! differenced.  These records are still diagnostic-only and do not
++         ! alter any LAPW2 result.
++         do l=0,min(lomax,lmax2n)
++            do jlo=1,ilo(l)
++               write(radial_dump_unit, &
++                    '(a,4(1x,i0),4(1x,es24.16))') ':RADIAL_LO_COEFF', &
++                    jatom,l,jlo,merge(1,0,lapw(l)), &
++                    alo(l,jlo),blo(l,jlo),clo(l,jlo),elo(l,jlo)
++               do m=1,jri(jatom)
++                  write(radial_dump_unit, &
++                       '(a,4(1x,i0),5(1x,es24.16))') ':RADIAL_LO_FD', &
++                       jatom,l,jlo,m,rnet(m),a1lo(m,jlo,l), &
++                       b1lo(m,jlo,l),ap1lo(m,jlo,l),bp1lo(m,jlo,l)
++               enddo
++            enddo
++         enddo
+          close(radial_dump_unit)
+       endif
+       

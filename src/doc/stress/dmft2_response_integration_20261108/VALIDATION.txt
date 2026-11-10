@@ -1,0 +1,23 @@
+VALIDATION — 8 November 2026
+13 integration tests passed; 15 existing response/report tests passed.
+The scheduler was tested with intermediate deferral, a single final pass,
+explicit disabling, failure blocking lcore/mixer, and an AST check that the
+final-pass call is outside all charge/impurity loops.
+
+Full standalone x_dmft --execute-only dmft2 test in an isolated SrVO3 copy:
+- 75 k points, four MPI ranks for dmft2; real screened-response backend.
+- Successful end-to-end execution: 243.416 seconds.
+- Screening converged after 9 actions; residual 0.0121207, threshold 0.02.
+- Central charge-map residual norm: 0.0001779823.
+- Prepared IN2/INDMF2/DEF files, sigma, density, potential, vectors and energies
+  retain identical input hashes after execution. EF.dat is a normal dmft2 output.
+- The original material directories were not modified.
+
+Post-installation STRFT test using ~/dbin/x_dmft.py --execute-only --no-response
+also passed: native core completed, original STRFT input was preserved, and no
+response workspace was created. Installed source and script hashes match the
+installation manifest. No native core executable was changed in this pass.
+
+The full run_dmft.py impurity/charge loop was not rerun as an integration test;
+its final-pass ordering and failure behavior were tested with substituted
+expensive steps. No full corrected tensor was applied or validated here.

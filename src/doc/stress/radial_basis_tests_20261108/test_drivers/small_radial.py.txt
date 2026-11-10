@@ -1,0 +1,21 @@
+"""Check the preexisting radial contraction at a 100x smaller probe step."""
+from run_tests import *
+
+def run(case):
+    root=ROOT/(case+'_DFT');c=root/'center';scale=0.01
+    is_c='in1c' in next(l for l in (c/'lapw1.def').read_text().splitlines() if l.split(',')[0].strip()=='5')
+    l2='lapw2c' if is_c else 'lapw2';in2=case+('.in2c' if is_c else '.in2')
+    for sign in ['minus','plus']:
+        d=root/(sign+'_complete_small')
+        shutil.copy2(d/'basis.vsp',d/(case+'.vsp'))
+        p=d/in2;a=p.read_text().splitlines();a[0]='TOT '+a[0][4:];p.write_text('\n'.join(a)+'\n')
+        execute(d,'lapw2',[str(WIEN/l2),'lapw2.def'],{'WIEN_STRESS_RADIAL_DUMP':str(d/'radial.dump')})
+    response=root/'radial_response_small.dat';s=json.loads((root/'summary.json').read_text())
+    derivative(root/'minus_complete_small/radial.dump',root/'plus_complete_small/radial.dump',scale*s['step'],response)
+    d=root/'small_diag';clone(c,d,case)
+    for suffix in ['vector','energy','nsh']:
+        shutil.copy2(c/(case+'.'+suffix),d/(case+'.'+suffix))
+    execute(d,'dmft2_radial',['/opt/homebrew/bin/mpirun','-n','4','/Users/haule/dbin/dmft2_response','dmft2.def'],{'EDMFT_STRESS_RADIAL_RESPONSE':str(response)})
+    text=(d/(case+'.outputdmf2')).read_text();print('\n'.join(l for l in text.splitlines() if 'RADIAL_FD_' in l and ('GPA' in l or 'RY' in l)),flush=True)
+
+if __name__=='__main__':run(sys.argv[1])

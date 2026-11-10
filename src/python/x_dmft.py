@@ -9,6 +9,7 @@ import utils,indmffile
 import chemicalP as c_p
 import gwienfile as gw
 import builtins
+import dmft2_step
 
 def getTemperature():
     if os.path.exists('params.dat'):
@@ -291,15 +292,23 @@ def checkSigmas(cixs, sig='sig.inp'):
 
 
 
-def runExternal(widmf, ROOT, MPI, nom, ntail, dmft_exe='dmft', m_ext='',performSplit=True):
+def runExternal(widmf, ROOT, MPI, nom, ntail, dmft_exe='dmft', m_ext='',performSplit=True, response_config=None, no_response=False):
     "Runs external executable"
     if performSplit:
         cmd = ROOT+'/ssplit.py -n '+str(nom)+' -t '+str(ntail)
         if len(m_ext)>0: cmd += ' -l '+m_ext
         print('..... running:', cmd)
-        subprocess.call(cmd, bufsize = 1,  shell=True)
+        if dmft_exe == 'dmft2':
+            subprocess.check_call(cmd, bufsize=1, shell=True)
+        else:
+            subprocess.call(cmd, bufsize=1, shell=True)
 
     deffile = widmf+m_ext+'.def'
+    if dmft_exe == 'dmft2':
+        # The same prepared executor is used by run_dmft. Input generation
+        # and sigma splitting remain the responsibility of this caller.
+        return dmft2_step.execute(w2k.case, ROOT, MPI, deffile,
+                                 config_path=response_config, disabled=no_response)
     
     if MPI: # In parallel mode needs to copy the executable to the current directory
         shutil.copy(ROOT+'/'+dmft_exe, os.getcwd() )
@@ -367,6 +376,13 @@ if __name__=='__main__':
     parser.add_option("--hermitian",      dest="herm",     action="store_true", default=False, help="make Hamiltonian matrix hermitian, i.e., like neglecting scattering rate")
     parser.add_option("--hermitianw",     dest="hermw",    action="store_true", default=False, help="make Hamiltonian matrix hermitian and create a new vector file for irreps")
     parser.add_option("--broad",          dest="broad",    default=0.0025, help="broadening for dmftgk. default 0.0025/13.6058")
+    parser.add_option("--execute-only", action="store_true", default=False,
+                      help="dmft2: execute existing DEF/input/split sigma files without preparing them")
+    parser.add_option("--response-config", default=None,
+                      help="optional dmft2 response overrides (default: case.stress_response.json); "
+                           "response MPI otherwise inherits mpi_prefix.dat2 or mpi_prefix.dat")
+    parser.add_option("--no-response", action="store_true", default=False,
+                      help="dmft2: suppress response for this standalone execution")
     # Next, parse the arguments
     (options, args) = parser.parse_args()
     
@@ -377,6 +393,11 @@ if __name__=='__main__':
         print('Need exactly one argument. One of the dmft0|dmft1|dmft2|mu|dmftp|dmftu')
         sys.exit(1)
     
+    if args[0] != 'dmft2' and (options.execute_only or options.response_config or options.no_response):
+        parser.error('response and --execute-only options require dmft2')
+    if options.execute_only and options.def_only:
+        parser.error('--execute-only cannot be combined with -d')
+
     dmfe = utils.DmftEnvironment()  # DMFT paths
     w2k = utils.W2kEnvironment()    # W2k filenames and paths
     
@@ -437,6 +458,15 @@ if __name__=='__main__':
         sodum = 'dum'
         cmplx = 'c'
     
+    if options.execute_only:
+        # Do not call PrepareInFile, PrepareDefinitionFile, or ssplit here.
+        # This is the path for inputs edited after x_dmft.py -d dmft2.
+        dmft2_step.execute(w2k.case, dmfe.ROOT, dmfe.MPI2,
+                           'dmft2'+options.m_ext+'.def',
+                           config_path=options.response_config,
+                           disabled=options.no_response)
+        sys.exit(0)
+
     # Processing 'case.indmfl' file
     inl = indmffile.Indmfl(w2k.case) # case.indmfl file
     inl.read()                       # case.indmfl read
@@ -482,8 +512,18 @@ if __name__=='__main__':
         PrepareInFile(idmf+options.m_ext, mode, w2k.case, updn, 0, options.recomputeEF, options.mixEF, options.WL,Temperature,options.Q_ETOT)
 
         if not options.def_only:
-            #checkSigmas(cixs)
-            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft2',options.m_ext)
+            # A requested total response owns the two-spin measurement. Prepare
+            # and split the companion here, where ordinary input generation is
+            # already authorized. --execute-only deliberately never does this.
+            if (not options.m_ext and mode == 'c' and
+                os.path.isfile(w2k.case+'.indmfldn') and os.path.getsize(w2k.case+'.indmfldn') > 0 and
+                dmft2_step.request(w2k.case, 'dmft2.def', options.response_config, options.no_response)['enabled']):
+                down = indmffile.Indmfl(w2k.case, 'indmfldn')
+                down.read()
+                PrepareDefinitionFile_dmft2('2dn', mode, w2k.case, list(down.siginds.keys()), updn, dnup, so, para, w2k.SCRATCH, cmplx, 'dn')
+                PrepareInFile('2dn', mode, w2k.case, updn, 0, 0, options.mixEF, options.WL, Temperature, options.Q_ETOT)
+                subprocess.check_call([sys.executable, os.path.join(dmfe.ROOT,'ssplit.py'), '-n', str(options.nom), '-t', str(options.ntail), '-l', 'dn'])
+            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft2', options.m_ext, response_config=options.response_config, no_response=options.no_response)
             
     elif args[0] == 'dmftu':
         idmf = 'u'

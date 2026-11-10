@@ -331,41 +331,38 @@ SUBROUTINE SymmetrizeOverlap(Olapm, cfX, cix_orb, cixdim, iSx, &
 END SUBROUTINE SymmetrizeOverlap
 
 
-! Symmetrize the normalization functional gradient over the same missing
-! k-star members that define the global projector overlap.  The accumulated
-! object is momentBar=conjg(N), where N=sum_k U_k^+ C_k.  N is a general
-! complex matrix (not a density matrix), so it must not be Hermitianized.
+! Apply the exact adjoint of the overlap symmetry map AFTER differentiating
+! X=S^(-1/2). Forward symmetrization without this reverse chain does not
+! differentiate the normalized projector used in the lattice functional.
+! This is a required chain-rule operation, regardless of whether it improves
+! agreement with a particular numerical pressure.
 !
-! This operation is deliberately diagnostic/default-off for now.  The
-! production result is unchanged unless
-!
-!   EDMFT_STRESS_NORM_SYMMETRY=APPLY
-!
-! is set.  DIAG evaluates and reports the group projection without applying
-! it.  This lets the finite-difference regression establish whether the
-! missing adjoint k-star projection is the hydrostatic stress discrepancy
-! before it becomes a production correction.
-SUBROUTINE SymmetrizeNormalizationMoment(momentBar,cfX,cix_orb,cixdim, &
+! Default APPLY is physical. EDMFT_STRESS_NORM_SYMMETRY=OFF or DIAG retains
+! the old unsymmetrized response only for controlled regression diagnostics.
+! DIAG computes and prints the change but does not apply it.
+! Final stress tensor symmetrization also rotates the Cartesian indices;
+! hydrostatic contraction is already invariant under that last operation.
+SUBROUTINE SymmetrizeNormalizationAdjoint(Qbar,cfX,cix_orb,cixdim, &
      iSx,iorbital,nindo,norbitals,maxdim2)
   USE sym2,   ONLY: iord
   USE dmfts,  ONLY: maxdim,ncix,natom,lmaxp
   USE com_mpi,ONLY: myrank,master
   IMPLICIT NONE
-  COMPLEX*16,intent(inout) :: momentBar(maxdim,maxdim,ncix)
+  COMPLEX*16,intent(inout) :: Qbar(maxdim,maxdim,ncix)
   COMPLEX*16,intent(in) :: cfX(maxdim2,maxdim2,norbitals,norbitals)
   INTEGER,intent(in) :: cix_orb(norbitals),cixdim(ncix)
   INTEGER,intent(in) :: iSx(maxdim2,norbitals)
   INTEGER,intent(in) :: iorbital(natom,lmaxp+1),nindo(norbitals)
   INTEGER,intent(in) :: norbitals,maxdim2
-  COMPLEX*16,allocatable :: Nraw(:,:,:),Nsym(:,:,:),RT(:,:,:)
+  COMPLEX*16,allocatable :: Qraw(:,:,:),Qsym(:,:,:),RT(:,:,:)
   CHARACTER(len=32) :: mode
   INTEGER :: status,i,letter,ig,icix,cdim
   REAL*8 :: rawNorm,differenceNorm,relativeDifference,maxChange
 
-  mode='OFF'
+  mode='APPLY'
   CALL GET_ENVIRONMENT_VARIABLE('EDMFT_STRESS_NORM_SYMMETRY',mode, &
        STATUS=status)
-  if (status.ne.0 .or. len_trim(mode).eq.0) mode='OFF'
+  if (status.ne.0 .or. len_trim(mode).eq.0) mode='APPLY'
   mode=adjustl(mode)
   do i=1,len_trim(mode)
      letter=iachar(mode(i:i))
@@ -376,40 +373,51 @@ SUBROUTINE SymmetrizeNormalizationMoment(momentBar,cfX,cix_orb,cixdim, &
   if (trim(mode).ne.'DIAG' .and. trim(mode).ne.'APPLY') then
      WRITE(6,'(A,A)') 'ERROR: unknown EDMFT_STRESS_NORM_SYMMETRY=', &
           trim(mode)
-     STOP 'invalid normalization-moment symmetry mode'
+     STOP 'invalid normalization-adjoint symmetry mode'
   endif
 
-  allocate(Nraw(maxdim,maxdim,ncix),Nsym(maxdim,maxdim,ncix), &
+  allocate(Qraw(maxdim,maxdim,ncix),Qsym(maxdim,maxdim,ncix), &
        RT(maxdim,maxdim,ncix))
-  ! momentBar is stored conjugated to match the projector-gradient convention.
-  ! Undo that convention before applying N(gk)=R_g^+ N(k) R_g; conjugate the
-  ! group-projected result only when returning to l2main.
-  Nraw=conjg(momentBar)
-  Nsym=0.d0
+  ! BuildNormalizationAdjoint returns conjg(Q), with Q Hermitian and
+  ! dGamma_norm = 2 Re Tr(Q dS). Undo this storage convention first.
+  ! The FORWARD overlap map is Herm o EquivalentAverage o OrbitalAverage:
+  !     S = Herm E [sum_g R_g^dagger Sraw R_g / |G|].
+  ! Reverse these operations for its exact ADJOINT. In particular the
+  ! equivalent-cix average precedes the orbital rotations here, and the
+  ! products are R_g Q R_g^dagger, not R_g^dagger Q R_g. No commutation of
+  ! X, Q or equivalent-block rotations is assumed. This remains correct for
+  ! a saved normalization X which is only approximately symmetry invariant.
+  Qraw=conjg(Qbar)
+  do icix=1,ncix
+     cdim=cixdim(icix)
+     Qraw(:cdim,:cdim,icix)=0.5d0*(Qraw(:cdim,:cdim,icix)+ &
+          conjg(transpose(Qraw(:cdim,:cdim,icix))))
+  enddo
+  CALL AverageEquivalentCixMatrices(Qraw,cixdim,maxdim,ncix)
+  Qsym=0.d0
   do ig=1,iord
      CALL CmpSymmetryTransformation(ig,RT,cfX,cix_orb,cixdim,iSx, &
           iorbital,nindo,norbitals,maxdim2,.False.)
      do icix=1,ncix
         cdim=cixdim(icix)
-        Nsym(:cdim,:cdim,icix)=Nsym(:cdim,:cdim,icix)+ &
-             matmul(conjg(transpose(RT(:cdim,:cdim,icix))), &
-             matmul(Nraw(:cdim,:cdim,icix), &
-             RT(:cdim,:cdim,icix)))/dble(iord)
+        Qsym(:cdim,:cdim,icix)=Qsym(:cdim,:cdim,icix)+ &
+             matmul(RT(:cdim,:cdim,icix), &
+             matmul(Qraw(:cdim,:cdim,icix), &
+             conjg(transpose(RT(:cdim,:cdim,icix)))))/dble(iord)
      enddo
   enddo
-  CALL AverageEquivalentCixMatrices(Nsym,cixdim,maxdim,ncix)
 
-  rawNorm=sqrt(sum(abs(Nraw)**2))
-  differenceNorm=sqrt(sum(abs(Nsym-Nraw)**2))
+  rawNorm=sqrt(sum(abs(Qbar)**2))
+  differenceNorm=sqrt(sum(abs(Qsym-conjg(Qbar))**2))
   relativeDifference=differenceNorm/max(rawNorm,tiny(1.d0))
-  maxChange=maxval(abs(Nsym-Nraw))
+  maxChange=maxval(abs(Qsym-conjg(Qbar)))
   if (myrank.eq.master) WRITE(6,'(A,1X,A,3(1X,ES20.11))') &
-       ':DMFT_NORMALIZATION_MOMENT_SYMMETRY:',trim(mode), &
+       ':DMFT_NORMALIZATION_ADJOINT_SYMMETRY:',trim(mode), &
        rawNorm,relativeDifference,maxChange
-  if (trim(mode).eq.'APPLY') momentBar=conjg(Nsym)
+  if (trim(mode).eq.'APPLY') Qbar=conjg(Qsym)
 
-  deallocate(RT,Nsym,Nraw)
-END SUBROUTINE SymmetrizeNormalizationMoment
+  deallocate(RT,Qsym,Qraw)
+END SUBROUTINE SymmetrizeNormalizationAdjoint
 
 
 ! Symmetrize a Cartesian derivative of the overlap.  nq=3 denotes a polar

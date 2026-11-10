@@ -1,0 +1,202 @@
+--- a/SRC_lapw0/xcpot1.f
++++ b/SRC_lapw0/xcpot1.f
+@@ -10,6 +10,7 @@
+       use TestCases,only : Lebedev, LEECE
+ !      use gga_str_kb, only: sig_str_u,sig_str_d, sig_str_ud  !,sigma_str    !for the stress tensor
+       use str_switch, only : SW_STRESS, STRESS
++      use gga_str_kb, only: gga_mt_metric,gga_metric_full
+ !                                                                       
+ !     XCPOT1 CALCULATES THE EXCHANGE-CORRELATION POTENTIAL INSIDE       
+ !     THE SPHERES.                                                      
+@@ -24,33 +25,38 @@
+       INCLUDE 'param.inc'
+ 
+ !     arguments
+-      integer        :: luse2, iprint, jatom, imfield
+-      integer        :: LM(2,NCOM+3,NAT),LMMAX(NAT)
+-      real*8         :: bextene
+-      real*8         :: sigmaj(2)
+-      logical        :: lr2v
+-      real*8         :: sigma_str(1:nrad,1:lmmaxx,nstart(myid):nstop(myid),1:3)
++      integer, intent(in) :: luse2, iprint, jatom, imfield, jspin
++      integer, intent(in) :: LM(2,NCOM+3,NAT),LMMAX(NAT)
++      real*8, intent(in)  :: bextene
++      logical, intent(in) :: lr2v
++      character*5, intent(in):: switch1
++      real*8, intent(out) :: sigmaj(2)
++      real*8, intent(out) :: sigma_str(1:nrad,1:lmmaxx,nstart(myid):nstop(myid),1:3)
+ 
+ !     local
+       LOGICAL        :: robfit, spin, nospin
+       real*8         :: YY(NCOM,nspd),YYB(nspd,NCOM),ROTA1(3)
+       REAL*8            bbu(NCOM),bbbu(NCOM),bbd(NCOM), bbbd(NCOM), &
+            vtau_bu(ncom),vtau_bd(ncom),vlapl_bu(ncom),vlapl_bd(ncom)
+-      COMPLEX*16     :: YL((lmax2X+1)*(lmax2X+1)),&
+-           dyt((lmax2X+1)*(lmax2X+1)),dyt2((lmax2X+1)*(lmax2X+1)), &
+-           dyp((lmax2X+1)*(lmax2X+1)),dyp2((lmax2X+1)*(lmax2X+1)), &
+-           dytp((lmax2X+1)*(lmax2X+1))
+-      real*8 :: spt(3,nspd),weight(nspd), &
+-           vxcsu(nspd),vxcsd(nspd), &
+-           vxu(nspd),vxd(nspd),exu(nspd),exd(nspd), &
+-           vtau_rad_up(nspd),vtau_rad_dn(nspd), &
+-           vlapl_rad_up(nspd),vlapl_rad_dn(nspd),&
+-           dcsp(ncom,nrad,2),ddcsp(ncom,nrad,2), &
+-           dydt(ncom,nspd),dydt2(ncom,nspd), &
+-           dydp(ncom,nspd),dydp2(ncom,nspd),dydtp(ncom,nspd), &
+-           qrhou(ncom),qrhod(ncom), &
+-           qsin(nspd),qcos(nspd)
+-      
++      COMPLEX*16, allocatable :: YL(:), dyt(:),dyt2(:), dyp(:),dyp2(:), dytp(:)
++      !COMPLEX*16     :: YL((lmax2X+1)*(lmax2X+1)),&
++      !     dyt((lmax2X+1)*(lmax2X+1)),dyt2((lmax2X+1)*(lmax2X+1)), &
++      !     dyp((lmax2X+1)*(lmax2X+1)),dyp2((lmax2X+1)*(lmax2X+1)), &
++      !     dytp((lmax2X+1)*(lmax2X+1))
++      !real*8 :: spt(3,nspd),weight(nspd), &
++      !     vxcsu(nspd),vxcsd(nspd), &
++      !     vxu(nspd),vxd(nspd),exu(nspd),exd(nspd), &
++      !     vtau_rad_up(nspd),vtau_rad_dn(nspd), &
++      !     vlapl_rad_up(nspd),vlapl_rad_dn(nspd),&
++      !     dcsp(ncom,nrad,2),ddcsp(ncom,nrad,2), &
++      !     dydt(ncom,nspd),dydt2(ncom,nspd), &
++      !     dydp(ncom,nspd),dydp2(ncom,nspd),dydtp(ncom,nspd), &
++      !     qrhou(ncom),qrhod(ncom), &
++      !     qsin(nspd),qcos(nspd)
++      real*8, allocatable :: spt(:,:),weight(:),vxcsu(:),vxcsd(:),vxu(:),vxd(:),exu(:),exd(:)
++      real*8, allocatable :: vtau_rad_up(:),vtau_rad_dn(:),vlapl_rad_up(:),vlapl_rad_dn(:)
++      real*8, allocatable :: dcsp(:,:,:),ddcsp(:,:,:),dydt(:,:),dydt2(:,:),dydp(:,:),dydp2(:,:)
++      real*8, allocatable :: dydtp(:,:),qrhou(:),qrhod(:),qsin(:),qcos(:)
+ !     derivatives of kinetic energy density
+       real*8   ::  dtau_dr(ncom,nrad,2),d2tau_dr2(ncom,nrad,2), &
+            dtau_dt_u, dtau_dt_d, dtau_dt_t, d2tau_dt2_u , d2tau_dt2_d, &
+@@ -67,7 +73,7 @@
+            dtau_u_drho_d, dtau_d_drho_u, dtau_d_drho_d, d2tau_dr2_u, &
+            d2tau_dr2_d, d2tau_dr2_t, sig_str_u,sig_str_d,sig_str_ud
+ 
+-      integer  ::  quadtest,iatj,l,ll,jspin,iatest,ncomx,j,index,llmm,luse,&
++      integer  ::  quadtest,iatj,l,ll,iatest,ncomx,j,index,llmm,luse,&
+            npt1,lm1,ind,init,ir,k,irsigmaup,irsigmadn
+       real*8   :: dmaxup,dmaxdn,sigmamaxup,sigmamaxdn, &
+            sum0,rp,rpp,ft,fu,fd,tautot,tauup,taudn,vxuold,vxdold,vxtold, &
+@@ -100,7 +106,6 @@
+        real*8 du_h(nspd), dd_h(nspd), tmpup(nspd), tmpdn(nspd)
+        logical UseLM(ncom), UseInterp, UseLDA, there, EECE_SWITCH
+        character*6 EECE_Show
+-       character*5 switch1
+        real*4,allocatable :: rwork(:)
+        real*8,allocatable :: tmp(:,:)
+        integer,allocatable:: itmp(:)
+@@ -109,13 +114,24 @@
+        
+ !******* for the stress tensor
+        REAL*8 :: gxyzu1(nspd),gxyzd1(nspd),gxyzud1(nspd)
+-
+-                        
+-!
+-
++       real(8),allocatable :: metric_radial(:,:)
++       real(8) :: er_st(3),et_st(3),ep_st(3),gu_st(3),gd_st(3),q_st(3,3)
++       real(8) :: cp_st,sp_st,xy_st,metric_integral
++       integer :: aa_st,bb_st,ii_st
++!
+ !       STRESS = .false.
+ !       IF(SW_STRESS .eq. 'YES') STRESS = .true.
++
++       allocate(YL((lmax2X+1)*(lmax2X+1)),dyt((lmax2X+1)*(lmax2X+1)),dyt2((lmax2X+1)*(lmax2X+1)))
++       allocate(dyp((lmax2X+1)*(lmax2X+1)),dyp2((lmax2X+1)*(lmax2X+1)), dytp((lmax2X+1)*(lmax2X+1)))
++       allocate(spt(3,nspd),weight(nspd),vxcsu(nspd),vxcsd(nspd),vxu(nspd),vxd(nspd),exu(nspd),exd(nspd))
++       allocate(vtau_rad_up(nspd),vtau_rad_dn(nspd),vlapl_rad_up(nspd),vlapl_rad_dn(nspd),dcsp(ncom,nrad,2))
++       allocate(ddcsp(ncom,nrad,2),dydt(ncom,nspd),dydt2(ncom,nspd),dydp(ncom,nspd),dydp2(ncom,nspd))
++       allocate(dydtp(ncom,nspd),qrhou(ncom),qrhod(ncom),qsin(nspd),qcos(nspd))
+        
++       if(STRESS.and.GGA_SWITCH.and.gga_metric_full)then
++          allocate(metric_radial(nrad,9));metric_radial=0.d0
++       endif
+        UseInterp= .false.
+        UseLDA   = .false.
+        EECE_SWITCH=.false.
+@@ -290,12 +306,12 @@
+       endif
+ !-----------
+ !     Note, we don't need LUSE later to be big
++      
+       LUSE=0
+       do LM1=1,LLMM
+         luse = max( iabs(LM(1,LM1,JATOM)), luse)
+       enddo
+       LUse=LUse+2
+-
+       Sum0 = 0.D0
+       do 1 ind=1,npt1
+          rota1(1)=spt(1,ind)
+@@ -338,6 +354,7 @@
+          ENDIF
+ !                                                                       
+   1   CONTINUE
++      
+ !                                                                       
+ !========================================================
+ !         derivatives dCLM/dR and ddCLM/ddR
+@@ -422,7 +439,8 @@
+ !$omp& vtauc_up,vtauc_dn,vlaplc_up,vlaplc_dn, &
+ !$omp& vtau_rad_up,vtau_rad_dn,vlapl_rad_up,vlapl_rad_dn, &
+ !$omp& vtau_ua,vtau_da,vlapl_ua,vlapl_da, gxyzu1, gxyzd1, gxyzud1, &
+-!$omp& sig_str_u,sig_str_d,sig_str_ud) &
++!$omp& sig_str_u,sig_str_d,sig_str_ud,er_st,et_st,ep_st,gu_st,gd_st, &
++!$omp& q_st,cp_st,sp_st,xy_st,aa_st,bb_st,ii_st) &
+ !$omp& lastprivate(vxcsu,vxcsd,bbu,bbd, &
+ !$omp& vtau_bu,vtau_bd,vlapl_bu,vlapl_bd) &
+ !$omp& copyin(xc1,xc2,xc3,xc4,xcconst) &
+@@ -713,6 +731,28 @@
+         !vtauc_dn = 0.0d0
+ !        
+ !                 
++         if(STRESS.and.GGA_SWITCH.and.gga_metric_full)then
++           ! GRANS returns components along (e_r,e_theta,e_phi), not the
++           ! fixed Cartesian axes. Rotate before taking outer products.
++           er_st=spt(:,k)
++           xy_st=sqrt(er_st(1)**2+er_st(2)**2)
++           cp_st=1.d0;sp_st=0.d0
++           if(xy_st>1.d-14)then
++             cp_st=er_st(1)/xy_st;sp_st=er_st(2)/xy_st
++           endif
++           et_st=[er_st(3)*cp_st,er_st(3)*sp_st,-xy_st]
++           ep_st=[-sp_st,cp_st,0.d0]
++           gu_st=gxu*er_st+gyu*et_st+gzu*ep_st
++           gd_st=gxd*er_st+gyd*et_st+gzd*ep_st
++           call gga_metric_tensor(jspin,gu_st,gd_st,sig_str_u,sig_str_d,sig_str_ud,q_st)
++           ii_st=0
++           do aa_st=1,3
++             do bb_st=1,3
++               ii_st=ii_st+1
++               metric_radial(ir,ii_st)=metric_radial(ir,ii_st)+weight(k)*rp*rp*q_st(aa_st,bb_st)
++             enddo
++           enddo
++         endif
+          IF(STRESS) THEN
+            gxyzu1(k) = sig_str_u
+            IF(spin) then
+@@ -1150,6 +1190,24 @@
+              F8.5)                                                      
+  1540 FORMAT(3X,'INDEX',6X,'V-XC',7X,'FIT',5X,'DIFFERENCE')             
+  1550 FORMAT(I8,2F10.5,F15.5)                                           
++
++
++      if(allocated(metric_radial))then
++         ! The radial integrand already includes r^2 and the angular
++         ! quadrature weights. Charge performs integral dr, not r^2 dr.
++         do ii_st=1,9
++           call charge(r,log(r(2)/r(1)),metric_radial(:,ii_st),1,jri(jatom),metric_integral)
++           gga_mt_metric(ii_st,jatom)=metric_integral
++         enddo
++         deallocate(metric_radial)
++      endif
++      deallocate(spt,weight,vxcsu,vxcsd,vxu,vxd,exu,exd)
++      deallocate(vtau_rad_up,vtau_rad_dn,vlapl_rad_up,vlapl_rad_dn,dcsp)
++      deallocate(ddcsp,dydt,dydt2,dydp,dydp2)
++      deallocate(dydtp,qrhou,qrhod,qsin,qcos)
++      deallocate(YL,dyt,dyt2)
++      deallocate(dyp,dyp2,dytp)
++      
+       RETURN                                                            
+       END
+                                                                

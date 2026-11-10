@@ -1,0 +1,55 @@
+--- a/SRC_lapw0/pwxad5.f
++++ b/SRC_lapw0/pwxad5.f
+@@ -367,6 +367,7 @@
+                         gga_int_dn_31, gga_int_dn_32, gga_int_dn_33 )
+ !This subroutine contains the interstitial part of the gga correction  --- KAMAL JUN 2021
+ !    use gga_str_kb, only: sig_str_u,sig_str_d
++    use gga_str_kb, only: gga_metric_full
+     IMPLICIT none
+     real*8,intent(in)    :: GXU,GYU,GZU,GXD,GYD,GZD,GX,GY,GZ,du0,dd0,sig_str_u,sig_str_d,sig_str_ud
+     integer,intent(in)   :: JSPIN
+@@ -378,10 +379,44 @@
+                             gga_int_dn_21, gga_int_dn_22, gga_int_dn_23 , &
+                             gga_int_dn_31, gga_int_dn_32, gga_int_dn_33
+     real*8               :: grad_rho(3,2)
++    real(8) :: metric_q(3,3),density_total
++
+     integer              :: alpha,beta,index1
+     
+     grad_rho(1,1) = GXU; grad_rho(2,1) = GYU; grad_rho(3,1) = GZU
+     grad_rho(1,2) = GXD; grad_rho(2,2) = GYD; grad_rho(3,2) = GZD
++    if(gga_metric_full)then
++      call gga_metric_tensor(jspin,grad_rho(:,1),grad_rho(:,2),sig_str_u,sig_str_d,sig_str_ud,metric_q)
++      ! XCPOT3 multiplies these buffers by 2*n_spin before the FFT.
++      ! Give both spin slots Q/(2*n_total), so the downstream sum is Q
++      ! including the mixed-spin derivative; do not multiply Q by n again.
++      density_total=du0+dd0
++      if(density_total>1.d-30)then
++        metric_q=metric_q/(2.d0*density_total)
++      else
++        metric_q=0.d0
++      endif
++      gga_int_up_11=metric_q(1,1)
++      gga_int_up_12=metric_q(1,2)
++      gga_int_up_13=metric_q(1,3)
++      gga_int_up_21=metric_q(2,1)
++      gga_int_up_22=metric_q(2,2)
++      gga_int_up_23=metric_q(2,3)
++      gga_int_up_31=metric_q(3,1)
++      gga_int_up_32=metric_q(3,2)
++      gga_int_up_33=metric_q(3,3)
++      gga_int_dn_11=metric_q(1,1)
++      gga_int_dn_12=metric_q(1,2)
++      gga_int_dn_13=metric_q(1,3)
++      gga_int_dn_21=metric_q(2,1)
++      gga_int_dn_22=metric_q(2,2)
++      gga_int_dn_23=metric_q(2,3)
++      gga_int_dn_31=metric_q(3,1)
++      gga_int_dn_32=metric_q(3,2)
++      gga_int_dn_33=metric_q(3,3)
++      return
++    endif
++
+     
+ !     index1 = 0
+ !     DO alpha = 1, 3

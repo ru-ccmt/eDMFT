@@ -1,0 +1,114 @@
+{
+  "case": "FeSe",
+  "scope": "native file-coordinate explicit/induced potential split; not total stress",
+  "fixed_rmt": true,
+  "radial_energy": "fixed",
+  "mesh": 140,
+  "steps": {
+    "0.00025": {
+      "actual_steps": [
+        -0.00024998132921416616,
+        0.0002499813292142772
+      ],
+      "strain_direction": [
+        0.9998740117600982,
+        0.9998740117600982,
+        1.000251976480502
+      ],
+      "total_relative": 0.0002383322980240875,
+      "induced_relative": 3.0070445221172248e-05,
+      "sectors": {
+        "spherical": {
+          "relative": 1.4465687947675175e-05,
+          "explicit_norm": 326.33951139054415,
+          "induced_norm": 309.7827808972465,
+          "total_norm": 36.18208158838133
+        },
+        "nonspherical": {
+          "relative": 0.000628478899665982,
+          "explicit_norm": 12.172058970229484,
+          "induced_norm": 9.085212894871601,
+          "total_norm": 14.804959002650907
+        },
+        "interstitial": {
+          "relative": 2.982197420900576e-07,
+          "explicit_norm": 0.6971678667244172,
+          "induced_norm": 0.2191627384834346,
+          "total_norm": 0.8068889524212268
+        }
+      },
+      "projector_potential_only_Ry": {
+        "explicit": 15.271178923822692,
+        "induced": -13.192872189300033,
+        "total": 2.078306734522662,
+        "native_total": 2.0783073480514966,
+        "difference": -6.135288349829244e-07
+      }
+    },
+    "0.000125": {
+      "actual_steps": [
+        -0.0001249906646071386,
+        0.00012499066460702757
+      ],
+      "strain_direction": [
+        0.9998740117603202,
+        0.9998740117603202,
+        1.000251976480724
+      ],
+      "total_relative": 5.994925114245327e-05,
+      "induced_relative": 7.563811976755189e-06,
+      "sectors": {
+        "spherical": {
+          "relative": 5.7206723357296395e-06,
+          "explicit_norm": 326.3395074018087,
+          "induced_norm": 309.7827808972465,
+          "total_norm": 36.182081618414344
+        },
+        "nonspherical": {
+          "relative": 0.00015771677657561845,
+          "explicit_norm": 12.172695034273177,
+          "induced_norm": 9.085212894871601,
+          "total_norm": 14.804959918309475
+        },
+        "interstitial": {
+          "relative": 7.446940088762724e-08,
+          "explicit_norm": 0.6971683483656849,
+          "induced_norm": 0.2191627384834346,
+          "total_norm": 0.8068894237573596
+        }
+      },
+      "projector_potential_only_Ry": {
+        "explicit": 15.271178899022969,
+        "induced": -13.192872189300033,
+        "total": 2.0783067097229337,
+        "native_total": 2.0783068624206757,
+        "difference": -1.5269774262121576e-07
+      }
+    }
+  },
+  "timings": [
+    {
+      "folder": "total_m_0.00025",
+      "seconds": 0.5867734160274267
+    },
+    {
+      "folder": "total_p_0.00025",
+      "seconds": 0.5978562911041081
+    },
+    {
+      "folder": "total_m_0.000125",
+      "seconds": 0.5889156251214445
+    },
+    {
+      "folder": "total_p_0.000125",
+      "seconds": 0.5878709580283612
+    }
+  ],
+  "error_reduction": 3.975567558930051,
+  "explicit_step_relative": 3.402844619936121e-06,
+  "inputs": {
+    "/private/tmp/edmft_screened_native_20261108/full_bz/FeSe/central/FeSe.struct": "7503825334944f3d0e646b10a60d22f4f1924768ddb27499700f64682e59be16",
+    "/private/tmp/edmft_screened_native_20261108/full_bz/FeSe/central/FeSe.clmsum": "6b35498f5f4f8a2fbd69be9d8d252314608a6f52490c688f183b8c2aa13aa621",
+    "/private/tmp/edmft_xc_core_response_20261108/native/SRC_lapw0/lapw0": "c5e1be43658448d36b61366bc701bfec42ddf04b8c3fae18f63a273852e5b823"
+  }
+}

@@ -1,0 +1,3591 @@
+
+------- MnO.scf0 --------
+ Euler-Maclaurian Coulomb
+ Consistent 3/8+Simpson combinations at start/end
+ New Mode for Coulomb Integral
+ Extension of core to zero
+ LDM version in phi
+ Fifth-order quadrature in outwin
+ Lebedev-Laikov Grid in lapw0
+
+
+            ---------
+:ITE370:370. ITERATION
+            ---------
+
+:NATO :    2 INDEPENDENT AND    2 TOTAL ATOMS IN UNITCELL
+       SUBSTANCE: MnO                                                         
+
+       LATTICE                      = F   
+:LAT  : LATTICE CONSTANTS=  8.40729  8.40729  8.40729    1.571    1.571    1.571
+:VOL  : UNIT CELL VOLUME =     148.56196
+:POT  : POTENTIAL OPTION EX_PBE EC_PBE VX_PBE VC_PBE
+       MODE OF CALCULATION IS       = RELA
+       NON-SPINPOLARIZED CALCULATION
+:IFFT  : FFT-parameters:   72   72   72 Factor: 2.00
+
+
+   CONVERGENCE PARAMETER FOR PSEUDOCHARGE: NCON=  9
+   MAXIMAL VALUE OF RMT(JATOM)*ABSK(NKK) : RK  =26.78502
+
+
+:VKCOUL :  VK-COUL convergence: 0.400E-06
+ Lebedev grid of          350
+ :rho_min:   2.0000000000000000E-008   1.0000000000000001E-009
+:VCOUL001 ATOMNUMBER=  1 O       VCOUL-ZERO =  0.53721E+00
+:VCOUL002 ATOMNUMBER=  2 Mn      VCOUL-ZERO =  0.32288E+00
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991103E-03
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991103E-03
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551688E-01
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551688E-01
+:DEN  : DENSITY INTEGRAL  =         -1044.11670876   (Ry)
+       ELS_POTENTIAL_AT Z=0 and Z=0.5:  -2.15996  -2.15996
+       ELS_POTENTIAL_AT Y=0 and Y=0.5:   0.00000   0.00000
+:VZERO:v0,v0c,v0x  -3.32118  -2.15996  -1.16122 v5,v5c,v5x  -3.32118  -2.15996  -1.16122
+:VZERY:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+:VZERX:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+
+------- MnO.scf1 --------
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  O         
+:e__0001: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0001: E( 0)=    0.6858
+             APW+lo
+:E0_0001: E( 0)=   -0.8641   E(BOTTOM)=   -1.542   E(TOP)=   -0.186  1  2   166
+             LOCAL ORBITAL
+:E1_0001: E( 1)=    0.2858
+             APW+lo
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  Mn        
+:e__0002: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0002: E( 0)=    0.2858
+             APW+lo
+:E0_0002: E( 0)=   -5.3644   E(BOTTOM)=   -5.403   E(TOP)=   -5.326  2  3   175
+             LOCAL ORBITAL
+:E1_0002: E( 1)=    0.2858
+             APW+lo
+:E1_0002: E( 1)=   -3.0822   E(BOTTOM)=   -3.172   E(TOP)=   -2.993  1  2   169
+             LOCAL ORBITAL
+:E2_0002: E( 2)=    0.4037   E(BOTTOM)=    0.065   E(TOP)=    0.743  0  1   135
+             APW+lo
+
+       K=   0.00000   0.00000   0.00000            1
+:RKM  : MATRIX SIZE   131LOs:  18  RKM= 6.45  WEIGHT= 1.00  PGR:    
+       EIGENVALUES ARE:
+:EIG00001:      -5.3571551   -3.0606824   -3.0606824   -3.0606824   -0.9246415
+:EIG00006:       0.2903607    0.2903607    0.2903607    0.3905608    0.3905608
+:EIG00011:       0.3905608    0.4321205    0.4321205    0.5311037    1.5759704
+:EIG00016:       1.7859179    1.7859179    1.7859179    2.0293357    2.0293357
+:EIG00021:       2.0293357    2.3077474    2.3077474
+       ********************************************************
+
+:KPT   :      NUMBER OF K-POINTS:    72
+
+------- MnO.scf2 --------
+:GMA  : POTENTIAL AND CHARGE CUT-OFF  11.99 Ry**.5
+
+
+:NLDA  : NUMBER OF ELECTRONS          =  21.000
+
+:FLDA  : F E R M I - ENERGY           =   0.00000
+
+
+:NOE  : NUMBER OF ELECTRONS          =  21.000
+
+:FER  : F E R M I - ENERGY           =   0.48579
+
+:POS001: ATOM    1 X,Y,Z = 0.50000 0.50000 0.50000  MULT= 1  ZZ=  8.000  O         
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+:POS002: ATOM    2 X,Y,Z = 0.00000 0.00000 0.00000  MULT= 1  ZZ= 25.000  Mn        
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+
+   QTL-B VALUE .EQ.   15.59525 in Band of energy    0.6165eV from EF ATOM=    2  L=  2
+    Check for ghostbands or EIGENVALUES BELOW XX messages
+    The projection of charge to \dot{u}(r) is   0.15595, which is large. Adjust your Energy-parameters for this ATOM and L (or use -in1new switch), check RMTs  !!!
+
+
+
+
+   QTL-B VALUE .EQ.   12.91146 in Band of energy   17.4060eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12911, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.41449 in Band of energy   16.4483eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07414, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.09802 in Band of energy   11.0936eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04098, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.60703 in Band of energy    9.8739eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.02607, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32852 in Band of energy    9.2360eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03329, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.52278 in Band of energy    4.4678eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.05523, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.53450 in Band of energy   16.8665eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10534, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.99651 in Band of energy   13.1635eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05997, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.31500 in Band of energy    3.3536eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04315, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.93722 in Band of energy   10.2557eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03937, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.55404 in Band of energy    4.7786eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03554, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.67117 in Band of energy    9.0323eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.96939 in Band of energy    4.8984eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02969, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.52189 in Band of energy    4.6102eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03522, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.30481 in Band of energy   10.6617eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04305, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.23918 in Band of energy   12.0995eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05239, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.94060 in Band of energy   13.4231eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05941, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.30765 in Band of energy   13.2178eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08308, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.86057 in Band of energy   12.2759eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07861, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.02340 in Band of energy    4.8196eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04023, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.85433 in Band of energy    5.5032eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03854, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.67142 in Band of energy    8.9520eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.84744 in Band of energy    8.8763eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03847, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.50289 in Band of energy    9.3367eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03503, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.10729 in Band of energy   10.3018eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04107, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.75282 in Band of energy   11.3737eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05753, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.65411 in Band of energy   12.5081eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10654, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.99889 in Band of energy   11.8957eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06999, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34135 in Band of energy   11.2021eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06341, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.16468 in Band of energy   10.6086eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04165, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64192 in Band of energy   10.1503eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.28944 in Band of energy    9.9714eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03289, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64582 in Band of energy    9.9500eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03646, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   12.18188 in Band of energy   12.0492eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12182, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.17290 in Band of energy   11.5106eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10173, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.85618 in Band of energy   10.6471eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06856, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.33748 in Band of energy    8.9324eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04337, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.80926 in Band of energy    9.2483eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03809, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.06534 in Band of energy    9.2481eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13065, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.74900 in Band of energy   11.3625eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10749, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.91419 in Band of energy   10.4587eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06914, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.35421 in Band of energy    8.9938eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13354, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.93338 in Band of energy   12.4224eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06933, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.65486 in Band of energy    4.1928eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03655, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.68321 in Band of energy    9.9310eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03683, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.61722 in Band of energy    9.1385eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03617, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.04354 in Band of energy    8.8964eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04044, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.64159 in Band of energy   11.7225eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.30077 in Band of energy   11.3556eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05301, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.91997 in Band of energy   10.9487eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03920, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.41408 in Band of energy   10.6748eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03414, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32769 in Band of energy   10.5596eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03328, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.51438 in Band of energy    9.6622eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03514, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.13945 in Band of energy   10.6668eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05139, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.46225 in Band of energy   11.3299eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08462, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34238 in Band of energy   10.6798eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06342, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.01659 in Band of energy   10.0730eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04017, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.66180 in Band of energy    9.6256eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03662, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.05419 in Band of energy    9.5988eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03054, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.23223 in Band of energy   11.1535eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09232, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.57964 in Band of energy   10.4402eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06580, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.35006 in Band of energy    9.1384eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04350, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.54470 in Band of energy   11.1041eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09545, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.07399 in Band of energy   10.3092eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05074, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.56430 in Band of energy   10.0603eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03564, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.59349 in Band of energy   10.0174eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03593, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.32068 in Band of energy   10.1829eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05321, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.75355 in Band of energy    9.0555eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03754, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.49020 in Band of energy    9.4881eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03490, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.46761 in Band of energy   10.1575eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05468, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64397 in Band of energy    9.4691eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03644, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+:CHA001: TOTAL CHARGE INSIDE SPHERE   1 =     6.054651
+:PCS001: PARTIAL CHARGES SPHERE =  1 S,P,D,F,      D-EG,D-T2G 
+:QTL001: 1.7783 4.2376 0.0290 0.0072 0.0000 0.0000 0.0000 0.0165 0.0125 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL001:  1.7285 -0.8617    0.1296 -0.0682    0.0012 -2.7939    0.0005 -3.0591
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH001:  0.0498  0.3050    4.1080  0.1445    0.0278  0.4120    0.0067  0.4555
+
+:CHA002: TOTAL CHARGE INSIDE SPHERE   2 =    13.233377
+:PCS002: PARTIAL CHARGES SPHERE =  2 S,P,D,F,      D-EG,D-T2G 
+:QTL002: 2.1886 6.1785 4.8274 0.0309 0.0000 0.0000 0.0000 2.0185 2.8089 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL002:  2.0426 -5.2453    5.9929 -3.0526    0.0329 -0.6548    0.0040 -0.8125
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH002:  0.1460  0.0857    0.1856  0.1287    4.7945  0.4659    0.0269  0.1811
+
+:CHA  : TOTAL CHARGE INSIDE UNIT CELL =      21.008040
+
+:NCOR    5.03823844  1    5       2.66628163  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.03611558       0.00000000      -0.00000000      -0.00000000      -0.00000000   
+    0.00000000       1.03611558      -0.00000000      -0.00000000       0.00000000   
+    0.00000000       0.00000000       0.98866910      -0.00000000       0.00000000   
+   -0.00000000      -0.00000000      -0.00000000       0.98866910      -0.00000000   
+    0.00000000       0.00000000       0.00000000      -0.00000000       0.98866910   
+
+  rho-rho_expected in dmft2:
+:DRHO        0.008040029616
+
+:SUM  : SUM OF EIGENVALUES =         -27.595143364
+
+:XSUM : SUM OF EIGENVALUES =         -27.600217468   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)+Tr(G(D-w*dD))
+:YSUM : SUM OF EIGENVALUES =         -29.325831809   # Tr(log(G))+mu*N-Tr((Sig-Vdc)*G)
+:ZSUM : SUM OF EIGENVALUES =         -27.342142374   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)
+:WSUM : SUM OF EIGENVALUES =         -27.538440933   # Tr(log(G))-Tr(log(G_loc))+Tr(G(D-w*dD))
+:QSUM : SUM OF EIGENVALUES =         -27.146174280   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc+s_oo)G)
+:VSUM : SUM OF EIGENVALUES =         -31.442676955   # Tr(log(G))+mu*N
+
+---------- Eorb_imp.dat --------------
+--- impurity 0 with degeneracy 1 ---
+#  Phidc= 85.8687579634013
+#  Tr(Sigma*G)/2= 80.98978866301833
+#  Tr(Sigma*G)/2-Phidc= -4.878969300382963
+#  Phi_DMFT= 104.52455609608185
+#  Phi_DMFT-Phi_DC= 18.65579813268056
+#  Tr(log(-Gimp))= -56.6251840138333
+#  Fimpurity+TS= -114.08979646843913
+#  E_pot+E_kin-Tr(w*dD/dw)= 77.4573841641702
+:EORB   -0.35859766085288414
+:XEORB  1.3711759922731515
+:ZEORB  -0.6182246255836765
+
+------- MnO.scfc --------
+
+        1.ATOM      O                     1 CORE STATES
+:1S 001: 1S                 -36.697390807 Ry
+
+        2.ATOM      Mn                    4 CORE STATES
+:1S 002: 1S                -471.505678666 Ry
+:2S 002: 2S                 -53.681799206 Ry
+:2PP002: 2P*                -45.835480261 Ry
+:2P 002: 2P                 -45.068758797 Ry
+
+  TOTAL CORE CORRECTION STRESS TENSOR in Ry/Bohr^3, EQ. (6.48) 
+ ************************************************************
+:STR_CORE001:          9.9157830859        0.0000000000        0.0000000000
+:STR_CORE002:          0.0000000000        9.9157830859        0.0000000000
+:STR_CORE003:          0.0000000000        0.0000000000        9.9157830859
+ ************************************************************
+
+
+------- MnO.scfm --------
+:CINT001 Core Integral Atom   1    2.00000000
+:CINT002 Core Integral Atom   2   10.00000000
+
+       DENSITY AT NUCLEUS
+        JATOM        VALENCE       SEMI-CORE          CORE           TOTAL
+:RTO001:   1       15.015852        0.000000      304.073045      319.088898
+:RTO002:   2      162.325476        0.000000    13171.345147    13333.670623
+:K-LIST:Reduced k-vector list      145      41
+     
+       CHARGES OF NEW CHARGE DENSITY
+:NTO   : INTERSTITIAL CHARGE  =     1.719999
+:NPC   : INTERSTITIAL CHARGE  =     5.525515
+:NTO001: CHARGE SPHERE   1    =     8.054651
+:NTO002: CHARGE SPHERE   2    =    23.233377
+
+:NEC01: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00802658 Plane Wave
+        Charge not renormalized due to INPUT-option
+     
+       CHARGES OF OLD CHARGE DENSITY
+:OTO   : INTERSTITIAL CHARGE  =     1.720000
+:OPC   : INTERSTITIAL CHARGE  =     5.525556
+:OTO001: CHARGE SPHERE   1    =     8.054663
+:OTO002: CHARGE SPHERE   2    =    23.233392
+
+:NEC02: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805532
+        Charge not renormalized due to INPUT-option
+     
+       CONVERGENCE TEST
+:DTO001: DIFFERENCE IN SPHERE  1 =  0.0000202
+:DTO002: DIFFERENCE IN SPHERE  2 =  0.0000157
+
+:DIS  :  CHARGE DISTANCE      (  0.0000202 for atom    1 spin 1)      0.0000180
+ 
+******************************************************
+* Multisecant Mixing Release 10.8.9                  *
+* Standard Mode with step bound                      *
+* Multisecant MSR1 Algorithm                         *
+* Restart from converged density                     *
+* Regularization       2.000E-04                     *
+* Minimum Greed        1.000E-03                     *
+* Max Number of Memory Steps    8                    *
+******************************************************
+ 
+:NOTE :  Forcing a restart
+:INFO: Global read efermi error
+
+:FULLRMS/Atom   0.0000647412
+:PLANE:  PW /ATOM     1.35956 DISTAN   1.24E-05 %  9.11E-04
+:CHARG:  CLM/ATOM   108.99379 DISTAN   4.41E-05 %  4.04E-05
+
+Step History
+        Dmix         Dmixt        Red     Pred      Step      Lambda    MagAbs    Beta
+  1   3.5000E-01   3.5000E-01  1.00E+00  1.00E+00  1.00E-01  1.00E+00  3.20E-06  1.00E+00
+:NOTE :  :INFO: Pratt in use
+:TRUST:  Step  1.0E-01 Charge  3.3E-02 (e) CTO  2.0E-01 (e) PW  2.0E-01 (e)
+:DIRP : |PRAT|= 6.193E-07 |PRATT|= 2.477E-05 ANGLE=   0.0 DEGREES
+:DIRQ : |PRAT|= 2.204E-06 |PRATT|= 8.814E-05 ANGLE=   0.0 DEGREES
+:DIRT : |PRAT|= 2.289E-06 |PRATT|= 9.156E-05 ANGLE=   0.0 DEGREES
+:MIX  :  PRATT  REGULARIZATION:  2.00E-04 GREED: 0.02500                 
+     
+       CHARGES OF MIXED CHARGE DENSITY
+:CTO   : INTERSTITIAL CHARGE  =     1.720000
+:CPC   : INTERSTITIAL CHARGE  =     5.525555
+:CTO001: CHARGE SPHERE   1    =     8.054663
+:CTO002: CHARGE SPHERE   2    =    23.233392
+
+:NEC03: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805460
+        Charge not renormalized due to INPUT-option
+
+PW CHANGE     H    K    L      Current       Change    Residue
+:PTO001:      0    0    0  4.87712685E-02 -7.051E-09 -2.820E-07
+:PTO002:     -1   -1   -1 -5.47760331E-02  1.510E-08  6.040E-07
+:PTO003:      0    0   -2  7.77885535E-02 -2.067E-08 -8.270E-07
+:PTO004:      0   -2   -2  4.20896109E-02 -1.979E-08 -7.917E-07
+:PTO005:     -1   -1   -3 -2.97591400E-02  2.135E-08  8.539E-07
+:PTO006:     -2   -2   -2  4.30742843E-03 -5.501E-09 -2.200E-07
+:PTO007:      0    0   -4 -1.13102708E-03 -4.484E-10 -1.794E-08
+:PTO008:     -1   -3   -3 -1.08808572E-03  1.324E-09  5.295E-08
+:PTO009:      0   -2   -4 -1.07542823E-02 -7.328E-11 -2.931E-09
+:PTO010:     -2   -2   -4 -9.64745653E-03  7.224E-10  2.890E-08
+:PTO011:     -3   -3   -3  1.22465785E-03 -9.556E-10 -3.822E-08
+:PTO012:     -1   -1   -5  3.26401795E-03  7.636E-11  3.054E-09
+
+:ENE  : ********** TOTAL ENERGY IN Ry =        -2467.78618285
+
+
+ ************************************************************
+          STRESS TENSOR, EQ. (6.187) 
+ ************************************************************
+
+ In Ry/Bohr^3 
+
+:STRESS_RY001:        -9.9157830859       -0.0000000000       -0.0000000000
+:STRESS_RY002:        -0.0000000000       -9.9157830859       -0.0000000000
+:STRESS_RY003:        -0.0000000000       -0.0000000000       -9.9157830859
+
+ In GPa, 10 Kbar = 1 Gpa 
+
+:STRESS_GPa001:   -145866.28976       -0.00000       -0.00000   partial
+:STRESS_GPa002:        -0.00000  -145866.28976       -0.00000   partial
+:STRESS_GPa003:        -0.00000       -0.00000  -145866.28976   partial
+
+:PRESSURE:       -145866.28976 GPa     partial
+
+
+------- MnO.scf0 --------
+ Euler-Maclaurian Coulomb
+ Consistent 3/8+Simpson combinations at start/end
+ New Mode for Coulomb Integral
+ Extension of core to zero
+ LDM version in phi
+ Fifth-order quadrature in outwin
+ Lebedev-Laikov Grid in lapw0
+
+
+            ---------
+:ITE371:371. ITERATION
+            ---------
+
+:NATO :    2 INDEPENDENT AND    2 TOTAL ATOMS IN UNITCELL
+       SUBSTANCE: MnO                                                         
+
+       LATTICE                      = F   
+:LAT  : LATTICE CONSTANTS=  8.40729  8.40729  8.40729    1.571    1.571    1.571
+:VOL  : UNIT CELL VOLUME =     148.56196
+:POT  : POTENTIAL OPTION EX_PBE EC_PBE VX_PBE VC_PBE
+       MODE OF CALCULATION IS       = RELA
+       NON-SPINPOLARIZED CALCULATION
+:IFFT  : FFT-parameters:   72   72   72 Factor: 2.00
+
+
+   CONVERGENCE PARAMETER FOR PSEUDOCHARGE: NCON=  9
+   MAXIMAL VALUE OF RMT(JATOM)*ABSK(NKK) : RK  =26.78502
+
+
+:VKCOUL :  VK-COUL convergence: 0.400E-06
+ Lebedev grid of          350
+ :rho_min:   2.0000000000000000E-008   1.0000000000000001E-009
+:VCOUL001 ATOMNUMBER=  1 O       VCOUL-ZERO =  0.53721E+00
+:VCOUL002 ATOMNUMBER=  2 Mn      VCOUL-ZERO =  0.32288E+00
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991230E-03
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991230E-03
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551690E-01
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551690E-01
+:DEN  : DENSITY INTEGRAL  =         -1044.11670790   (Ry)
+       ELS_POTENTIAL_AT Z=0 and Z=0.5:  -2.15996  -2.15996
+       ELS_POTENTIAL_AT Y=0 and Y=0.5:   0.00000   0.00000
+:VZERO:v0,v0c,v0x  -3.32118  -2.15996  -1.16122 v5,v5c,v5x  -3.32118  -2.15996  -1.16122
+:VZERY:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+:VZERX:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+
+------- MnO.scf1 --------
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  O         
+:e__0001: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0001: E( 0)=    0.6858
+             APW+lo
+:E0_0001: E( 0)=   -0.8641   E(BOTTOM)=   -1.542   E(TOP)=   -0.186  1  2   169
+             LOCAL ORBITAL
+:E1_0001: E( 1)=    0.2858
+             APW+lo
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  Mn        
+:e__0002: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0002: E( 0)=    0.2858
+             APW+lo
+:E0_0002: E( 0)=   -5.3644   E(BOTTOM)=   -5.403   E(TOP)=   -5.326  2  3   173
+             LOCAL ORBITAL
+:E1_0002: E( 1)=    0.2858
+             APW+lo
+:E1_0002: E( 1)=   -3.0822   E(BOTTOM)=   -3.172   E(TOP)=   -2.993  1  2   173
+             LOCAL ORBITAL
+:E2_0002: E( 2)=    0.4037   E(BOTTOM)=    0.065   E(TOP)=    0.743  0  1   133
+             APW+lo
+
+       K=   0.00000   0.00000   0.00000            1
+:RKM  : MATRIX SIZE   131LOs:  18  RKM= 6.45  WEIGHT= 1.00  PGR:    
+       EIGENVALUES ARE:
+:EIG00001:      -5.3571552   -3.0606825   -3.0606825   -3.0606825   -0.9246415
+:EIG00006:       0.2903607    0.2903607    0.2903607    0.3905607    0.3905607
+:EIG00011:       0.3905607    0.4321205    0.4321205    0.5311037    1.5759704
+:EIG00016:       1.7859179    1.7859179    1.7859179    2.0293357    2.0293357
+:EIG00021:       2.0293357    2.3077474    2.3077474
+       ********************************************************
+
+:KPT   :      NUMBER OF K-POINTS:    72
+
+------- MnO.scf2 --------
+:GMA  : POTENTIAL AND CHARGE CUT-OFF  11.99 Ry**.5
+
+
+:NLDA  : NUMBER OF ELECTRONS          =  21.000
+
+:FLDA  : F E R M I - ENERGY           =   0.00000
+
+
+:NOE  : NUMBER OF ELECTRONS          =  21.000
+
+:FER  : F E R M I - ENERGY           =   0.48579
+
+:POS001: ATOM    1 X,Y,Z = 0.50000 0.50000 0.50000  MULT= 1  ZZ=  8.000  O         
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+:POS002: ATOM    2 X,Y,Z = 0.00000 0.00000 0.00000  MULT= 1  ZZ= 25.000  Mn        
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+
+   QTL-B VALUE .EQ.   15.59518 in Band of energy    0.6165eV from EF ATOM=    2  L=  2
+    Check for ghostbands or EIGENVALUES BELOW XX messages
+    The projection of charge to \dot{u}(r) is   0.15595, which is large. Adjust your Energy-parameters for this ATOM and L (or use -in1new switch), check RMTs  !!!
+
+
+
+
+   QTL-B VALUE .EQ.   12.91103 in Band of energy   17.4060eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12911, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.41445 in Band of energy   16.4483eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07414, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.09802 in Band of energy   11.0936eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04098, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.60703 in Band of energy    9.8739eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.02607, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32852 in Band of energy    9.2360eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03329, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.52278 in Band of energy    4.4678eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.05523, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.53439 in Band of energy   16.8665eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10534, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.99651 in Band of energy   13.1635eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05997, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.31500 in Band of energy    3.3536eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04315, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.93722 in Band of energy   10.2557eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03937, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.55404 in Band of energy    4.7786eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03554, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.67117 in Band of energy    9.0323eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.96939 in Band of energy    4.8984eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02969, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.52189 in Band of energy    4.6102eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03522, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.30481 in Band of energy   10.6617eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04305, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.23918 in Band of energy   12.0995eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05239, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.94060 in Band of energy   13.4231eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05941, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.30765 in Band of energy   13.2178eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08308, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.86057 in Band of energy   12.2759eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07861, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.02340 in Band of energy    4.8196eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04023, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.85433 in Band of energy    5.5032eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03854, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.67142 in Band of energy    8.9520eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.84744 in Band of energy    8.8763eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03847, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.50289 in Band of energy    9.3367eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03503, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.10729 in Band of energy   10.3018eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04107, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.75282 in Band of energy   11.3737eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05753, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.65411 in Band of energy   12.5081eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10654, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.99889 in Band of energy   11.8957eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06999, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34135 in Band of energy   11.2021eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06341, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.16468 in Band of energy   10.6086eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04165, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64192 in Band of energy   10.1503eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.28944 in Band of energy    9.9714eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03289, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64581 in Band of energy    9.9500eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03646, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   12.18188 in Band of energy   12.0492eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12182, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.17290 in Band of energy   11.5106eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10173, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.85618 in Band of energy   10.6471eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06856, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.33748 in Band of energy    8.9324eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04337, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.80926 in Band of energy    9.2483eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03809, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.06534 in Band of energy    9.2481eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13065, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.74900 in Band of energy   11.3625eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10749, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.91419 in Band of energy   10.4587eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06914, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.35421 in Band of energy    8.9938eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13354, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.93338 in Band of energy   12.4224eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06933, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.65486 in Band of energy    4.1928eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03655, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.68321 in Band of energy    9.9310eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03683, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.61722 in Band of energy    9.1385eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03617, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.04354 in Band of energy    8.8964eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04044, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.64159 in Band of energy   11.7225eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.30077 in Band of energy   11.3556eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05301, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.91997 in Band of energy   10.9487eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03920, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.41408 in Band of energy   10.6748eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03414, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32769 in Band of energy   10.5596eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03328, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.51438 in Band of energy    9.6622eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03514, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.13945 in Band of energy   10.6668eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05139, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.46225 in Band of energy   11.3299eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08462, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34238 in Band of energy   10.6798eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06342, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.01659 in Band of energy   10.0730eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04017, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.66180 in Band of energy    9.6256eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03662, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.05419 in Band of energy    9.5988eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03054, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.23223 in Band of energy   11.1535eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09232, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.57964 in Band of energy   10.4402eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06580, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.35006 in Band of energy    9.1384eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04350, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.54470 in Band of energy   11.1041eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09545, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.07399 in Band of energy   10.3092eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05074, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.56430 in Band of energy   10.0603eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03564, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.59349 in Band of energy   10.0174eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03593, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.32068 in Band of energy   10.1829eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05321, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.75355 in Band of energy    9.0555eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03754, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.49020 in Band of energy    9.4881eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03490, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.46761 in Band of energy   10.1575eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05468, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64397 in Band of energy    9.4691eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03644, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+:CHA001: TOTAL CHARGE INSIDE SPHERE   1 =     6.054651
+:PCS001: PARTIAL CHARGES SPHERE =  1 S,P,D,F,      D-EG,D-T2G 
+:QTL001: 1.7783 4.2376 0.0290 0.0072 0.0000 0.0000 0.0000 0.0165 0.0125 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL001:  1.7285 -0.8617    0.1296 -0.0682    0.0012 -2.7939    0.0005 -3.0591
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH001:  0.0498  0.3050    4.1080  0.1445    0.0278  0.4120    0.0067  0.4555
+
+:CHA002: TOTAL CHARGE INSIDE SPHERE   2 =    13.233377
+:PCS002: PARTIAL CHARGES SPHERE =  2 S,P,D,F,      D-EG,D-T2G 
+:QTL002: 2.1886 6.1785 4.8274 0.0309 0.0000 0.0000 0.0000 2.0185 2.8089 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL002:  2.0426 -5.2453    5.9929 -3.0526    0.0329 -0.6548    0.0040 -0.8125
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH002:  0.1460  0.0857    0.1856  0.1287    4.7945  0.4659    0.0269  0.1811
+
+:CHA  : TOTAL CHARGE INSIDE UNIT CELL =      21.008040
+
+:NCOR    5.03823892  1    5       2.66628189  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.03611568       0.00000000      -0.00000000       0.00000000      -0.00000000   
+   -0.00000000       1.03611567      -0.00000000      -0.00000000       0.00000000   
+    0.00000000       0.00000000       0.98866919       0.00000000       0.00000000   
+    0.00000000      -0.00000000       0.00000000       0.98866919      -0.00000000   
+   -0.00000000       0.00000000       0.00000000      -0.00000000       0.98866919   
+
+  rho-rho_expected in dmft2:
+:DRHO        0.008040420360
+
+:SUM  : SUM OF EIGENVALUES =         -27.595144165
+
+:XSUM : SUM OF EIGENVALUES =         -27.600219494   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)+Tr(G(D-w*dD))
+:YSUM : SUM OF EIGENVALUES =         -29.325833311   # Tr(log(G))+mu*N-Tr((Sig-Vdc)*G)
+:ZSUM : SUM OF EIGENVALUES =         -27.342143244   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)
+:WSUM : SUM OF EIGENVALUES =         -27.538442614   # Tr(log(G))-Tr(log(G_loc))+Tr(G(D-w*dD))
+:QSUM : SUM OF EIGENVALUES =         -27.146175131   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc+s_oo)G)
+:VSUM : SUM OF EIGENVALUES =         -31.442678395   # Tr(log(G))+mu*N
+
+---------- Eorb_imp.dat --------------
+--- impurity 0 with degeneracy 1 ---
+#  Phidc= 85.8687579634013
+#  Tr(Sigma*G)/2= 80.98978866301833
+#  Tr(Sigma*G)/2-Phidc= -4.878969300382963
+#  Phi_DMFT= 104.52455609608185
+#  Phi_DMFT-Phi_DC= 18.65579813268056
+#  Tr(log(-Gimp))= -56.6251840138333
+#  Fimpurity+TS= -114.08979646843913
+#  E_pot+E_kin-Tr(w*dD/dw)= 77.4573841641702
+:EORB   -0.35859766085288414
+:XEORB  1.3711759922731515
+:ZEORB  -0.6182246255836765
+
+------- MnO.scfc --------
+
+        1.ATOM      O                     1 CORE STATES
+:1S 001: 1S                 -36.697390910 Ry
+
+        2.ATOM      Mn                    4 CORE STATES
+:1S 002: 1S                -471.505678579 Ry
+:2S 002: 2S                 -53.681799184 Ry
+:2PP002: 2P*                -45.835480228 Ry
+:2P 002: 2P                 -45.068758766 Ry
+
+  TOTAL CORE CORRECTION STRESS TENSOR in Ry/Bohr^3, EQ. (6.48) 
+ ************************************************************
+:STR_CORE001:          9.9157830833        0.0000000000        0.0000000000
+:STR_CORE002:          0.0000000000        9.9157830833        0.0000000000
+:STR_CORE003:          0.0000000000        0.0000000000        9.9157830833
+ ************************************************************
+
+
+------- MnO.scfm --------
+:CINT001 Core Integral Atom   1    2.00000000
+:CINT002 Core Integral Atom   2   10.00000000
+
+       DENSITY AT NUCLEUS
+        JATOM        VALENCE       SEMI-CORE          CORE           TOTAL
+:RTO001:   1       15.015853        0.000000      304.073046      319.088899
+:RTO002:   2      162.325476        0.000000    13171.345145    13333.670621
+:K-LIST:Reduced k-vector list      145      41
+     
+       CHARGES OF NEW CHARGE DENSITY
+:NTO   : INTERSTITIAL CHARGE  =     1.719999
+:NPC   : INTERSTITIAL CHARGE  =     5.525515
+:NTO001: CHARGE SPHERE   1    =     8.054651
+:NTO002: CHARGE SPHERE   2    =    23.233377
+
+:NEC01: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00802697 Plane Wave
+        Charge not renormalized due to INPUT-option
+     
+       CHARGES OF OLD CHARGE DENSITY
+:OTO   : INTERSTITIAL CHARGE  =     1.720000
+:OPC   : INTERSTITIAL CHARGE  =     5.525555
+:OTO001: CHARGE SPHERE   1    =     8.054663
+:OTO002: CHARGE SPHERE   2    =    23.233392
+
+:NEC02: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805460
+        Charge not renormalized due to INPUT-option
+     
+       CONVERGENCE TEST
+:DTO001: DIFFERENCE IN SPHERE  1 =  0.0000197
+:DTO002: DIFFERENCE IN SPHERE  2 =  0.0000154
+
+:DIS  :  CHARGE DISTANCE      (  0.0000197 for atom    1 spin 1)      0.0000176
+ 
+******************************************************
+* Multisecant Mixing Release 10.8.9                  *
+* Standard Mode with step bound                      *
+* Multisecant MSR1 Algorithm                         *
+* Restart from converged density                     *
+* Regularization       2.000E-04                     *
+* Minimum Greed        1.000E-03                     *
+* Max Number of Memory Steps    8                    *
+******************************************************
+ 
+:NOTE :  Forcing a restart
+:INFO: Global read efermi error
+
+:FULLRMS/Atom   0.0000430544
+:PLANE:  PW /ATOM     1.35956 DISTAN   1.21E-05 %  8.92E-04
+:CHARG:  CLM/ATOM   108.99379 DISTAN   2.79E-05 %  2.56E-05
+:INFOF Fractnow,Tolerror,TolReject,qtot     0.665     1.667     3.000     0.000 F F F
+
+Step History
+        Dmix         Dmixt        Red     Pred      Step      Lambda    MagAbs    Beta
+  1   3.5000E-01   3.5000E-01  1.00E+00  1.00E+00  1.00E-01  1.00E+00  3.20E-06  1.00E+00
+  2   2.5000E-02   2.5000E-02  1.00E+00  1.00E+00  1.00E-01  1.00E+00  3.20E-06  1.00E+00
+:NOTE :  Number of Memory Steps    1 Skipping    0
+   2.5000000000000001E-002   1.5754470910430810E-002
+
+:PREDicted Charge, CTotal, PW Trust   9.18E-07   1.25E-06   6.60E-07
+:PREDicted DMix, Beta, BLim           1.58E-02   1.00E+00   1.97E-02
+
+Eigenvalues, unscaled except for SY+YY with Slambda=   1.00000 Ylambda=   1.00000
+   #     SY Real       SY Imag         SS            YY        SY+YY Real     SY+YY Imag
+   1   1.55101E-02   0.00000E+00   2.87228E-04   9.84490E-01   1.00000E+00   0.00000E+00
+
+:TRUST:  Step  1.0E-01 Charge  1.6E-02 (e) CTO  1.0E-01 (e) PW  1.0E-01 (e)
+:DIRM :  MEMORY  1/8  RED  0.67 PRED  1.00 NEXT  0.58
+:DIRP : |MSR1|= 1.561E-07 |PRATT|= 2.425E-05 ANGLE=   0.1 DEGREES
+:DIRQ : |MSR1|= 7.989E-07 |PRATT|= 5.585E-05 ANGLE=  15.2 DEGREES
+:DIRT : |MSR1|= 8.140E-07 |PRATT|= 6.089E-05 ANGLE=  19.1 DEGREES
+:MIX  :  MSD1   REGULARIZATION:  2.00E-04 GREED: 0.01575  Newton 1.00  0.0134                
+     
+       CHARGES OF MIXED CHARGE DENSITY
+:CTO   : INTERSTITIAL CHARGE  =     1.720000
+:CPC   : INTERSTITIAL CHARGE  =     5.525555
+:CTO001: CHARGE SPHERE   1    =     8.054663
+:CTO002: CHARGE SPHERE   2    =    23.233392
+
+:NEC03: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805443
+        Charge not renormalized due to INPUT-option
+
+PW CHANGE     H    K    L      Current       Change    Residue
+:PTO001:      0    0    0  4.87712668E-02 -1.788E-09 -2.772E-07
+:PTO002:     -1   -1   -1 -5.47760293E-02  3.830E-09  5.938E-07
+:PTO003:      0    0   -2  7.77885483E-02 -5.192E-09 -8.078E-07
+:PTO004:      0   -2   -2  4.20896060E-02 -4.965E-09 -7.728E-07
+:PTO005:     -1   -1   -3 -2.97591346E-02  5.362E-09  8.342E-07
+:PTO006:     -2   -2   -2  4.30742705E-03 -1.386E-09 -2.154E-07
+:PTO007:      0    0   -4 -1.13102720E-03 -1.145E-10 -1.771E-08
+:PTO008:     -1   -3   -3 -1.08808540E-03  3.213E-10  5.060E-08
+:PTO009:      0   -2   -4 -1.07542823E-02 -1.999E-11 -3.023E-09
+:PTO010:     -2   -2   -4 -9.64745635E-03  1.781E-10  2.789E-08
+:PTO011:     -3   -3   -3  1.22465760E-03 -2.423E-10 -3.757E-08
+:PTO012:     -1   -1   -5  3.26401797E-03  1.702E-11  2.766E-09
+
+:ENE  : ********** TOTAL ENERGY IN Ry =        -2467.78618259
+
+
+ ************************************************************
+          STRESS TENSOR, EQ. (6.187) 
+ ************************************************************
+
+ In Ry/Bohr^3 
+
+:STRESS_RY001:        -9.9157830833       -0.0000000000       -0.0000000000
+:STRESS_RY002:        -0.0000000000       -9.9157830833       -0.0000000000
+:STRESS_RY003:        -0.0000000000       -0.0000000000       -9.9157830833
+
+ In GPa, 10 Kbar = 1 Gpa 
+
+:STRESS_GPa001:   -145866.28972       -0.00000       -0.00000   partial
+:STRESS_GPa002:        -0.00000  -145866.28972       -0.00000   partial
+:STRESS_GPa003:        -0.00000       -0.00000  -145866.28972   partial
+
+:PRESSURE:       -145866.28972 GPa     partial
+
+
+------- MnO.scf0 --------
+ Euler-Maclaurian Coulomb
+ Consistent 3/8+Simpson combinations at start/end
+ New Mode for Coulomb Integral
+ Extension of core to zero
+ LDM version in phi
+ Fifth-order quadrature in outwin
+ Lebedev-Laikov Grid in lapw0
+
+
+            ---------
+:ITE372:372. ITERATION
+            ---------
+
+:NATO :    2 INDEPENDENT AND    2 TOTAL ATOMS IN UNITCELL
+       SUBSTANCE: MnO                                                         
+
+       LATTICE                      = F   
+:LAT  : LATTICE CONSTANTS=  8.40729  8.40729  8.40729    1.571    1.571    1.571
+:VOL  : UNIT CELL VOLUME =     148.56196
+:POT  : POTENTIAL OPTION EX_PBE EC_PBE VX_PBE VC_PBE
+       MODE OF CALCULATION IS       = RELA
+       NON-SPINPOLARIZED CALCULATION
+:IFFT  : FFT-parameters:   72   72   72 Factor: 2.00
+
+
+   CONVERGENCE PARAMETER FOR PSEUDOCHARGE: NCON=  9
+   MAXIMAL VALUE OF RMT(JATOM)*ABSK(NKK) : RK  =26.78502
+
+
+:VKCOUL :  VK-COUL convergence: 0.400E-06
+ Lebedev grid of          350
+ :rho_min:   2.0000000000000000E-008   1.0000000000000001E-009
+:VCOUL001 ATOMNUMBER=  1 O       VCOUL-ZERO =  0.53721E+00
+:VCOUL002 ATOMNUMBER=  2 Mn      VCOUL-ZERO =  0.32288E+00
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991262E-03
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991262E-03
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551690E-01
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551690E-01
+:DEN  : DENSITY INTEGRAL  =         -1044.11670782   (Ry)
+       ELS_POTENTIAL_AT Z=0 and Z=0.5:  -2.15996  -2.15996
+       ELS_POTENTIAL_AT Y=0 and Y=0.5:   0.00000   0.00000
+:VZERO:v0,v0c,v0x  -3.32118  -2.15996  -1.16122 v5,v5c,v5x  -3.32118  -2.15996  -1.16122
+:VZERY:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+:VZERX:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+
+------- MnO.scf1 --------
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  O         
+:e__0001: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0001: E( 0)=    0.6858
+             APW+lo
+:E0_0001: E( 0)=   -0.8641   E(BOTTOM)=   -1.542   E(TOP)=   -0.186  1  2   169
+             LOCAL ORBITAL
+:E1_0001: E( 1)=    0.2858
+             APW+lo
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  Mn        
+:e__0002: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0002: E( 0)=    0.2858
+             APW+lo
+:E0_0002: E( 0)=   -5.3644   E(BOTTOM)=   -5.403   E(TOP)=   -5.326  2  3   172
+             LOCAL ORBITAL
+:E1_0002: E( 1)=    0.2858
+             APW+lo
+:E1_0002: E( 1)=   -3.0822   E(BOTTOM)=   -3.172   E(TOP)=   -2.993  1  2   173
+             LOCAL ORBITAL
+:E2_0002: E( 2)=    0.4037   E(BOTTOM)=    0.065   E(TOP)=    0.743  0  1   133
+             APW+lo
+
+       K=   0.00000   0.00000   0.00000            1
+:RKM  : MATRIX SIZE   131LOs:  18  RKM= 6.45  WEIGHT= 1.00  PGR:    
+       EIGENVALUES ARE:
+:EIG00001:      -5.3571552   -3.0606825   -3.0606825   -3.0606825   -0.9246415
+:EIG00006:       0.2903607    0.2903607    0.2903607    0.3905607    0.3905607
+:EIG00011:       0.3905607    0.4321204    0.4321204    0.5311037    1.5759704
+:EIG00016:       1.7859179    1.7859179    1.7859179    2.0293357    2.0293357
+:EIG00021:       2.0293357    2.3077474    2.3077474
+       ********************************************************
+
+:KPT   :      NUMBER OF K-POINTS:    72
+
+------- MnO.scf2 --------
+:GMA  : POTENTIAL AND CHARGE CUT-OFF  11.99 Ry**.5
+
+
+:NLDA  : NUMBER OF ELECTRONS          =  21.000
+
+:FLDA  : F E R M I - ENERGY           =   0.00000
+
+
+:NOE  : NUMBER OF ELECTRONS          =  21.000
+
+:FER  : F E R M I - ENERGY           =   0.48579
+
+:POS001: ATOM    1 X,Y,Z = 0.50000 0.50000 0.50000  MULT= 1  ZZ=  8.000  O         
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+:POS002: ATOM    2 X,Y,Z = 0.00000 0.00000 0.00000  MULT= 1  ZZ= 25.000  Mn        
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+
+   QTL-B VALUE .EQ.   15.59526 in Band of energy    0.6165eV from EF ATOM=    2  L=  2
+    Check for ghostbands or EIGENVALUES BELOW XX messages
+    The projection of charge to \dot{u}(r) is   0.15595, which is large. Adjust your Energy-parameters for this ATOM and L (or use -in1new switch), check RMTs  !!!
+
+
+
+
+   QTL-B VALUE .EQ.   12.91103 in Band of energy   17.4060eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12911, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.41456 in Band of energy   16.4483eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07415, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.09802 in Band of energy   11.0936eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04098, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.60703 in Band of energy    9.8739eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.02607, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32852 in Band of energy    9.2360eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03329, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.52278 in Band of energy    4.4678eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.05523, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.53446 in Band of energy   16.8665eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10534, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.99652 in Band of energy   13.1635eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05997, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.31500 in Band of energy    3.3536eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04315, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.93722 in Band of energy   10.2557eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03937, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.55404 in Band of energy    4.7786eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03554, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.67117 in Band of energy    9.0323eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.96939 in Band of energy    4.8984eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02969, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.52189 in Band of energy    4.6102eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03522, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.30481 in Band of energy   10.6617eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04305, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.23918 in Band of energy   12.0995eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05239, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.94060 in Band of energy   13.4231eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05941, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.30765 in Band of energy   13.2178eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08308, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.86057 in Band of energy   12.2759eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07861, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.02340 in Band of energy    4.8196eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04023, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.85433 in Band of energy    5.5032eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03854, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.67142 in Band of energy    8.9520eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.84744 in Band of energy    8.8763eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03847, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.50289 in Band of energy    9.3367eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03503, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.10729 in Band of energy   10.3018eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04107, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.75282 in Band of energy   11.3737eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05753, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.65411 in Band of energy   12.5081eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10654, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.99889 in Band of energy   11.8957eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06999, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34135 in Band of energy   11.2021eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06341, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.16468 in Band of energy   10.6086eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04165, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64192 in Band of energy   10.1503eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.28944 in Band of energy    9.9714eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03289, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64582 in Band of energy    9.9500eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03646, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   12.18188 in Band of energy   12.0492eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12182, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.17290 in Band of energy   11.5106eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10173, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.85618 in Band of energy   10.6471eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06856, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.33748 in Band of energy    8.9324eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04337, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.80926 in Band of energy    9.2483eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03809, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.06534 in Band of energy    9.2481eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13065, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.74900 in Band of energy   11.3625eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10749, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.91419 in Band of energy   10.4587eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06914, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.35421 in Band of energy    8.9938eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13354, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.93338 in Band of energy   12.4224eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06933, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.65486 in Band of energy    4.1928eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03655, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.68321 in Band of energy    9.9310eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03683, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.61722 in Band of energy    9.1385eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03617, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.04354 in Band of energy    8.8964eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04044, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.64159 in Band of energy   11.7225eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.30077 in Band of energy   11.3556eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05301, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.91997 in Band of energy   10.9487eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03920, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.41408 in Band of energy   10.6748eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03414, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32769 in Band of energy   10.5596eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03328, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.51438 in Band of energy    9.6622eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03514, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.13945 in Band of energy   10.6668eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05139, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.46225 in Band of energy   11.3299eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08462, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34238 in Band of energy   10.6798eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06342, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.01659 in Band of energy   10.0730eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04017, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.66180 in Band of energy    9.6256eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03662, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.05419 in Band of energy    9.5988eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03054, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.23223 in Band of energy   11.1535eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09232, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.57964 in Band of energy   10.4402eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06580, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.35006 in Band of energy    9.1384eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04350, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.54470 in Band of energy   11.1041eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09545, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.07399 in Band of energy   10.3092eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05074, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.56430 in Band of energy   10.0603eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03564, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.59349 in Band of energy   10.0174eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03593, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.32068 in Band of energy   10.1829eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05321, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.75355 in Band of energy    9.0555eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03754, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.49020 in Band of energy    9.4881eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03490, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.46761 in Band of energy   10.1575eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05468, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64397 in Band of energy    9.4691eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03644, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+:CHA001: TOTAL CHARGE INSIDE SPHERE   1 =     6.054651
+:PCS001: PARTIAL CHARGES SPHERE =  1 S,P,D,F,      D-EG,D-T2G 
+:QTL001: 1.7783 4.2376 0.0290 0.0072 0.0000 0.0000 0.0000 0.0165 0.0125 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL001:  1.7285 -0.8617    0.1296 -0.0682    0.0012 -2.7939    0.0005 -3.0591
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH001:  0.0498  0.3050    4.1080  0.1445    0.0278  0.4119    0.0067  0.4555
+
+:CHA002: TOTAL CHARGE INSIDE SPHERE   2 =    13.233377
+:PCS002: PARTIAL CHARGES SPHERE =  2 S,P,D,F,      D-EG,D-T2G 
+:QTL002: 2.1886 6.1785 4.8274 0.0309 0.0000 0.0000 0.0000 2.0185 2.8089 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL002:  2.0426 -5.2453    5.9929 -3.0526    0.0329 -0.6548    0.0040 -0.8125
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH002:  0.1460  0.0857    0.1856  0.1287    4.7945  0.4659    0.0269  0.1811
+
+:CHA  : TOTAL CHARGE INSIDE UNIT CELL =      21.008040
+
+:NCOR    5.03823889  1    5       2.66628187  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.03611567      -0.00000000       0.00000000      -0.00000000      -0.00000000   
+    0.00000000       1.03611567       0.00000000       0.00000000       0.00000000   
+    0.00000000      -0.00000000       0.98866918       0.00000000       0.00000000   
+   -0.00000000       0.00000000       0.00000000       0.98866918      -0.00000000   
+    0.00000000       0.00000000       0.00000000      -0.00000000       0.98866918   
+
+  rho-rho_expected in dmft2:
+:DRHO        0.008040471541
+
+:SUM  : SUM OF EIGENVALUES =         -27.595144474
+
+:XSUM : SUM OF EIGENVALUES =         -27.600218202   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)+Tr(G(D-w*dD))
+:YSUM : SUM OF EIGENVALUES =         -29.325832599   # Tr(log(G))+mu*N-Tr((Sig-Vdc)*G)
+:ZSUM : SUM OF EIGENVALUES =         -27.342143737   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)
+:WSUM : SUM OF EIGENVALUES =         -27.538441256   # Tr(log(G))-Tr(log(G_loc))+Tr(G(D-w*dD))
+:QSUM : SUM OF EIGENVALUES =         -27.146175625   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc+s_oo)G)
+:VSUM : SUM OF EIGENVALUES =         -31.442677754   # Tr(log(G))+mu*N
+
+---------- Eorb_imp.dat --------------
+--- impurity 0 with degeneracy 1 ---
+#  Phidc= 85.8687579634013
+#  Tr(Sigma*G)/2= 80.98978866301833
+#  Tr(Sigma*G)/2-Phidc= -4.878969300382963
+#  Phi_DMFT= 104.52455609608185
+#  Phi_DMFT-Phi_DC= 18.65579813268056
+#  Tr(log(-Gimp))= -56.6251840138333
+#  Fimpurity+TS= -114.08979646843913
+#  E_pot+E_kin-Tr(w*dD/dw)= 77.4573841641702
+:EORB   -0.35859766085288414
+:XEORB  1.3711759922731515
+:ZEORB  -0.6182246255836765
+
+------- MnO.scfc --------
+
+        1.ATOM      O                     1 CORE STATES
+:1S 001: 1S                 -36.697390934 Ry
+
+        2.ATOM      Mn                    4 CORE STATES
+:1S 002: 1S                -471.505678550 Ry
+:2S 002: 2S                 -53.681799171 Ry
+:2PP002: 2P*                -45.835480213 Ry
+:2P 002: 2P                 -45.068758750 Ry
+
+  TOTAL CORE CORRECTION STRESS TENSOR in Ry/Bohr^3, EQ. (6.48) 
+ ************************************************************
+:STR_CORE001:          9.9157830827        0.0000000000        0.0000000000
+:STR_CORE002:          0.0000000000        9.9157830827        0.0000000000
+:STR_CORE003:          0.0000000000        0.0000000000        9.9157830827
+ ************************************************************
+
+
+------- MnO.scfm --------
+:CINT001 Core Integral Atom   1    2.00000000
+:CINT002 Core Integral Atom   2   10.00000000
+
+       DENSITY AT NUCLEUS
+        JATOM        VALENCE       SEMI-CORE          CORE           TOTAL
+:RTO001:   1       15.015853        0.000000      304.073046      319.088899
+:RTO002:   2      162.325476        0.000000    13171.345145    13333.670621
+:K-LIST:Reduced k-vector list      145      41
+     
+       CHARGES OF NEW CHARGE DENSITY
+:NTO   : INTERSTITIAL CHARGE  =     1.719999
+:NPC   : INTERSTITIAL CHARGE  =     5.525515
+:NTO001: CHARGE SPHERE   1    =     8.054651
+:NTO002: CHARGE SPHERE   2    =    23.233377
+
+:NEC01: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00802702 Plane Wave
+        Charge not renormalized due to INPUT-option
+     
+       CHARGES OF OLD CHARGE DENSITY
+:OTO   : INTERSTITIAL CHARGE  =     1.720000
+:OPC   : INTERSTITIAL CHARGE  =     5.525555
+:OTO001: CHARGE SPHERE   1    =     8.054663
+:OTO002: CHARGE SPHERE   2    =    23.233392
+
+:NEC02: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805443
+        Charge not renormalized due to INPUT-option
+     
+       CONVERGENCE TEST
+:DTO001: DIFFERENCE IN SPHERE  1 =  0.0000196
+:DTO002: DIFFERENCE IN SPHERE  2 =  0.0000152
+
+:DIS  :  CHARGE DISTANCE      (  0.0000196 for atom    1 spin 1)      0.0000174
+ 
+******************************************************
+* Multisecant Mixing Release 10.8.9                  *
+* Standard Mode with step bound                      *
+* Multisecant MSR1 Algorithm                         *
+* Regularization       2.000E-04                     *
+* Minimum Greed        1.000E-03                     *
+* Max Number of Memory Steps    8                    *
+******************************************************
+ 
+:NOTE :  Forcing a restart
+:INFO: Global read efermi error
+
+:FULLRMS/Atom   0.0000962350
+:PLANE:  PW /ATOM     1.35956 DISTAN   1.21E-05 %  8.87E-04
+:CHARG:  CLM/ATOM   108.99379 DISTAN   6.70E-05 %  6.14E-05
+
+Step History
+        Dmix         Dmixt        Red     Pred      Step      Lambda    MagAbs    Beta
+  1   3.5000E-01   3.5000E-01  1.00E+00  1.00E+00  1.00E-01  1.00E+00  4.76E-06  1.00E+00
+:NOTE :  :INFO: Pratt in use
+:TRUST:  Step  1.0E-01 Charge  3.3E-02 (e) CTO  2.0E-01 (e) PW  2.0E-01 (e)
+:DIRP : |PRAT|= 6.029E-07 |PRATT|= 2.411E-05 ANGLE=   0.0 DEGREES
+:DIRQ : |PRAT|= 3.349E-06 |PRATT|= 1.339E-04 ANGLE=   0.0 DEGREES
+:DIRT : |PRAT|= 3.402E-06 |PRATT|= 1.361E-04 ANGLE=   0.0 DEGREES
+:MIX  :  PRATT  REGULARIZATION:  2.00E-04 GREED: 0.02500                 
+     
+       CHARGES OF MIXED CHARGE DENSITY
+:CTO   : INTERSTITIAL CHARGE  =     1.720000
+:CPC   : INTERSTITIAL CHARGE  =     5.525554
+:CTO001: CHARGE SPHERE   1    =     8.054662
+:CTO002: CHARGE SPHERE   2    =    23.233391
+
+:NEC03: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805374
+        Charge not renormalized due to INPUT-option
+
+PW CHANGE     H    K    L      Current       Change    Residue
+:PTO001:      0    0    0  4.87712599E-02 -6.880E-09 -2.752E-07
+:PTO002:     -1   -1   -1 -5.47760145E-02  1.479E-08  5.916E-07
+:PTO003:      0    0   -2  7.77885282E-02 -2.008E-08 -8.032E-07
+:PTO004:      0   -2   -2  4.20895867E-02 -1.923E-08 -7.693E-07
+:PTO005:     -1   -1   -3 -2.97591139E-02  2.071E-08  8.282E-07
+:PTO006:     -2   -2   -2  4.30742169E-03 -5.351E-09 -2.140E-07
+:PTO007:      0    0   -4 -1.13102763E-03 -4.363E-10 -1.745E-08
+:PTO008:     -1   -3   -3 -1.08808414E-03  1.262E-09  5.048E-08
+:PTO009:      0   -2   -4 -1.07542824E-02 -7.556E-11 -3.023E-09
+:PTO010:     -2   -2   -4 -9.64745565E-03  7.020E-10  2.808E-08
+:PTO011:     -3   -3   -3  1.22465668E-03 -9.291E-10 -3.716E-08
+:PTO012:     -1   -1   -5  3.26401804E-03  6.968E-11  2.787E-09
+
+:ENE  : ********** TOTAL ENERGY IN Ry =        -2467.78618269
+
+
+ ************************************************************
+          STRESS TENSOR, EQ. (6.187) 
+ ************************************************************
+
+ In Ry/Bohr^3 
+
+:STRESS_RY001:        -9.9157830827       -0.0000000000       -0.0000000000
+:STRESS_RY002:        -0.0000000000       -9.9157830827       -0.0000000000
+:STRESS_RY003:        -0.0000000000       -0.0000000000       -9.9157830827
+
+ In GPa, 10 Kbar = 1 Gpa 
+
+:STRESS_GPa001:   -145866.28971       -0.00000       -0.00000   partial
+:STRESS_GPa002:        -0.00000  -145866.28971       -0.00000   partial
+:STRESS_GPa003:        -0.00000       -0.00000  -145866.28971   partial
+
+:PRESSURE:       -145866.28971 GPa     partial
+
+
+------- MnO.scf0 --------
+ Euler-Maclaurian Coulomb
+ Consistent 3/8+Simpson combinations at start/end
+ New Mode for Coulomb Integral
+ Extension of core to zero
+ LDM version in phi
+ Fifth-order quadrature in outwin
+ Lebedev-Laikov Grid in lapw0
+
+
+            ---------
+:ITE373:373. ITERATION
+            ---------
+
+:NATO :    2 INDEPENDENT AND    2 TOTAL ATOMS IN UNITCELL
+       SUBSTANCE: MnO                                                         
+
+       LATTICE                      = F   
+:LAT  : LATTICE CONSTANTS=  8.40729  8.40729  8.40729    1.571    1.571    1.571
+:VOL  : UNIT CELL VOLUME =     148.56196
+:POT  : POTENTIAL OPTION EX_PBE EC_PBE VX_PBE VC_PBE
+       MODE OF CALCULATION IS       = RELA
+       NON-SPINPOLARIZED CALCULATION
+:IFFT  : FFT-parameters:   72   72   72 Factor: 2.00
+
+
+   CONVERGENCE PARAMETER FOR PSEUDOCHARGE: NCON=  9
+   MAXIMAL VALUE OF RMT(JATOM)*ABSK(NKK) : RK  =26.78502
+
+
+:VKCOUL :  VK-COUL convergence: 0.400E-06
+ Lebedev grid of          350
+ :rho_min:   2.0000000000000000E-008   1.0000000000000001E-009
+:VCOUL001 ATOMNUMBER=  1 O       VCOUL-ZERO =  0.53721E+00
+:VCOUL002 ATOMNUMBER=  2 Mn      VCOUL-ZERO =  0.32288E+00
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991386E-03
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991386E-03
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551691E-01
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551691E-01
+:DEN  : DENSITY INTEGRAL  =         -1044.11670729   (Ry)
+       ELS_POTENTIAL_AT Z=0 and Z=0.5:  -2.15996  -2.15996
+       ELS_POTENTIAL_AT Y=0 and Y=0.5:   0.00000   0.00000
+:VZERO:v0,v0c,v0x  -3.32118  -2.15996  -1.16122 v5,v5c,v5x  -3.32118  -2.15996  -1.16122
+:VZERY:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+:VZERX:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+
+------- MnO.scf1 --------
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  O         
+:e__0001: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0001: E( 0)=    0.6858
+             APW+lo
+:E0_0001: E( 0)=   -0.8641   E(BOTTOM)=   -1.542   E(TOP)=   -0.186  1  2   169
+             LOCAL ORBITAL
+:E1_0001: E( 1)=    0.2858
+             APW+lo
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  Mn        
+:e__0002: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0002: E( 0)=    0.2858
+             APW+lo
+:E0_0002: E( 0)=   -5.3644   E(BOTTOM)=   -5.403   E(TOP)=   -5.326  2  3   178
+             LOCAL ORBITAL
+:E1_0002: E( 1)=    0.2858
+             APW+lo
+:E1_0002: E( 1)=   -3.0822   E(BOTTOM)=   -3.172   E(TOP)=   -2.993  1  2   172
+             LOCAL ORBITAL
+:E2_0002: E( 2)=    0.4037   E(BOTTOM)=    0.065   E(TOP)=    0.743  0  1   132
+             APW+lo
+
+       K=   0.00000   0.00000   0.00000            1
+:RKM  : MATRIX SIZE   131LOs:  18  RKM= 6.45  WEIGHT= 1.00  PGR:    
+       EIGENVALUES ARE:
+:EIG00001:      -5.3571553   -3.0606826   -3.0606826   -3.0606826   -0.9246415
+:EIG00006:       0.2903607    0.2903607    0.2903607    0.3905606    0.3905606
+:EIG00011:       0.3905606    0.4321204    0.4321204    0.5311037    1.5759705
+:EIG00016:       1.7859180    1.7859180    1.7859180    2.0293357    2.0293357
+:EIG00021:       2.0293357    2.3077474    2.3077474
+       ********************************************************
+
+:KPT   :      NUMBER OF K-POINTS:    72
+
+------- MnO.scf2 --------
+:GMA  : POTENTIAL AND CHARGE CUT-OFF  11.99 Ry**.5
+
+
+:NLDA  : NUMBER OF ELECTRONS          =  21.000
+
+:FLDA  : F E R M I - ENERGY           =   0.00000
+
+
+:NOE  : NUMBER OF ELECTRONS          =  21.000
+
+:FER  : F E R M I - ENERGY           =   0.48579
+
+:POS001: ATOM    1 X,Y,Z = 0.50000 0.50000 0.50000  MULT= 1  ZZ=  8.000  O         
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+:POS002: ATOM    2 X,Y,Z = 0.00000 0.00000 0.00000  MULT= 1  ZZ= 25.000  Mn        
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+
+   QTL-B VALUE .EQ.   15.59528 in Band of energy    0.6165eV from EF ATOM=    2  L=  2
+    Check for ghostbands or EIGENVALUES BELOW XX messages
+    The projection of charge to \dot{u}(r) is   0.15595, which is large. Adjust your Energy-parameters for this ATOM and L (or use -in1new switch), check RMTs  !!!
+
+
+
+
+   QTL-B VALUE .EQ.   12.91253 in Band of energy   17.4060eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12913, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.41457 in Band of energy   16.4483eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07415, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.09802 in Band of energy   11.0936eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04098, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.60703 in Band of energy    9.8739eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.02607, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32852 in Band of energy    9.2360eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03329, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.52278 in Band of energy    4.4678eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.05523, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.53442 in Band of energy   16.8665eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10534, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.99652 in Band of energy   13.1635eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05997, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.31500 in Band of energy    3.3536eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04315, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.93722 in Band of energy   10.2557eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03937, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.55404 in Band of energy    4.7786eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03554, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.67117 in Band of energy    9.0323eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.96939 in Band of energy    4.8984eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02969, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.52189 in Band of energy    4.6102eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03522, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.30481 in Band of energy   10.6617eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04305, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.23918 in Band of energy   12.0995eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05239, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.94060 in Band of energy   13.4231eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05941, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.30765 in Band of energy   13.2178eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08308, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.86057 in Band of energy   12.2759eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07861, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.02340 in Band of energy    4.8196eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04023, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.85433 in Band of energy    5.5032eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03854, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.67142 in Band of energy    8.9520eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.84744 in Band of energy    8.8763eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03847, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.50289 in Band of energy    9.3367eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03503, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.10729 in Band of energy   10.3018eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04107, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.75282 in Band of energy   11.3737eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05753, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.65411 in Band of energy   12.5081eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10654, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.99888 in Band of energy   11.8957eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06999, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34135 in Band of energy   11.2021eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06341, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.16468 in Band of energy   10.6086eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04165, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64192 in Band of energy   10.1503eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.28944 in Band of energy    9.9714eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03289, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64581 in Band of energy    9.9500eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03646, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   12.18188 in Band of energy   12.0492eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12182, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.17290 in Band of energy   11.5106eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10173, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.85618 in Band of energy   10.6471eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06856, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.33748 in Band of energy    8.9324eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04337, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.80926 in Band of energy    9.2483eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03809, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.06534 in Band of energy    9.2481eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13065, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.74900 in Band of energy   11.3625eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10749, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.91419 in Band of energy   10.4587eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06914, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.35421 in Band of energy    8.9938eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13354, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.93338 in Band of energy   12.4224eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06933, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.65486 in Band of energy    4.1928eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03655, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.68321 in Band of energy    9.9310eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03683, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.61722 in Band of energy    9.1385eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03617, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.04354 in Band of energy    8.8964eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04044, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.64159 in Band of energy   11.7225eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.30077 in Band of energy   11.3556eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05301, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.91997 in Band of energy   10.9487eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03920, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.41408 in Band of energy   10.6748eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03414, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32769 in Band of energy   10.5596eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03328, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.51438 in Band of energy    9.6622eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03514, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.13945 in Band of energy   10.6668eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05139, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.46225 in Band of energy   11.3299eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08462, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34238 in Band of energy   10.6798eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06342, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.01659 in Band of energy   10.0730eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04017, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.66180 in Band of energy    9.6256eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03662, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.05419 in Band of energy    9.5988eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03054, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.23223 in Band of energy   11.1535eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09232, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.57964 in Band of energy   10.4402eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06580, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.35006 in Band of energy    9.1384eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04350, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.54470 in Band of energy   11.1041eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09545, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.07399 in Band of energy   10.3092eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05074, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.56430 in Band of energy   10.0603eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03564, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.59349 in Band of energy   10.0174eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03593, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.32068 in Band of energy   10.1829eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05321, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.75355 in Band of energy    9.0555eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03754, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.49020 in Band of energy    9.4881eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03490, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.46761 in Band of energy   10.1575eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05468, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64397 in Band of energy    9.4691eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03644, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+:CHA001: TOTAL CHARGE INSIDE SPHERE   1 =     6.054651
+:PCS001: PARTIAL CHARGES SPHERE =  1 S,P,D,F,      D-EG,D-T2G 
+:QTL001: 1.7783 4.2376 0.0290 0.0072 0.0000 0.0000 0.0000 0.0165 0.0125 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL001:  1.7285 -0.8617    0.1296 -0.0682    0.0012 -2.7939    0.0005 -3.0591
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH001:  0.0498  0.3050    4.1080  0.1445    0.0278  0.4120    0.0067  0.4555
+
+:CHA002: TOTAL CHARGE INSIDE SPHERE   2 =    13.233378
+:PCS002: PARTIAL CHARGES SPHERE =  2 S,P,D,F,      D-EG,D-T2G 
+:QTL002: 2.1886 6.1785 4.8274 0.0309 0.0000 0.0000 0.0000 2.0185 2.8089 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL002:  2.0426 -5.2453    5.9929 -3.0526    0.0329 -0.6548    0.0040 -0.8125
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH002:  0.1460  0.0857    0.1856  0.1287    4.7945  0.4659    0.0269  0.1811
+
+:CHA  : TOTAL CHARGE INSIDE UNIT CELL =      21.008041
+
+:NCOR    5.03823939  1    5       2.66628215  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.03611576      -0.00000000       0.00000000      -0.00000000      -0.00000000   
+   -0.00000000       1.03611575       0.00000000      -0.00000000       0.00000000   
+   -0.00000000       0.00000000       0.98866929       0.00000000       0.00000000   
+   -0.00000000       0.00000000      -0.00000000       0.98866929      -0.00000000   
+   -0.00000000       0.00000000       0.00000000      -0.00000000       0.98866929   
+
+  rho-rho_expected in dmft2:
+:DRHO        0.008040798256
+
+:SUM  : SUM OF EIGENVALUES =         -27.595145100
+
+:XSUM : SUM OF EIGENVALUES =         -27.600219386   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)+Tr(G(D-w*dD))
+:YSUM : SUM OF EIGENVALUES =         -29.325833756   # Tr(log(G))+mu*N-Tr((Sig-Vdc)*G)
+:ZSUM : SUM OF EIGENVALUES =         -27.342144116   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)
+:WSUM : SUM OF EIGENVALUES =         -27.538442147   # Tr(log(G))-Tr(log(G_loc))+Tr(G(D-w*dD))
+:QSUM : SUM OF EIGENVALUES =         -27.146175984   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc+s_oo)G)
+:VSUM : SUM OF EIGENVALUES =         -31.442678871   # Tr(log(G))+mu*N
+
+---------- Eorb_imp.dat --------------
+--- impurity 0 with degeneracy 1 ---
+#  Phidc= 85.8687579634013
+#  Tr(Sigma*G)/2= 80.98978866301833
+#  Tr(Sigma*G)/2-Phidc= -4.878969300382963
+#  Phi_DMFT= 104.52455609608185
+#  Phi_DMFT-Phi_DC= 18.65579813268056
+#  Tr(log(-Gimp))= -56.6251840138333
+#  Fimpurity+TS= -114.08979646843913
+#  E_pot+E_kin-Tr(w*dD/dw)= 77.4573841641702
+:EORB   -0.35859766085288414
+:XEORB  1.3711759922731515
+:ZEORB  -0.6182246255836765
+
+------- MnO.scfc --------
+
+        1.ATOM      O                     1 CORE STATES
+:1S 001: 1S                 -36.697391028 Ry
+
+        2.ATOM      Mn                    4 CORE STATES
+:1S 002: 1S                -471.505678449 Ry
+:2S 002: 2S                 -53.681799132 Ry
+:2PP002: 2P*                -45.835480165 Ry
+:2P 002: 2P                 -45.068758704 Ry
+
+  TOTAL CORE CORRECTION STRESS TENSOR in Ry/Bohr^3, EQ. (6.48) 
+ ************************************************************
+:STR_CORE001:          9.9157830801        0.0000000000        0.0000000000
+:STR_CORE002:          0.0000000000        9.9157830801        0.0000000000
+:STR_CORE003:          0.0000000000        0.0000000000        9.9157830801
+ ************************************************************
+
+
+------- MnO.scfm --------
+:CINT001 Core Integral Atom   1    2.00000000
+:CINT002 Core Integral Atom   2   10.00000000
+
+       DENSITY AT NUCLEUS
+        JATOM        VALENCE       SEMI-CORE          CORE           TOTAL
+:RTO001:   1       15.015853        0.000000      304.073047      319.088900
+:RTO002:   2      162.325475        0.000000    13171.345144    13333.670619
+:K-LIST:Reduced k-vector list      145      41
+     
+       CHARGES OF NEW CHARGE DENSITY
+:NTO   : INTERSTITIAL CHARGE  =     1.719999
+:NPC   : INTERSTITIAL CHARGE  =     5.525515
+:NTO001: CHARGE SPHERE   1    =     8.054651
+:NTO002: CHARGE SPHERE   2    =    23.233378
+
+:NEC01: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00802735 Plane Wave
+        Charge not renormalized due to INPUT-option
+     
+       CHARGES OF OLD CHARGE DENSITY
+:OTO   : INTERSTITIAL CHARGE  =     1.720000
+:OPC   : INTERSTITIAL CHARGE  =     5.525554
+:OTO001: CHARGE SPHERE   1    =     8.054662
+:OTO002: CHARGE SPHERE   2    =    23.233391
+
+:NEC02: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805374
+        Charge not renormalized due to INPUT-option
+     
+       CONVERGENCE TEST
+:DTO001: DIFFERENCE IN SPHERE  1 =  0.0000191
+:DTO002: DIFFERENCE IN SPHERE  2 =  0.0000150
+
+:DIS  :  CHARGE DISTANCE      (  0.0000191 for atom    1 spin 1)      0.0000170
+ 
+******************************************************
+* Multisecant Mixing Release 10.8.9                  *
+* Standard Mode with step bound                      *
+* Multisecant MSR1 Algorithm                         *
+* Restart from converged density                     *
+* Regularization       2.000E-04                     *
+* Minimum Greed        1.000E-03                     *
+* Max Number of Memory Steps    8                    *
+******************************************************
+ 
+:NOTE :  Forcing a restart
+:INFO: Global read efermi error
+
+:FULLRMS/Atom   0.0000438514
+:PLANE:  PW /ATOM     1.35956 DISTAN   1.18E-05 %  8.69E-04
+:CHARG:  CLM/ATOM   108.99379 DISTAN   2.87E-05 %  2.63E-05
+
+Step History
+        Dmix         Dmixt        Red     Pred      Step      Lambda    MagAbs    Beta
+  1   3.5000E-01   3.5000E-01  1.00E+00  1.00E+00  1.00E-01  1.00E+00  2.17E-06  1.00E+00
+:NOTE :  :INFO: Pratt in use
+:TRUST:  Step  1.0E-01 Charge  3.3E-02 (e) CTO  2.0E-01 (e) PW  2.0E-01 (e)
+:DIRP : |PRAT|= 5.905E-07 |PRATT|= 2.362E-05 ANGLE=   0.0 DEGREES
+:DIRQ : |PRAT|= 1.434E-06 |PRATT|= 5.734E-05 ANGLE=   0.0 DEGREES
+:DIRT : |PRAT|= 1.550E-06 |PRATT|= 6.202E-05 ANGLE=   0.0 DEGREES
+:MIX  :  PRATT  REGULARIZATION:  2.00E-04 GREED: 0.02500                 
+     
+       CHARGES OF MIXED CHARGE DENSITY
+:CTO   : INTERSTITIAL CHARGE  =     1.720000
+:CPC   : INTERSTITIAL CHARGE  =     5.525553
+:CTO001: CHARGE SPHERE   1    =     8.054662
+:CTO002: CHARGE SPHERE   2    =    23.233391
+
+:NEC03: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805308
+        Charge not renormalized due to INPUT-option
+
+PW CHANGE     H    K    L      Current       Change    Residue
+:PTO001:      0    0    0  4.87712531E-02 -6.786E-09 -2.714E-07
+:PTO002:     -1   -1   -1 -5.47760000E-02  1.453E-08  5.813E-07
+:PTO003:      0    0   -2  7.77885086E-02 -1.960E-08 -7.839E-07
+:PTO004:      0   -2   -2  4.20895680E-02 -1.874E-08 -7.496E-07
+:PTO005:     -1   -1   -3 -2.97590936E-02  2.025E-08  8.099E-07
+:PTO006:     -2   -2   -2  4.30741644E-03 -5.256E-09 -2.103E-07
+:PTO007:      0    0   -4 -1.13102806E-03 -4.302E-10 -1.721E-08
+:PTO008:     -1   -3   -3 -1.08808294E-03  1.198E-09  4.794E-08
+:PTO009:      0   -2   -4 -1.07542824E-02 -7.858E-11 -3.143E-09
+:PTO010:     -2   -2   -4 -9.64745498E-03  6.674E-10  2.670E-08
+:PTO011:     -3   -3   -3  1.22465576E-03 -9.162E-10 -3.665E-08
+:PTO012:     -1   -1   -5  3.26401809E-03  5.620E-11  2.248E-09
+
+:ENE  : ********** TOTAL ENERGY IN Ry =        -2467.78618241
+
+
+ ************************************************************
+          STRESS TENSOR, EQ. (6.187) 
+ ************************************************************
+
+ In Ry/Bohr^3 
+
+:STRESS_RY001:        -9.9157830801       -0.0000000000       -0.0000000000
+:STRESS_RY002:        -0.0000000000       -9.9157830801       -0.0000000000
+:STRESS_RY003:        -0.0000000000       -0.0000000000       -9.9157830801
+
+ In GPa, 10 Kbar = 1 Gpa 
+
+:STRESS_GPa001:   -145866.28968       -0.00000       -0.00000   partial
+:STRESS_GPa002:        -0.00000  -145866.28968       -0.00000   partial
+:STRESS_GPa003:        -0.00000       -0.00000  -145866.28968   partial
+
+:PRESSURE:       -145866.28968 GPa     partial
+
+
+------- MnO.scf0 --------
+ Euler-Maclaurian Coulomb
+ Consistent 3/8+Simpson combinations at start/end
+ New Mode for Coulomb Integral
+ Extension of core to zero
+ LDM version in phi
+ Fifth-order quadrature in outwin
+ Lebedev-Laikov Grid in lapw0
+
+
+            ---------
+:ITE374:374. ITERATION
+            ---------
+
+:NATO :    2 INDEPENDENT AND    2 TOTAL ATOMS IN UNITCELL
+       SUBSTANCE: MnO                                                         
+
+       LATTICE                      = F   
+:LAT  : LATTICE CONSTANTS=  8.40729  8.40729  8.40729    1.571    1.571    1.571
+:VOL  : UNIT CELL VOLUME =     148.56196
+:POT  : POTENTIAL OPTION EX_PBE EC_PBE VX_PBE VC_PBE
+       MODE OF CALCULATION IS       = RELA
+       NON-SPINPOLARIZED CALCULATION
+:IFFT  : FFT-parameters:   72   72   72 Factor: 2.00
+
+
+   CONVERGENCE PARAMETER FOR PSEUDOCHARGE: NCON=  9
+   MAXIMAL VALUE OF RMT(JATOM)*ABSK(NKK) : RK  =26.78502
+
+
+:VKCOUL :  VK-COUL convergence: 0.400E-06
+ Lebedev grid of          350
+ :rho_min:   2.0000000000000000E-008   1.0000000000000001E-009
+:VCOUL001 ATOMNUMBER=  1 O       VCOUL-ZERO =  0.53721E+00
+:VCOUL002 ATOMNUMBER=  2 Mn      VCOUL-ZERO =  0.32288E+00
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991506E-03
+:FIT001: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  1  0.7991506E-03
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551693E-01
+:FIT002: LUSE= 13 SIGMA OF V-XC FIT FOR ATOM  2  0.1551693E-01
+:DEN  : DENSITY INTEGRAL  =         -1044.11670717   (Ry)
+       ELS_POTENTIAL_AT Z=0 and Z=0.5:  -2.15996  -2.15996
+       ELS_POTENTIAL_AT Y=0 and Y=0.5:   0.00000   0.00000
+:VZERO:v0,v0c,v0x  -3.32118  -2.15996  -1.16122 v5,v5c,v5x  -3.32118  -2.15996  -1.16122
+:VZERY:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+:VZERX:v0,v0c,v0x  -0.77401   0.00000  -0.77401 v5,v5c,v5x  -0.77401   0.00000  -0.77401
+
+------- MnO.scf1 --------
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  O         
+:e__0001: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0001: E( 0)=    0.6858
+             APW+lo
+:E0_0001: E( 0)=   -0.8641   E(BOTTOM)=   -1.542   E(TOP)=   -0.186  1  2   167
+             LOCAL ORBITAL
+:E1_0001: E( 1)=    0.2858
+             APW+lo
+
+          ATOMIC SPHERE DEPENDENT PARAMETERS FOR ATOM  Mn        
+:e__0002: OVERALL ENERGY PARAMETER IS    0.2858
+          OVERALL BASIS SET ON ATOM IS LAPW
+:E0_0002: E( 0)=    0.2858
+             APW+lo
+:E0_0002: E( 0)=   -5.3644   E(BOTTOM)=   -5.403   E(TOP)=   -5.326  2  3   176
+             LOCAL ORBITAL
+:E1_0002: E( 1)=    0.2858
+             APW+lo
+:E1_0002: E( 1)=   -3.0822   E(BOTTOM)=   -3.172   E(TOP)=   -2.993  1  2   170
+             LOCAL ORBITAL
+:E2_0002: E( 2)=    0.4037   E(BOTTOM)=    0.065   E(TOP)=    0.743  0  1   133
+             APW+lo
+
+       K=   0.00000   0.00000   0.00000            1
+:RKM  : MATRIX SIZE   131LOs:  18  RKM= 6.45  WEIGHT= 1.00  PGR:    
+       EIGENVALUES ARE:
+:EIG00001:      -5.3571554   -3.0606826   -3.0606826   -3.0606826   -0.9246415
+:EIG00006:       0.2903607    0.2903607    0.2903607    0.3905606    0.3905606
+:EIG00011:       0.3905606    0.4321204    0.4321204    0.5311037    1.5759705
+:EIG00016:       1.7859180    1.7859180    1.7859180    2.0293357    2.0293357
+:EIG00021:       2.0293357    2.3077475    2.3077475
+       ********************************************************
+
+:KPT   :      NUMBER OF K-POINTS:    72
+
+------- MnO.scf2 --------
+:GMA  : POTENTIAL AND CHARGE CUT-OFF  11.99 Ry**.5
+
+
+:NLDA  : NUMBER OF ELECTRONS          =  21.000
+
+:FLDA  : F E R M I - ENERGY           =   0.00000
+
+
+:NOE  : NUMBER OF ELECTRONS          =  21.000
+
+:FER  : F E R M I - ENERGY           =   0.48579
+
+:POS001: ATOM    1 X,Y,Z = 0.50000 0.50000 0.50000  MULT= 1  ZZ=  8.000  O         
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+:POS002: ATOM    2 X,Y,Z = 0.00000 0.00000 0.00000  MULT= 1  ZZ= 25.000  Mn        
+
+       LMMAX  5
+       LM=   0 0  4 0  4 4  6 0  6 4
+
+
+   QTL-B VALUE .EQ.   15.59521 in Band of energy    0.6165eV from EF ATOM=    2  L=  2
+    Check for ghostbands or EIGENVALUES BELOW XX messages
+    The projection of charge to \dot{u}(r) is   0.15595, which is large. Adjust your Energy-parameters for this ATOM and L (or use -in1new switch), check RMTs  !!!
+
+
+
+
+   QTL-B VALUE .EQ.   12.91103 in Band of energy   17.4060eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12911, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.41458 in Band of energy   16.4483eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07415, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.09802 in Band of energy   11.0936eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04098, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.60703 in Band of energy    9.8739eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.02607, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32852 in Band of energy    9.2360eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03329, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.52278 in Band of energy    4.4678eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.05523, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.53439 in Band of energy   16.8665eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10534, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.99652 in Band of energy   13.1635eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05997, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.31500 in Band of energy    3.3536eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04315, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.93722 in Band of energy   10.2557eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03937, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.55404 in Band of energy    4.7786eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03554, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.67117 in Band of energy    9.0323eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.96939 in Band of energy    4.8984eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.02969, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.52189 in Band of energy    4.6102eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03522, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.30481 in Band of energy   10.6617eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04305, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.23918 in Band of energy   12.0995eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05239, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.94060 in Band of energy   13.4231eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05941, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.30765 in Band of energy   13.2178eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08308, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.86057 in Band of energy   12.2759eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07861, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.02340 in Band of energy    4.8196eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04023, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.85433 in Band of energy    5.5032eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03854, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.67142 in Band of energy    8.9520eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03671, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.84744 in Band of energy    8.8763eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03847, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.50289 in Band of energy    9.3367eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03503, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.10729 in Band of energy   10.3018eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04107, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.75282 in Band of energy   11.3737eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05753, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.65411 in Band of energy   12.5081eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10654, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.99888 in Band of energy   11.8957eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06999, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34135 in Band of energy   11.2021eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06341, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.16468 in Band of energy   10.6086eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04165, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64192 in Band of energy   10.1503eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.28944 in Band of energy    9.9714eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03289, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64581 in Band of energy    9.9500eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03646, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   12.18188 in Band of energy   12.0492eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.12182, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.17290 in Band of energy   11.5106eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10173, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.85618 in Band of energy   10.6471eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06856, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.33748 in Band of energy    8.9324eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04337, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.80926 in Band of energy    9.2483eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03809, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.06534 in Band of energy    9.2481eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13065, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   10.74900 in Band of energy   11.3625eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.10749, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.91419 in Band of energy   10.4587eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06914, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.   13.35421 in Band of energy    8.9938eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.13354, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.93338 in Band of energy   12.4224eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06933, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.65486 in Band of energy    4.1928eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03655, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.68321 in Band of energy    9.9310eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03683, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.61722 in Band of energy    9.1385eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03617, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.04354 in Band of energy    8.8964eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04044, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    7.64159 in Band of energy   11.7225eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.07642, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.30077 in Band of energy   11.3556eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05301, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.91997 in Band of energy   10.9487eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03920, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.41408 in Band of energy   10.6748eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03414, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.32769 in Band of energy   10.5596eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03328, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.51438 in Band of energy    9.6622eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03514, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.13945 in Band of energy   10.6668eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05139, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    8.46225 in Band of energy   11.3299eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.08462, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.34238 in Band of energy   10.6798eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06342, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.01659 in Band of energy   10.0730eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.04017, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.66180 in Band of energy    9.6256eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03662, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.05419 in Band of energy    9.5988eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03054, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.23223 in Band of energy   11.1535eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09232, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    6.57964 in Band of energy   10.4402eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.06580, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    4.35006 in Band of energy    9.1384eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.04350, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    9.54470 in Band of energy   11.1041eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.09545, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.07399 in Band of energy   10.3092eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05074, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.56430 in Band of energy   10.0603eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.03564, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.59349 in Band of energy   10.0174eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03593, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.32068 in Band of energy   10.1829eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05321, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.75355 in Band of energy    9.0555eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03754, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.49020 in Band of energy    9.4881eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03490, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    5.46761 in Band of energy   10.1575eV from EF ATOM=    2  L=  2
+   The projection of charge to \dot{u}(r) is   0.05468, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    3.64397 in Band of energy    9.4691eV from EF ATOM=    1  L=  1
+   The projection of charge to \dot{u}(r) is   0.03644, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+:CHA001: TOTAL CHARGE INSIDE SPHERE   1 =     6.054651
+:PCS001: PARTIAL CHARGES SPHERE =  1 S,P,D,F,      D-EG,D-T2G 
+:QTL001: 1.7783 4.2376 0.0290 0.0072 0.0000 0.0000 0.0000 0.0165 0.0125 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL001:  1.7285 -0.8617    0.1296 -0.0682    0.0012 -2.7939    0.0005 -3.0591
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH001:  0.0498  0.3050    4.1080  0.1445    0.0278  0.4120    0.0067  0.4555
+
+:CHA002: TOTAL CHARGE INSIDE SPHERE   2 =    13.233378
+:PCS002: PARTIAL CHARGES SPHERE =  2 S,P,D,F,      D-EG,D-T2G 
+:QTL002: 2.1886 6.1785 4.8274 0.0309 0.0000 0.0000 0.0000 2.0185 2.8089 0.0000 0.0000 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL002:  2.0426 -5.2453    5.9929 -3.0526    0.0329 -0.6548    0.0040 -0.8125
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH002:  0.1460  0.0857    0.1856  0.1287    4.7945  0.4659    0.0269  0.1810
+
+:CHA  : TOTAL CHARGE INSIDE UNIT CELL =      21.008041
+
+:NCOR    5.03823950  1    5       2.66628220  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.03611579      -0.00000000       0.00000000      -0.00000000       0.00000000   
+    0.00000000       1.03611578       0.00000000      -0.00000000       0.00000000   
+    0.00000000       0.00000000       0.98866931      -0.00000000       0.00000000   
+    0.00000000       0.00000000      -0.00000000       0.98866931      -0.00000000   
+    0.00000000       0.00000000       0.00000000      -0.00000000       0.98866931   
+
+  rho-rho_expected in dmft2:
+:DRHO        0.008041041755
+
+:SUM  : SUM OF EIGENVALUES =         -27.595145701
+
+:XSUM : SUM OF EIGENVALUES =         -27.600220008   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)+Tr(G(D-w*dD))
+:YSUM : SUM OF EIGENVALUES =         -29.325834381   # Tr(log(G))+mu*N-Tr((Sig-Vdc)*G)
+:ZSUM : SUM OF EIGENVALUES =         -27.342144647   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)
+:WSUM : SUM OF EIGENVALUES =         -27.538442542   # Tr(log(G))-Tr(log(G_loc))+Tr(G(D-w*dD))
+:QSUM : SUM OF EIGENVALUES =         -27.146176511   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc+s_oo)G)
+:VSUM : SUM OF EIGENVALUES =         -31.442679480   # Tr(log(G))+mu*N
+
+---------- Eorb_imp.dat --------------
+--- impurity 0 with degeneracy 1 ---
+#  Phidc= 85.8687579634013
+#  Tr(Sigma*G)/2= 80.98978866301833
+#  Tr(Sigma*G)/2-Phidc= -4.878969300382963
+#  Phi_DMFT= 104.52455609608185
+#  Phi_DMFT-Phi_DC= 18.65579813268056
+#  Tr(log(-Gimp))= -56.6251840138333
+#  Fimpurity+TS= -114.08979646843913
+#  E_pot+E_kin-Tr(w*dD/dw)= 77.4573841641702
+:EORB   -0.35859766085288414
+:XEORB  1.3711759922731515
+:ZEORB  -0.6182246255836765
+
+------- MnO.scfc --------
+
+        1.ATOM      O                     1 CORE STATES
+:1S 001: 1S                 -36.697391115 Ry
+
+        2.ATOM      Mn                    4 CORE STATES
+:1S 002: 1S                -471.505678329 Ry
+:2S 002: 2S                 -53.681799073 Ry
+:2PP002: 2P*                -45.835480096 Ry
+:2P 002: 2P                 -45.068758636 Ry
+
+  TOTAL CORE CORRECTION STRESS TENSOR in Ry/Bohr^3, EQ. (6.48) 
+ ************************************************************
+:STR_CORE001:          9.9157830776        0.0000000000        0.0000000000
+:STR_CORE002:          0.0000000000        9.9157830776        0.0000000000
+:STR_CORE003:          0.0000000000        0.0000000000        9.9157830776
+ ************************************************************
+
+
+------- MnO.scfm --------
+:CINT001 Core Integral Atom   1    2.00000000
+:CINT002 Core Integral Atom   2   10.00000000
+
+       DENSITY AT NUCLEUS
+        JATOM        VALENCE       SEMI-CORE          CORE           TOTAL
+:RTO001:   1       15.015853        0.000000      304.073047      319.088900
+:RTO002:   2      162.325474        0.000000    13171.345142    13333.670617
+:K-LIST:Reduced k-vector list      145      41
+     
+       CHARGES OF NEW CHARGE DENSITY
+:NTO   : INTERSTITIAL CHARGE  =     1.719999
+:NPC   : INTERSTITIAL CHARGE  =     5.525515
+:NTO001: CHARGE SPHERE   1    =     8.054651
+:NTO002: CHARGE SPHERE   2    =    23.233378
+
+:NEC01: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00802759 Plane Wave
+        Charge not renormalized due to INPUT-option
+     
+       CHARGES OF OLD CHARGE DENSITY
+:OTO   : INTERSTITIAL CHARGE  =     1.720000
+:OPC   : INTERSTITIAL CHARGE  =     5.525553
+:OTO001: CHARGE SPHERE   1    =     8.054662
+:OTO002: CHARGE SPHERE   2    =    23.233391
+
+:NEC02: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805308
+        Charge not renormalized due to INPUT-option
+     
+       CONVERGENCE TEST
+:DTO001: DIFFERENCE IN SPHERE  1 =  0.0000186
+:DTO002: DIFFERENCE IN SPHERE  2 =  0.0000145
+
+:DIS  :  CHARGE DISTANCE      (  0.0000186 for atom    1 spin 1)      0.0000166
+ 
+******************************************************
+* Multisecant Mixing Release 10.8.9                  *
+* Standard Mode with step bound                      *
+* Multisecant MSR1 Algorithm                         *
+* Restart from converged density                     *
+* Regularization       2.000E-04                     *
+* Minimum Greed        1.000E-03                     *
+* Max Number of Memory Steps    8                    *
+******************************************************
+ 
+:NOTE :  Forcing a restart
+:INFO: Global read efermi error
+
+:FULLRMS/Atom   0.0000285283
+:PLANE:  PW /ATOM     1.35956 DISTAN   1.16E-05 %  8.50E-04
+:CHARG:  CLM/ATOM   108.99379 DISTAN   1.65E-05 %  1.52E-05
+
+Step History
+        Dmix         Dmixt        Red     Pred      Step      Lambda    MagAbs    Beta
+  1   3.5000E-01   3.5000E-01  1.00E+00  1.00E+00  1.00E-01  1.00E+00  1.41E-06  1.00E+00
+:NOTE :  :INFO: Pratt in use
+:TRUST:  Step  1.0E-01 Charge  3.3E-02 (e) CTO  2.0E-01 (e) PW  2.0E-01 (e)
+:DIRP : |PRAT|= 5.776E-07 |PRATT|= 2.311E-05 ANGLE=   0.0 DEGREES
+:DIRQ : |PRAT|= 8.268E-07 |PRATT|= 3.307E-05 ANGLE=   0.0 DEGREES
+:DIRT : |PRAT|= 1.009E-06 |PRATT|= 4.035E-05 ANGLE=   0.0 DEGREES
+:MIX  :  PRATT  REGULARIZATION:  2.00E-04 GREED: 0.02500                 
+     
+       CHARGES OF MIXED CHARGE DENSITY
+:CTO   : INTERSTITIAL CHARGE  =     1.720000
+:CPC   : INTERSTITIAL CHARGE  =     5.525552
+:CTO001: CHARGE SPHERE   1    =     8.054662
+:CTO002: CHARGE SPHERE   2    =    23.233391
+
+:NEC03: NUCLEAR AND ELECTRONIC CHARGE     33.00000000    33.00805245
+        Charge not renormalized due to INPUT-option
+
+PW CHANGE     H    K    L      Current       Change    Residue
+:PTO001:      0    0    0  4.87712465E-02 -6.620E-09 -2.648E-07
+:PTO002:     -1   -1   -1 -5.47759857E-02  1.430E-08  5.718E-07
+:PTO003:      0    0   -2  7.77884894E-02 -1.916E-08 -7.664E-07
+:PTO004:      0   -2   -2  4.20895496E-02 -1.837E-08 -7.346E-07
+:PTO005:     -1   -1   -3 -2.97590739E-02  1.976E-08  7.906E-07
+:PTO006:     -2   -2   -2  4.30741131E-03 -5.132E-09 -2.053E-07
+:PTO007:      0    0   -4 -1.13102847E-03 -4.070E-10 -1.628E-08
+:PTO008:     -1   -3   -3 -1.08808177E-03  1.165E-09  4.659E-08
+:PTO009:      0   -2   -4 -1.07542825E-02 -6.955E-11 -2.782E-09
+:PTO010:     -2   -2   -4 -9.64745432E-03  6.624E-10  2.650E-08
+:PTO011:     -3   -3   -3  1.22465487E-03 -8.927E-10 -3.571E-08
+:PTO012:     -1   -1   -5  3.26401815E-03  5.354E-11  2.142E-09
+
+:ENE  : ********** TOTAL ENERGY IN Ry =        -2467.78618230
+
+
+ ************************************************************
+          STRESS TENSOR, EQ. (6.187) 
+ ************************************************************
+
+ In Ry/Bohr^3 
+
+:STRESS_RY001:        -9.9157830776       -0.0000000000       -0.0000000000
+:STRESS_RY002:        -0.0000000000       -9.9157830776       -0.0000000000
+:STRESS_RY003:        -0.0000000000       -0.0000000000       -9.9157830776
+
+ In GPa, 10 Kbar = 1 Gpa 
+
+:STRESS_GPa001:   -145866.28964       -0.00000       -0.00000   partial
+:STRESS_GPa002:        -0.00000  -145866.28964       -0.00000   partial
+:STRESS_GPa003:        -0.00000       -0.00000  -145866.28964   partial
+
+:PRESSURE:       -145866.28964 GPa     partial
+

@@ -1,0 +1,145 @@
+:GMA  : POTENTIAL AND CHARGE CUT-OFF  12.00 Ry**.5
+
+
+:NLDA  : NUMBER OF ELECTRONS          =  64.000
+
+:FLDA  : F E R M I - ENERGY           =   0.00000
+:DEF   0.000001538719906    5.766893800303261
+
+
+:NOE  : NUMBER OF ELECTRONS          =  64.000
+
+:FER  : F E R M I - ENERGY           =   0.42386
+
+:POS001: ATOM   -1 X,Y,Z = 0.75000 0.25000 0.00000  MULT= 2  ZZ= 26.000  Fe        
+
+       LMMAX 10
+       LM=   0 0  2 0 -3 2  4 0  4 4 -5 2  6 0  6 4  0 0  0 0
+
+:POS002: ATOM   -2 X,Y,Z = 0.25000 0.25000 0.71835  MULT= 2  ZZ= 34.000  Se        
+
+       LMMAX 10
+       LM=   0 0  1 0  2 0  3 0  4 0  4 4  5 0  5 4  6 0  6 4
+
+
+   QTL-B VALUE .EQ.    2.27909 in Band of energy    4.4752eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02279, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.41887 in Band of energy    4.5349eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02419, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.33900 in Band of energy    4.6296eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02339, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.12991 in Band of energy    4.6905eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02130, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.08837 in Band of energy    4.5130eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02088, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.25846 in Band of energy    9.9450eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02258, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.20673 in Band of energy    8.7750eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02207, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.07236 in Band of energy   10.4585eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02072, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.01032 in Band of energy    5.9873eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02010, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.01955 in Band of energy    8.5384eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02020, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.21401 in Band of energy    7.8410eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02214, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.34023 in Band of energy    8.0922eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02340, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+
+   QTL-B VALUE .EQ.    2.01294 in Band of energy    7.9967eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02013, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+
+:CHA001: TOTAL CHARGE INSIDE SPHERE   1 =    14.701116
+:PCS001: PARTIAL CHARGES SPHERE =  1 S,P,D,F,PZ,PXY,,D-Z2,D-XY,D-X2Y2,D-XZ,YZ 
+:QTL001: 2.3206 6.3337 6.0198 0.0217 2.1006 4.2331 0.0000 1.3279 1.1431 1.2605 2.2883 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL001:  2.0788 -5.8302    6.0331 -3.5306    0.0489 -0.4952    0.0041 -0.6296
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH001:  0.2418  0.0738    0.3005  0.1467    5.9709  0.2631    0.0176  0.1713
+:VZZ001: EFG INSIDE SPHERE   1 =    -0.102560      UP TO R =   2.28000
+
+:CHA002: TOTAL CHARGE INSIDE SPHERE   2 =    13.821597
+:PCS002: PARTIAL CHARGES SPHERE =  2 S,P,D,F,PZ,PXY,,D-Z2,D-XY,D-X2Y2,D-XZ,YZ 
+:QTL002: 1.4608 2.301110.0466 0.0106 0.7809 1.5202 0.0000 2.0091 2.0076 2.0071 4.0228 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL002:  1.3617 -0.5685    0.1137 -0.0912    9.9866 -3.1099    0.0003 -2.3764
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH002:  0.0992  0.1060    2.1874  0.1280    0.0600  0.2213    0.0103  0.2588
+:VZZ002: EFG INSIDE SPHERE   2 =    -3.215705      UP TO R =   2.17000
+
+:CHA  : TOTAL CHARGE INSIDE UNIT CELL =      64.000000
+
+:NCOR    6.25965890  1    5       2.60569540  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.39242522       0.00000000       0.00000000       0.00000000      -0.00000000   
+    0.00000000       1.31003960       0.00000000       0.00000000       0.00000000   
+    0.00000000       0.00000000       1.18528082      -0.00000000       0.00000000   
+    0.00000000       0.00000000       0.00000000       1.18528082       0.00000000   
+   -0.00000000       0.00000000       0.00000000       0.00000000       1.18663243   
+:NCOR    6.25961452  2    5       2.60568018  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.39239189       0.00000000       0.00000000       0.00000000      -0.00000000   
+    0.00000000       1.31005377       0.00000000       0.00000000       0.00000000   
+    0.00000000       0.00000000       1.18527846      -0.00000000      -0.00000000   
+   -0.00000000       0.00000000      -0.00000000       1.18527846      -0.00000000   
+   -0.00000000       0.00000000      -0.00000000      -0.00000000       1.18661195   
+
+  rho-rho_expected in dmft2:
+:DRHO       -0.000000000195
+
+:SUM  : SUM OF EIGENVALUES =        -126.644099274
+
+:XSUM : SUM OF EIGENVALUES =        -126.653597431   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)+Tr(G(D-w*dD))
+:YSUM : SUM OF EIGENVALUES =        -127.026198353   # Tr(log(G))+mu*N-Tr((Sig-Vdc)*G)
+:ZSUM : SUM OF EIGENVALUES =        -125.430747446   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc)G)
+:WSUM : SUM OF EIGENVALUES =        -125.229522905   # Tr(log(G))-Tr(log(G_loc))+Tr(G(D-w*dD))
+:QSUM : SUM OF EIGENVALUES =        -125.047718389   # Tr(log(G))-Tr(log(G_loc))+Tr((eimp+Vdc+s_oo)G)
+:VSUM : SUM OF EIGENVALUES =        -128.095650108   # Tr(log(G))+mu*N

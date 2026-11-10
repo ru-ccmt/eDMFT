@@ -1,0 +1,50 @@
+[
+  {
+    "iteration": 1,
+    "charge_distance": 1.3e-06,
+    "energy": -8592.21438405,
+    "energy_change": null
+  },
+  {
+    "iteration": 2,
+    "charge_distance": 1.2e-06,
+    "energy": -8592.21438404,
+    "energy_change": 9.998984751291573e-09
+  },
+  {
+    "iteration": 3,
+    "charge_distance": 1e-06,
+    "energy": -8592.21438403,
+    "energy_change": 1.0000803740695119e-08
+  },
+  {
+    "iteration": 4,
+    "charge_distance": 1.6e-06,
+    "energy": -8592.21438404,
+    "energy_change": -1.0000803740695119e-08
+  },
+  {
+    "iteration": 5,
+    "charge_distance": 8.2e-06,
+    "energy": -8592.21438403,
+    "energy_change": 1.0000803740695119e-08
+  },
+  {
+    "iteration": 6,
+    "charge_distance": 7.3e-06,
+    "energy": -8592.21438402,
+    "energy_change": 9.998984751291573e-09
+  },
+  {
+    "iteration": 7,
+    "charge_distance": 6.5e-06,
+    "energy": -8592.21438403,
+    "energy_change": -9.998984751291573e-09
+  },
+  {
+    "iteration": 8,
+    "charge_distance": 1e-07,
+    "energy": -8592.21438403,
+    "energy_change": 0.0
+  }
+]

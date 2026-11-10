@@ -1,0 +1,198 @@
+--- a/src/dftKS/modules.FPP
++++ b/src/dftKS/modules.FPP
+@@ -806,6 +806,13 @@
+ end module response_run
+ 
+ module potnlc
++  ! Optional alternate radial basis at a fixed physical KS operator.
++  ! VR remains the potential used by the radial solver.  BASIS_DELTA_VR is
++  ! r*(Vphysical-Vbasis) in Hartree.  Low-l/LO restoration uses the existing
++  ! Gaunt path; high-l augmentation uses three spherical radial integrals.
++  logical :: basis_potential_enabled=.false.
++  integer :: basis_restore_lmin=0
++  real*8, allocatable :: basis_delta_vr(:,:),basis_restore_spherical(:,:,:)
+   !        VR(j,i) - spherical part (l=0, m=0) of the total potential r*V
+   !                  at mesh point j for atom i
+   DOUBLE PRECISION, allocatable :: VR(:,:)
+--- a/src/dftKS/read_and_initialize.FPP
++++ b/src/dftKS/read_and_initialize.FPP
+@@ -10,15 +10,16 @@
+   use coml, only    : SPRSWF, PRNTWF, WFTAPE, REL, ITER, NOHNS
+   use comr, only    : RKM, ELow, EUp, WEIGHT, sproj_limit,eshift_iter,readHinv
+   use kpts, only    : K3
+-  use potnlc, only  : VR
++  use potnlc, only  : VR,basis_potential_enabled,basis_delta_vr, &
++       basis_restore_spherical,basis_restore_lmin
+   use response_run, only: response_matrices_only
+   use mgaunt, only  : gaunt_init
+   use structure, only: lattic, aname, alpha, alat, jri, r0, dx, POS, RMT, V, VOL, MULT, ndf, ZZ, BR1, BR2, ORTHO, ReadStructure, WriteInfoStructure, iord, imat, tau, rotij, tauij, spaceGroupInit, ReadStructureGroup
+-  use readPotential, ONLY: init_V_vsp, read_V_vsp, read_V_vns_interstital_nk, read_V_vns_interstital_pot_real, read_V_vns_interstital_pot_cmplx
++  use readPotential, ONLY: close_V_vsp,init_V_vsp, read_V_vsp, read_V_vns_interstital_nk, read_V_vns_interstital_pot_real, read_V_vns_interstital_pot_cmplx
+   use radial, only  : init_radial, end_radial
+   use loint, only   : init_loint
+   use nmr, only : dokorig, korig, writeham
+-  use mpi, only : Qprint, mpi_bcast_V_vsp, vector_para, myrank, master
++  use mpi, only : Qprint, mpi_bcast_V_vsp, vector_para, myrank, master,stop_MPI
+   IMPLICIT NONE
+   !INCLUDE 'param.inc'
+   !
+@@ -32,6 +33,9 @@
+   REAL*8         :: E1n, E2n, E1, E2, eorb_ind, efermi
+   REAL*8         :: PI
+   CHARACTER*67   :: ERRMSG
++  character(len=180) :: basis_vsp_file
++  integer :: basis_vsp_status
++  logical :: basis_file_exists
+   LOGICAL        :: RUNORB
+   LOGICAL        :: FORCE
+   INTEGER        :: lxdos, iscf, tnlov
+@@ -125,6 +129,46 @@
+      Vr(:,:) = Vr(:,:)/2.d0    ! Converst from Rydbergs to Hartrees
+   endif
+   call mpi_bcast_V_vsp(Vr, NRAD,NAT)
++
++  ! A response probe can change trial functions without changing the
++  ! physical potential.  Keeping these separate is necessary for the
++  ! stationary radial Pulay derivative.  Use with MATRICES_ONLY to avoid
++  ! solving a second eigenproblem.  Ordinary runs take no extra radial work.
++  basis_vsp_file=''
++  call get_environment_variable('DFTKS_BASIS_VSP',basis_vsp_file,status=basis_vsp_status)
++  if (basis_vsp_status.eq.-1) then
++     if (Qprint) write(6,*) 'DFTKS_BASIS_VSP exceeds 180 characters'
++     call stop_MPI()
++     stop 1
++  endif
++  basis_potential_enabled=(basis_vsp_status.eq.0.and.len_trim(basis_vsp_file).gt.0)
++  if (basis_potential_enabled) then
++     inquire(file=trim(basis_vsp_file),exist=basis_file_exists)
++     if (.not.basis_file_exists.or.NOHNS) then
++        if (Qprint) write(6,*) 'Alternate radial basis requires a readable VSP and HNS enabled'
++        call stop_MPI()
++        stop 1
++     endif
++     allocate(basis_delta_vr(NRAD,NAT),basis_restore_spherical(3,NT,NAT))
++     basis_delta_vr=VR
++     basis_restore_spherical=0.d0
++     basis_restore_lmin=LNSMAX+1
++     if (myrank.eq.master) then
++        call close_V_vsp()
++        call init_V_vsp(basis_vsp_file,18,ISCF)
++        VR=0.d0
++        do jatom=1,nat
++           call read_V_vsp(VR(:jri(jatom),jatom),jatom,jri(jatom))
++        enddo
++        VR=VR/2.d0
++        call close_V_vsp()
++        write(6,'(A,1X,A)') ':DFTKS_BASIS_VSP:',trim(basis_vsp_file)
++        write(6,'(A)') ':DFTKS_BASIS_OPERATOR: restoring physical potential in all angular channels'
++     endif
++     call mpi_bcast_V_vsp(VR,NRAD,NAT)
++     basis_delta_vr=basis_delta_vr-VR
++  endif
++
+   
+   ! case.in1 contains information of how to choose linearization energies.
+   ! The linearization energies E & Elo are determined here inside on the fly.
+@@ -138,6 +182,18 @@
+   !enddo
+   ! call exit
+ 
++
++  if (basis_potential_enabled) then
++     do jatom=1,nat
++        do l=LNSMAX+1,LOMAX
++           if (ilo(l,jatom).gt.0) then
++              if (Qprint) write(6,*) 'Alternate-basis probe needs LNSMAX to include every LO'
++              call stop_MPI()
++              stop 1
++           endif
++        enddo
++     enddo
++  endif
+ 
+   ! Compute how many localized orbitals appear before each atom nlov(jatom)
+   allocate(nlov(nat+1))
+--- a/src/dftKS/atpar.f90
++++ b/src/dftKS/atpar.f90
+@@ -9,7 +9,7 @@
+        VNS1,VNS2,VNS3,WNS1,WNS2,WNS3,WNS4,GFAC
+   use structure, only  : jri, dx, r0, aname
+   use loint, only : VNS1LO,VNS2LO,VNS3LO,WNS1LO,WNS2LO,WNS3LO,WNS4LO,WNS5LO
+-  use potnlc, only: VR 
++  use potnlc, only: VR,basis_potential_enabled,basis_delta_vr,basis_restore_spherical 
+   use structure, only : IATNR
+   use mgaunt, only: gaunt1
+   use mpi, only : myrank, master, mpi_bcast_V_vns, Qprint, stop_MPI
+@@ -139,6 +139,19 @@
+         ! the radial derivatives as to their primitive radial functions.
+         APE(1:JRI_) = APE(1:JRI_) - CROSS*AP(1:JRI_)
+         BPE(1:JRI_) = BPE(1:JRI_) - CROSS*BP(1:JRI_)
++        if (basis_potential_enabled.and.l.gt.LNSMAX) then
++           ! All-l restoration: never truncate a spherical operator at the
++           ! nonspherical orbital cutoff.  This uses precisely the radial
++           ! normalization and RELA metric used in the low-l Gaunt path.
++           ! The factor 2 converts Hartree to Ry; the potential file stores r*V.
++           AW(1:JRI_)=A(1:JRI_)*2.d0*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
++           BW(1:JRI_)=B(1:JRI_)*2.d0*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
++           AEW(1:JRI_)=AE(1:JRI_)*2.d0*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
++           BEW(1:JRI_)=BE(1:JRI_)*2.d0*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
++           basis_restore_spherical(1,l+1,jatom)=RINT13(REL,AW,BW,A,B,NRAD,DX_,JRI_,R0_)
++           basis_restore_spherical(2,l+1,jatom)=RINT13(REL,AEW,BEW,AE,BE,NRAD,DX_,JRI_,R0_)
++           basis_restore_spherical(3,l+1,jatom)=RINT13(REL,AW,BW,AE,BE,NRAD,DX_,JRI_,R0_)
++        endif
+         ! stores radial functions into A1, B1, AE1, BE1
+         IF ((l+1) .LE. NSLMAX) THEN
+            A1(1:JRI_,l+1) = A(1:JRI_)
+@@ -223,6 +236,21 @@
+      endif
+      !call mpi_bcast_V_vns(Vlm,lmmax(jatom),lm_stored,LM(:,:,jatom),jatom,nrad,jri(jatom),lmmx,lnsmax)
+      call mpi_bcast_V_vns(Vlm,lmmax(jatom),lm_stored,LM(:,:,jatom),nrad,lmmx)
++     if (basis_potential_enabled) then
++        ! Reuse the fully coupled low-l and local-orbital machinery for L=0.
++        ! DeltaV_00=sqrt(4*pi)*(Vphysical-Vbasis); HNS supplies the Gaunt
++        ! coefficient.  The high-l Legendre path does NOT use this Y00 factor.
++        if (lm_stored.ge.lmmx) then
++           if (Qprint) write(6,*) 'No free potential harmonic for alternate-basis restoration'
++           call stop_MPI()
++           stop 1
++        endif
++        lm_stored=lm_stored+1
++        lmmax(jatom)=max(lmmax(jatom),lm_stored)
++        LM(:,lm_stored,jatom)=0
++        VLM(:,lm_stored)=0.d0
++        VLM(1:JRI_,lm_stored)=2.d0*sqrt(4.d0*acos(-1.d0))*basis_delta_vr(1:JRI_,jatom)/RNET(1:JRI_)
++     endif
+      !        calculate possible nonspherical contributions to H
+      if (Qprint) then
+         WRITE (6,*) ' POSSIBLE NONSPHERICAL CONTRIBUTIONS TO H: '
+--- a/src/dftKS/hamilt.FPP
++++ b/src/dftKS/hamilt.FPP
+@@ -39,6 +39,7 @@
+   use albl, ONLY: init_albl, end_albl, Al_c, Al_r, Bl_c, Bl_r
+   use param, ONLY: lmax, lomax, nloat, blocksize
+   use mpi, ONLY: Qprint
++  use potnlc, only: basis_potential_enabled,basis_restore_spherical,basis_restore_lmin
+   IMPLICIT NONE
+   !        Arguments
+   INTEGER, intent(in) :: LMX, NAT, NV  ! max-l, n-sorts, N-plane waves
+@@ -263,6 +264,20 @@
+                     tmp1(j) = tmp1(j) + (wtmpa*Al_r(j,l) + wtmpb*Bl_r(j,l))*tmp3
+                  end do
+ 		 !  !$OMP END PARALLEL DO
++              endif
++              if (basis_potential_enabled.and.l.ge.basis_restore_lmin) then
++                 ! Spherical DeltaV is diagonal in (l,m).  The angular sum
++                 ! gives (2*l+1)*P_l.  VIFPR4 and the atom phases are applied
++                 ! below exactly as for the ordinary spherical Hamiltonian.
++                 ! Both u-udot orientations are needed for a Hermitian form.
++                 do j=1,i_g
++                    tmp3=(2*l+1)*Pl(j,l,ihelp)
++                    tmp1(j)=tmp1(j)+tmp3*( &
++                         basis_restore_spherical(1,l+1,jatom)*Al_c(ihelp,l)*Al_r(j,l) &
++                        +basis_restore_spherical(2,l+1,jatom)*Bl_c(ihelp,l)*Bl_r(j,l) &
++                        +basis_restore_spherical(3,l+1,jatom)*( &
++                             Al_c(ihelp,l)*Bl_r(j,l)+Bl_c(ihelp,l)*Al_r(j,l)))
++                 enddo
+               endif
+            enddo
+ 	   !	   !$OMP PARALLEL DO PRIVATE(phs)

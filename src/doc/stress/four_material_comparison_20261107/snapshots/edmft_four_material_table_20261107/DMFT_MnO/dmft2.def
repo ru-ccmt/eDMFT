@@ -1,0 +1,24 @@
+  2, 'MnO.indmf2'   , 'old'     , 'formatted'  , 0   
+  3, 'MnO.in1c'     , 'unknown' , 'formatted'  , 0   
+  4, 'MnO.inso'     , 'unknown' , 'formatted'  , 0   
+  5, 'MnO.in2'      , 'old'     , 'formatted'  , 0   
+  6, 'MnO.outputdmf2', 'unknown' , 'formatted'  , 0   
+  7, 'MnO.indmfl'   , 'old'     , 'formatted'  , 0   
+  8, 'MnO.clmval'   , 'unknown' , 'formatted'  , 0   
+  9, './MnO.vector' , 'old'     , 'unformatted', 9000
+ 10, './MnO.vectordn', 'unknown' , 'unformatted', 9000
+ 12, 'MnO.norm'     , 'unknown' , 'formatted'  , 0   
+ 13, 'MnO.recprlist', 'unknown' , 'formatted'  , 9000
+ 14, 'MnO.kgen'     , 'unknown' , 'formatted'  , 0   
+ 15, './MnO.bnds'   , 'unknown' , 'unformatted', 0   
+ 18, 'MnO.vsp'      , 'old'     , 'formatted'  , 0   
+ 20, 'MnO.struct'   , 'old'     , 'formatted'  , 0   
+ 21, 'MnO.scf2'     , 'unknown' , 'formatted'  , 0   
+ 22, 'MnO.rotlm'    , 'unknown' , 'formatted'  , 0   
+500, 'MnO.cdos3'    , 'unknown' , 'formatted'  , 0   
+ 29, 'MnO.energydn' , 'unknown' , 'formatted'  , 0   
+ 30, 'MnO.energy'   , 'old'     , 'formatted'  , 0   
+ 31, 'MnO.energydn' , 'unknown' , 'formatted'  , 0   
+9902, 'MnO.nsh'      , 'unknown' , 'unformatted', 0   
+9919, 'MnO.vns'      , 'unknown' , 'formatted'  , 0   
+ 81, 'sig.inp1'     , 'old'     , 'formatted'  , 0   

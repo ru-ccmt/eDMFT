@@ -1,0 +1,50 @@
+[
+  {
+    "material": "MnO",
+    "directory": "MnO_center",
+    "residual_norm": 0.00036332564152805844,
+    "maximum": 4.4005999842333665e-05,
+    "alpha": 1.0,
+    "normalization_enabled": false
+  },
+  {
+    "material": "MnO",
+    "directory": "MnO_m_0.001",
+    "residual_norm": 0.00029339617353540265,
+    "maximum": 2.5850816389999878e-05,
+    "alpha": 1.0,
+    "normalization_enabled": false
+  },
+  {
+    "material": "MnO",
+    "directory": "MnO_p_0.001",
+    "residual_norm": 0.0002862954112431752,
+    "maximum": 2.889910734538148e-05,
+    "alpha": 1.0,
+    "normalization_enabled": false
+  },
+  {
+    "material": "MnTe",
+    "directory": "dmft",
+    "residual_norm": 0.0050314056004830176,
+    "maximum": 0.00043672967268904017,
+    "alpha": 1.0001903184305676,
+    "normalization_enabled": true
+  },
+  {
+    "material": "MnTe",
+    "directory": "dmft_m_0.001",
+    "residual_norm": 0.002693794281359149,
+    "maximum": 0.00022923706604238703,
+    "alpha": 1.000191074625393,
+    "normalization_enabled": true
+  },
+  {
+    "material": "MnTe",
+    "directory": "dmft_p_0.001",
+    "residual_norm": 0.001888125931474364,
+    "maximum": 0.0001597660727572503,
+    "alpha": 1.0001895298507668,
+    "normalization_enabled": true
+  }
+]

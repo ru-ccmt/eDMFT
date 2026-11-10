@@ -1,0 +1,25 @@
+ 2,'SrVO3.nsh',    'unknown','unformatted',-1
+ 3,'SrVO3.in1c',   'unknown','formatted',0
+ 4,'SrVO3.inso',           'unknown','formatted',-1
+ 5,'SrVO3.in2c',   'old',    'formatted',0
+ 6,'SrVO3.output2','unknown','formatted',0
+ 7,'SrVO3.vorb','unknown','formatted',0
+ 8,'SrVO3.clmval','unknown','formatted',0
+10,'./SrVO3.vector', 'unknown','unformatted',0
+13,'SrVO3.recprlist',      'unknown','unformatted',9000
+14,'SrVO3.kgen',        'unknown','formatted',-1
+16,'SrVO3.qtl',       'unknown','formatted',0
+17,'SrVO3.weightaver','unknown','formatted',0
+18,'SrVO3.vsp',       'old',    'formatted',-1
+19,'SrVO3.vns',       'unknown','formatted',-1
+20,'SrVO3.struct',         'old',    'formatted',-1
+21,'SrVO3.scf2','unknown','formatted',0
+922,'SrVO3.rotlm',   'unknown',    'formatted',0
+23,'SrVO3.radwf',   'unknown',    'formatted',0
+26,'SrVO3.weight',   'unknown','formatted',0
+27,'SrVO3.weightdn',   'unknown','formatted',0
+29,'SrVO3.energydn','unknown','formatted',0
+30,'SrVO3.energy', 'unknown','formatted',0
+32,'SrVO3.qdmft',   'unknown',    'formatted',0
+34,'SrVO3.oubwin',   'unknown',    'formatted',0
+231,'SrVO3.dmftsym',   'unknown',    'formatted',0

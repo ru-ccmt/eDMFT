@@ -101,7 +101,8 @@
 !                             lfirst)
 SUBROUTINE val_corr_stress(isize,ibpp_max,ibb,nemin,nemax,ALM,BLM,clm, &
      buf_sph_val_fin,buf_nsp_match,buf_nsp_radial,buf_nsp_angular, &
-     do_nsp,jatom,rmt,latom,lfirst)
+     buf_sph_match,buf_sph_radial,buf_sph_angular,do_nsp,jatom,rmt, &
+     latom,lfirst)
     use param
     use xa3   ,    only: a,bkx, bky, bkz
                          
@@ -127,7 +128,10 @@ SUBROUTINE val_corr_stress(isize,ibpp_max,ibb,nemin,nemax,ALM,BLM,clm, &
     complex*16, intent(out) :: buf_sph_val_fin(1:3,1:3,nume), &
                                buf_nsp_match(1:3,1:3,nume), &
                                buf_nsp_radial(1:3,1:3,nume), &
-                               buf_nsp_angular(1:3,1:3,nume)
+                               buf_nsp_angular(1:3,1:3,nume), &
+                               buf_sph_match(1:3,1:3,nume), &
+                               buf_sph_radial(1:3,1:3,nume), &
+                               buf_sph_angular(1:3,1:3,nume)
     real*8    , intent(in)  :: rmt
     
     complex*16              :: CAPD0LM(3,3,(lmax2+1)*(lmax2+1),nume), &
@@ -463,7 +467,9 @@ SUBROUTINE val_corr_stress(isize,ibpp_max,ibb,nemin,nemax,ALM,BLM,clm, &
                                            !     buf_sph_val1_buf3(alpha,beta,num) = buf_sph_val1_buf3(alpha,beta,num) + & 
                                                  gaunt1*gaunt2*conjg(c_am(alpha,t))*conjg(c_am(beta,u))*&
                                                  conjg(clm(index1,num,jlo))*clm(index2,num,jlop)* &
-                                                 (elo(lp,jlop)-e(num))*jr3upu_22(jlo,jlop,l,lp)
+                                                 ! jr3upu_22 stores the derivative on its second index.
+                                                 ! G2 requires a differentiated bra, with the ket energy.
+                                                 (elo(lp,jlop)-e(num))*jr3upu_22(jlop,jlo,lp,l)
                                               ENDIF
                                            ENDDO                                           
                                         ENDIF
@@ -537,6 +543,15 @@ SUBROUTINE val_corr_stress(isize,ibpp_max,ibb,nemin,nemax,ALM,BLM,clm, &
     DO alpha = 1,3
        DO beta = 1,3
           DO num = nemin,nemax
+             ! Keep the three lines of the spherical Blaha kernel available
+             ! separately.  Their sum is unchanged below.  This split is
+             ! needed for the off-shell DMFT audit: in DFT only the on-shell
+             ! H-epsilon O combination is observable, whereas M_Sigma probes
+             ! the overlap derivative itself and can reveal a term that was
+             ! legitimately eliminated in the on-shell derivation.
+             buf_sph_match(alpha,beta,num)=buf_sph_val0(alpha,beta,num)
+             buf_sph_radial(alpha,beta,num)=buf_sph_val1(alpha,beta,num)
+             buf_sph_angular(alpha,beta,num)=buf_sph_val2(alpha,beta,num)
              buf_sph_val_fin(alpha,beta,num) = buf_sph_val0(alpha,beta,num)+buf_sph_val1(alpha,beta,num) +&
                                                buf_sph_val2(alpha,beta,num)                                                                                             
           ENDDO
@@ -705,7 +720,8 @@ SUBROUTINE build_nsp_geometry(jatom)
      l=lpv(ih,jatom)
      lp=lv(ih,jatom)
      duplicate_radial_channel=.FALSE.
-     IF (ih.GT.1 .AND. lpv(ih-1,jatom).EQ.l .AND. &
+     IF (ih.GT.1) THEN
+     IF (lpv(ih-1,jatom).EQ.l .AND. &
           lv(ih-1,jatom).EQ.lp .AND. &
           llv(ih-1,jatom).EQ.llv(ih,jatom) .AND. &
           mmv(ih-1,jatom).EQ.mmv(ih,jatom)) THEN
@@ -715,6 +731,7 @@ SUBROUTINE build_nsp_geometry(jatom)
              SUM(ABS(WPts(:,:,ih,jatom)))
         duplicate_radial_channel= &
              channel_diff.LE.1.d-12*(1.d0+channel_scale)
+     ENDIF
      ENDIF
      IF (.NOT.duplicate_radial_channel) &
           maxterm=maxterm+(2*l+1)*(2*lp+1)
@@ -733,7 +750,8 @@ SUBROUTINE build_nsp_geometry(jatom)
      l=lpv(ih,jatom)
      lp=lv(ih,jatom)
      duplicate_radial_channel=.FALSE.
-     IF (ih.GT.1 .AND. lpv(ih-1,jatom).EQ.l .AND. &
+     IF (ih.GT.1) THEN
+     IF (lpv(ih-1,jatom).EQ.l .AND. &
           lv(ih-1,jatom).EQ.lp .AND. &
           llv(ih-1,jatom).EQ.llv(ih,jatom) .AND. &
           mmv(ih-1,jatom).EQ.mmv(ih,jatom)) THEN
@@ -743,6 +761,7 @@ SUBROUTINE build_nsp_geometry(jatom)
              SUM(ABS(WPts(:,:,ih,jatom)))
         duplicate_radial_channel= &
              channel_diff.LE.1.d-12*(1.d0+channel_scale)
+     ENDIF
      ENDIF
      IF (duplicate_radial_channel) CYCLE
 
@@ -773,8 +792,8 @@ SUBROUTINE build_nsp_geometry(jatom)
                              IF (ABS(gaunt_couple).LT.1.d-30) CYCLE
                              DO beta=1,3
                                 DO alpha=1,3
-                                   radial_factor=conjg(c_am(alpha,t))* &
-                                        conjg(c_am(beta,u))*gaunt1* &
+                                   radial_factor=c_am(alpha,t)* &
+                                        c_am(beta,u)*gaunt1* &
                                         gaunt_pot*gaunt_couple
                                    radial_geom(alpha,beta)= &
                                         radial_geom(alpha,beta)+radial_factor
@@ -789,7 +808,8 @@ SUBROUTINE build_nsp_geometry(jatom)
 
            angular_geom=zeroc
            DO v=-1,1,2
-              IF (l+v.LT.0 .OR. l+v.GT.lmax2n) CYCLE
+              ! l+1 is an intermediate harmonic even at the radial cutoff.
+              IF (l+v.LT.0) CYCLE
               DO t=-1,1
                  IF (mbra+t.LT.-(l+v) .OR. mbra+t.GT.l+v) CYCLE
                  DO tp=-1,1
@@ -871,7 +891,7 @@ SUBROUTINE val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,RMT)
     integer, external          :: NOTRI
     REAL*8,  external          :: GAUNT
     real*8                     :: gaunt1,gaunt2,gaunt3,RMT2
-    real*8                     :: g1_deriv_scale
+    real*8                     :: g1_deriv_scale, g1_lo_scale
     integer                    :: g1_legacy_status
     character(len=32)          :: g1_legacy_env
     REAL*8, PARAMETER          :: ohalf = 1.D0/2.D0    
@@ -889,19 +909,29 @@ SUBROUTINE val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,RMT)
     lmax = lmax2n        !at least lmax = 7 is needed
 !=====================                                      
 
-    ! Equation G1 carries one overall factor 1/2.  In the historical
-    ! implementation the first-radial-derivative part duplicated its angular
-    ! factor and consequently lost this 1/2, while the accompanying -u/r**2
-    ! piece retained it.  Use the corrected factor by default, matching the
-    ! patched WIEN2k-24 stress kernel.  The environment switch is diagnostic
-    ! only and permits exact reproduction of the legacy result.
-    g1_deriv_scale = 0.5d0
+    ! G1 product rule (audit 2026-11-07): F2 differentiates n_alpha only.
+    ! The derivative of Y in D_beta(n_alpha*Y) belongs in F3 as well as
+    ! the separate n_beta*D_alpha(Y) row. Thus F3 is
+    !       (2*R1-R0) * (n_alpha*D_beta+n_beta*D_alpha)/2,
+    ! R1=int r*u_bra*u'_ket dr, R0=int u_bra*u_ket dr.
+    ! Halving the R1 coefficient was an incorrect earlier correction.
+    ! In particular psi=r*Y_10 is proportional to z and has ZERO Hessian;
+    ! the halved coefficient gives a spurious, traceless tensor instead.
+    ! LO--LO products have no extra multiplicity: the ordered pair sum
+    ! already contains every primitive pair, just as for u and udot.
+    ! PREAUDIT explicitly reproduces the two old angular defects for
+    ! diagnostics only; the physical/default scales are both one.
+    g1_deriv_scale = 1.d0
+    g1_lo_scale = 1.d0
     g1_legacy_env = ''
-    call get_environment_variable('WIEN_STRESS_G1_LEGACY',g1_legacy_env, &
-         status=g1_legacy_status)
-    if (g1_legacy_status.eq.0 .and. len_trim(g1_legacy_env).gt.0 .and. &
-         trim(g1_legacy_env).ne.'0') g1_deriv_scale = 1.d0
-                                  
+    call get_environment_variable('WIEN_STRESS_G1_PREAUDIT',g1_legacy_env, &
+                                  status=g1_legacy_status)
+    if(g1_legacy_status.eq.0 .and. len_trim(g1_legacy_env).gt.0 .and. &
+       trim(g1_legacy_env).ne.'0') then
+       g1_deriv_scale = 0.5d0
+       g1_lo_scale = 2.d0
+    endif
+
     DO l = 0, lmax
        FF(0,l)   = P(l)
        FF(1,l)   = PE(l)
@@ -1166,11 +1196,11 @@ SUBROUTINE val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,RMT)
                                                F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
                                                (c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u) +&
                                                c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*&
-                                               ohalf*g1_deriv_scale*gaunt1*2.d0* &
+                                               ohalf*g1_deriv_scale*gaunt1*g1_lo_scale* &
                                                conjg( clm(index1,num,jlo) )*clm(index2,num,jlop)*&
                                                judu_22(jlo,jlop,l,lp)- &
                                                (c_am(beta,t)*ca_st_lm(alpha,v,u)+c_am(alpha,t)*ca_st_lm(beta,v,u))*ohalf*gaunt1*&
-                                               2.d0*conjg( clm(index1,num,jlo) )*clm(index2,num,jlop)*&
+                                               g1_lo_scale*conjg( clm(index1,num,jlo) )*clm(index2,num,jlop)*&
                                                juu_22(jlo,jlop,l,lp) 
                                             ENDIF
                                           ENDDO

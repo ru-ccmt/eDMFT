@@ -1,0 +1,260 @@
+--- a/src/dmft2/l2main.f90
++++ b/src/dmft2/l2main.f90
+@@ -13,7 +13,7 @@
+   USE xa,    ONLY: LM, R, fj, dfj, E, WEIGHT, init_xa, fini_xa !, TC100, TCA100, TCB100, SUMA, SUMB, SUMAB, SUMBA, AVEC, BK, BKRLOC, BKROT
+   USE xa3,   ONLY: bk3, aK, bk3lo, init_xa3, fini_xa3, k3, k3lo, As, As_lo!, A, A_lo
+   USE reclat,ONLY: inst, tauk, kzz
+-  USE muzero,ONLY: nomq, jomq, iomq, womq, abom, n0_om, init_muzero, fini_muzero
++  USE muzero,ONLY: nomq, jomq, iomq, womq, abom, n0_om, init_muzero, fini_muzero, matsum_weight
+   USE com_mpi,ONLY: nprocs,myrank,master,FilenameMPI,Reduce_MPI,Reduce_MPI0, &
+        Gather_procs,FindMax_MPI,pr_proc,pr_procr,pr_procs,vector_para, &
+        vectors,nvector,fvectors,VECFN,FindMaxK_MPI,Qprint,stop_MPI
+@@ -166,8 +166,16 @@
+   REAL*8     :: fnsp(3,natm)
+   REAL*8     :: fvdrho(3,nat), fdvrho(3,nat)
+   REAL*8     :: forb(3,natm), fextra(3,nat), fsur(3,nat), fkdc(3), fsur2(9), fsur_norm
++  CHARACTER(2048) :: response_density_prefix, response_export_prefix
++  LOGICAL :: response_density_mode
++  REAL*8, ALLOCATABLE :: response_frequency_weights(:)
+   LOGICAL    :: Qforce2
+ 
++  response_density_prefix=''
++  response_export_prefix=''
++  call get_environment_variable('EDMFT_RESPONSE_DENSITY_PREFIX',response_density_prefix)
++  call get_environment_variable('EDMFT_RESPONSE_EXPORT',response_export_prefix)
++  response_density_mode=len_trim(response_density_prefix).gt.0
+   Qforce2=.True.
+   
+   RENORM_SIMPLE = .False.
+@@ -460,6 +468,29 @@
+           dXrel,dXstress,Qforce,Qstress,info.eq.0)
+      if (Qstress) CALL WriteNormalizationStrainDiagnostic(SOlapm,dXstress, &
+           cixdim,maxdim,ncix)
++  endif
++
++  if(response_density_mode)then
++     if(Qforce.or.Qstress.or.recomputeEF.ne.0.or.iso.ne.1) &
++          error stop 'response reconstruction requires TOT, recomputeEF=0, no SOC'
++     write(6,'(A)') ':RESPONSE_DENSITY_ONLY: energies and impurity observables are NOT response results'
++  endif
++  if(len_trim(response_export_prefix).gt.0)then
++     ! Metadata precedes the optional EF search, so require a final charge
++     ! replay at the saved chemical potential.  Exporting a stale mu would
++     ! make the external response differentiate a different lattice state.
++     if(recomputeEF.ne.0.or.mode.ne.'c'.or.iso.ne.1.or.nspin1.ne.1) &
++          error stop 'response export requires nonmagnetic charge mode, recomputeEF=0, no SOC'
++     if(.not.Qrenormalize.or.abs(projector).ne.5.or..not.matsubara) &
++          error stop 'response export requires normalized projector 5 on Matsubara axis'
++     allocate(response_frequency_weights(npomega))
++     response_frequency_weights=1.d0
++     response_frequency_weights(n0_om:npomega)=matsum_weight(n0_om:npomega)
++     call ExportFrozenResponseMetadata(response_export_prefix,omega, &
++          response_frequency_weights,npomega,sigma,s_oo,nomega,maxsize, &
++          DM_EF,Temperature,SOlapm,cfX,cix_orb,cixdim,iSx,iorbital, &
++          nindo,norbitals,maxdim2)
++     deallocate(response_frequency_weights)
+   endif
+ 
+   ! The ordinary complementary-band correction treats the saved global
+@@ -743,7 +774,7 @@
+         call walltim(t1w)
+      
+         nbands = DM_nemax-DM_nemin+1
+-        if (Qforce .or. Qstress) then
++        if (Qforce .or. Qstress .or. len_trim(response_export_prefix).gt.0) then
+            nbands_full = nemax-nemin+1
+            iw0 = DM_nemin-nemin+1
+            iw1 = DM_nemax-nemin+1
+@@ -770,7 +801,7 @@
+         ! improves the completeness of the projector derivative.  A non-force
+         ! run follows the original, cheaper window-only path.
+ 
+-        if (Qforce .or. Qstress) then
++        if (Qforce .or. Qstress .or. len_trim(response_export_prefix).gt.0) then
+            CALL Build_DMFT_Projector(DMFTUfull,cfX,Rspin,iorbital, &
+                 norbitals,nipc,n0,nnlo,nbands_full,cix_orb,nindo, &
+                 nemin,nemax,maxdim2,lmaxp,Qstress)
+@@ -877,6 +908,11 @@
+         time_dmfw=time_dmfw+t2w-t1w
+         
+         wkp = (twgh/sumw)*2.0
++        if(len_trim(response_export_prefix).gt.0) &
++             call ExportFrozenResponseK(response_export_prefix,ikp,n0,iso, &
++             nmat,nume,nbands_full,nemin,nemax,DM_nemin,DM_nemax, &
++             maxdim2,norbitals,E,As,k3,k3lo,nnlo, &
++             DMFTUfull(:,:,:,1),dble(wkp))
+         zw0(:)=0
+         DO num=nemin,DM_nemin-1
+            zw0(num) = dble(wkp) ! These bands are fully filled
+@@ -1127,9 +1163,24 @@
+         FTOT0 = FTOT0 + TDE1+TDE2
+         !WRITE(6,'(A,f11.6,1x,A,f11.6,1x,A,f11.6,1x,A,f11.6,1x,A,f11.6,1x,A,f11.6)') 'Density=', dens, 'ETOT(band)=', ETOT2, 'trlgG+mu*N=', FTOT2+DM_EF*dens, 'logG=',logG,'TDE=', TDE1+TDE2, 'trlgG=', FTOT2
+         
++        ! The optional external matrix already includes spin and k weights.
++        ! Expand only this density reconstruction to ALL stored bands; do not
++        ! redefine the impurity window or its Dyson equation.  The following
++        ! k point reads DM_nemin/DM_nemax again from the ordinary input window.
++        if(response_density_mode)then
++           deallocate(Aweight)
++           nbands=nemax-nemin+1
++           DM_nemin=nemin
++           DM_nemax=nemax
++           DM_nemaxx=nemax
++           allocate(Aweight(nbands,nbands))
++           call ReadFrozenResponseDensity(response_density_prefix,ikp, &
++                n0,iso,nmat,nume,nemin,nemax,E,As,Aweight)
++        endif
++
+         allocate( zw2(nbands) )
+         CALL Diagonalize_DMFT_WEIGHTS(zw2,Aweight,nbands,DM_nemin, &
+-             DM_nemaxx,.True.,'physical_density',ikp)
++             DM_nemaxx,.not.response_density_mode,'physical_density',ikp)
+ 
+         ! Weights for all bands, which are needed below
+         weight=0
+--- a/src/dmft2/Makefile
++++ b/src/dmft2/Makefile
+@@ -20,7 +20,7 @@
+            p_project.o csplit.o d5splt.o f7splt.o gtfnam.o \
+            harmon.o kdelta.o lomain.o l2mainSubs.o alm_blm_clm.o stress_g2_matrices.o \
+ 	   stress_integrals.o stress_kernels.o stress_rela.o stress_interstitial.o stress_symmetry.o \
+-	   cmp_mt_density.o cmp_dmft_stress.o cmp_dmft_weights.o l2main.o dmft2.o init_energy_file.o lda_fermi.o \
++	   cmp_mt_density.o cmp_dmft_stress.o cmp_dmft_weights.o frozen_response_io.o l2main.o dmft2.o init_energy_file.o lda_fermi.o \
+            latgen.o p3splt.o psplit.o recfil.o recpr.o \
+            spin_rotate.o cmp_log_gdloc.o print_pre_atpar.o fomai3.o symmetrize.o
+ 
+--- /dev/null
++++ b/src/dmft2/frozen_response_io.f90
+@@ -0,0 +1,132 @@
++! Optional interfaces for the frozen-self-energy linear-response diagnostic.
++!
++! These routines do not alter a normal dmft2 calculation.  The Python response
++! driver differentiates the central lattice resolvent, including the moving
++! finite band window and the global inverse-square-root normalization.  Its
++! Hermitian, SIGNED density matrix is then reconstructed using the same LAPW
++! radial/angular/FFT machinery as an ordinary density.  No physical occupation
++! cutoff may be applied: positive and negative response eigenvalues cancel.
++!
++! The input includes the central eigenvectors, not just eigenvalues.  Equal
++! eigenvalues do not identify a gauge inside a degenerate subspace.  Refusing
++! a different vector file prevents a silently gauge-dependent charge response.
++SUBROUTINE ReadFrozenResponseDensity(prefix,ikp,n0,iso,nmat,nume, &
++     first,last,E,As,rho)
++  USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
++  IMPLICIT NONE
++  CHARACTER(*),intent(in)::prefix
++  INTEGER,intent(in)::ikp,n0,iso,nmat,nume,first,last
++  REAL*8,intent(in)::E(nume)
++  COMPLEX*16,intent(in)::As(nmat,nume,iso)
++  COMPLEX*16,intent(out)::rho(last-first+1,last-first+1)
++  CHARACTER(8)::magic
++  CHARACTER(2048)::path
++  INTEGER::u,ios,h(7),n
++  REAL*8,allocatable::er(:)
++  COMPLEX*16,allocatable::ar(:,:,:)
++  n=last-first+1
++  write(path,'(A,A,I8.8,A)') trim(prefix),'.k',ikp,'.bin'
++  open(newunit=u,file=trim(path),status='old',access='stream', &
++       form='unformatted',iostat=ios)
++  if(ios.ne.0) error stop 'response density: cannot open input'
++  read(u,iostat=ios) magic,h
++  if(ios.ne.0) error stop 'response density: truncated header'
++  if(magic.ne.'EDMRHO01') error stop 'response density: invalid magic'
++  if(any(h.ne.(/1,ikp,n0,iso,n,first,last/))) &
++       error stop 'response density: incompatible basis dimensions'
++  allocate(er(n),ar(n0,n,iso))
++  read(u,iostat=ios) er,ar,rho
++  close(u)
++  if(ios.ne.0) error stop 'response density: truncated matrices'
++  if(maxval(abs(er-E(first:last))).gt.1.d-10) &
++       error stop 'response density: eigenvalues differ from reference'
++  if(maxval(abs(ar-As(1:n0,first:last,:))).gt.1.d-10) &
++       error stop 'response density: eigenvector gauge differs from reference'
++  if(.not.all(ieee_is_finite(dble(rho)))) error stop 'nonfinite response density'
++  if(.not.all(ieee_is_finite(aimag(rho)))) error stop 'nonfinite response density'
++  if(maxval(abs(rho-conjg(transpose(rho)))).gt.1.d-10) &
++       error stop 'non-Hermitian response density'
++  rho=0.5d0*(rho+conjg(transpose(rho)))
++  deallocate(er,ar)
++END SUBROUTINE ReadFrozenResponseDensity
++
++! Export the actual quadrature, self-energy, and normalization symmetry map.
++! A Python reimplementation must not guess the orbital symmetry from Sigind:
++! overlap symmetry is a group average, followed by equivalent-site averaging.
++! Exporting its action on real and imaginary matrix units also captures the
++! final Hermitian projection, which is real-linear rather than complex-linear.
++SUBROUTINE ExportFrozenResponseMetadata(prefix,omega,weights,npomega, &
++     sigma,sinf,nomega,maxsize,mu,temp,SOlapm,cfX,cix_orb,cixdim, &
++     iSx,iorbital,nindo,norbitals,maxdim2)
++  USE dmfts,ONLY:maxdim,ncix,natom,lmaxp,Sigind
++  USE com_mpi,ONLY:myrank,master
++  IMPLICIT NONE
++  CHARACTER(*),intent(in)::prefix
++  INTEGER,intent(in)::npomega,nomega,maxsize,norbitals,maxdim2
++  REAL*8,intent(in)::omega(nomega),weights(npomega),mu,temp
++  COMPLEX*16,intent(in)::sigma(maxsize,ncix,nomega),sinf(maxsize,ncix)
++  COMPLEX*16,intent(in)::SOlapm(maxdim,maxdim,ncix)
++  COMPLEX*16,intent(in)::cfX(maxdim2,maxdim2,norbitals,norbitals)
++  INTEGER,intent(in)::cix_orb(norbitals),cixdim(ncix),iSx(maxdim2,norbitals)
++  INTEGER,intent(in)::iorbital(natom,lmaxp+1),nindo(norbitals)
++  COMPLEX*16,allocatable::local(:,:,:),unit(:,:,:)
++  INTEGER::u,iw,ic,i,j,part
++  if(myrank.ne.master.or.len_trim(prefix).eq.0)return
++  allocate(local(maxdim,maxdim,ncix),unit(maxdim,maxdim,ncix))
++  open(newunit=u,file=trim(prefix)//'.meta',status='replace', &
++       access='stream',form='unformatted')
++  write(u)'EDMRSP01',2,maxdim,ncix,maxdim2,norbitals,npomega
++  write(u)mu,temp,omega(:npomega),weights
++  write(u)cixdim,cix_orb,nindo,iSx,Sigind,SOlapm
++  call BuildLocalSigmaMatrix(local,sinf,Sigind,cixdim,maxdim,maxsize,ncix)
++  write(u)local
++  do iw=1,npomega
++     call BuildLocalSigmaMatrix(local,sigma(:,:,iw),Sigind,cixdim, &
++          maxdim,maxsize,ncix)
++     write(u)local
++  enddo
++  do part=1,2
++     do ic=1,ncix
++        do j=1,maxdim
++           do i=1,maxdim
++              unit=0.d0
++              if(i.le.cixdim(ic).and.j.le.cixdim(ic))then
++                 if(part.eq.1)unit(i,j,ic)=1.d0
++                 if(part.eq.2)unit(i,j,ic)=(0.d0,1.d0)
++              endif
++              call SymmetrizeOverlap(unit,cfX,cix_orb,cixdim,iSx, &
++                   iorbital,nindo,norbitals,maxdim2)
++              write(u)unit
++           enddo
++        enddo
++     enddo
++  enddo
++  close(u)
++  deallocate(local,unit)
++  write(6,'(A,1X,A)')':FROZEN_RESPONSE_METADATA:',trim(prefix)//'.meta'
++END SUBROUTINE ExportFrozenResponseMetadata
++
++! Central k-point data for a standalone response calculation.  The saved U
++! contains all stored rows of the raw overlap AFTER normalization, before
++! truncation to W.  Python recovers raw P through the saved invertible X.
++! Only W is embedded in the central Dyson equation.  Outside rows are needed
++! for dPi_W and must never be embedded as an enlarged impurity window.
++SUBROUTINE ExportFrozenResponseK(prefix,ikp,n0,iso,nmat,nume,nstored, &
++     first,last,wfirst,wlast,maxdim2,norbitals,E,As,k3,k3lo,nnlo,U,wkp)
++  IMPLICIT NONE
++  CHARACTER(*),intent(in)::prefix
++  INTEGER,intent(in)::ikp,n0,iso,nmat,nume,nstored,first,last,wfirst,wlast
++  INTEGER,intent(in)::maxdim2,norbitals,nnlo,k3(3,nmat),k3lo(3,nnlo)
++  REAL*8,intent(in)::E(nume),wkp
++  COMPLEX*16,intent(in)::As(nmat,nume,iso),U(nstored,maxdim2,norbitals)
++  INTEGER::fh
++  CHARACTER(2048)::path
++  if(len_trim(prefix).eq.0)return
++  write(path,'(A,A,I8.8,A)')trim(prefix),'.k',ikp,'.bin'
++  open(newunit=fh,file=trim(path),status='replace',access='stream',form='unformatted')
++  write(fh)'EDMRPK01',1,ikp,n0,iso,nstored,first,last,wfirst,wlast, &
++       maxdim2,norbitals,nnlo
++  write(fh)wkp,E(first:last),As(1:n0,first:last,:),U
++  write(fh)k3(:,1:n0-nnlo),k3lo
++  close(fh)
++END SUBROUTINE ExportFrozenResponseK

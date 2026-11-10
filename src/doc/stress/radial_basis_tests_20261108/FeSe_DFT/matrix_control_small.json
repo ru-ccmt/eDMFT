@@ -1,0 +1,8 @@
+{
+  "H_Ry": -84.21088512660013,
+  "rhoE_O_Ry": -84.20277588663828,
+  "H_minus_O_Ry": -0.008109239961854087,
+  "fixed_DFT_weights_GPa": -0.07517296214686915,
+  "step": 1e-05,
+  "fixed_weights_eigenvalue_fd_GPa": -0.07386326270913299
+}

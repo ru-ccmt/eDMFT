@@ -1,0 +1,131 @@
+:CINT001 Core Integral Atom   1   27.99995242
+:CINT002 Core Integral Atom   2    9.99999994
+:CINT003 Core Integral Atom   3    1.99999997
+:CINT004 Core Integral Atom   4    1.99999997
+
+       DENSITY AT NUCLEUS
+        JATOM        VALENCE       SEMI-CORE          CORE           TOTAL
+:RTO001:   1       82.627682        0.000000    37710.830634    37793.458316
+:RTO002:   2       95.140431        0.000000     8026.797984     8121.938415
+:RTO003:   3       14.582570        0.000000      292.004963      306.587533
+:RTO004:   4       14.582211        0.000000      292.005018      306.587230
+:K-LIST:Reduced k-vector list     1648     576
+     
+       CHARGES OF NEW CHARGE DENSITY
+:NTO   : INTERSTITIAL CHARGE  =     6.431594
+:NPC   : INTERSTITIAL CHARGE  =    21.290984
+:NTO001: CHARGE SPHERE   1    =    35.852531
+:NTO002: CHARGE SPHERE   2    =    20.276788
+:NTO003: CHARGE SPHERE   3    =     7.479741
+:NTO004: CHARGE SPHERE   4    =     7.479649
+
+:NEC01: NUCLEAR AND ELECTRONIC CHARGE     85.00000000    84.99995226 Plane Wave
+     
+       CHARGES OF OLD CHARGE DENSITY
+:OTO   : INTERSTITIAL CHARGE  =     6.431642
+:OPC   : INTERSTITIAL CHARGE  =    21.291364
+:OTO001: CHARGE SPHERE   1    =    35.852529
+:OTO002: CHARGE SPHERE   2    =    20.276788
+:OTO003: CHARGE SPHERE   3    =     7.479742
+:OTO004: CHARGE SPHERE   4    =     7.479650
+
+:NEC02: NUCLEAR AND ELECTRONIC CHARGE     85.00000000    85.00000000
+     
+       CONVERGENCE TEST
+:DTO001: DIFFERENCE IN SPHERE  1 =  0.0000015
+:DTO002: DIFFERENCE IN SPHERE  2 =  0.0000009
+:DTO003: DIFFERENCE IN SPHERE  3 =  0.0000013
+:DTO004: DIFFERENCE IN SPHERE  4 =  0.0000014
+
+:DIS  :  CHARGE DISTANCE      (  0.0000015 for atom    1 spin 1)      0.0000013
+ 
+******************************************************
+* Multisecant Mixing Release 10.8.9                  *
+* Standard Mode with step bound                      *
+* Multisecant MSR1 Algorithm                         *
+* Regularization       2.000E-04                     *
+* Minimum Greed        1.000E-03                     *
+* Max Number of Memory Steps    8                    *
+******************************************************
+ 
+:INFO: Global read efermi error
+
+:FULLRMS/Atom   0.0001045660
+:PLANE:  PW /ATOM     1.86250 DISTAN   5.84E-05 %  3.14E-03
+:CHARG:  CLM/ATOM   114.71256 DISTAN   7.40E-07 %  6.45E-07
+:INFOF Fractnow,Tolerror,TolReject,qtot   174.597     1.667     3.000     0.000 T T F
+
+Step History
+        Dmix         Dmixt        Red     Pred      Step      Lambda    MagAbs    Beta
+  7   4.2817E-01   4.2817E-01  2.48E-01  3.22E-01  1.15E+00  1.47E+00  1.10E-01  1.00E+00
+  8   7.2686E-01   7.2686E-01  5.31E-01  5.01E-01  2.31E+00  1.49E+00  5.50E-02  1.00E+00
+  9   5.2432E-01   5.2432E-01  1.49E-01  3.05E-01  2.31E+00  1.53E+00  2.92E-02  1.00E+00
+ 10   1.0000E+00   1.0000E+00  2.40E-01  2.84E-01  8.06E+00  1.50E+00  1.52E-02  1.00E+00
+ 11   1.0000E+00   1.0000E+00  1.18E+00  4.64E-01  2.06E+01  1.50E+00  9.35E-03  1.00E+00
+ 12   5.6699E-01   5.6699E-01  2.01E-01  1.92E-01  1.35E+01  1.49E+00  7.21E-03  1.00E+00
+ 13   7.8750E-01   7.8750E-01  1.59E-01  2.37E-01  3.74E+01  1.49E+00  4.00E-03  1.00E+00
+ 14   1.0000E+00   1.0000E+00  3.03E-01  2.97E-01  1.18E+02  1.45E+00  2.00E-03  1.00E+00
+ 15   1.0000E+00   1.0000E+00  2.60E-01  2.10E-01  1.94E+02  1.65E+00  1.00E-03  1.00E+00
+ 16   8.6403E-01   8.6403E-01  1.00E+00  2.96E-01  3.73E+02  1.73E+00  5.00E-04  1.00E+00
+:TRUST:  Step  2.5E-01 Charge  1.2E-03 (e) CTO  2.5E-03 (e) PW  2.5E-03 (e)
+:DIRM :  MEMORY  9/8  RED ***** PRED  0.30 NEXT  1.80
+:DIRP : |BACK|= 3.059E-08 |PRATT|= 5.328E-07 ANGLE=  19.8 DEGREES
+:DIRQ : |BACK|= 4.767E-08 |PRATT|= 1.229E-06 ANGLE=  29.7 DEGREES
+:DIRT : |BACK|= 5.664E-08 |PRATT|= 1.339E-06 ANGLE=  29.2 DEGREES
+:MIX  :  BACK   REGULARIZATION:  2.00E-04 GREED: 0.86403  BackTr 1.00  0.8640                
+     
+       CHARGES OF MIXED CHARGE DENSITY
+:CTO   : INTERSTITIAL CHARGE  =     6.431642
+:CPC   : INTERSTITIAL CHARGE  =    21.291364
+:CTO001: CHARGE SPHERE   1    =    35.852529
+:CTO002: CHARGE SPHERE   2    =    20.276787
+:CTO003: CHARGE SPHERE   3    =     7.479742
+:CTO004: CHARGE SPHERE   4    =     7.479650
+
+:NEC03: NUCLEAR AND ELECTRONIC CHARGE     85.00000000    85.00000000
+
+PW CHANGE     H    K    L             Current                    Change               Residue
+:PTO001:      0    0    0  7.22219838E-02 0.00000000E+00 -2.401E-10  0.000E+00 -5.757E-07  0.000E+00
+:PTO002:     -1    0    0 -1.72655741E-02 0.00000000E+00 -1.495E-09  0.000E+00 -1.922E-06  0.000E+00
+:PTO003:      0    0   -1 -4.31551687E-03-1.72819639E-04 -3.162E-10 -1.919E-09 -4.804E-07 -8.692E-10
+:PTO004:      0    0    1 -4.31551687E-03 1.72819639E-04 -3.162E-10  1.919E-09 -4.804E-07  8.692E-10
+:PTO005:     -1   -1    0  3.98912694E-02 0.00000000E+00 -6.876E-10  0.000E+00 -1.712E-06  0.000E+00
+:PTO006:     -1    0   -1  3.98878176E-02 4.54111850E-04 -9.367E-10 -2.552E-10 -1.713E-06  2.321E-10
+:PTO007:     -1    0    1  3.98878176E-02-4.54111850E-04 -9.367E-10  2.552E-10 -1.713E-06 -2.321E-10
+:PTO008:     -1   -1   -1  6.58435666E-02-3.30240825E-04  2.844E-10 -1.549E-09 -1.472E-06 -1.528E-10
+:PTO009:     -1   -1    1  6.58435666E-02 3.30240825E-04  2.844E-10  1.549E-09 -1.472E-06  1.528E-10
+:PTO010:     -2    0    0  7.59443399E-02 0.00000000E+00  7.593E-11  0.000E+00 -1.316E-06  0.000E+00
+:PTO011:      0    0   -2  1.89843163E-02 1.12226792E-04  3.282E-11 -2.315E-10 -3.289E-07 -7.562E-11
+:PTO012:      0    0    2  1.89843163E-02-1.12226792E-04  3.282E-11  2.315E-10 -3.289E-07  7.562E-11
+
+:ENE  : ********** TOTAL ENERGY IN Ry =        -8592.21280511
+
+
+ ************************************************************
+          STRESS TENSOR, EQ. (6.187) 
+ ************************************************************
+
+ In Ry/Bohr^3 
+
+:STRESS_RY001:         0.0006150155       -0.0000000000       -0.0000000000
+:STRESS_RY002:        -0.0000000000        0.0006150155       -0.0000000000
+:STRESS_RY003:        -0.0000000000       -0.0000000000        0.0006149165
+
+ In GPa, 10 Kbar = 1 Gpa 
+
+:STRESS_GPa001:         9.04720       -0.00000       -0.00000   total
+:STRESS_GPa002:        -0.00000        9.04720       -0.00000   total
+:STRESS_GPa003:        -0.00000       -0.00000        9.04574   total
+
+:PRESSURE:             9.04671 GPa     total
+
+:FOR001:   1.ATOM       1.026913       0.000000       0.000000       1.026913 total forces
+:FOR002:   2.ATOM       5.158094       0.000000      -0.000000      -5.158094 total forces
+:FOR003:   3.ATOM       1.591916       0.000000       0.000000       1.591916 total forces
+:FOR004:   4.ATOM       1.272709       0.000000       0.000000       1.272709 total forces
+       TOTAL FORCE WITH RESPECT TO THE GLOBAL COORDINATE SYSTEM:
+:FGL001:   1.ATOM                 0.000000000     0.000000000     1.026912601 total forces
+:FGL002:   2.ATOM                 0.000000000    -0.000000000    -5.158094344 total forces
+:FGL003:   3.ATOM                 0.000000000     0.000000000     1.591916246 total forces
+:FGL004:   4.ATOM                 0.000000000     0.000000000     1.272709079 total forces
+:FCHECK:   Sum of forces          0.000000000    -0.000000000     0.006152662

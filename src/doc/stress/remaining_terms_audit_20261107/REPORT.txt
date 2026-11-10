@@ -1,0 +1,112 @@
+REMAINING STRESS TERMS AUDIT - 7 November 2026
+
+Main outcome
+============
+Three demonstrated defects were corrected and installed in local WIEN2k lapw0
+and lcore. The RKMAX=8 SrVO3 eDMFT discrepancy remains unresolved. No dmft2 source
+was changed in this audit. No converged material reference was changed.
+
+Read remaining_terms_audit.pdf (and its LaTeX source) for derivations and exact
+conventions. All GPa comparisons here are mean normal stress, trace/3, already
+including the division by three. Pressure in the conventional sign is minus
+this mean stress.
+
+Installed fixes
+===============
+1. Physical angular momentum is abs(signed WIEN lattice-harmonic label) after
+   the sine/cosine phase has been encoded in complex coefficients. Signed l
+   incorrectly suppressed valid terms in lcore E3 and lapw0 electrostatics.
+2. Full Cartesian, spin-resolved GGA gradient tensor is integrated on the
+   existing XC angular grid. Cross-harmonic, tangential-gradient, and mixed-spin
+   terms are retained. Default is full; WIEN_STRESS_GGA_MODE=LEGACY is diagnostic.
+3. Removed REAL(real8) conversion in lapw0 final electrostatic assembly, which
+   had rounded a large contribution to default single precision.
+
+Tests
+=====
+PASS core polynomial-potential fixture, all five real quadrupoles; max error
+  1.51e-8. Old code lost yz and xy terms of magnitude 0.07283656.
+PASS electrostatic Cartesian angular fixture, density and potential separately
+  and jointly nonspherical; max corrected error 1.68e-8 (old 0.0915291).
+PASS arbitrary spin-gradient metric finite differences, 60 samples, six strain
+  channels; max error 2.56e-10. Rotation/spin equivalence errors ~7e-15.
+PASS metric derivative of native WIEN PBEX/PBEC energy, 40 magnetic samples;
+  max error 1.15e-11.
+PASS combined Coulomb hydrostatic identity after correction:
+  SrVO3 DFT/DMFT residual -0.001478/-0.001478 GPa;
+  FeSe DFT/DMFT residual -0.000452/-0.000452 GPa.
+  FeSe pre-audit residual was -0.065402/-0.057307 GPa.
+PASS independent actual core radial differentiation: only ~0.00290 GPa shift
+  for SrVO3 and ~0.00334 GPa for FeSe, essentially equal in DFT and eDMFT.
+PASS serial builds, two-thread stress, MPI 4 ranks SrVO3 and 2 ranks FeSe.
+PASS installed executables reproduce staged results in all four snapshots.
+PASS ordinary potential and core-density outputs unchanged byte-for-byte at
+  one thread. Two-thread Vns differences <=1e-13 Ry; stress unchanged in output.
+PASS portable patch check/application/idempotence and site-compiler preservation.
+PASS full LAPW0 spin integration: equal-spin representation reproduces the
+  unpolarized tensor, and swapping 65:35 to 35:65 spin densities leaves the
+  tensor invariant, both exactly at the printed 12-decimal precision.
+NOT RESOLVED whole-functional XC scaling: LDA mean residual ~0.01244 GPa;
+  FeSe GGA residual +0.37945 DFT and +0.36776 eDMFT GPa. Native pointwise
+  metric derivatives pass; investigate Euler-potential/radial/boundary consistency.
+NOT RESOLVED analytic versus charge-relaxed numeric eDMFT stress in SrVO3.
+
+Fixed-density shifts from all installed corrections (GPa)
+========================================================
+                 Coulomb+precision  Full-GGA increment  Total
+SrVO3 DFT           +0.000505              0            +0.000505
+SrVO3 eDMFT         +0.002347              0            +0.002347
+FeSe DFT            +0.064950          +0.184193        +0.249143
+FeSe eDMFT          +0.056855          +0.179044        +0.235899
+These are snapshot corrections, not freshly reconverged total-stress/FD pairs.
+The current FeSe snapshots differ from previously archived comparison snapshots.
+
+SrVO3 response-complement convergence at fixed RKMAX=8, window [12,31]
+===================================================================
+Stored bands   Old density assembly   Corrected density assembly
+   43             5.54527 GPa             5.54761 GPa
+  100             6.19649                 6.19884
+  200             6.05060                 6.05295
+  400             6.05411                 6.05645
+  680             6.06958                 6.07193
+Numerical reference: 2.93315 GPa. The larger complement does not fix the error.
+RKMAX controls a different truncation from the stored-band response complement.
+Matrix dimensions 690-713, 75 k-points. The 680-band run still omits 10-33 states.
+SUM and VSUM identical at printed precision; EF changes <3e-14 eV; output SOlapm
+hash identical across all runs. Lower and upper stored complementary bands are
+both included by the code. Increasing bands changes the response, not the
+underlying electronic state.
+
+Installation and rollback
+=========================
+Installed: /Users/haule/wien2k_24/lapw0 and /Users/haule/wien2k_24/lcore.
+Source and executable backups: before/ in this audit directory.
+Exact installed/source hashes: installed_executables.json, source_changes.json.
+MPI executable was built and tested only in scratch, not installed as a new
+production configuration. The material directories and dmft2 are unchanged.
+
+Portable supplement:
+  wien2k_patches/wien2k24_stress_20261102/supplements/remaining_terms_20261107/
+This is an incremental source supplement with known-input hash checks, not a
+claim that the older cumulative installer contains every intervening G1/G2 fix.
+No changes were made on rupc-01.
+
+Reproducibility
+===============
+Structured result files, independent fixture inputs/outputs, source before/after
+hashes, manifests and the exact tested patch are retained here. Execution scripts
+under scripts/ preserve the original scratch locations; they require the user's
+WIEN2k sources and input datasets, and are audit recipes, not a standalone public
+test package. Scratch data and large vectors remain at
+  /private/tmp/stress_remaining_audit_20261107/
+Test input data under snapshots/ excludes large vectors and binaries.
+
+Next priorities
+===============
+(1) Diagnose the whole-functional GGA residual via explicit density derivatives
+    versus the integrated Euler-potential expression, including interfaces.
+(2) SrVO3 is LDA: the tested core/electrostatic defects are far too small. Revisit
+    matched H', O', and normalized-projector derivatives with a converged band
+    complement and retain all stationarity cancellation partners together.
+(3) Isolate genuine radial-wavefunction, linearization-energy, and projector
+    radial-integral responses. No empirical or unmatched radial term was added.

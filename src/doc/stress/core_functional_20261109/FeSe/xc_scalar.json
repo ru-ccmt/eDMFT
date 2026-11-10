@@ -1,0 +1,21 @@
+{
+  "central_XC_energy_Ry": -575.6341443305965,
+  "native_XC_energy_Ry": -575.63414433,
+  "central_error_Ry": -5.965148375253193e-10,
+  "directions": {
+    "probe": {
+      "analytic_XC_defect_Ry": 0.0006857330469497257,
+      "remaining_native_DEN_defect_Ry": 6.71338801829359e-06,
+      "analytic_XC_minus_LDA_density_term_Ry": -0.0016038458741228102,
+      "native_XC_minus_LDA_density_term_Ry": -0.001603846582536761,
+      "XC_minus_LDA_error_Ry": 7.08413950764597e-10
+    },
+    "screened_full_bz": {
+      "analytic_XC_defect_Ry": -0.04313189038692069,
+      "remaining_native_DEN_defect_Ry": -0.00029425248487389283,
+      "analytic_XC_minus_LDA_density_term_Ry": -8.16399208828278,
+      "native_XC_minus_LDA_density_term_Ry": -8.163992007818706,
+      "XC_minus_LDA_error_Ry": -8.046407451445248e-08
+    }
+  }
+}

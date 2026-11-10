@@ -1,0 +1,63 @@
+DmftEnvironment: mpi_prefix.dat does not exist -- running in single-processor mode.
+case= MnO
+root= /Users/haule/dbin
+cixs= [1]
+NOE= 21.0
+opening MnO.scf2
+Ef= 6.6095090826747
+Found DMFT-mu= 6.609509262416999
+DmftEnvironment: mpi_prefix.dat does not exist -- running in single-processor mode.
+case= MnO
+root= /Users/haule/dbin
+cixs= [1]
+NOE= 21.0
+opening MnO.scf2
+Ef= 6.6095090826747
+Found DMFT-mu= 6.609509262416999
+nargs= 1
+argi=dmft2.def
+ OpeningMnO.outputdmf2                                                                                                                                                                      
+DmftEnvironment: mpi_prefix.dat does not exist -- running in single-processor mode.
+case= MnO
+root= /Users/haule/dbin
+cixs= [1]
+NOE= 21.0
+opening MnO.scf2
+Ef= 6.6095090826747
+Found DMFT-mu= 6.609509262416999
+nargs= 1
+argi=dmft2.def
+ OpeningMnO.outputdmf2                                                                                                                                                                      
+DmftEnvironment: mpi_prefix.dat does not exist -- running in single-processor mode.
+case= MnO
+root= /Users/haule/dbin
+cixs= [1]
+NOE= 21.0
+opening MnO.scf2
+Ef= 6.6095090826747
+Found DMFT-mu= 6.609509262416999
+nargs= 1
+argi=dmft2.def
+ OpeningMnO.outputdmf2                                                                                                                                                                      
+DmftEnvironment: mpi_prefix.dat does not exist -- running in single-processor mode.
+case= MnO
+root= /Users/haule/dbin
+cixs= [1]
+NOE= 21.0
+opening MnO.scf2
+Ef= 6.6095090826747
+Found DMFT-mu= 6.609509262416999
+nargs= 1
+argi=dmft2.def
+ OpeningMnO.outputdmf2                                                                                                                                                                      
+DmftEnvironment: mpi_prefix.dat does not exist -- running in single-processor mode.
+case= MnO
+root= /Users/haule/dbin
+cixs= [1]
+NOE= 21.0
+opening MnO.scf2
+Ef= 6.6095090826747
+Found DMFT-mu= 6.609509262416999
+nargs= 1
+argi=dmft2.def
+ OpeningMnO.outputdmf2                                                                                                                                                                      

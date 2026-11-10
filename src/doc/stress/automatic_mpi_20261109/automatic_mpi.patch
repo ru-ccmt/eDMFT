@@ -1,0 +1,431 @@
+--- /dev/null
++++ b/src/python/response_mpi.py
+@@ -0,0 +1,194 @@
++"""Choose response MPI launchers without making each case carry a JSON file.
++
++The caller supplies DmftEnvironment.MPI2, which already honors mpi_prefix.dat2
++before mpi_prefix.dat. Native Fortran workers inherit that exact argument list.
++Python's mpi4py can be linked to a DIFFERENT MPI implementation (in particular,
++conda MPICH versus Homebrew Open MPI on macOS). Reusing the wrong launcher can
++start independent singletons or hang, so a plain local launch is translated to
++a verified launcher from the active Python environment, retaining its rank count.
++
++Host/scheduler/binding arguments must never disappear in that translation.
++Matching MPI implementations retain the complete prefix; scheduler launchers
++retain the site's prefix. Cross-implementation translation of a complex prefix
++requires an explicit solver.mpi override. An explicit [] means serial. These
++choices affect execution only, not the stress formulas or physical inputs.
++"""
++from functools import lru_cache
++from pathlib import Path
++import json
++import os
++import re
++import shlex
++import shutil
++import subprocess
++import sys
++
++
++def argument_list(value, label):
++    """Response subprocesses use argv, never shell expansion or evaluation."""
++    if not isinstance(value, list) or any(not isinstance(x, str) or not x for x in value):
++        raise ValueError(label + ' must be an explicit argument list')
++    if any(any(c in x for c in '$;|><\n\r') for x in value):
++        raise ValueError(label + ' must not contain shell expansions or operators')
++    return list(value)
++
++
++def _family(text):
++    name = text.lower()
++    if 'intel' in name and 'mpi' in name:
++        return 'intel'
++    if 'mvapich' in name:
++        return 'mvapich'
++    if 'open mpi' in name or 'openrte' in name or 'open-mpi' in name:
++        return 'openmpi'
++    if 'mpich' in name or 'hydra build details' in name:
++        return 'mpich'
++    return None
++
++
++@lru_cache(maxsize=4)
++def python_mpi_family(executable):
++    """Probe in a short child WITHOUT MPI_Init in the launcher's parent.
++
++    Initializing MPI here would create progress threads and make subsequent
++    native subprocess/fork execution unsafe. MPI library identification is
++    permitted before initialization; mpi4py's automatic init is disabled.
++    """
++    code = (
++        'import mpi4py; mpi4py.rc.initialize=False; mpi4py.rc.finalize=False; '
++        'from mpi4py import MPI; import json; '
++        'print(json.dumps(MPI.get_vendor()[0]))'
++    )
++    env = os.environ | {'PYTHONDONTWRITEBYTECODE': '1'}
++    try:
++        result = subprocess.run([executable, '-c', code], capture_output=True,
++                                text=True, env=env, timeout=10, check=True)
++        vendor = json.loads(result.stdout.strip())
++    except (OSError, subprocess.SubprocessError, ValueError) as error:
++        raise ValueError('Cannot identify mpi4py in the active Python environment; '
++                         'install its compatible MPI runtime or set solver.mpi explicitly') from error
++    family = _family(vendor)
++    if family is None:
++        raise ValueError('Unrecognized Python MPI implementation '+repr(vendor)+
++                         '; set solver.mpi explicitly')
++    return family
++
++
++@lru_cache(maxsize=32)
++def launcher_family(executable):
++    try:
++        result = subprocess.run([executable, '--version'], capture_output=True,
++                                text=True, timeout=5, check=True)
++    except (OSError, subprocess.SubprocessError):
++        return None
++    return _family(result.stdout + '\n' + result.stderr)
++
++
++def _executable(name):
++    expanded = os.path.expanduser(name)
++    if '/' in expanded:
++        p = Path(expanded)
++        return str(p.resolve()) if p.is_file() and os.access(p, os.X_OK) else None
++    return shutil.which(expanded)
++
++
++def plain_local_ranks(command):
++    """Recognize only a local mpiexec/mpirun plus one explicit rank count.
++
++    This deliberately excludes hostfiles, placement, environment assignments,
++    scheduler wrappers and MPMD syntax. Silently discarding any of them can
++    turn a cluster job into hundreds of ranks on its login node.
++    """
++    if not command or Path(command[0]).name not in ('mpiexec', 'mpirun', 'mpiexec.hydra'):
++        return None
++    args = command[1:]
++    number = None
++    if len(args) == 2 and args[0] in ('-n', '-np', '--np', '--ntasks'):
++        number = args[1]
++    elif len(args) == 1:
++        match = re.fullmatch(r'(?:-np|-n|--np=|--ntasks=)([0-9]+)', args[0])
++        number = match[1] if match else None
++    return int(number) if number and number.isdigit() and int(number) > 0 else None
++
++
++def _matching_launcher(family):
++    # Prefer the runtime installed beside this Python. PATH is a fallback,
++    # but every candidate is checked; its filename alone proves nothing.
++    directories = [Path(sys.executable).parent, Path(sys.prefix)/'bin']
++    candidates = [str(d/name) for d in directories for name in ('mpiexec', 'mpirun')]
++    candidates += [shutil.which(name) for name in ('mpiexec', 'mpirun')]
++    seen = set()
++    for candidate in candidates:
++        if not candidate:
++            continue
++        executable = _executable(candidate)
++        if executable and executable not in seen:
++            seen.add(executable)
++            if launcher_family(executable) == family:
++                return executable
++    raise ValueError('No launcher matching Python MPI ('+family+
++                     ') was found; activate a compatible environment or set solver.mpi')
++
++
++def _site_allocation():
++    """A bare rank count can still mean a multi-node job through environment."""
++    return any(os.environ.get(key) for key in (
++        'SLURM_JOB_ID', 'SLURM_JOBID', 'PBS_JOBID', 'LSB_JOBID',
++        'COBALT_JOBID', 'LOADL_STEP_ID', 'HYDRA_HOST_FILE', 'MPICH_HOSTFILE',
++        'I_MPI_HYDRA_HOST_FILE', 'OMPI_MCA_orte_default_hostfile',
++        'PRTE_MCA_prte_default_hostfile',
++    ))
++
++
++def automatic_python_launch(native):
++    if not native:
++        return []
++    family = python_mpi_family(sys.executable)
++    name = Path(native[0]).name
++    # Schedulers launch the site's configured PMI/PMIx environment. Preserve
++    # their allocation, task-count, affinity and transport options verbatim.
++    if name in ('srun', 'aprun', 'jsrun', 'ibrun'):
++        return list(native)
++    if name not in ('mpiexec', 'mpirun', 'mpiexec.hydra'):
++        raise ValueError('Cannot automatically adapt MPI wrapper '+repr(native[0])+
++                         '; set solver.mpi to its Python-compatible argument list')
++    executable = _executable(native[0])
++    actual = launcher_family(executable) if executable else None
++    ranks = plain_local_ranks(native)
++    if actual == family:
++        launch = list(native)
++    elif ranks is not None and not _site_allocation():
++        launch = [_matching_launcher(family), '-n', str(ranks)]
++    else:
++        raise ValueError('Native/Python MPI implementations differ or cannot be verified; '
++                         'cannot translate host/binding options or a site allocation safely. '
++                         'Set solver.mpi explicitly')
++    # Local conda MPICH/OFI on this Mac spent two CPU cores per rank polling
++    # while idle. The TCP provider removes that overhead, and passed both MPI
++    # response tests and a full SrVO3 run. Do NOT force TCP on Linux clusters,
++    # multi-host launches, explicit JSON commands or a user-selected provider.
++    if (sys.platform == 'darwin' and family == 'mpich' and ranks is not None
++            and not _site_allocation()
++            and not os.environ.get('FI_PROVIDER')
++            and not any('FI_PROVIDER' in word for word in launch)):
++        launch[1:1] = ['-genv', 'FI_PROVIDER', 'tcp']
++    return launch
++
++
++def resolve_launches(prefix, solver, *, analytic=True):
++    """Return Python and native argv, honoring independent explicit overrides.
++
++    No prefix means serial by default. JSON keys are optional, and presence
++    (including []) wins over inference. The native backend retains its previous
++    launch semantics; only the analytic backend needs Python MPI detection.
++    """
++    # If both commands are supplied, an arbitrary historical shell prefix for
++    # ordinary dmft2 need not be interpreted by this separate response path.
++    need_prefix = 'mpi' not in solver or 'native_mpi' not in solver
++    native_default = argument_list(shlex.split(prefix), 'MPI prefix') if need_prefix else []
++    native = argument_list(solver.get('native_mpi', native_default), 'solver.native_mpi')
++    if 'mpi' in solver:
++        python = argument_list(solver['mpi'], 'solver.mpi')
++    else:
++        python = automatic_python_launch(native_default) if analytic else native_default
++    return python, native
+--- a/src/python/dmft2_step.py
++++ b/src/python/dmft2_step.py
+@@ -324,16 +324,12 @@
+         .expanduser()
+         .resolve()
+     )
+-    # The Python response and native workers may use different MPI builds.
+-    # Keep explicit launch lists: for example MPICH mpi4py and Open MPI Fortran.
+-    # MPI settings never change the caller's ordinary dmft2 launch.
+-    launch = solver.get("mpi", [] if backend == "analytic" else shlex.split(mpi))
+-    if not isinstance(launch, list) or any(not isinstance(x, str) for x in launch):
+-        raise ValueError("solver.mpi must be an argument list")
+-    if any("$" in x or any(t in x for t in [";", "|", ">", "<"]) for x in launch):
+-        raise ValueError(
+-            "set solver.mpi to explicit arguments, without shell expansions"
+-        )
++    # Inherit the ordinary dmft2 MPI prefix automatically. Python's mpi4py
++    # and the Fortran workers may link different MPI implementations, so the
++    # shared resolver verifies/adapts the Python launcher without changing
++    # the ordinary dmft2 command. Explicit JSON argv lists still override it.
++    from response_mpi import resolve_launches
++    launch, native_launch = resolve_launches(mpi, solver, analytic=backend == "analytic")
+     for p in [wi / "x", wi / "lapw1", wi / "lapw1c", exe]:
+         if not p.is_file() or not os.access(p, os.X_OK):
+             raise ValueError(f"missing executable: {p}")
+@@ -357,12 +353,6 @@
+             raise ValueError(
+                 "solver.basis_cache_mb must be a nonnegative per-rank budget"
+             )
+-        native_launch = solver.get("native_mpi", [])
+-        if not isinstance(native_launch, list) or any(
+-            not isinstance(x, str) or any(c in x for c in "$;|><")
+-            for x in native_launch
+-        ):
+-            raise ValueError("solver.native_mpi must be an explicit argument list")
+         legacy = set(solver) & {"strain", "probe_step", "tolerance", "max_iterations"}
+         if legacy:
+             raise ValueError(
+@@ -399,6 +389,7 @@
+         "wien_root": str(wi),
+         "dmft2": str(exe),
+         "mpi": launch,
++        "native_mpi": native_launch,
+         "charge_integration": solver.get("charge_integration", "native"),
+     }
+ 
+@@ -411,6 +402,12 @@
+     directly, avoiding recursive x_dmft/run_dmft response execution.
+     """
+     solver = preflight(case, req, root, mpi)
++    if solver.get("backend") == "analytic":
++        for label, key in [("Python", "mpi"), ("native", "native_mpi")]:
++            command = solver.get(key, [])
++            print("RESPONSE ..... " + label + " MPI: " +
++                  (shlex.join(command) if command else "serial"),
++                  file=output, flush=True)
+     base = (
+         Path(req["config"].get("workspace_root", f"{case}.response_runs"))
+         .expanduser()
+@@ -469,6 +466,7 @@
+     scripts = {}
+     for module in [
+         "response_parallel",
++        "response_mpi",
+         "lapw_response_policy",
+         "dmft2_spin",
+         "lapw_magnetic_response",
+--- a/src/python/x_dmft.py
++++ b/src/python/x_dmft.py
+@@ -379,7 +379,8 @@
+     parser.add_option("--execute-only", action="store_true", default=False,
+                       help="dmft2: execute existing DEF/input/split sigma files without preparing them")
+     parser.add_option("--response-config", default=None,
+-                      help="dmft2 response JSON (default: case.stress_response.json)")
++                      help="optional dmft2 response overrides (default: case.stress_response.json); "
++                           "response MPI otherwise inherits mpi_prefix.dat2 or mpi_prefix.dat")
+     parser.add_option("--no-response", action="store_true", default=False,
+                       help="dmft2: suppress response for this standalone execution")
+     # Next, parse the arguments
+--- a/src/python/tests/test_analytic_stress_integration.py
++++ b/src/python/tests/test_analytic_stress_integration.py
+@@ -74,21 +74,24 @@
+ 
+ 
+ class IntegrationTests(unittest.TestCase):
+-    def test_analytic_defaults_serial_but_preserves_production_mpi(self):
++    def test_analytic_inherits_mpi_but_explicit_serial_still_wins(self):
+         with fixture() as (root, bin, wi, req):
+             structure = SimpleNamespace(
+                 a=4., b=5., c=6., lattyp="P", alpha=90.0, beta=90.0, gamma=90.0, ReadStruct=lambda _: None
+             )
+             with patch("wstruct.Struct", return_value=structure), patch(
+                 "lapw_total_stress.invariant_strains"
+-            ):
++            ), patch("response_mpi.automatic_python_launch",
++                     return_value=["python-mpiexec", "-n", "4"]):
+                 result = step.preflight("sample", req, bin, "mpirun -np 4")
+                 self.assertEqual(result["backend"], "analytic")
++                self.assertEqual(result["mpi"], ["python-mpiexec", "-n", "4"])
++                self.assertEqual(result["native_mpi"], ["mpirun", "-np", "4"])
++                self.assertEqual(result["lapw1_worker"], str(bin / "lapw1_response"))
++                req["config"]["solver"]["mpi"] = []
++                result = step.preflight("sample", req, bin, "mpirun -np 4")
+                 self.assertEqual(result["mpi"], [])
+-                self.assertEqual(result["lapw1_worker"], str(bin / "lapw1_response"))
+-                req["config"]["solver"]["mpi"] = ["mpirun", "-np", "4"]
+-                result = step.preflight("sample", req, bin, "mpirun -np 4")
+-                self.assertEqual(result["mpi"], ["mpirun", "-np", "4"])
++                self.assertEqual(result["native_mpi"], ["mpirun", "-np", "4"])
+ 
+     def test_preparation_and_driver_are_isolated_then_ready_not_applied(self):
+         with fixture() as (root, bin, wi, req):
+--- /dev/null
++++ b/src/python/tests/test_response_mpi.py
+@@ -0,0 +1,119 @@
++"""MPI inference must preserve rank counts, allocation and explicit choices."""
++import os
++import unittest
++from contextlib import contextmanager
++from unittest.mock import patch
++import response_mpi as mpi
++
++
++@contextmanager
++def runtimes(python='mpich', native='openmpi', platform='darwin'):
++    with patch.object(mpi, 'python_mpi_family', return_value=python), \
++         patch.object(mpi, 'launcher_family', return_value=native), \
++         patch.object(mpi, '_executable', side_effect=lambda x: x), \
++         patch.object(mpi, '_matching_launcher', return_value='/python/bin/mpiexec'), \
++         patch.object(mpi.sys, 'platform', platform), \
++         patch.dict(os.environ, {}, clear=True):
++        yield
++
++
++class AutomaticMPI(unittest.TestCase):
++    def test_serial_does_not_probe_mpi4py(self):
++        with patch.object(mpi, 'python_mpi_family') as probe:
++            self.assertEqual(mpi.resolve_launches('', {}), ([], []))
++            probe.assert_not_called()
++
++    def test_explicit_commands_override_even_shell_prefix(self):
++        with patch.object(mpi, 'python_mpi_family') as probe:
++            self.assertEqual(mpi.resolve_launches('env X=1; site-wrapper',
++                             {'mpi': [], 'native_mpi': ['wrapper', '4']}),
++                             ([], ['wrapper', '4']))
++            probe.assert_not_called()
++
++    def test_explicit_serial_python_still_inherits_native(self):
++        with patch.object(mpi, 'python_mpi_family') as probe:
++            self.assertEqual(mpi.resolve_launches('mpirun -np 6', {'mpi': []}),
++                             ([], ['mpirun', '-np', '6']))
++            probe.assert_not_called()
++
++    def test_local_mixed_runtimes_preserve_rank_count_and_native_command(self):
++        with runtimes():
++            python, native = mpi.resolve_launches('/native/mpirun -np 6', {})
++        self.assertEqual(python, ['/python/bin/mpiexec', '-genv', 'FI_PROVIDER',
++                                  'tcp', '-n', '6'])
++        self.assertEqual(native, ['/native/mpirun', '-np', '6'])
++
++    def test_matching_mpi_preserves_hosts_and_binding(self):
++        prefix = 'mpirun -np 240 --hostfile "two hosts" --bind-to core'
++        with runtimes(python='openmpi', platform='linux'):
++            python, native = mpi.resolve_launches(prefix, {})
++        self.assertEqual(python, native)
++        self.assertEqual(python[3:], ['--hostfile', 'two hosts', '--bind-to', 'core'])
++
++    def test_mismatched_cluster_options_never_disappear(self):
++        with runtimes():
++            for prefix in ('mpirun -np 240 --hostfile nodes',
++                           'mpirun -np 4 --bind-to core', 'mpirun'):
++                with self.subTest(prefix=prefix), self.assertRaisesRegex(
++                        ValueError, 'cannot translate host/binding'):
++                    mpi.resolve_launches(prefix, {})
++
++    def test_scheduler_options_pass_through(self):
++        with runtimes(platform='linux'):
++            python, native = mpi.resolve_launches('srun -n 240 --mpi=pmix', {})
++        self.assertEqual(python, ['srun', '-n', '240', '--mpi=pmix'])
++        self.assertEqual(python, native)
++
++    def test_mismatched_bare_prefix_inside_allocation_is_not_local(self):
++        with runtimes(platform='linux'), patch.dict(os.environ, {'SLURM_JOB_ID': '42'}):
++            with self.assertRaisesRegex(ValueError, 'site allocation'):
++                mpi.resolve_launches('mpirun -np 240', {})
++
++    def test_native_override_does_not_change_python_rank_count(self):
++        with runtimes(platform='linux'):
++            python, native = mpi.resolve_launches('mpirun -n 6', {'native_mpi': []})
++        self.assertEqual(python, ['/python/bin/mpiexec', '-n', '6'])
++        self.assertEqual(native, [])
++
++    def test_tcp_is_not_forced_on_linux_or_over_explicit_provider(self):
++        with runtimes(platform='linux'):
++            python, _ = mpi.resolve_launches('mpirun -n 4', {})
++        self.assertNotIn('FI_PROVIDER', python)
++        with runtimes(), patch.dict(os.environ, {'FI_PROVIDER': 'custom'}):
++            python, _ = mpi.resolve_launches('mpirun -n 4', {})
++        self.assertNotIn('FI_PROVIDER', python)
++        with runtimes(native='mpich'):
++            python, _ = mpi.resolve_launches('mpiexec -genv FI_PROVIDER custom -n 4', {})
++        self.assertEqual(python, ['mpiexec', '-genv', 'FI_PROVIDER', 'custom', '-n', '4'])
++
++    def test_explicit_python_command_is_not_rewritten(self):
++        command = ['mpiexec', '-n', '4']
++        with runtimes():
++            python, _ = mpi.resolve_launches('mpirun -n 6', {'mpi': command})
++        self.assertEqual(python, command)
++        self.assertIsNot(python, command)
++
++    def test_unknown_wrapper_needs_explicit_python_command(self):
++        with runtimes(), self.assertRaisesRegex(ValueError, 'MPI wrapper'):
++            mpi.resolve_launches('site-wrapper 6', {})
++
++    def test_shell_expansion_rejected_before_launch(self):
++        for prefix in ('mpirun -n $RANKS', 'mpirun -n 4; echo bad'):
++            with self.subTest(prefix=prefix), self.assertRaises(ValueError):
++                mpi.resolve_launches(prefix, {})
++
++    def test_legacy_backend_does_not_probe_python_mpi(self):
++        with patch.object(mpi, 'python_mpi_family') as probe:
++            python, native = mpi.resolve_launches('mpirun -np 6', {}, analytic=False)
++            self.assertEqual(python, native)
++            probe.assert_not_called()
++
++    def test_local_count_syntax_and_no_implicit_count(self):
++        for args in (['-n', '4'], ['-np4'], ['--np=4']):
++            self.assertEqual(mpi.plain_local_ranks(['mpirun', *args]), 4)
++        for args in ([], ['-n', '0'], ['-np', '4', '--host', 'node']):
++            self.assertIsNone(mpi.plain_local_ranks(['mpirun', *args]))
++
++
++if __name__ == '__main__':
++    unittest.main()

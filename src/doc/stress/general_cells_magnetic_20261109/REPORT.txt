@@ -1,0 +1,259 @@
+GENERAL CELLS, MAGNETIC RESPONSE, AND WINDOW-CUT DIAGNOSTICS
+2026-11-09 -- staged work; not installed
+
+Current comparison (mean tensile stress, GPa)
+--------------------------------------------
+Material       Analytic         Numerical       Absolute difference
+SrVO3          +2.93395515      +2.93315290      .00080225
+MnTe           -.66817537       -.66720930      .00096607
+MnO           -72.31416075     -72.35171059      .03754984
+
+SrVO3 is a regression against its earlier converged numerical reference.
+MnTe and MnO are new diagnostic hydrostatic tests on isolated snapshots;
+window-degeneracy omission and snapshot consistency limit their status.
+MnO preserves fixed mu and INM=NO; MnTe uses common fixed N and INM=YES.
+Full tensor publication and magnetic launcher integration remain unfinished.
+
+Scope and permission
+--------------------
+All edits are under /private/tmp/edmft_general_cells_20261109/stage.
+No production source, ~/dbin file, or live material calculation was changed.
+Native tests ran in isolated copies of the six material directories. A single
+native update was performed on saved densities; these are NOT newly converged
+endpoint calculations. The patch requires approval before installation, under
+the user's instruction: "Do not change my source code before asking".
+
+Physical conventions
+--------------------
+Here eta strains all three lengths by (1+eta). Mean tensile stress is
+  sigma_bar = [dK/deta]/(3 Omega).
+Compression-positive thermodynamic pressure is -sigma_bar. Every GPa number
+below uses this convention. A separate window contribution is NOT an additive
+correction to an already assembled total stress.
+
+1. Fixed-band window: what was measured
+--------------------------------------
+The default projector/window scheme is unchanged. In the staged diagnostic,
+only inverse energy denominators with |epsilon_in-epsilon_out| <= cutoff are
+replaced by zero. Central eigenvectors, band membership, projectors, X, k-point
+weights and densities remain unchanged. The regular pairs at an affected k
+point remain included. Diagnostic contexts cannot publish a total stress.
+Default strict validation still rejects an unresolved window degeneracy.
+The existing native DMFT2 code already skips denominators <=1e-10 Ry in its
+window response; this is not a newly proposed physical regularization.
+
+MnO: upper cut 16/17 is degenerate at k points 1--8 (nine omitted pairs).
+MnTe: upper cut 51/52 is degenerate at k points 4,97--100.
+
+Window-plus-normalization component contracted against endpoint-derived H/O:
+  MnO: +34.0899437023 GPa, unchanged for cutoffs 1e-12 through 1e-3 Ry.
+  MnTe: raising cutoff to 1e-4 Ry changes the spin-averaged component by
+        about +7.49e-7 GPa; individual spin changes largely cancel.
+
+Dropping ALL window-motion terms at affected k points instead changes that
+component by -8.02799737 GPa (MnO) and +0.002788667 GPa (MnTe).
+Do not interpret these as changes of the full screened total stress. In
+particular, discarding whole k points is not justified by these results.
+
+Finite random rotations within the cut-degenerate cluster, recomputing X,
+changed the frozen-Sigma lattice scalar by at most 2.2355e-7 Ry for MnO and
+about 1.6254e-8 Ry for spin-averaged MnTe in the sampled tests. Dividing these
+finite gauge changes by h*3*Omega (h=.001) gives scales .00740 and .000118 GPa.
+These are neither rigorous bounds nor measured stress derivatives. At an exact
+cut degeneracy the unregularized fixed-subspace derivative is not unique;
+a cutoff plateau alone does not establish differentiability.
+
+Complete screened MnO diagnostic (fixed mu, actual INM=NO policy):
+  cutoff 1e-10 Ry: sigma_bar = -72.3141607458 GPa
+  cutoff 1e-4 Ry:  sigma_bar = -72.3141607458 GPa (unchanged).
+  dK/deta = -2.18435048600 Ry
+  explicit = -.707104887509 Ry; induced = -1.47724559849 Ry.
+The saved endpoint reference is -72.3517105902 GPa, a difference of .03755 GPa.
+
+Complete screened MnTe diagnostic (shared fixed N, actual INM=YES policy):
+  cutoff 1e-10 Ry: sigma_bar = -.668175369232 GPa
+  cutoff 1e-4 Ry:  sigma_bar = -.668175086755 GPa
+  cutoff sensitivity = +2.8248e-7 GPa.
+The saved endpoint reference is -.667209300357 GPa, a difference of .000966 GPa.
+One common adjoint serves both magnetic branches. The two complete runs took
+503 and 478 seconds on four MPI ranks, including preparation; these overlapped
+other diagnostics, so the timings are not controlled scaling benchmarks.
+
+Important correction to the initial diagnostic: MnO uses INM=NO, but the
+first harness incorrectly enabled charge normalization, producing +1.00584
+GPa. That result and its apparent +73.3 GPa adjoint residual correction belong
+to the WRONG charge map and are superseded. Matching the actual policy removes
+the large analytic/numerical discrepancy without changing the user calculation.
+The staged loader records INM and the screened-state adapter now rejects a
+normalization-policy mismatch instead of silently differentiating another map.
+
+These remain diagnostic hydrostatic results, not production-approved complete
+tensors: omission at an exact window degeneracy still needs controlled checks,
+MnTe's density residual exceeds the current publication threshold, and MnO's
+central/end-point chemical potentials differ slightly. Numerical agreement with
+a fixed-mu calculation does not by itself establish its desired physical
+fixed-particle-number pressure.
+
+Evidence: window_probe.json, total_probe_MnO.json, spin_compensation.json,
+          total_probe_MnTe.json (fixed-N magnetic test).
+
+2. MnO inputs and fixed-mu sensitivity
+-------------------------------------
+All three MnO IN1 reference energies now agree: .485779237133333 Ry.
+The captured EF.dat values are center 6.6083422596215815 eV and endpoints
+6.609509262416999 eV (difference 1.167 meV). Do not confuse IN1's radial-search
+reference energy with the interacting chemical potential in EF.dat.
+
+At fixed saved density/potential and frozen Sigma, evaluating the endpoint
+lattice scalars with a common mu shifted by +/-1 meV changes the numerical
+stress estimate by approximately -/+ .0186424 GPa; +/-10 meV gives
+-/+ .18642 GPa. This is a sensitivity test, not a relaxed correction or a
+thermodynamic compressibility calculation. At the common reference mu,
+valence N was 21.00070181 (center), 20.99271755 (minus), 21.00804087 (plus).
+The charge error is small but its strain dependence is measurable.
+
+For K_mu=Omega_Sigma+mu*N_target, partial_mu K_mu=N_target-N. If mu changes
+along a path, its extra contribution is (N_target-N)*dmu/deta. At strictly
+fixed mu this path term vanishes. The code already includes its mu*N and
+charge bookkeeping; appending an independent mu*dN term would double count.
+No chemical-potential or particle-number policy was changed.
+
+3. Geometry and native convention fixes in the staged patch
+----------------------------------------------------------
+New lapw_lattice.py reuses wlatgen.Latgen and keeps BR1 (stored G labels) and
+BR2 (primitive reciprocal basis) distinct. It provides Cartesian reciprocal
+momenta, primitive volume, fractional-to-Cartesian rotations and centering
+translations for P/S/F/B/H/R/CXY/CXZ/CYZ. Centered FFT masks use the allowed
+reflection projector; conventional volume is not substituted for primitive
+volume. Tests exercise arbitrary symmetric deformations of these maps.
+
+Additional native conventions needed by these cases:
+* Hexagonal PBE uses WIEN's 21-point finite-difference stencil, versus 27 points
+  for the other tested FFT geometry, with the full Cartesian cell metric.
+* Cubic harmonic input compression, XC output expansion and the C^T C energy
+  pairing are distinct maps. The nonspherical Hamiltonian uses the matching
+  native CBCOMB convention as well.
+* DMFT2 puts the identity symmetry first before ROTDEF. Reconstructing the
+  same charge symmetry is insufficient: the raw local projector gauge must
+  also match that actual ordering.
+* Native ROTDEF repairs finite-precision symmetry-equivalent positions.
+  Reproducing this in memory removes errors from STRUCT fractions such as 1/3;
+  no STRUCT file is edited.
+
+Empty stored-band degeneracy is separate from a DMFT-window degeneracy.
+Complement solves omit only columns independently proven thermally empty and
+outside the DMFT window, with charge and slope bounds below 1e-12. Occupied or
+DMFT-window columns cannot be disabled. The stored space itself is unchanged.
+
+Coverage is not yet universal production stress support. Native F-cell MnO
+and H-cell MnTe were tested. B/R/centered monoclinic cells have geometry tests,
+not full material stress comparisons. General shear publication is still
+rejected when symmetry permits shear; it must not silently return zero.
+
+4. Magnetic response and chemical-potential workflow
+---------------------------------------------------
+User clarification verified in all three MnTe params.dat files:
+  recomputeEF=1; MnTe uses adjusting mu, NOT a fixed-mu insulator policy.
+Changing EF.dat across strained structures is expected here. The initial
+fixed-mu MnTe stress job was stopped and replaced by a fixed-N job.
+
+The existing run_dmft.py workflow is preserved:
+* Ordinary compensated magnet: first dmft2 spin updates mu; second uses it.
+* Ferro=True with adjusting mu: FermiF computes the common EF before dmft2;
+  both calls then reuse it. The response must not infer fixed-mu physics just
+  because the individual Ferro dmft2 inputs temporarily use recomputeEF=0.
+
+The staged low-level response treats the two electronic branches separately,
+with one common unpolarized KS potential, core response, charge normalization,
+HXC kernel and screened adjoint. Native branch quantities contain a factor of
+2, so physical spin sums are represented by (branch_up+branch_down)/2.
+This is normalization bookkeeping, NOT an assumption of equal spin densities.
+
+For an arbitrary magnetic state:
+  delta N_up + delta N_down = 0,
+not delta N_up=delta N_down and not separate conservation of each population.
+The magnetization can respond. MnTe's hydrostatic compensated altermagnetic
+state should additionally respect its spin-interchanging symmetry. The central
+exports have physical valence N_up=30.9999999878 and N_down=31.0000068780:
+a residual imbalance of -6.89e-6 electrons, with exactly the same exported mu.
+A full strain-induced magnetization check remains to be done.
+
+If E_mu is the independent fixed-mu block response, z=d(rho_coeff)/dmu,
+b.x=delta N at fixed mu, and chi=dN/dmu, the shared constraint is
+  E_N x = E_mu x - z (b.x)/chi.
+The number covector includes Tr(rho O') as well as Tr(delta rho_coeff).
+The transpose and MPI reductions use exactly the same rank-one term. Half
+factors from native spin normalization cancel in delta mu. No impurity vertex
+or spin-dependent DFT potential is introduced.
+
+Automatic export/launcher and magnetic total-stress publication are not yet
+extended by this patch. The prepared two-spin response is available for
+controlled diagnostics; a guard prevents accidental production publication.
+
+5. Validation and remaining discrepancies
+-----------------------------------------
+283 component tests passed, including native radial/core libraries, lattice
+maps, cubic coordinates, hexagonal XC derivatives, magnetic shared-number and
+transpose tests, window diagnostics, and empty-complement degeneracy tests.
+A nonlinear two-endpoint common-mu test with unequal spin populations also
+agrees with the analytic shared-number tangent; compensation is not assumed.
+A first rerun omitted the native-library environment and failed to load two
+libraries; the final run with the correct environment has no failures/skips.
+
+Native agreement:
+* MnO central Hamiltonian relative error 9.59e-13, overlap 4.41e-13.
+* Native scalar C_DEN: MnO error -3.74e-9 Ry; MnTe -2.32e-9 Ry, at printed
+  native precision. Independent neutral-density LAPW0 finite differences
+  agree at roughly 1e-6 Ry derivative accuracy (limited by printed energies).
+* Native valence density reconstruction: MnO 1.14e-12, MnTe spin average
+  1.14e-10 relative error. Native core reconstruction below 2e-13.
+* Complete charge-map transpose tests: MnO 2.9e-14; two-spin MnTe 1.9e-14.
+  The latter native test used fixed mu; shared fixed-N also has unit tests.
+* SrVO3 end-to-end MPI-4 regression: mean tensile stress 2.933955149924 GPa,
+  versus previous 2.933955149891; difference <4e-11 GPa. Its previous numerical
+  result is 2.933152904042 GPa. Timing here overlaps other jobs and is not a
+  speed benchmark.
+
+Independent reconstruction from fresh one-pass endpoint exports gives
+  MnO numerical mean stress:  -72.3517105902 GPa
+  MnTe numerical mean stress:  -0.6672093004 GPa.
+These agree with the previous endpoint postprocessing. After matching the
+response ensemble and INM policy, the analytic/numerical discrepancies are
+small; neither whole-k deletion nor a change of projector scheme was needed.
+
+Central fixed-point residual norms in native density coordinates (not electron
+counts): MnO .00036333 (INM=NO); MnTe .00503141 (INM=YES). The current publication tolerance is
+.001, so the MnTe central snapshot fails it. Endpoint residuals are recorded
+in fixedpoint_probe.json. Passing native reconstruction checks does not prove
+SCF convergence. Tighter fixed points and consistent central mu are needed to assign a final
+precision to the remaining small analytic/numerical differences.
+
+Next work after this reviewed stage
+----------------------------------
+1. The fixed-N MnTe cutoff test is complete and agrees closely with the saved
+   numerical reference. Keep omission results diagnostic; test the full
+   strain-induced magnetic compensation before claiming that symmetry check.
+2. Establish tighter, consistent central/end-point fixed points, especially
+   MnTe, and consistent central mu for MnO. Preserve each actual INM policy.
+   Test the remaining symmetry-allowed strain sources against native derivatives.
+3. Integrate two-spin export/loading with the existing run_dmft.py EF workflow;
+   select fixed-N from the physical policy, not temporary per-call flags.
+4. Validate all symmetry-allowed strain directions and general shear before
+   enabling broader publication. No projector-window redesign is proposed yet.
+
+Artifacts
+---------
+general_cells_magnetic_diagnostic.patch : proposed production changes
+manifest.json                          : before/after hashes and source checks
+stage/                                 : tested candidate Python sources
+base/                                  : untouched pre-change source snapshots
+*_probe.json and native/                : independent test evidence
+SrVO3_regression/report.json            : end-to-end nonmagnetic regression
+regression_final.log                   : successful component suite
+
+Superseded evidence
+-------------------
+Files prefixed superseded_normalization_ and MnO_stationarity_adjoint.npz
+refer to the intentionally superseded INM=YES MnO harness. They are retained
+only to document the diagnosis; do not use them as final material results.
+The stopped fixed-mu MnTe job likewise is not the final MnTe ensemble.

@@ -1,0 +1,42 @@
+--- a/SRC_lapw1/seclr5.F
++++ b/SRC_lapw1/seclr5.F
+@@ -11,7 +11,8 @@
+                            ICTXTALL,LDHS,LCOLHS,LCOLZ,BLOCKSIZE,NPCOL,NPROW,ICTXT,&
+                            barrier, NBELW_PARA                                        !!!
+       use lolog, only : nlo, loor, lapw, ilo
+-      use comi, only    : NV => NVAA, NE, NBLW => NBELW, NAT,nemax_it
++      use comi, only    : NV => NVAA, NE, NBLW => NBELW, NAT,nemax_it, &
++                          fixed_nbands
+       use coml, only    : SPRSWF, ITER
+       use comr, only    : RKM, EL                                                     !!!
+       use struk, only    : mult
+@@ -170,6 +171,17 @@
+       CALL MPI_BCAST(NEOLD, 1, MPI_INTEGER, 0,  &
+                      MPI_COMM_WORLD, ierr)
+ #endif
++
++      if(fixed_nbands .and. nemax_it.gt.NV+NLO) then
++         write(6,*) 'FIXED_NBANDS exceeds the current matrix dimension:', &
++              nemax_it,NV+NLO
++         stop 'invalid FIXED_NBANDS request'
++      endif
++      if(fixed_nbands .and. NEOLD.lt.nemax_it) then
++         if(MYID.eq.0) write(6,*) &
++              'Old vector has too few bands for FIXED_NBANDS; using full diagonalization.'
++         goto 999
++      endif
+ 
+       ALLOCATE(ZI(MAX(NVOLD, NV+NLO)))
+ #ifdef Parallel
+@@ -293,6 +305,11 @@
+ !</HH>-------------------------------------------------------------------
+ 
+       NE = NEOLD
++      if(fixed_nbands) then
++         if(NE.ne.nemax_it) stop 'FIXED_NBANDS iterative count mismatch'
++         if(MYID.eq.0) write(6,'(A,I8)') &
++              ':FIXED_NBANDS: exact number of lowest eigenpairs =',NE
++      endif
+ !
+ !     Check for EV below EL (modified lines marked with ' !!! ')    
+ !  

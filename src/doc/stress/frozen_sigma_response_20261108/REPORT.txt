@@ -1,0 +1,105 @@
+FROZEN-SELF-ENERGY LINEAR RESPONSE -- 2026-11-08
+================================================
+
+Implemented and validated an opt-in central-cell response solver. No
+impurity solves and no two strained SCF calculations are needed. The source
+uses two single, unrelaxed affine-strain charge evaluations. Screening uses
+central-cell directional derivatives and Anderson acceleration.
+
+Equations (q is total density in material coordinates):
+  q_eta(x) = det(F_eta) n_eta(F_eta x)
+  v_eta(x) = V_KS,eta(F_eta x)
+  v1 = v_aff + K q1
+  q1 = s + A q1,  s = b + chi_frozen v_aff,  A = chi_frozen K
+  A x = [F_charge(n0+t*x)-F_charge(n0)]/t
+
+The charge map F_charge runs LAPW0, LAPW1, dmft2, lcore once, refreshes
+projector normalization, adjusts mu to fixed N, and applies the ordinary
+interstitial charge normalization. Sigma and double counting supplied to
+dmft2 stay fixed. This is not the full DMFT susceptibility (no impurity
+vertex). The physical response includes radial augmentation and all LAPW
+complement states implicitly through the full eigenvector solve.
+
+FINAL fixed-G, fixed-band results -- mean tensile stress, GPa:
+Material  Old analytic  New correction   Corrected     Numeric       Difference
+SrVO3     5.676884150 -2.986723065  2.690161085  2.933836407 -0.243675322
+FeSe     -0.116491672 -1.002175788 -1.118667459 -1.049151295 -0.069516164
+
+Pressure is the negative of these mean tensile stresses. The displayed
+numbers already contain the hydrostatic division by three. Numerical totals
+are the saved frozen-Sigma Klein references from the preceding audit; no
+new impurity solve or full total-energy convergence was performed here.
+
+Both predicted corrections match the independent relaxed-potential
+references within 0.000040 GPa. Halving source and density-probe steps
+changes the correction by 0.0000049 GPa (SrVO3) and 0.0000155 GPa (FeSe).
+The remaining 0.244 and 0.070 GPa discrepancies are TOTAL-stress residuals;
+they are not solved by claiming that this new response is exact. Further
+checks include the complement convergence of the stress adjoint itself,
+remaining basis approximations, and functional-reference consistency.
+
+Why the first analytic approximation failed:
+The stored-band G*dH*G action including window and X derivatives reproduces
+its own nonlinear finite differences. However, it freezes radial functions
+and truncates the complement. In SrVO3, the residual against the measured
+relaxed charge derivative decreases from 170.26 (43 bands), to 109.94
+(100), to 89.01 (200). The complete LAPW response with frozen radials still
+leaves 75.73. Including radial response reduces this to 0.0174. FeSe has
+426.41 with 66 stored bands and 0.0562 with the complete response. These are
+norms of the same density-file coefficient vector, not pressure units.
+
+The final screening solves took 9 actions in SrVO3 and 11 in FeSe, about
+169 and 138 seconds of action wall time on this laptop. Including central
+and source program evaluations gives about 218 and 172 seconds, before the
+separate potential-operator stress contraction. Four MPI ranks were used
+for dmft2, serial LAPW1. No impurity calls occurred.
+
+Validation:
+- Five independent algebra/unit checks pass: analytic resolvent/normalization
+  derivative, uniform-potential gauge and fixed-N response, non-Hermitian
+  input rejection, unstable linear screening rescued by Anderson, and
+  honest nonconvergence reporting.
+- Exported Python central band density agrees with native dmft2 to 3.3e-15
+  in SrVO3 and 9e-16 in FeSe.
+- Native metadata/k export reads back 75 SrVO3 k points and 43 bands.
+- Signed density reconstruction keeps negative modes and rejects a wrong
+  eigenvector gauge with nonzero status.
+- Default native charge output is identical for SrVO3 and differs by at
+  most 1.1e-18 for FeSe. The optional hooks are off by default.
+- Fixed integer G sets, band counts, k order and window boundary gaps are
+  checked. SrVO3: 75 k, 43 stored bands, W=[12,31]; FeSe: 140 k, 66 stored,
+  W=[21,44]. Both original cases use RKmax=8.
+
+Implementation bugs caught in the NEW diagnostic drivers (not attributed
+as new bugs in the original production code):
+- CLMVAL's spherical channel needs sqrt(4*pi) before adding core/CLMSUM.
+- A fixed band count alone does not freeze the G set under strain. The final
+  driver uses existing serial WIEN fixed-G marker support.
+- Empty in1c files can exist in a real-vector calculation. Select the LAPW1
+  executable from unit 5 in its definition file, not file existence.
+- A WIEN x wrapper can return zero even after a Fortran error; logs and error
+  files must be checked.
+
+Installation and limits:
+Sources: /Users/haule/projects/eDMFT_new/src/dmft2 and src/python.
+Separate native executable: /Users/haule/dbin/dmft2_response.
+All five new Python helpers are installed in dbin and also in the repository.
+The ordinary installed /Users/haule/dbin/dmft2 is unchanged. No automatic
+stress correction was enabled. Original material calculations were not edited.
+
+The reusable complete charge driver writes response.density plus predicted
+physical endpoint potentials. The hydrostatic contraction in this audit
+uses the existing frozen-central-basis potential probe and archived window
+plus normalization adjoints; it is still a diagnostic projection step, not
+an automatically enabled general stress-tensor implementation. The saved
+projector_correction_matrices.npz allows its final contraction to be repeated
+with frozen_sigma_projector_stress.py without the temporary vector files.
+
+Current tested scope: nonmagnetic, no SOC, primitive orthogonal cell,
+projector 5, fixed N, fixed RMT, hydrostatic strain. Do not substitute this
+fixed-N driver for the fixed-mu MnO calculation. Magnetic MnTe and general
+strain components remain untested.
+
+The self-contained LaTeX/PDF note defines the symbols, derivation, algorithms,
+checks and commands. Reference input snapshots and runnable JSON templates
+are stored with this report. Each run requires a NEW workspace.

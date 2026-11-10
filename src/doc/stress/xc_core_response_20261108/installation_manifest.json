@@ -1,0 +1,254 @@
+[
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/lapw_hartree_periodic.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/python/lapw_hartree_periodic.py",
+    "old_sha256": "dc1bb6e84b7d8cd5b573550311371125016d551c310806f21cb07858e65195f2",
+    "new_sha256": "573938a430f71466eaa15c80d9ec1858770582f9c3269ab7d68034483c9f4cbe"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/lapw_hartree_periodic.py",
+    "target": "/Users/haule/dbin/lapw_hartree_periodic.py",
+    "old_sha256": "dc1bb6e84b7d8cd5b573550311371125016d551c310806f21cb07858e65195f2",
+    "new_sha256": "573938a430f71466eaa15c80d9ec1858770582f9c3269ab7d68034483c9f4cbe"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/lapw_xc_response.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/python/lapw_xc_response.py",
+    "old_sha256": null,
+    "new_sha256": "d8163f2f39af707a7b91f99369187c5324cc6a4a542cf4aa98fd6811281330d4"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/lapw_xc_response.py",
+    "target": "/Users/haule/dbin/lapw_xc_response.py",
+    "old_sha256": null,
+    "new_sha256": "d8163f2f39af707a7b91f99369187c5324cc6a4a542cf4aa98fd6811281330d4"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/lapw_core_response.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/python/lapw_core_response.py",
+    "old_sha256": null,
+    "new_sha256": "0cf28b01ce202a579e6e274225cce21fabcbd27b6e4ca6573b7ae249dc67b612"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/lapw_core_response.py",
+    "target": "/Users/haule/dbin/lapw_core_response.py",
+    "old_sha256": null,
+    "new_sha256": "0cf28b01ce202a579e6e274225cce21fabcbd27b6e4ca6573b7ae249dc67b612"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/tests/test_lapw_core_response.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_core_response.py",
+    "old_sha256": null,
+    "new_sha256": "1c97860b7e496948e87f9794c534b653ccc10c0e35d57c03e1488aea3ec8ccf7"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/tests/test_lapw_hartree_periodic.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_hartree_periodic.py",
+    "old_sha256": "ff511d28165537e1f0db132c600429c593e2c649316976f4f83c4ede36a29654",
+    "new_sha256": "85a6d690c7247e2a22f357c8831a5f744876838bda016bbdc1ed97370b54ecb2"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/tests/test_lapw_xc_response.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/python/tests/test_lapw_xc_response.py",
+    "old_sha256": null,
+    "new_sha256": "b0935c60d840789a70498b649e2063ef55fde1694991a42693e6581f265d6034"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/stress_response_roadmap_20261108.txt",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/stress_response_roadmap_20261108.txt",
+    "old_sha256": "afaa61ae3157456e8e70295248916f2b1c9f763020d217a0609dd2c490f2c41c",
+    "new_sha256": "ab6510bba656bfb8b7d89da30c4fb76a9d6c90b1483d680f8fbca1a5260807cc"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/stage/hartree_periodic_REPORT.txt",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/hartree_periodic_response_20261108/REPORT.txt",
+    "old_sha256": "272a7d27c392b4e6168cb84e42255f1a7939b9f3d197507b929d6a0bf36d61a1",
+    "new_sha256": "cf6e3b97f6bfea75be89b0b27107f0707c3071a91d70958d3473b9be969e9cb3"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/REPORT.txt",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/REPORT.txt",
+    "old_sha256": null,
+    "new_sha256": "8074321c742507abede451a736b633c05692512539b8efc6774f9c50f1fedab3"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/full_tests.log",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/full_tests.log",
+    "old_sha256": null,
+    "new_sha256": "a150c39164213816952ad7784ba44d645863590eb8461481cfa62646429ee671"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/xc_core_tests.log",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/xc_core_tests.log",
+    "old_sha256": null,
+    "new_sha256": "a60929fc40e5abc28463ac46f86d310406d805650cf3410d1870e5ff3c90cdb7"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/core_material.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/core_material.json",
+    "old_sha256": null,
+    "new_sha256": "cf2c3a4127686014a362b21f71921d6503a29664ed74b5d5ded91cde71e55468"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/xc_mt_material.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/xc_mt_material.json",
+    "old_sha256": null,
+    "new_sha256": "01ba4c859bebb0167e2814a2f3a550299e2a0779ee472e982a5029e67c9a153b"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/xc_periodic_material.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/xc_periodic_material.json",
+    "old_sha256": null,
+    "new_sha256": "c4427568aebc5c9dfdfed04dc24b48610ae5da03713db47ba4781917bf6cd3a1"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/hxc_core_material.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/hxc_core_material.json",
+    "old_sha256": null,
+    "new_sha256": "c600898921b2c7bb827f3ac8e1bbf555f1e64736d23bf60479e8a53ae84d5f71"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/FeSe_composition.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/FeSe_composition.json",
+    "old_sha256": null,
+    "new_sha256": "c49966d56baeb64b19771a80c99464350a8ab0cde8c038aee81ae277596c504d"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/SrVO3_composition.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/SrVO3_composition.json",
+    "old_sha256": null,
+    "new_sha256": "726a018ef5095dbadf2185f4fd6963c54a015128938ab95fcb2151b85ef5bada"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/FeSe_fixed_n_roots.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/FeSe_fixed_n_roots.json",
+    "old_sha256": null,
+    "new_sha256": "3b603523974e6e2bfae3b5eecf588ec13259c2050be968f4eddaf9b5d900459c"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/SrVO3_fixed_n_roots.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/SrVO3_fixed_n_roots.json",
+    "old_sha256": null,
+    "new_sha256": "fc98e8954aa5c6f507507e7de144ee62af59160a0d0384cc42df30ac8ed92fff"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/SrVO3_before_file_conjugation.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/SrVO3_before_file_conjugation.json",
+    "old_sha256": null,
+    "new_sha256": "ad7a4431bf43287e31af955172d2208389dbcbc8f047604eec6bd206a1513441"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/FeSe_full_l_density_control.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/FeSe_full_l_density_control.json",
+    "old_sha256": null,
+    "new_sha256": "b37ab8e636d841056626adcab36ee3954fbd6501cfd5a5b1f35a4466198417c5"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/EVIDENCE_SHA256.json",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/EVIDENCE_SHA256.json",
+    "old_sha256": null,
+    "new_sha256": "bcfbc563536edf6096e1b934dabe2107ea2cf16a98ae755931d095f9f422e7ec"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/compact_native_evidence.tar.gz",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/compact_native_evidence.tar.gz",
+    "old_sha256": null,
+    "new_sha256": "7fea96e2e06686f3eae75e67ef001229fb439f37d73c0410ffe2dfff03f6acba"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/native_reference_ONLY.patch",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/native_reference_ONLY.patch",
+    "old_sha256": null,
+    "new_sha256": "fc0cff1630be2acea7a51b6a0c3066463999728d95ad9d77ddf83502d559c300"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/xc_core_response.patch",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/xc_core_response.patch",
+    "old_sha256": null,
+    "new_sha256": "cc57a9f846aa3702931392c666ba4d9dcf1cc458f604a46eb83de4ccf53cd2b0"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/prepare_native.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/prepare_native.py",
+    "old_sha256": null,
+    "new_sha256": "63b6ed55b682111c20513fde4bd043ae57ad733908c2483d7e0ee3e0888ba17a"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/setup_endpoints.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/setup_endpoints.py",
+    "old_sha256": null,
+    "new_sha256": "dd8e6851b7dbd47718e801f24f423e22568024adba4803740d38bbb6146d5ab2"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/setup_hxc_core.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/setup_hxc_core.py",
+    "old_sha256": null,
+    "new_sha256": "c477d0ef291c8c289f0569d33cb8f3cfc4924bb9f6faa4c28815bad69947753c"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/extra_charge_endpoints.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/extra_charge_endpoints.py",
+    "old_sha256": null,
+    "new_sha256": "2de54d20f2ac709adcc8cfce7772d4ee190d0ee45b85235f987d86050e935f71"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/setup_charge.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/setup_charge.py",
+    "old_sha256": null,
+    "new_sha256": "f2c580a290d2f52be9a4b2d4153e6985561071b77d86e38d0d19d1e811b08bdc"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/fixed_n_endpoints.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/fixed_n_endpoints.py",
+    "old_sha256": null,
+    "new_sha256": "9af497da30685dbf2ff16dbccb4a4de2f941b8c04448acf46dbf47515161b2fd"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/check_core.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/check_core.py",
+    "old_sha256": null,
+    "new_sha256": "a8fffc975c18d2fe31a7f9eb212507a5bfaa9997d316d1b7cf7fb2e4f9874766"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/check_xc.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/check_xc.py",
+    "old_sha256": null,
+    "new_sha256": "d51a2f3b17045062499eac2f704a3b5a0b15b551fb60a0ceca5ced27ad4f7812"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/check_xc_periodic.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/check_xc_periodic.py",
+    "old_sha256": null,
+    "new_sha256": "392180866907ef777b66a503e5e86bf249c47de99ab7414518c5d45138c10f6b"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/check_hxc_core.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/check_hxc_core.py",
+    "old_sha256": null,
+    "new_sha256": "f246cb65494d7696edfbcfdfa8fbc494c48c16811511cdd18edc9c69b7cc41b5"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/check_composition.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/check_composition.py",
+    "old_sha256": null,
+    "new_sha256": "3899f07fc781e33186ff9e04213741e1da95cb6ddef1281aa575010e684740fe"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/run_all_tests.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/run_all_tests.py",
+    "old_sha256": null,
+    "new_sha256": "3b81ad2d1a43bf84fc401888e67b3418db5df415e6d784a8c6d37a4f87cd363a"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/package_patch.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/package_patch.py",
+    "old_sha256": null,
+    "new_sha256": "53e6d823bff23b384242ae737ee68fdbdf852f6fc5a06ff59c8cc621add97b1b"
+  },
+  {
+    "source": "/private/tmp/edmft_xc_core_response_20261108/install_after_approval.py",
+    "target": "/Users/haule/projects/eDMFT_new/src/doc/stress/xc_core_response_20261108/install_after_approval.py",
+    "old_sha256": null,
+    "new_sha256": "e721d255383d98c9b42ab897934ba63cdb00417c6090c15fb5f043e217deac63"
+  }
+]

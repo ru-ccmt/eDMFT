@@ -1,0 +1,89 @@
+--- a/SRC_lapw2/val_kin_interstitial.F
++++ b/SRC_lapw2/val_kin_interstitial.F
+@@ -9,15 +9,12 @@
+    real*8 , intent(inout) :: kin_int_fn(1:3,1:3)
+ !_REAL  REAL*8,ALLOCATABLE          :: thetagp(:)
+ !_COMPLEX  COMPLEX*16,ALLOCATABLE   :: thetagp(:)
++!_REAL  REAL*8,ALLOCATABLE          :: kin_conv(:,:)
++!_COMPLEX  COMPLEX*16,ALLOCATABLE   :: kin_conv(:,:)
+    complex*16               :: kin_int_buf(1:3,1:3,nume)   
+-   integer                  :: ialpha, ibeta, tot_G, gx, gxp, num
++   integer                  :: ialpha, ibeta, tot_G, gx, gxp, num, nbands
+    integer, allocatable     :: Xxx(:),Yyy(:),Zzz(:)    
+-       tot_G = 0
+-       DO gx = 1, isize
+-          DO gxp = 1, isize
+-             tot_G = tot_G + 1
+-          ENDDO
+-       ENDDO
++       tot_G = isize*isize
+        allocate(thetagp(tot_G),Xxx(tot_G),Yyy(tot_G),Zzz(tot_G))
+        
+        tot_G = 0
+@@ -32,22 +29,42 @@
+        call step_fun(xxx,yyy,zzz,tot_G,thetagp)
+        deallocate(Xxx,Yyy,Zzz) 
+        
+-       kin_int_buf = zeroc       
+-       DO ialpha = 1, 3
+-          DO ibeta = 1, 3
+-              DO num = nemin, nemax
+-                 tot_G = 0
+-                 DO gx = 1, isize
+-                    DO gxp = 1, isize
+-                       tot_G = tot_G + 1
+-!_REAL                       kin_int_buf(ialpha,ibeta,num) = kin_int_buf(ialpha,ibeta,num) - &
+-!_REAL                       a(gx,num)*a(gxp,num)*F1P(gx,ialpha)*F1P(gx,ibeta)*thetagp(tot_G)
++       ! The original expression contained an explicit G,G' loop for every
++       ! band and Cartesian component:
++       !
++       !   sum_G conj(A_Gn) F_Ga F_Gb sum_G' Theta_(G-G') A_G'n .
++       !
++       ! Theta is independent of the band and of (a,b).  Form its convolution
++       ! with all band vectors once using BLAS, then contract the inexpensive
++       ! F_Ga F_Gb factors.  This removes a factor of nine from the dense work
++       ! and lets an optimized matrix kernel replace the scalar O(N_G^2 N_b)
++       ! loops.  STEP_FUN stores its flat array with G' as the fast index, so
++       ! it represents Theta(G',G)=Theta_(G-G'); the required convolution is
++       ! therefore transpose(Theta)*A (plain transpose, not conjugate
++       ! transpose, in the complex executable).
++       nbands = nemax-nemin+1
++       allocate(kin_conv(isize,nbands))
++!_REAL call dgemm('T','N',isize,nbands,isize,1.d0,thetagp,isize, &
++!_REAL            a(1,nemin),size(a,1),0.d0,kin_conv,isize)
++!_COMPLEX call zgemm('T','N',isize,nbands,isize,(1.d0,0.d0), &
++!_COMPLEX            thetagp,isize,a(1,nemin),size(a,1),(0.d0,0.d0), &
++!_COMPLEX            kin_conv,isize)
+ 
+-!_COMPLEX                    kin_int_buf(ialpha,ibeta,num) = kin_int_buf(ialpha,ibeta,num) - &
+-!_COMPLEX                    conjg(a(gx,num))*a(gxp,num)*F1P(gx,ialpha)*F1P(gx,ibeta)*thetagp(tot_G)
+-                    ENDDO
+-                 ENDDO
+-              ENDDO              
++       kin_int_buf = zeroc
++       DO num = nemin,nemax
++          DO gx = 1,isize
++             DO ialpha = 1,3
++                DO ibeta = 1,3
++!_REAL             kin_int_buf(ialpha,ibeta,num) = &
++!_REAL                  kin_int_buf(ialpha,ibeta,num) - &
++!_REAL                  a(gx,num)*kin_conv(gx,num-nemin+1)* &
++!_REAL                  F1P(gx,ialpha)*F1P(gx,ibeta)
++!_COMPLEX          kin_int_buf(ialpha,ibeta,num) = &
++!_COMPLEX               kin_int_buf(ialpha,ibeta,num) - &
++!_COMPLEX               conjg(a(gx,num))*kin_conv(gx,num-nemin+1)* &
++!_COMPLEX               F1P(gx,ialpha)*F1P(gx,ibeta)
++                ENDDO
++             ENDDO
+           ENDDO
+        ENDDO
+        
+@@ -60,7 +77,7 @@
+              ENDDO
+           ENDDO
+        ENDDO
+-       deallocate(thetagp)   
++       deallocate(thetagp,kin_conv)
+    
+    
+ return

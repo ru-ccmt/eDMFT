@@ -1,0 +1,33 @@
+--- a/SRC_lapw0/suml.f
++++ b/SRC_lapw0/suml.f
+@@ -6,18 +6,22 @@
+ !
+       COMPLEX*16 YL,IMAG,IMAG1                                          
+       REAL*8  MINU                                                      
+-      DIMENSION YL(*),LM(2,NCOM+3)                                     
++      !DIMENSION YL(*),LM(2,NCOM+3)
++      DIMENSION YL((lmax2X+1)*(lmax2X+1)),LM(2,NCOM+3)
+       DATA IMAG /(0.d0,1.0D0)/                                           
+ !                                                                       
+       ILM=LMMAX                                                         
+       IMAG1=(1.D0,0.d0)                                                   
+-      LL=IABS(LM(1,ILM))                                                
+-      MM=LM(2,ILM)                                                      
+-      MINU=1.                                                           
+-      IF(LM(1,ILM).LT.0) THEN                                           
+-      IMAG1=-IMAG                                                       
+-      MINU=-1.D0                                                        
+-      END IF                                                            
++      LL = LM(1,ILM)
++      MM = LM(2,ILM)
++      !LL=IABS(LM(1,ILM))                                                
++      !MM=LM(2,ILM)                                                      
++      MINU=1.
++      IF(LL.LT.0) THEN
++         IMAG1=-IMAG
++         MINU=-1.D0
++         LL = -LL
++      END IF
+       IF(MOD(MM,2).EQ.1) THEN                                           
+       IMAG1=-IMAG1                                                      
+       MINU=-MINU                                                        

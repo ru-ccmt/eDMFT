@@ -1,0 +1,1111 @@
+ Running DMFT in mpi mode
+
+
+
+
+                              --------------------------------------------------
+                                 S T R U C T U R A L   I N F O R M A T I O N
+                              --------------------------------------------------
+
+
+   SUBSTANCE                    = FeSe                                                                            
+
+   LATTICE                      = P   
+   LATTICE CONSTANTS ARE        =    7.1214290   7.1214290  10.4301510
+   NUMBER OF ATOMS IN UNITCELL  =   2
+   MODE OF CALCULATION IS       = RELA
+Operation  1 transforms atom   1 from first atom   1
+Operation  2 transforms atom   2 from first atom   1
+Operation  1 transforms atom   3 from first atom   3
+Operation  2 transforms atom   4 from first atom   3
+  Modus: STR  
+  Analytic stress:  T
+ no read error
+ RECPR LIST: NOFI
+   TYPE OF COORDINATES IN DSPLIT=      
+  BR1,  BR2
+   0.88229  -0.00000  -0.00000      0.88229  -0.00000  -0.00000
+   0.00000   0.88229  -0.00000      0.00000   0.88229  -0.00000
+   0.00000   0.00000   0.60241      0.00000   0.00000   0.60241
+ generate new recprlist
+  KXMAX,KYMAX,KZMAX          13          13          19
+         1196 PLANE WAVES GENERATED (INCLUDING FORBIDDEN H,K,L)
+
+ nwav1,kn       11111        1196
+       KVEC(         1) =     0    0    0    0.0000    1
+       KVEC(         2) =     0    0   -1    0.6024    2
+       KVEC(         3) =    -1    0    0    0.8823    4
+       KVEC(         4) =    -1    0   -1    1.0683    8
+       KVEC(         5) =     0    0   -2    1.2048    2
+       KVEC(         6) =    -1   -1    0    1.2478    4
+       KVEC(         7) =    -1   -1   -1    1.3856    8
+       KVEC(         8) =    -1    0   -2    1.4933    8
+       KVEC(         9) =    -1   -1   -2    1.7345    8
+ ......
+        SIZE INCLUDING STAR MEMBERS =      15439
+  time in recpr:    0.0000000000000000     
+nemin,nemax=     21     44
+imatsubara= 1 gammac=   0.02500 gamma=   0.02500
+--------- atom  1 -------------
+l=  2  qsplit=  2
+ No symmetrization over eq. k-points is performed
+  New local rotation matrix in global orthogonal system
+                       new x     new y     new z
+LOCAL ROT MATRIX:    0.7071068-0.7071068 0.0000000
+                     0.7071068 0.7071068-0.0000000
+                     0.0000000 0.0000000 1.0000000
+--------- atom  2 -------------
+l=  2  qsplit=  2
+ No symmetrization over eq. k-points is performed
+  New local rotation matrix in global orthogonal system
+                       new x     new y     new z
+LOCAL ROT MATRIX:    0.7071068-0.7071068 0.0000000
+                     0.7071068 0.7071068-0.0000000
+                     0.0000000 0.0000000 1.0000000
+ ********** Start Reading Cix file *************
+  Correlated block number           1
+  Correlated index=
+  1  0  0  0  0
+  0  2  0  0  0
+  0  0  3  0  0
+  0  0  0  4  0
+  0  0  0  0  5
+  Real part of unitary matrix=
+  0.0000  0.0000  1.0000  0.0000  0.0000
+  0.7071  0.0000  0.0000  0.0000  0.7071
+  0.0000  0.7071  0.0000 -0.7071  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000 -0.0000
+  Imaginary part of unitary matrix=
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.7071  0.0000  0.7071  0.0000
+  0.7071  0.0000  0.0000  0.0000 -0.7071
+  Correlated block number           2
+  Correlated index=
+  1  0  0  0  0
+  0  2  0  0  0
+  0  0  3  0  0
+  0  0  0  4  0
+  0  0  0  0  5
+  Real part of unitary matrix=
+  0.0000  0.0000  1.0000  0.0000  0.0000
+  0.7071  0.0000  0.0000  0.0000  0.7071
+  0.0000  0.7071  0.0000 -0.7071  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000 -0.0000
+  Imaginary part of unitary matrix=
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.7071  0.0000  0.7071  0.0000
+  0.7071  0.0000  0.0000  0.0000 -0.7071
+ ntcix=           5
+Unique Correlated index for forces icix=  1, jatom=  1
+  1  0  0  0  0
+  0  2  0  0  0
+  0  0  3  0  0
+  0  0  0  4  0
+  0  0  0  0  5
+Unique Correlated index for forces icix=  2, jatom=  1
+  1  0  0  0  0
+  0  2  0  0  0
+  0  0  3  0  0
+  0  0  0  4  0
+  0  0  0  0  5
+  At least one transformation matrix is not Identity
+ Found EF.dat and EF is    5.7668938003032606     
+ nume=          66 numkpt=         140
+ Energy/band window:   -0.0324 < E <      1.330
+ Greens function calculation for  2 atoms
+ sumw=   1764.0000000000000      eseper=  -3.2404637068834272E-002
+
+
+:NLDA  : NUMBER OF ELECTRONS          =  64.000
+
+:FLDA  : F E R M I - ENERGY           =   0.00000
+Actual position of atom  1 is:  0.750000    0.250000    0.000000
+The local coordinate system (withoth user rotation "locrot") is:
+    1.00    0.00    0.00     0.000
+    0.00    1.00    0.00     0.000
+    0.00    0.00    1.00     0.000
+Actual position of atom  2 is:  1.250000   -0.250000    0.000000
+The local coordinate system (withoth user rotation "locrot") is:
+    1.00    0.00    0.00     0.500
+    0.00   -1.00    0.00     0.000
+    0.00    0.00   -1.00     0.000
+Actual position of atom  3 is:  0.250000    0.250000    0.718348
+The local coordinate system (withoth user rotation "locrot") is:
+    1.00    0.00    0.00     0.000
+    0.00    1.00    0.00     0.000
+    0.00    0.00    1.00     0.000
+Actual position of atom  4 is:  0.750000   -0.250000   -0.718348
+The local coordinate system (withoth user rotation "locrot") is:
+    1.00    0.00    0.00     0.500
+    0.00   -1.00    0.00     0.000
+    0.00    0.00   -1.00     0.000
+
+The local coordinate systems on correlated atoms including users rotation ("locrot") are
+catom  1 ( atom   1 )
+   0.70711  -0.70711   0.00000
+   0.70711   0.70711   0.00000
+   0.00000   0.00000   1.00000
+
+catom  2 ( atom   2 )
+   0.70711   0.70711   0.00000
+   0.70711  -0.70711   0.00000
+   0.00000   0.00000  -1.00000
+
+
+icase,lcase,icix,iorb,nind1,ip1,iSx=    1    1    1    1    5    1    1
+icase,lcase,icix,iorb,nind1,ip1,iSx=    1    1    1    1    5    2    2
+icase,lcase,icix,iorb,nind1,ip1,iSx=    1    1    1    1    5    3    3
+icase,lcase,icix,iorb,nind1,ip1,iSx=    1    1    1    1    5    4    4
+icase,lcase,icix,iorb,nind1,ip1,iSx=    1    1    1    1    5    5    5
+icase,lcase,icix,iorb,nind1,ip1,iSx=    2    1    2    2    5    1    1
+icase,lcase,icix,iorb,nind1,ip1,iSx=    2    1    2    2    5    2    2
+icase,lcase,icix,iorb,nind1,ip1,iSx=    2    1    2    2    5    3    3
+icase,lcase,icix,iorb,nind1,ip1,iSx=    2    1    2    2    5    4    4
+icase,lcase,icix,iorb,nind1,ip1,iSx=    2    1    2    2    5    5    5
+cixdim( 1)= 5
+noccur( 1, 1)=   1
+noccur( 2, 1)=   1
+noccur( 3, 1)=   1
+noccur( 4, 1)=   1
+noccur( 5, 1)=   1
+cixdim( 2)= 5
+noccur( 1, 2)=   1
+noccur( 2, 2)=   1
+noccur( 3, 2)=   1
+noccur( 4, 2)=   1
+noccur( 5, 2)=   1
+iSx( 1, 1)=  1
+iSx( 2, 1)=  2
+iSx( 3, 1)=  3
+iSx( 4, 1)=  4
+iSx( 5, 1)=  5
+iSx( 1, 2)=  1
+iSx( 2, 2)=  2
+iSx( 3, 2)=  3
+iSx( 4, 2)=  4
+iSx( 5, 2)=  5
+nindo( 1)=  5
+nindo( 2)=  5
+CF for iorb1= 1 iorb2= 1
+    0.00000000     0.00000000       0.00000000     0.00000000       1.00000000     0.00000000       0.00000000     0.00000000       0.00000000     0.00000000   
+    0.70710678     0.00000000       0.00000000     0.00000000       0.00000000     0.00000000       0.00000000     0.00000000       0.70710678     0.00000000   
+    0.00000000     0.00000000       0.70710678     0.00000000       0.00000000     0.00000000      -0.70710678     0.00000000       0.00000000     0.00000000   
+    0.00000000     0.00000000       0.00000000     0.70710678       0.00000000     0.00000000       0.00000000     0.70710678       0.00000000     0.00000000   
+    0.00000000     0.70710678       0.00000000     0.00000000       0.00000000     0.00000000       0.00000000     0.00000000      -0.00000000    -0.70710678   
+CF for iorb1= 2 iorb2= 2
+    0.00000000     0.00000000       0.00000000     0.00000000       1.00000000     0.00000000       0.00000000     0.00000000       0.00000000     0.00000000   
+    0.70710678     0.00000000       0.00000000     0.00000000       0.00000000     0.00000000       0.00000000     0.00000000       0.70710678     0.00000000   
+    0.00000000     0.00000000       0.70710678     0.00000000       0.00000000     0.00000000      -0.70710678     0.00000000       0.00000000     0.00000000   
+    0.00000000     0.00000000       0.00000000     0.70710678       0.00000000     0.00000000       0.00000000     0.70710678       0.00000000     0.00000000   
+    0.00000000     0.70710678       0.00000000     0.00000000       0.00000000     0.00000000       0.00000000     0.00000000      -0.00000000    -0.70710678   
+ beta....=   49.999999999999886      n0_om...=         301
+:MATSUBARA_CUBIC_WEIGHTS:     600    2387   2.38700000E+03   2.38700000E+03   1.26890255E+00   2.03435246E+01
+     FORCE-CALCULATION: F
+
+
+
+
+:POS001: AT.NR.  -1 POSITION = 0.75000 0.25000 0.00000  MULTIPLICITY =  2
+
+
+   NOT EQUIV ATOM Fe          LOCAL ROTATION MATRIX
+                                 0.70711  -0.70711   0.00000
+                                 0.70711   0.70711   0.00000
+                                 0.00000   0.00000   1.00000
+             EQUIV ATOM   1   POSITION:    0.750   0.250   0.000
+                                 1.00000   0.00000   0.00000        0.00000
+                                 0.00000   1.00000   0.00000        0.00000
+                                 0.00000   0.00000   1.00000        0.00000
+             EQUIV ATOM   2   POSITION:    0.250   0.750   0.000
+                                 1.00000   0.00000   0.00000        0.50000
+                                 0.00000  -1.00000   0.00000        0.00000
+                                 0.00000   0.00000  -1.00000        0.00000
+
+          ATOMIC PARAMETERS FOR Fe        
+
+           ENERGY PARAMETERS ARE   0.14   0.14   0.25   0.14   0.14   0.14   0.14
+           ENERGY PARAMETERS ARE   0.14   0.14
+
+           L     U(R)          U'(R)         DU/DE        DU'/DE      NORM-U'
+           0 -0.533507E+00  0.104589E+00  0.112618E+00  0.338497E+00  0.153866E-01      3 3 3
+           1  0.622544E+00  0.165417E+00 -0.816757E-01 -0.330718E+00  0.128514E-01      2 2 2
+           2  0.176654E+00 -0.161651E+00 -0.592621E+00 -0.546844E+00  0.630939E+00      0 0 0
+           3  0.804545E+00  0.859044E+00 -0.589326E-01 -0.302025E+00  0.379460E-02      0 0 0
+           4  0.923845E+00  0.145950E+01 -0.398372E-01 -0.271155E+00  0.137393E-02      0 0 0
+           5  0.101982E+01  0.209704E+01 -0.302587E-01 -0.250840E+00  0.675959E-03      0 0 0
+           6  0.110428E+01  0.278132E+01 -0.242413E-01 -0.235243E+00  0.381551E-03      0 0 0
+           7  0.118123E+01  0.351270E+01 -0.200736E-01 -0.222527E+00  0.234398E-03      0 0 0
+           8  0.125265E+01  0.428976E+01 -0.170147E-01 -0.211808E+00  0.152844E-03      0 0 0
+           0  0.322229E-01 -0.619363E-01                                                0 2 0
+LO COEFFICIENT: l,A,B,C   0          0.86216     4.08433     0.00000
+LO COEFFICIENT: l,A,B,C   0          0.06020     0.00000     0.99669
+           1 -0.593552E-01  0.890653E-01                                                0 1 0
+LO COEFFICIENT: l,A,B,C   1          0.75666     5.76736     0.00000
+LO COEFFICIENT: l,A,B,C   1          0.09410     0.00000     0.98700
+LO COEFFICIENT: l,A,B,C   2          0.97309     0.29007     0.00000
+jatom= 1  l=0  e(l)=  0.13946310  lapw=F  <dot_u|dot_u>=   0.01539
+jatom= 1  l=1  e(l)=  0.13946310  lapw=F  <dot_u|dot_u>=   0.01285
+jatom= 1  l=2  e(l)=  0.24676746  lapw=F  <dot_u|dot_u>=   0.63094
+jatom= 1  l=3  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00379
+jatom= 1  l=4  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00137
+jatom= 1  l=5  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00068
+jatom= 1  l=6  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00038
+jatom= 1  l=7  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00023
+jatom= 1  l=8  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00015
+jatom= 1  l=0  ilo=2  elo(l)=     0.13946310    -6.05464802   999.00000000
+(rlo,loor): (F,F)  (F,T)  
+    <u|u_lo> <udot|u_lo> <u_lo|u_lo>   0.00000     0.00000     0.00000     0.02491    -0.01903     1.00000  
+jatom= 1  l=1  ilo=2  elo(l)=     0.13946310    -3.56880798   999.00000000
+(rlo,loor): (F,F)  (F,T)  
+    <u|u_lo> <udot|u_lo> <u_lo|u_lo>   0.00000     0.00000     0.00000     0.09142    -0.06239     1.00000  
+jatom= 1  l=2  ilo=1  elo(l)=     0.24676746   997.00000000   999.00000000
+(rlo,loor): (F,F)  
+    <u|u_lo> <udot|u_lo> <u_lo|u_lo>   0.00000     0.00000     0.00000  
+
+
+
+
+:POS002: AT.NR.  -2 POSITION = 0.25000 0.25000 0.71835  MULTIPLICITY =  2
+
+
+   NOT EQUIV ATOM Se          LOCAL ROTATION MATRIX
+                                 1.00000   0.00000   0.00000
+                                 0.00000   1.00000   0.00000
+                                 0.00000   0.00000   1.00000
+             EQUIV ATOM   1   POSITION:    0.250   0.250   0.718
+                                 1.00000   0.00000   0.00000        0.00000
+                                 0.00000   1.00000   0.00000        0.00000
+                                 0.00000   0.00000   1.00000        0.00000
+             EQUIV ATOM   2   POSITION:    0.750   0.750   0.282
+                                 1.00000   0.00000   0.00000        0.50000
+                                 0.00000  -1.00000   0.00000        0.00000
+                                 0.00000   0.00000  -1.00000        0.00000
+
+          ATOMIC PARAMETERS FOR Se        
+
+           ENERGY PARAMETERS ARE   0.54   0.14   0.14   0.14   0.14   0.14   0.14
+           ENERGY PARAMETERS ARE   0.14   0.14
+
+           L     U(R)          U'(R)         DU/DE        DU'/DE      NORM-U'
+           0 -0.102541E+00  0.736012E+00  0.251183E+00  0.268129E+00  0.772174E-01      3 3 3
+           1  0.459072E+00 -0.261184E+00 -0.159954E+00 -0.371617E+00  0.286637E-01      2 2 2
+           2 -0.699029E+00 -0.339581E+00  0.820272E-01  0.343671E+00  0.113084E-01      1 1 1
+           3  0.839610E+00  0.864429E+00 -0.626936E-01 -0.317481E+00  0.384966E-02      0 0 0
+           4  0.979726E+00  0.156778E+01 -0.406297E-01 -0.281771E+00  0.125911E-02      0 0 0
+           5  0.108794E+01  0.230226E+01 -0.303776E-01 -0.259473E+00  0.596543E-03      0 0 0
+           6  0.118163E+01  0.308550E+01 -0.241302E-01 -0.242714E+00  0.329835E-03      0 0 0
+           7  0.126625E+01  0.391974E+01 -0.198769E-01 -0.229218E+00  0.200017E-03      0 0 0
+           8  0.134436E+01  0.480419E+01 -0.167893E-01 -0.217934E+00  0.129289E-03      0 0 0
+           0 -0.292807E+00  0.476298E+00                                                0 3 0
+LO COEFFICIENT: l,A,B,C   0          0.99363     0.40563     0.00000
+LO COEFFICIENT: l,A,B,C   0          1.51248     0.00000    -0.52967
+LO COEFFICIENT: l,A,B,C   1          0.89944     2.58141     0.00000
+           2  0.437754E-01 -0.660484E-01                                                0 0 0
+LO COEFFICIENT: l,A,B,C   2          0.74100     6.31470     0.00000
+LO COEFFICIENT: l,A,B,C   2          0.06216     0.00000     0.99260
+jatom= 2  l=0  e(l)=  0.53946310  lapw=F  <dot_u|dot_u>=   0.07722
+jatom= 2  l=1  e(l)=  0.13946310  lapw=F  <dot_u|dot_u>=   0.02866
+jatom= 2  l=2  e(l)=  0.13946310  lapw=F  <dot_u|dot_u>=   0.01131
+jatom= 2  l=3  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00385
+jatom= 2  l=4  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00126
+jatom= 2  l=5  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00060
+jatom= 2  l=6  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00033
+jatom= 2  l=7  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00020
+jatom= 2  l=8  e(l)=  0.13946310  lapw=T  <dot_u|dot_u>=   0.00013
+jatom= 2  l=0  ilo=2  elo(l)=     0.53946310    -0.26240496   999.00000000
+(rlo,loor): (F,F)  (F,T)  
+    <u|u_lo> <udot|u_lo> <u_lo|u_lo>   0.00000     0.00000     0.00000     0.97873    -0.05698     1.00000  
+jatom= 2  l=1  ilo=1  elo(l)=     0.13946310   997.00000000   999.00000000
+(rlo,loor): (F,F)  
+    <u|u_lo> <udot|u_lo> <u_lo|u_lo>   0.00000     0.00000     0.00000  
+jatom= 2  l=2  ilo=2  elo(l)=     0.13946310    -3.11659233   999.00000000
+(rlo,loor): (F,F)  (F,T)  
+    <u|u_lo> <udot|u_lo> <u_lo|u_lo>   0.00000     0.00000     0.00000     0.08812    -0.05669     1.00000  
+:DMFT_STRESS_RADIAL_FD_INPUT /private/tmp/radial_stress_response_20261108/FeSe_DMFT/radial_response.dat
+:DMFT_STRESS_RADIAL_PROJECTOR_DIAGNOSTIC T
+:DMFT_STRESS_RADIAL_PROJECTOR_SIGN    1.0
+:DMFT_STRESS_RADIAL_FD_DIAGNOSTIC_ONLY T
+ after first reading case.nsh NGAU set to         306
+:DMFT_G2_NSH_CHECK:      1    2.66685440E-01    4.15875121E-06
+:DMFT_G2_COMPLETE_CACHE:      1   166     4    5.70378804E-15    1.17962025E-16
+:DMFT_G2_NSH_CHECK:      2    2.65430349E-01    8.72507129E-07
+:DMFT_G2_COMPLETE_CACHE:      2   168     4    6.77929934E-15    2.08166817E-17
+ nipc=           1 For force calculation on correlated atom it should be 4
+max_lcase=  1
+nl_case(  1)=  1
+al_ucase(  1,  1)=  1
+al_ucase(  2,  1)=  1
+n_al_ucase=  1
+l_al_ucase(  1)=  2
+j_al_ucase(  1)=  1
+nrf=  2
+
+Overlap of projector function (from projectorw.dat) and the solution of Dirac equation
+    rix_mat(  1,irf= 1)= 0.998211997940482
+    rix_mat(  1,irf= 2)= 0.047466645377283
+:DMFT_STRESS_RADIAL_PROJECTOR_DRIX_NORM    8.343229314024675E-01
+:DMFT_STRESS_RADIAL_PROJECTOR_SIGNED_DRIX_NORM    8.343229314024675E-01
+:DMFT_STRESS_RADIAL_FD_VNS_RECON_MAX_REL    6.322943735822207E-06
+pr_proc= 35  pr_procr= 35
+tot-k=140
+  0) Finished k-point number   1   1 with #bands=  24
+  0) Finished k-point number   2   2 with #bands=  24
+  0) Finished k-point number   3   3 with #bands=  24
+  0) Finished k-point number   4   4 with #bands=  24
+  0) Finished k-point number   5   5 with #bands=  24
+  0) Finished k-point number   6   6 with #bands=  24
+  0) Finished k-point number   7   7 with #bands=  24
+  0) Finished k-point number   8   8 with #bands=  24
+  0) Finished k-point number   9   9 with #bands=  24
+  0) Finished k-point number  10  10 with #bands=  24
+  0) Finished k-point number  11  11 with #bands=  24
+  0) Finished k-point number  12  12 with #bands=  24
+  0) Finished k-point number  13  13 with #bands=  24
+  0) Finished k-point number  14  14 with #bands=  24
+  0) Finished k-point number  15  15 with #bands=  24
+  0) Finished k-point number  16  16 with #bands=  24
+  0) Finished k-point number  17  17 with #bands=  24
+  0) Finished k-point number  18  18 with #bands=  24
+  0) Finished k-point number  19  19 with #bands=  24
+  0) Finished k-point number  20  20 with #bands=  24
+  0) Finished k-point number  21  21 with #bands=  24
+  0) Finished k-point number  22  22 with #bands=  24
+  0) Finished k-point number  23  23 with #bands=  24
+  0) Finished k-point number  24  24 with #bands=  24
+  0) Finished k-point number  25  25 with #bands=  24
+  0) Finished k-point number  26  26 with #bands=  24
+  0) Finished k-point number  27  27 with #bands=  24
+  0) Finished k-point number  28  28 with #bands=  24
+  0) Finished k-point number  29  29 with #bands=  24
+  0) Finished k-point number  30  30 with #bands=  24
+  0) Finished k-point number  31  31 with #bands=  24
+  0) Finished k-point number  32  32 with #bands=  24
+  0) Finished k-point number  33  33 with #bands=  24
+  0) Finished k-point number  34  34 with #bands=  24
+  0) Finished k-point number  35  35 with #bands=  24
+:OVERLAP_SYM_SCALAR:   4.615371E-03   1.648736E-19   0.000000E+00
+:OVERLAP_SYM_STRAIN:   2.730705E-01   2.787728E-17   0.000000E+00
+ Renormalizing Gloc to account for the interstitials
+Z to renormalize=    0.9726330711    0.9749315535    0.9703883462    0.9703883462    0.9706215157
+Z to renormalize=    0.9726330711    0.9749315535    0.9703883462    0.9703883462    0.9706215157
+  0) Finished k-point number   1   1 with #bands=  24
+  0) Finished k-point number   1   1 with #bands=  24
+  0) Finished k-point number   2   2 with #bands=  24
+  0) Finished k-point number   2   2 with #bands=  24
+  0) Finished k-point number   3   3 with #bands=  24
+  0) Finished k-point number   3   3 with #bands=  24
+  0) Finished k-point number   4   4 with #bands=  24
+  0) Finished k-point number   4   4 with #bands=  24
+  0) Finished k-point number   5   5 with #bands=  24
+  0) Finished k-point number   5   5 with #bands=  24
+  0) Finished k-point number   6   6 with #bands=  24
+  0) Finished k-point number   6   6 with #bands=  24
+  0) Finished k-point number   7   7 with #bands=  24
+  0) Finished k-point number   7   7 with #bands=  24
+  0) Finished k-point number   8   8 with #bands=  24
+  0) Finished k-point number   8   8 with #bands=  24
+  0) Finished k-point number   9   9 with #bands=  24
+  0) Finished k-point number   9   9 with #bands=  24
+  0) Finished k-point number  10  10 with #bands=  24
+  0) Finished k-point number  10  10 with #bands=  24
+  0) Finished k-point number  11  11 with #bands=  24
+  0) Finished k-point number  11  11 with #bands=  24
+  0) Finished k-point number  12  12 with #bands=  24
+  0) Finished k-point number  12  12 with #bands=  24
+  0) Finished k-point number  13  13 with #bands=  24
+  0) Finished k-point number  13  13 with #bands=  24
+  0) Finished k-point number  14  14 with #bands=  24
+  0) Finished k-point number  14  14 with #bands=  24
+  0) Finished k-point number  15  15 with #bands=  24
+  0) Finished k-point number  15  15 with #bands=  24
+  0) Finished k-point number  16  16 with #bands=  24
+  0) Finished k-point number  16  16 with #bands=  24
+  0) Finished k-point number  17  17 with #bands=  24
+  0) Finished k-point number  17  17 with #bands=  24
+  0) Finished k-point number  18  18 with #bands=  24
+  0) Finished k-point number  18  18 with #bands=  24
+  0) Finished k-point number  19  19 with #bands=  24
+  0) Finished k-point number  19  19 with #bands=  24
+  0) Finished k-point number  20  20 with #bands=  24
+  0) Finished k-point number  20  20 with #bands=  24
+  0) Finished k-point number  21  21 with #bands=  24
+  0) Finished k-point number  21  21 with #bands=  24
+  0) Finished k-point number  22  22 with #bands=  24
+  0) Finished k-point number  22  22 with #bands=  24
+  0) Finished k-point number  23  23 with #bands=  24
+  0) Finished k-point number  23  23 with #bands=  24
+  0) Finished k-point number  24  24 with #bands=  24
+  0) Finished k-point number  24  24 with #bands=  24
+  0) Finished k-point number  25  25 with #bands=  24
+  0) Finished k-point number  25  25 with #bands=  24
+  0) Finished k-point number  26  26 with #bands=  24
+  0) Finished k-point number  26  26 with #bands=  24
+  0) Finished k-point number  27  27 with #bands=  24
+  0) Finished k-point number  27  27 with #bands=  24
+  0) Finished k-point number  28  28 with #bands=  24
+  0) Finished k-point number  28  28 with #bands=  24
+  0) Finished k-point number  29  29 with #bands=  24
+  0) Finished k-point number  29  29 with #bands=  24
+  0) Finished k-point number  30  30 with #bands=  24
+  0) Finished k-point number  30  30 with #bands=  24
+  0) Finished k-point number  31  31 with #bands=  24
+  0) Finished k-point number  31  31 with #bands=  24
+  0) Finished k-point number  32  32 with #bands=  24
+  0) Finished k-point number  32  32 with #bands=  24
+  0) Finished k-point number  33  33 with #bands=  24
+  0) Finished k-point number  33  33 with #bands=  24
+  0) Finished k-point number  34  34 with #bands=  24
+  0) Finished k-point number  34  34 with #bands=  24
+  0) Finished k-point number  35  35 with #bands=  24
+  0) Finished k-point number  35  35 with #bands=  24
+EF[eV]=   5.76689380 Density=   64.00000000 N=   64.0000 EF[Ry]=    0.42385889
+EF[eV]=   5.76675774 Density=   63.99950676 N=   64.0000 EF[Ry]=    0.42384889
+EF[eV]=   5.76675774 Density=   63.99950676 N=   64.0000 EF[Ry]=    0.42384889
+  
+ Brent's Method
+  
+ Step      XA            XB             F(XA)         F(XB)
+  
+   0    0.42385889      0.42384889      0.193705E-08 -0.493239E-03
+   1    0.42385889      0.42385889     -0.473866E-07  0.193705E-08
+  
+   Absolute convergence of the X interval.
+Difference in EF=   0.0000000000 EF set to :    5.7668938003 new EF (no-mixing):    5.7668938003
+
+
+
+:NOE  : NUMBER OF ELECTRONS          =  64.000
+
+:FER  : F E R M I - ENERGY           =   0.42386
+ max k indices:           4           4           6
+ n,iff1,iff2,iff3         -56          24          24          30
+  atom           1  ncomu           0  lmmax          10
+
+       LMMAX 10
+       LM=   0 0  2 0 -3 2  4 0  4 4 -5 2  6 0  6 4  0 0  0 0
+  atom           2  ncomu           0  lmmax          10
+
+       LMMAX 10
+       LM=   0 0  1 0  2 0  3 0  4 0  4 4  5 0  5 4  6 0  6 4
+
+          --------------------------------------------------------------------
+           W A V E F U N C T I O N S   AND   C H A R G E S   IN   S P H E R E S
+          --------------------------------------------------------------------
+pr_proc= 35  tot-k=140
+ mpr_proc=          35 myrank=           0 nprocs=           4 nkpt=         140
+:SELFENERGY_TAIL: GOOD     1     1    24   1.8791E+01   2.2042E+01   3.3680E-05   9.8780E-04   2.1838E-02   0.0000E+00    1.037558840E-01   -1.997456144E-03   -4.411855034E-02   -2.359281165E-02
+:SELFENERGY_TAIL: GOOD     1     2    24   1.8791E+01   2.2042E+01   3.2532E-05   9.2320E-04   2.0489E-02   0.0000E+00    1.012200118E-01   -1.751267527E-03   -3.868089158E-02   -2.448470947E-02
+:SELFENERGY_TAIL: GOOD     1     3    24   1.8791E+01   2.2042E+01   3.0303E-05   7.8306E-04   1.6016E-02   0.0000E+00    1.115005149E-01   -1.428639409E-03   -3.155488538E-02   -2.359035249E-02
+:SELFENERGY_TAIL: GOOD     1     4    24   1.8791E+01   2.2042E+01   2.9283E-05   7.2238E-04   1.5866E-02   0.0000E+00    1.115030501E-01   -1.174307016E-03   -2.593735204E-02   -2.912838578E-02
+:SELFENERGY_TAIL: GOOD     1     5    24   1.8791E+01   2.2042E+01   2.9464E-05   7.2664E-04   1.4248E-02   0.0000E+00    1.187583035E-01   -1.284550597E-03   -2.837234266E-02   -2.423887199E-02
+:SELFENERGY_TAIL: GOOD     2     1    24   1.8791E+01   2.2042E+01   3.3680E-05   9.8780E-04   2.1838E-02   0.0000E+00    1.037558840E-01   -1.997456144E-03   -4.411855034E-02   -2.359281165E-02
+:SELFENERGY_TAIL: GOOD     2     2    24   1.8791E+01   2.2042E+01   3.2532E-05   9.2320E-04   2.0489E-02   0.0000E+00    1.012200118E-01   -1.751267527E-03   -3.868089158E-02   -2.448470947E-02
+:SELFENERGY_TAIL: GOOD     2     3    24   1.8791E+01   2.2042E+01   3.0303E-05   7.8306E-04   1.6016E-02   0.0000E+00    1.115005149E-01   -1.428639409E-03   -3.155488538E-02   -2.359035249E-02
+:SELFENERGY_TAIL: GOOD     2     4    24   1.8791E+01   2.2042E+01   2.9283E-05   7.2238E-04   1.5866E-02   0.0000E+00    1.115030501E-01   -1.174307016E-03   -2.593735204E-02   -2.912838578E-02
+:SELFENERGY_TAIL: GOOD     2     5    24   1.8791E+01   2.2042E+01   2.9464E-05   7.2664E-04   1.4248E-02   0.0000E+00    1.187583035E-01   -1.284550597E-03   -2.837234266E-02   -2.423887199E-02
+:DMFT_ONEPARTICLE_DUMP: /private/tmp/radial_stress_response_20261108/FeSe_DMFT/one_particle.k00000001.bin
+:DMFT_STERNHEIMER_DUMP: /private/tmp/radial_stress_response_20261108/FeSe_DMFT/projector.k00000001.bin
+  0) Finished k-point   1    1 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.27881 in Band of energy    4.4752eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02279, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point   2    2 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.41858 in Band of energy    4.5349eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02419, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point   3    3 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.33873 in Band of energy    4.6296eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02339, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point   4    4 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.12967 in Band of energy    4.6905eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02130, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point   5    5 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point   6    6 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.08812 in Band of energy    4.5130eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02088, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point   7    7 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.25829 in Band of energy    9.9450eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02258, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point   8    8 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.20656 in Band of energy    8.7750eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02207, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point   9    9 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  10   10 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  11   11 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  12   12 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.07220 in Band of energy   10.4585eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02072, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point  13   13 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  14   14 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  15   15 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  16   16 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  17   17 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  18   18 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  19   19 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  20   20 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.01012 in Band of energy    5.9873eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02010, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point  21   21 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  22   22 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.01939 in Band of energy    8.5384eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02019, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point  23   23 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  24   24 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  25   25 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  26   26 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.21384 in Band of energy    7.8410eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02214, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point  27   27 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  28   28 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  29   29 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  30   30 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  31   31 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.34004 in Band of energy    8.0922eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02340, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point  32   32 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+
+
+   QTL-B VALUE .EQ.    2.01277 in Band of energy    7.9967eV from EF ATOM=    1  L=  2
+   The projection of charge to \dot{u}(r) is   0.02013, which is large. Most likely no ghostbands, but adjust Energy-parameters for this ATOM and L
+
+
+  0) Finished k-point  33   33 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  34   34 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  0) Finished k-point  35   35 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_NORMALIZATION_ADJOINT_SYMMETRY: APPLY    1.81129561451E-01    9.23356217477E-02    5.80865500329E-03
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.550081850222E-03
+:DMFT_STERNHEIMER_NORMALIZATION_DUMP: /private/tmp/radial_stress_response_20261108/FeSe_DMFT/projector_norm.k00000001.bin
+ Finished normalization-window stress k-point     1
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.548402132685E-03
+ Finished normalization-window stress k-point     2
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.548134028851E-03
+ Finished normalization-window stress k-point     3
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.545962323890E-03
+ Finished normalization-window stress k-point     4
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     7.691424723384E-04
+ Finished normalization-window stress k-point     5
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.097030119502E-03
+ Finished normalization-window stress k-point     6
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.093798721806E-03
+ Finished normalization-window stress k-point     7
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.092290079071E-03
+ Finished normalization-window stress k-point     8
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.085972529017E-03
+ Finished normalization-window stress k-point     9
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.540713858177E-03
+ Finished normalization-window stress k-point    10
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.089778616084E-03
+ Finished normalization-window stress k-point    11
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.088891590705E-03
+ Finished normalization-window stress k-point    12
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.086916593820E-03
+ Finished normalization-window stress k-point    13
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.084660195137E-03
+ Finished normalization-window stress k-point    14
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.542660559362E-03
+ Finished normalization-window stress k-point    15
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.086247757240E-03
+ Finished normalization-window stress k-point    16
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.084289007705E-03
+ Finished normalization-window stress k-point    17
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.082030289042E-03
+ Finished normalization-window stress k-point    18
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.084587390421E-03
+ Finished normalization-window stress k-point    19
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.543339571071E-03
+ Finished normalization-window stress k-point    20
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.089200324622E-03
+ Finished normalization-window stress k-point    21
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.086468205255E-03
+ Finished normalization-window stress k-point    22
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.084103738633E-03
+ Finished normalization-window stress k-point    23
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.085982278064E-03
+ Finished normalization-window stress k-point    24
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.543899328877E-03
+ Finished normalization-window stress k-point    25
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.091041276349E-03
+ Finished normalization-window stress k-point    26
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.088164013824E-03
+ Finished normalization-window stress k-point    27
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.086027091515E-03
+ Finished normalization-window stress k-point    28
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.087934419056E-03
+ Finished normalization-window stress k-point    29
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.544745415901E-03
+ Finished normalization-window stress k-point    30
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.093212421771E-03
+ Finished normalization-window stress k-point    31
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.089762478819E-03
+ Finished normalization-window stress k-point    32
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.087704436541E-03
+ Finished normalization-window stress k-point    33
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     3.090396427461E-03
+ Finished normalization-window stress k-point    34
+:DMFT_NORM_WINDOW_METRIC_KERNEL:     1.546174907262E-03
+ Finished normalization-window stress k-point    35
+:DMFT_STRESS_SIGMA_DIAG_ENABLED T
+:DMFT_STRESS_PROJECTOR_RAW_SIGN   -1.0
+:DMFT_STRESS_NORM_RESPONSE_SIGN    1.0
+:DMFT_STRESS_PROFILE_WALL_MAX_S      11.9484     122.1382     133.4259     117.4483       0.0657     335.4999
+:DMFT_STRESS_PROFILE_LABELS sigma_diag main window normalization rela_setup rela_band
+:DMFT_STRESS_RESPONSE_MODES_MAX     48     48
+:DMFT_STRESS_RESPONSE_MODE_LABELS window normalization
+:DMFT_STRESS_RESPONSES_FUSED F
+:DMFT_STRESS_RADIAL_FD_RHO_HSPH_RY   -4.541458577346773E+01
+:DMFT_STRESS_RADIAL_FD_RHO_HNSP_RY   -5.883312323556949E-03
+:DMFT_STRESS_RADIAL_FD_RHOE_OVERLAP_RY   -4.527878690122395E+01
+:DMFT_STRESS_RADIAL_FD_DK_RY   -1.416821845673368E-01
+:DMFT_STRESS_RADIAL_FD_MEAN_DK_GPA       -1.313400010
+:DMFT_STRESS_RADIAL_FD_PASS_RY 1   -4.541766843714781E+01    2.879579483087748E-03   -4.595549478727739E+01    5.407059296126633E-01
+:DMFT_STRESS_RADIAL_FD_PASS_MEAN_DK_GPA 1        5.012367471
+:DMFT_STRESS_RADIAL_FD_PASS_RY 2   -3.171309820074803E-03   -7.202995664392826E-03    4.746582923032797E-03   -1.512088840750043E-02
+:DMFT_STRESS_RADIAL_FD_PASS_MEAN_DK_GPA 2       -0.140171293
+:DMFT_STRESS_RADIAL_FD_PASS_RY 3    6.253973500117422E-03   -1.559896142251907E-03    6.719613031306195E-01   -6.672672257727540E-01
+:DMFT_STRESS_RADIAL_FD_PASS_MEAN_DK_GPA 3       -6.185596187
+:DMFT_STRESS_RADIAL_FD_NOT_ADDED_TO_PRODUCTION T
+=== DMFT analytic-stress diagnostic decomposition ===
+Rows are MPI-reduced but unsymmetrized; units are Ry/Bohr^3.
+:DMFT_STRESS_DIAG_MAIN_TOTAL_RY001    1.74988805962E+00    1.79923180527E-03   -8.29613571382E-05
+:DMFT_STRESS_DIAG_MAIN_TOTAL_RY002    1.79923180527E-03    1.75448294932E+00    2.98874389621E-04
+:DMFT_STRESS_DIAG_MAIN_TOTAL_RY003   -8.29613718623E-05    2.98874397949E-04    1.75544903725E+00
+:DMFT_STRESS_DIAG_MAIN_TOTAL_MEAN_GPA    2.57915563602E+04
+:DMFT_STRESS_DIAG_MAIN_DFTLIKE_RY001    1.75133861103E+00    1.80362316598E-03    4.08965417600E-05
+:DMFT_STRESS_DIAG_MAIN_DFTLIKE_RY002    1.80362316598E-03    1.75577425013E+00    3.00081709730E-04
+:DMFT_STRESS_DIAG_MAIN_DFTLIKE_RY003    4.08965334166E-05    3.00081717913E-04    1.75664139102E+00
+:DMFT_STRESS_DIAG_MAIN_DFTLIKE_MEAN_GPA    2.58108477608E+04
+:DMFT_STRESS_DIAG_SIGMA_MOMENT_OVERLAP_RY001   -1.45055141000E-03   -4.39136071482E-06   -1.23857898898E-04
+:DMFT_STRESS_DIAG_SIGMA_MOMENT_OVERLAP_RY002   -4.39136071482E-06   -1.29130080512E-03   -1.20732010883E-06
+:DMFT_STRESS_DIAG_SIGMA_MOMENT_OVERLAP_RY003   -1.23857905279E-04   -1.20731996466E-06   -1.19235377148E-03
+:DMFT_STRESS_DIAG_SIGMA_MOMENT_OVERLAP_MEAN_GPA   -1.92914005698E+01
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_MATCHING_RY001   -3.27925156773E-03   -4.88391965964E-06   -1.22836843004E-04
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_MATCHING_RY002   -4.88391965964E-06   -3.10979691630E-03   -1.33633789968E-07
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_MATCHING_RY003   -1.22836849339E-04   -1.33633596620E-07   -3.01445523082E-03
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_MATCHING_MEAN_GPA   -4.61101318894E+01
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_RADIAL_RY001    1.84266447980E-03   -2.12813160205E-05    6.00818536184E-07
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_RADIAL_RY002   -2.12813160205E-05    1.82453721871E-03    3.74855855976E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_RADIAL_RY003    6.00818601361E-07    3.74855881047E-06    1.80209602974E-03
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_RADIAL_MEAN_GPA    2.68187313197E+01
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_ANGULAR_RY001   -1.39643220722E-05    2.17738749654E-05   -1.62187443035E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_ANGULAR_RY002    2.17738749654E-05   -6.04110752769E-06   -4.82224487863E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_ANGULAR_RY003   -1.62187454144E-06   -4.82224517851E-06    2.00054295999E-05
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_ANGULAR_MEAN_GPA    7.99223812719E-15
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_INTERSTITIAL_RY001   -1.24723564407E-04    4.90426895426E-07   -1.02097548853E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_INTERSTITIAL_RY002    4.90426895426E-07   -1.34925316550E-04   -1.07369966317E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_INTERSTITIAL_RY003   -1.02097548853E-06   -1.07369966317E-06   -1.31314663581E-04
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_INTERSTITIAL_MEAN_GPA   -1.91709187865E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_FIXED_SPHERE_RY001   -3.40397513214E-03   -4.39349276421E-06   -1.23857818493E-04
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_FIXED_SPHERE_RY002   -4.39349276421E-06   -3.24472223285E-03   -1.20733345313E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_FIXED_SPHERE_RY003   -1.23857824827E-04   -1.20733325979E-06   -3.14576989440E-03
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_FIXED_SPHERE_MEAN_GPA   -4.80272237681E+01
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_FD_MT_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_FD_MT_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_FD_MT_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_FD_MT_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_FD_TOTAL_RY001   -1.24723564407E-04    4.90426895426E-07   -1.02097548853E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_FD_TOTAL_RY002    4.90426895426E-07   -1.34925316550E-04   -1.07369966317E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_FD_TOTAL_RY003   -1.02097548853E-06   -1.07369966317E-06   -1.31314663581E-04
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_FD_TOTAL_MEAN_GPA   -1.91709187865E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_ANALYTIC_MT_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_ANALYTIC_MT_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_ANALYTIC_MT_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_ANALYTIC_MT_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_ANALYTIC_TOTAL_RY001   -1.24723564407E-04    4.90426895426E-07   -1.02097548853E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_ANALYTIC_TOTAL_RY002    4.90426895426E-07   -1.34925316550E-04   -1.07369966317E-06
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_ANALYTIC_TOTAL_RY003   -1.02097548853E-06   -1.07369966317E-06   -1.31314663581E-04
+:DMFT_STRESS_DIAG_SIGMA_OVERLAP_COEFF_ANALYTIC_TOTAL_MEAN_GPA   -1.91709187865E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_MATCHING_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_MATCHING_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_MATCHING_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_MATCHING_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_MATCHING_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_MATCHING_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_MATCHING_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_MATCHING_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_MATCHING_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_MATCHING_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_MATCHING_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_MATCHING_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_COMPLETE_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_COMPLETE_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_COMPLETE_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_COMPLETE_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_COMPLETE_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_COMPLETE_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_COMPLETE_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_COMPLETE_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_COMPLETE_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_COMPLETE_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_COMPLETE_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_COMPLETE_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_KINETIC_MATCHING_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_KINETIC_MATCHING_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_KINETIC_MATCHING_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_KINETIC_MATCHING_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_KINETIC_MATCHING_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_KINETIC_MATCHING_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_KINETIC_MATCHING_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_KINETIC_MATCHING_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_KINETIC_MATCHING_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_KINETIC_MATCHING_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_KINETIC_MATCHING_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_KINETIC_MATCHING_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_KINETIC_COMPLETE_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_KINETIC_COMPLETE_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_KINETIC_COMPLETE_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_WINDOW_KINETIC_COMPLETE_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_KINETIC_COMPLETE_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_KINETIC_COMPLETE_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_KINETIC_COMPLETE_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_NORM_KINETIC_COMPLETE_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_KINETIC_COMPLETE_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_KINETIC_COMPLETE_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_KINETIC_COMPLETE_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_MAIN_CORRECTION_KINETIC_COMPLETE_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_SIGMA_MATCHING_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_SIGMA_MATCHING_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_SIGMA_MATCHING_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_SIGMA_MATCHING_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_SIGMA_COMPLETE_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_SIGMA_COMPLETE_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_SIGMA_COMPLETE_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_SIGMA_COMPLETE_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_DIAGONAL_REFERENCE_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_DIAGONAL_REFERENCE_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_DIAGONAL_REFERENCE_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_DIAGONAL_REFERENCE_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_RECONSTRUCTED_MAIN_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_RECONSTRUCTED_MAIN_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_RECONSTRUCTED_MAIN_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_RECONSTRUCTED_MAIN_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_RECONSTRUCTED_MAIN_KINETIC_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_RECONSTRUCTED_MAIN_KINETIC_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_RECONSTRUCTED_MAIN_KINETIC_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_PAIRED_RECONSTRUCTED_MAIN_KINETIC_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_DFTLIKE_DIAGONAL_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_DFTLIKE_DIAGONAL_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_DFTLIKE_DIAGONAL_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_DFTLIKE_DIAGONAL_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_DFTLIKE_OFFDIAGONAL_RY001    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_DFTLIKE_OFFDIAGONAL_RY002    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_DFTLIKE_OFFDIAGONAL_RY003    0.00000000000E+00    0.00000000000E+00    0.00000000000E+00
+:DMFT_STRESS_DIAG_DFTLIKE_OFFDIAGONAL_MEAN_GPA    0.00000000000E+00
+:DMFT_STRESS_DIAG_WINDOW_TOTAL_RY001    1.44831613435E-03    2.45910513712E-05    1.11931631112E-05
+:DMFT_STRESS_DIAG_WINDOW_TOTAL_RY002    2.45910513712E-05    1.39651090942E-03    2.56773614882E-05
+:DMFT_STRESS_DIAG_WINDOW_TOTAL_RY003    1.11931640130E-05    2.56773626238E-05    1.52861867197E-03
+:DMFT_STRESS_DIAG_WINDOW_TOTAL_MEAN_GPA    2.14452149836E+01
+:DMFT_STRESS_DIAG_NORM_WINDOW_TOTAL_RY001   -4.12309768342E-04    2.77133869633E-05    8.82935495542E-05
+:DMFT_STRESS_DIAG_NORM_WINDOW_TOTAL_RY002    2.77133869633E-05   -4.54066065522E-04   -8.27486475129E-06
+:DMFT_STRESS_DIAG_NORM_WINDOW_TOTAL_RY003    8.82935533658E-05   -8.27486551037E-06   -4.71792539412E-04
+:DMFT_STRESS_DIAG_NORM_WINDOW_TOTAL_MEAN_GPA   -6.56171593622E+00
+:DMFT_STRESS_DIAG_MAIN_OVERLAP_PART_RY001    2.39932820741E-01   -3.35628746504E-02    4.41440064950E-03
+:DMFT_STRESS_DIAG_MAIN_OVERLAP_PART_RY002   -3.35628746504E-02    2.15832081841E-01    5.12964470894E-03
+:DMFT_STRESS_DIAG_MAIN_OVERLAP_PART_RY003    4.41440090958E-03    5.12964457842E-03    2.52751461729E-01
+:DMFT_STRESS_DIAG_MAIN_OVERLAP_PART_MEAN_GPA    3.47421386697E+03
+:DMFT_STRESS_DIAG_WINDOW_OVERLAP_PART_RY001    1.21456668474E-04   -2.16352189600E-05    2.45008148197E-05
+:DMFT_STRESS_DIAG_WINDOW_OVERLAP_PART_RY002   -2.16352189600E-05    9.09595892330E-05   -4.91769864112E-06
+:DMFT_STRESS_DIAG_WINDOW_OVERLAP_PART_RY003    2.45008162588E-05   -4.91769878483E-06   -1.75127322575E-06
+:DMFT_STRESS_DIAG_WINDOW_OVERLAP_PART_MEAN_GPA    1.03299690344E+00
+:DMFT_STRESS_DIAG_WINDOW_HAMILTONIAN_PART_RY001    1.32685946588E-03    4.62262703312E-05   -1.33076517085E-05
+:DMFT_STRESS_DIAG_WINDOW_HAMILTONIAN_PART_RY002    4.62262703312E-05    1.30555132019E-03    3.05950601293E-05
+:DMFT_STRESS_DIAG_WINDOW_HAMILTONIAN_PART_RY003   -1.33076522458E-05    3.05950614087E-05    1.53036994520E-03
+:DMFT_STRESS_DIAG_WINDOW_HAMILTONIAN_PART_MEAN_GPA    2.04122180802E+01
+:DMFT_STRESS_DIAG_NORM_OVERLAP_PART_RY001    1.05250926751E-03    5.59417648014E-05    6.74136795121E-05
+:DMFT_STRESS_DIAG_NORM_OVERLAP_PART_RY002    5.59417648014E-05    9.95733782341E-04    5.70383977027E-07
+:DMFT_STRESS_DIAG_NORM_OVERLAP_PART_RY003    6.74136828127E-05    5.70383897645E-07    1.06322816616E-03
+:DMFT_STRESS_DIAG_NORM_OVERLAP_PART_MEAN_GPA    1.52571161230E+01
+:DMFT_STRESS_DIAG_NORM_HAMILTONIAN_PART_RY001   -1.46481903585E-03   -2.82283778382E-05    2.08798700421E-05
+:DMFT_STRESS_DIAG_NORM_HAMILTONIAN_PART_RY002   -2.82283778382E-05   -1.44979984786E-03   -8.84524872832E-06
+:DMFT_STRESS_DIAG_NORM_HAMILTONIAN_PART_RY003    2.08798705531E-05   -8.84524940802E-06   -1.53502070557E-03
+:DMFT_STRESS_DIAG_NORM_HAMILTONIAN_PART_MEAN_GPA   -2.18188320592E+01
+:DMFT_STRESS_DIAG_EXPLICIT_PROJECTOR_RY001    5.05570853534E-04   -7.31381155761E-06    1.60695909239E-04
+:DMFT_STRESS_DIAG_EXPLICIT_PROJECTOR_RY002   -7.31381155761E-06    2.72181150059E-04   -4.28366192795E-06
+:DMFT_STRESS_DIAG_EXPLICIT_PROJECTOR_RY003    1.60695909239E-04   -4.28366192795E-06    2.27280965874E-04
+:DMFT_STRESS_DIAG_EXPLICIT_PROJECTOR_MEAN_GPA    4.92818466187E+00
+:DMFT_STRESS_DIAG_RELA_VOLUME_IN_KIN_MT_RY001   -7.90664045192E-03   -1.46031681722E-06   -1.46003245174E-06
+:DMFT_STRESS_DIAG_RELA_VOLUME_IN_KIN_MT_RY002   -1.46031681722E-06   -7.90329247331E-03   -1.54693715426E-06
+:DMFT_STRESS_DIAG_RELA_VOLUME_IN_KIN_MT_RY003   -1.46003245944E-06   -1.54693717440E-06   -7.91022115432E-03
+:DMFT_STRESS_DIAG_RELA_VOLUME_IN_KIN_MT_MEAN_GPA   -1.16311905244E+02
+:DMFT_STRESS_DIAG_RELA_SURFACE_IN_KIN_MT_RY001    1.91436488037E-08    4.10208199053E-10    1.70919463208E-11
+:DMFT_STRESS_DIAG_RELA_SURFACE_IN_KIN_MT_RY002    4.10208199053E-10    1.83155590102E-08   -2.21387423875E-11
+:DMFT_STRESS_DIAG_RELA_SURFACE_IN_KIN_MT_RY003    1.70919390363E-11   -2.21387453758E-11    1.97893555181E-08
+:DMFT_STRESS_DIAG_RELA_SURFACE_IN_KIN_MT_MEAN_GPA    2.80718643366E-04
+:DMFT_STRESS_DIAG_ASSEMBLED_VALENCE_RY001    1.75142963684E+00    1.84422243204E-03    1.77221264766E-04
+:DMFT_STRESS_DIAG_ASSEMBLED_VALENCE_RY002    1.84422243204E-03    1.75569757532E+00    3.11993224430E-04
+:DMFT_STRESS_DIAG_ASSEMBLED_VALENCE_RY003    1.77221254756E-04    3.11993233134E-04    1.75673314435E+00
+:DMFT_STRESS_DIAG_ASSEMBLED_VALENCE_MEAN_GPA    2.58113680439E+04
+:DMFT_STRESS_DIAG_MAIN_VAL_CORR_RY001   -1.47705426366E-03    3.64511722329E-06   -1.55796209388E-04
+:DMFT_STRESS_DIAG_MAIN_VAL_CORR_RY002    3.64511722329E-06   -1.32366015727E-03    4.07285729525E-06
+:DMFT_STRESS_DIAG_MAIN_VAL_CORR_RY003   -1.55796217558E-04    4.07285751290E-06   -8.88567237519E-04
+:DMFT_STRESS_DIAG_MAIN_VAL_CORR_MEAN_GPA   -1.80904127873E+01
+:DMFT_STRESS_DIAG_MAIN_KIN_MT_RY001    1.74929417828E+00    1.92231525643E-03    3.32443460935E-05
+:DMFT_STRESS_DIAG_MAIN_KIN_MT_RY002    1.92231525643E-03    1.75372327712E+00    2.79905847624E-04
+:DMFT_STRESS_DIAG_MAIN_KIN_MT_RY003    3.32443395016E-05    2.79905855744E-04    1.75418725408E+00
+:DMFT_STRESS_DIAG_MAIN_KIN_MT_MEAN_GPA    2.57787320423E+04
+:DMFT_STRESS_DIAG_MAIN_KIN_INT_RY001    2.50691831638E-03   -1.26552807814E-04    3.95809619567E-05
+:DMFT_STRESS_DIAG_MAIN_KIN_INT_RY002   -1.26552807814E-04    2.51185946039E-03    1.51970368543E-05
+:DMFT_STRESS_DIAG_MAIN_KIN_INT_RY003    3.95809619567E-05    1.51970368543E-05    2.58791556104E-03
+:DMFT_STRESS_DIAG_MAIN_KIN_INT_MEAN_GPA    3.72994623796E+01
+:DMFT_STRESS_DIAG_MAIN_APW_RY001   -4.35982717930E-04   -1.75760573764E-07    9.54419977978E-09
+:DMFT_STRESS_DIAG_MAIN_APW_RY002   -1.75760573764E-07   -4.28527101022E-04   -3.01352152038E-07
+:DMFT_STRESS_DIAG_MAIN_APW_RY003    9.54423768393E-09   -3.01352163121E-07   -4.37565148818E-04
+:DMFT_STRESS_DIAG_MAIN_APW_MEAN_GPA   -6.38473172494E+00
+:DMFT_STRESS_DIAG_WINDOW_VAL_CORR_RY001    2.11261045339E-06   -3.83331010983E-06   -5.19913106597E-06
+:DMFT_STRESS_DIAG_WINDOW_VAL_CORR_RY002   -3.83331010983E-06    3.25829333582E-05    9.83031182402E-07
+:DMFT_STRESS_DIAG_WINDOW_VAL_CORR_RY003   -5.19913147189E-06    9.83031118511E-07    4.74139063831E-05
+:DMFT_STRESS_DIAG_WINDOW_VAL_CORR_MEAN_GPA    4.02624138050E-01
+:DMFT_STRESS_DIAG_WINDOW_KIN_MT_RY001    1.48141373418E-03    2.29389080248E-05    2.47859547173E-05
+:DMFT_STRESS_DIAG_WINDOW_KIN_MT_RY002    2.29389080248E-05    1.41853236547E-03    2.69844353383E-05
+:DMFT_STRESS_DIAG_WINDOW_KIN_MT_RY003    2.47859560352E-05    2.69844365428E-05    1.53576390726E-03
+:DMFT_STRESS_DIAG_WINDOW_KIN_MT_MEAN_GPA    2.17505282759E+01
+:DMFT_STRESS_DIAG_WINDOW_KIN_INT_RY001   -3.59618750543E-05    5.73766316751E-06   -8.15582248307E-06
+:DMFT_STRESS_DIAG_WINDOW_KIN_INT_RY002    5.73766316751E-06   -5.34982614954E-05   -2.17174607467E-06
+:DMFT_STRESS_DIAG_WINDOW_KIN_INT_RY003   -8.15582248307E-06   -2.17174607467E-06   -5.33983196325E-05
+:DMFT_STRESS_DIAG_WINDOW_KIN_INT_MEAN_GPA   -7.00507221120E-01
+:DMFT_STRESS_DIAG_WINDOW_APW_RY001    7.51664768361E-07   -2.52209711219E-07   -2.37838057043E-07
+:DMFT_STRESS_DIAG_WINDOW_APW_RY002   -2.52209711219E-07   -1.10612790641E-06   -1.18358957904E-07
+:DMFT_STRESS_DIAG_WINDOW_APW_RY003   -2.37838067243E-07   -1.18358962819E-07   -1.16082204147E-06
+:DMFT_STRESS_DIAG_WINDOW_APW_MEAN_GPA   -7.43020916419E-03
+:DMFT_STRESS_DIAG_NORM_VAL_CORR_RY001    1.14013237770E-03    4.22495559301E-05    8.72255891347E-05
+:DMFT_STRESS_DIAG_NORM_VAL_CORR_RY002    4.22495559301E-05    1.03659700151E-03   -5.02964900773E-06
+:DMFT_STRESS_DIAG_NORM_VAL_CORR_RY003    8.72255937637E-05   -5.02964927373E-06    1.01059431554E-03
+:DMFT_STRESS_DIAG_NORM_VAL_CORR_MEAN_GPA    1.56290591673E+01
+:DMFT_STRESS_DIAG_NORM_KIN_MT_RY001   -1.59870878349E-03   -8.35985114831E-06   -7.14493312528E-06
+:DMFT_STRESS_DIAG_NORM_KIN_MT_RY002   -8.35985114831E-06   -1.55547228982E-03   -6.28883473542E-06
+:DMFT_STRESS_DIAG_NORM_KIN_MT_RY003   -7.14493395429E-06   -6.28883523108E-06   -1.55271071386E-03
+:DMFT_STRESS_DIAG_NORM_KIN_MT_MEAN_GPA   -2.30802696183E+01
+:DMFT_STRESS_DIAG_NORM_KIN_INT_RY001    4.23138299120E-05   -6.17036691030E-06    8.03734006514E-06
+:DMFT_STRESS_DIAG_NORM_KIN_INT_RY002   -6.17036691030E-06    5.98539520672E-05    3.03355141135E-06
+:DMFT_STRESS_DIAG_NORM_KIN_INT_RY003    8.03734006514E-06    3.03355141135E-06    6.55068356763E-05
+:DMFT_STRESS_DIAG_NORM_KIN_INT_MEAN_GPA    8.22193404614E-01
+:DMFT_STRESS_DIAG_NORM_APW_RY001    3.95280753901E-06   -5.95090821961E-09    1.75553479640E-07
+:DMFT_STRESS_DIAG_NORM_APW_RY002   -5.95090821961E-09    4.95527073021E-06    1.00675804975E-08
+:DMFT_STRESS_DIAG_NORM_APW_RY003    1.75553491265E-07    1.00675830818E-08    4.81702322275E-06
+:DMFT_STRESS_DIAG_NORM_APW_MEAN_GPA    6.73011102225E-02
+:DMFT_STRESS_PAIRED_ASSEMBLY: F
+:DMFT_STRESS_OVERLAP_MODE: CURRENT
+:DMFT_STRESS_MOVING_BAND: F
+:DMFT_STRESS_RESPONSE_MODE: FULL
+ ==============INDIVIDUAL VALENCE STRESS TNESOR====================
+
+ ---SPHERICAL PART OF THE "valence correction" ---
+ -0.15585602622768649        0.0000000000000000        0.0000000000000000     
+   0.0000000000000000      -0.15585602622768654        0.0000000000000000     
+   0.0000000000000000        0.0000000000000000        8.9627928558514883E-002
+
+ ---Valence kinetic stress inside atomic sphere ---
+   926.41521404654372        0.0000000000000000        0.0000000000000000     
+   0.0000000000000000        926.41521404654372        0.0000000000000000     
+   0.0000000000000000        0.0000000000000000        927.89033024304456     
+
+ ---Valence kinetic stress in the intersititial region ---
+   1.3307335811876644        0.0000000000000000        0.0000000000000000     
+   0.0000000000000000        1.3307335811876642        0.0000000000000000     
+   0.0000000000000000        0.0000000000000000        1.3753152641580937     
+
+ ---Extra surface term from the kinetic energy ---
+ -0.22638437138762091        0.0000000000000000        0.0000000000000000     
+   0.0000000000000000      -0.22638437138762091        0.0000000000000000     
+   0.0000000000000000        0.0000000000000000      -0.22952156643458113     
+
+ ---Explicit normalized-DMFT-projector stress ---
+  0.20570082633096176        0.0000000000000000        0.0000000000000000     
+   0.0000000000000000       0.20570082633096176        0.0000000000000000     
+   0.0000000000000000        0.0000000000000000       0.12022311038344989     
+
+ ---Normalization-window response stress ---
+ -0.22914016822253533        0.0000000000000000        0.0000000000000000     
+   0.0000000000000000      -0.22914016822253533        0.0000000000000000     
+   0.0000000000000000        0.0000000000000000      -0.24956056626105660     
+
+ ---Nonspherical G2 terms; selected mode: FULL ---
+ MATCH    -9.1569387161589549E-002   0.0000000000000000        0.0000000000000000     
+ RADIAL   -2.6297713107941902E-002   0.0000000000000000        0.0000000000000000     
+ ANGULAR   1.1501867001061665E-003   0.0000000000000000        0.0000000000000000     
+ MATCH     0.0000000000000000       -9.1569387161589536E-002   0.0000000000000000     
+ RADIAL    0.0000000000000000       -2.6297713107941899E-002   0.0000000000000000     
+ ANGULAR   0.0000000000000000        1.1501867001061665E-003   0.0000000000000000     
+ MATCH     0.0000000000000000        0.0000000000000000      -0.14175043929569320     
+ RADIAL    0.0000000000000000        0.0000000000000000       0.22505539677864259     
+ ANGULAR   0.0000000000000000        0.0000000000000000       -2.3003734002124054E-003
+
+ Sum of eigenvalues=  -1723.0807012151190      eV
+ TrLogG=  -1742.8300555705862      eV
+ icix=           1 it=           1 it2=           1
+ icix=           1 it=           2 it2=           2
+ icix=           1 it=           3 it2=           3
+ icix=           1 it=           4 it2=           4
+ icix=           1 it=           5 it2=           5
+ icix=           2 it=           1 it2=           1
+ icix=           2 it=           2 it2=           2
+ icix=           2 it=           3 it2=           3
+ icix=           2 it=           4 it2=           4
+ icix=           2 it=           5 it2=           5
+ icx_ind=           2           2           2           2           2
+ it_ind=           1           2           3           4           5
+ Nds for each orbital:
+   c:     2.7848184      2.6200956      2.3703583      2.3707627      2.3732455 
+ -Tr(G*(s_oo-Vdc)) for each orbital in mRy/Br:
+   c:   -34.9164024    -56.2390944    -99.0962522    -99.2363158    -93.5412092 
+-Tr(G*(Sigma-s_oo)) for each orbital in mRy/Br:
+   c:   245.1663124    237.6244955    310.1404270    309.2475324    350.3023936 
+-Tr(G*(Sigma-Vdc)) for each orbital in mRy/Br:
+   c:   210.2499100    181.3854011    211.0441748    210.0112167    256.7611844 
+:DMFT_STRESS_TRACE_RHOE_RY   -1.277139012837811E+02
+:DMFT_STRESS_TRACE_ERHO_RY   -1.266441011669046E+02
+:DMFT_STRESS_TRACE_SIGMA_MOMENT_RY   -1.069800116876352E+00
+:DMFT_STRESS_TRACE_IDENTITY_RESIDUAL_RY   -8.482103908136196E-14
+:DMFT_STRESS_TRSIGVDC_LOCAL_RY   -1.069451886960662E+00
+:DMFT_STRESS_SIGMA_TRACE_MINUS_LOCAL_RY   -3.482299156893909E-04
+:DMFT_STRESS_SIGMA_TRACE_PLUS_LOCAL_RY   -2.139252003837014E+00
+ TrLog(Gloc)[eV]=  -55.633365925879133     
+ Eimp*Nd[eV]=  -19.375589412181107     
+ (Eimp+s_oo)*Nd[eV]=  -14.164211054536665     
+ Tr((Delta-w*dDelta)G)=  -16.637650426755670     
+Ratio to renormalize= 0.999999999973 rho-rho_expected=   0.0000000017
+0 TOTAL CHARGE INSIDE SPHERE    1:   14.701114
+:PCS001: PARTIAL CHARGES SPHERE =  1 S,P,D,F,PZ,PXY,,D-Z2,D-XY,D-X2Y2,D-XZ,YZ 
+:QTL001: 2.3206 6.3337 6.0198 0.0217 2.1006 4.2331 0.0000 1.3279 1.1431 1.2605 2.2883 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL001:  2.0788 -5.8302    6.0331 -3.5306    0.0489 -0.4952    0.0041 -0.6296
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH001:  0.2418  0.0738    0.3005  0.1467    5.9709  0.2631    0.0176  0.1713
+  EFG INSIDE SPHERE    1:   -0.102528      UP TO R =  2.2800000
+0 TOTAL CHARGE INSIDE SPHERE    2:   13.821599
+:PCS002: PARTIAL CHARGES SPHERE =  2 S,P,D,F,PZ,PXY,,D-Z2,D-XY,D-X2Y2,D-XZ,YZ 
+:QTL002: 1.4608 2.301110.0466 0.0106 0.7809 1.5202 0.0000 2.0091 2.0076 2.0071 4.0228 0.0000
+        Q-s-low E-s-low   Q-p-low E-p-low   Q-d-low E-d-low   Q-f-low E-f-low
+:EPL002:  1.3617 -0.5685    0.1137 -0.0912    9.9866 -3.1099    0.0003 -2.3764
+        Q-s-hi  E-s-hi    Q-p-hi  E-p-hi    Q-d-hi  E-d-hi    Q-f-hi  E-f-hi 
+:EPH002:  0.0992  0.1060    2.1874  0.1280    0.0600  0.2213    0.0103  0.2588
+  EFG INSIDE SPHERE    2:   -3.215702      UP TO R =  2.1700000
+
+   atpar              (cpu,wall):       0.0       0.0
+   readvec            (cpu,wall):       0.0       0.0
+   readvec, read only (cpu,wall):       0.0       0.0
+   cmp_MT_density     (cpu,wall):     261.5     265.1
+   alm_blm_clm             (cpu):       0.2       0.2
+   blocked loop            (cpu):       1.0       1.1
+   ilm-tot loop            (cpu):       0.2       0.3
+   cmm_MT_force            (cpu):       0.0       0.0
+   local orbit loop        (cpu):       0.3       0.3
+   ilm-1 loop              (cpu):       0.0       0.1
+   ilm-2 loop              (cpu):       0.1       0.2
+   ilm-3 loop              (cpu):       0.1       0.0
+   cmp_dmft_weights        (cpu):       3.7       5.4
+   write-clm          (cpu,wall):       0.0       0.0
+   write-scf          (cpu,wall):       0.0       0.0
+   write-efg          (cpu,wakk):       0.0       0.0
+   write              (cpu,wall):       0.0       0.0
+   dmft renorm-overlap(cpu,wall):       0.1       0.1
+   dmft chemical pot  (cpu,wall):       2.1       2.1
+   dmft transformation(cpu,wall):       0.1       0.2
+   dmft exact-diag    (cpu,wall):       0.0       0.0
+   interstitial charge(cpu,wall):       0.2       0.2
+   cmp_log_gdloc      (cpu,wall):       0.0       0.0
+
+:CHA  : TOTAL CHARGE INSIDE UNIT CELL =      64.000000
+
+:NCOR    6.25966235  1    5       2.60569679  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.39242585       0.00000000       0.00000000       0.00000000       0.00000000   
+    0.00000000       1.31004069       0.00000000       0.00000000       0.00000000   
+    0.00000000       0.00000000       1.18528142       0.00000000       0.00000000   
+    0.00000000       0.00000000       0.00000000       1.18528142       0.00000000   
+    0.00000000       0.00000000       0.00000000       0.00000000       1.18663296   
+:NCOR    6.25961797  2    5       2.60568157  # nf, icix, dimension Tr((s_oo-Edc)*G)
+    1.39239252       0.00000000       0.00000000       0.00000000      -0.00000000   
+    0.00000000       1.31005485       0.00000000       0.00000000       0.00000000   
+    0.00000000       0.00000000       1.18527906       0.00000000      -0.00000000   
+    0.00000000       0.00000000       0.00000000       1.18527906      -0.00000000   
+   -0.00000000       0.00000000      -0.00000000      -0.00000000       1.18661248   
+
+:DM    1   Density matrix
+    1.39242585   -0.00000000       0.00000000    0.00000000       0.00000000    0.00000000       0.00000000    0.00000000       0.00000000    0.00000000   
+    0.00000000   -0.00000000       1.31004069    0.00000000       0.00000000   -0.00000000       0.00000000    0.00000000       0.00000000   -0.00000000   
+    0.00000000   -0.00000000       0.00000000    0.00000000       1.18528142   -0.00000000       0.00000000    0.00000000       0.00000000   -0.00000000   
+    0.00000000    0.00000000       0.00000000   -0.00000000       0.00000000   -0.00000000       1.18528142   -0.00000000       0.00000000    0.00000000   
+    0.00000000    0.00000000       0.00000000    0.00000000       0.00000000    0.00000000       0.00000000    0.00000000       1.18663296    0.00000000   
+:DM    2   Density matrix
+    1.39239252   -0.00000000       0.00000000   -0.00000000       0.00000000   -0.00000000       0.00000000    0.00000000      -0.00000000   -0.00000000   
+    0.00000000    0.00000000       1.31005485   -0.00000000       0.00000000    0.00000000       0.00000000    0.00000000       0.00000000    0.00000000   
+    0.00000000    0.00000000       0.00000000   -0.00000000       1.18527906    0.00000000       0.00000000    0.00000000      -0.00000000    0.00000000   
+    0.00000000    0.00000000       0.00000000   -0.00000000       0.00000000   -0.00000000       1.18527906    0.00000000      -0.00000000    0.00000000   
+   -0.00000000    0.00000000       0.00000000   -0.00000000      -0.00000000   -0.00000000      -0.00000000   -0.00000000       1.18661248   -0.00000000   
+
+Ratio to renormalize= 0.999999999973 rho-rho_expected=   0.0000000017
+TrLog(-G)=     -128.095652  TrLog(-Gloc)=       -4.088977
+
+
+   SUM OF EIGENVALUES:             -126.644101
+   Tr(log(G))-Tr(log(Gloc)):       -124.006675
+
+      1196 FOURIER COEFFICIENTS CALCULATED
+ LARGEST COMPONENTS:     5     5     7
+
+
+   =====>>> CPU TIME SUMMARY
+
+            TOTAL       :    387.5     ... 100. PERCENT
+            PART FERMI  :      0.1     ...   0. PERCENT
+            PART CLM    :    387.5     ... 100. PERCENT
+            PART FOURIR :      0.0     ...   0. PERCENT
+
+
+   =====>>> WALL TIME SUMMARY
+
+            TOTAL       :    393.8     ... 100. PERCENT
+            PART FERMI  :      0.1     ...   0. PERCENT
+            PART CLM    :    393.8     ... 100. PERCENT
+            PART FOURIR :      0.0     ...   0. PERCENT

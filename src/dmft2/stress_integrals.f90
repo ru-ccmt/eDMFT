@@ -188,7 +188,6 @@ subroutine kin_str_integrals(REL, rrad1,rrad2,rade1,rade2,a1lo,b1lo,jatom,imax,d
                           UCL(nrad),UCS(nrad),UCLP(nrad),UCSP(nrad),   &
                           UAB(nrad),UBA(nrad), &
                           UAA(nrad), r1(nrad)                                                     
-   logical             :: IsEven                       
    real*8              :: CIN,CINP,g0,TC, VALUE(nrad)                          
    
    
@@ -212,24 +211,22 @@ subroutine kin_str_integrals(REL, rrad1,rrad2,rade1,rade2,a1lo,b1lo,jatom,imax,d
        ! u_l(r)/r behaves as r**l at the origin.  DERGL_STRESS extends
        ! the radial mesh to negative r, so its parity flag must follow l.
        ! The distributed WIEN2k source leaves this assignment commented,
-       ! which makes IsEven undefined and the stress compiler-dependent.
-       IsEven = mod(lp,2).eq.0
-       call dergl_stress(imax,r1,UAL,UAA,IsEven,g0)   !in new dergl last logic is absent              
-       call dergl_stress(imax,r1,UAS,UAB,IsEven,g0)       
+       call g1_radial_derivative(imax,r1,UAL,UAA)   !in new dergl last logic is absent              
+       call g1_radial_derivative(imax,r1,UAS,UAB)       
        
-       call dergl_stress(imax,r1,UAA,UAL,IsEven,g0)
-       call dergl_stress(imax,r1,UAB,UAS,IsEven,g0)
+       call g1_radial_derivative(imax,r1,UAA,UAL)
+       call g1_radial_derivative(imax,r1,UAB,UAS)
        
        DO i = 1, imax
           uppl2(i,lp) = UAL(i)*r1(i)
           upps2(i,lp) = UAS(i)*r1(i)
        ENDDO       
        
-       call dergl_stress(imax,r1,UBL,UAA,IsEven,g0)
-       call dergl_stress(imax,r1,UBS,UAB,IsEven,g0)
+       call g1_radial_derivative(imax,r1,UBL,UAA)
+       call g1_radial_derivative(imax,r1,UBS,UAB)
        
-       call dergl_stress(imax,r1,UAA,UBL,IsEven,g0)
-       call dergl_stress(imax,r1,UAB,UBS,IsEven,g0)
+       call g1_radial_derivative(imax,r1,UAA,UBL)
+       call g1_radial_derivative(imax,r1,UAB,UBS)
        
        DO i = 1, imax
           udppl2(i,lp) = UBL(i)*r1(i)
@@ -258,12 +255,11 @@ subroutine kin_str_integrals(REL, rrad1,rrad2,rade1,rade2,a1lo,b1lo,jatom,imax,d
              UBLP(i) = rade1(i,l)/r1(i) 
              UBSP(i) = rade2(i,l)/r1(i)              
           ENDDO        
-          IsEven = mod(lp,2).eq.0
-          call dergl_stress(imax,r1,UAL,dul,IsEven,g0)
-          call dergl_stress(imax,r1,UAS,dus,IsEven,g0)
+          call g1_radial_derivative(imax,r1,UAL,dul)
+          call g1_radial_derivative(imax,r1,UAS,dus)
              
-          call dergl_stress(imax,r1,UBL,dudl,IsEven,g0)
-          call dergl_stress(imax,r1,UBS,duds,IsEven,g0)
+          call g1_radial_derivative(imax,r1,UBL,dudl)
+          call g1_radial_derivative(imax,r1,UBS,duds)
           
           CALL rint13_stress(rel,rrad1(1,l),rrad2(1,l),dul(1),dus(1),  TC2S00(l,lp), jatom)   !integrand contains just product of two functions: r*u_llmd*du_llmdp; d derivative
           CALL rint13_stress(rel,rrad1(1,l),rrad2(1,l),dudl(1),duds(1),TC2S01(l,lp), jatom)
@@ -286,11 +282,11 @@ subroutine kin_str_integrals(REL, rrad1,rrad2,rade1,rade2,a1lo,b1lo,jatom,imax,d
                    UCL(i) = a1lo(i,jlop,lp)/r1(i)                         !large comp of LO fun ul(e2)
                    UCS(i) = b1lo(i,jlop,lp)/r1(i)                         !small comp of LO fun us(e2)
                 ENDDO
-                call dergl_stress(imax,r1,UCL,dulol,.true.,g0)         !first derivative of  ul(r,e2)
-                call dergl_stress(imax,r1,UCS,dulos,.true.,g0)         !first derivative of  uS(r,e2)
+                call g1_radial_derivative(imax,r1,UCL,dulol)         !first derivative of  ul(r,e2)
+                call g1_radial_derivative(imax,r1,UCS,dulos)         !first derivative of  uS(r,e2)
                 
-                call dergl_stress(imax,r1,dulol,ddulol,.true.,g0)      !2nd derivative of  ul(r,e2)
-                call dergl_stress(imax,r1,dulos,ddulos,.true.,g0)      !2nd derivative of  us(r,e2)  
+                call g1_radial_derivative(imax,r1,dulol,ddulol)      !2nd derivative of  ul(r,e2)
+                call g1_radial_derivative(imax,r1,dulos,ddulos)      !2nd derivative of  us(r,e2)  
              
                 DO i = 1, imax
                    ddulol(i) = r1(i)*ddulol(i)
@@ -327,11 +323,11 @@ subroutine kin_str_integrals(REL, rrad1,rrad2,rade1,rade2,a1lo,b1lo,jatom,imax,d
                 UBL(i) = rade1(i,lp)/r1(i) 
                 UBS(i) = rade2(i,lp)/r1(i) 
             ENDDO                  
-            call dergl_stress(imax,r1,UAL,dul,.true.,g0)
-            call dergl_stress(imax,r1,UAS,dus,.true.,g0)
+            call g1_radial_derivative(imax,r1,UAL,dul)
+            call g1_radial_derivative(imax,r1,UAS,dus)
              
-            call dergl_stress(imax,r1,UBL,dudl,.true.,g0)
-            call dergl_stress(imax,r1,UBS,duds,.true.,g0)
+            call g1_radial_derivative(imax,r1,UBL,dudl)
+            call g1_radial_derivative(imax,r1,UBS,duds)
             
             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),uppl2(1,lp),upps2(1,lp),  juddu_20(jlo,l,lp),jatom)     !integral u times double radia derivative
             CALL rint13_stress(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),udppl2(1,lp),udpps2(1,lp),juddu_21(jlo,l,lp),jatom)
@@ -365,11 +361,11 @@ subroutine kin_str_integrals(REL, rrad1,rrad2,rade1,rade2,a1lo,b1lo,jatom,imax,d
              UCL(i) = a1lo(i,jlop,lp)/r1(i)                         !large comp of LO fun ul(e2)
              UCS(i) = b1lo(i,jlop,lp)/r1(i)                         !small comp of LO fun us(e2)
           ENDDO
-          call dergl_stress(imax,r1,UCL,dulol,.true.,g0)         !first derivative of  ul(r,e2)
-          call dergl_stress(imax,r1,UCS,dulos,.true.,g0)         !first derivative of  uS(r,e2)
+          call g1_radial_derivative(imax,r1,UCL,dulol)         !first derivative of  ul(r,e2)
+          call g1_radial_derivative(imax,r1,UCS,dulos)         !first derivative of  uS(r,e2)
                 
-          call dergl_stress(imax,r1,dulol,ddulol,.true.,g0)      !2nd derivative of  ul(r,e2)
-          call dergl_stress(imax,r1,dulos,ddulos,.true.,g0)      !2nd derivative of  us(r,e2)  
+          call g1_radial_derivative(imax,r1,dulol,ddulol)      !2nd derivative of  ul(r,e2)
+          call g1_radial_derivative(imax,r1,dulos,ddulos)      !2nd derivative of  us(r,e2)  
              
           DO i = 1, imax
              ddulol(i) = r1(i)*ddulol(i)
@@ -479,3 +475,23 @@ subroutine rotate_stress(vector,rotmat,rotvec)
   rotvec=matmul(rotmat,vector)
 end subroutine rotate_stress
 
+
+subroutine g1_radial_derivative(n,r,f,df)
+  ! Stress-only derivative on the physical positive-r mesh.
+  ! The old G1 path passed an UNINITIALIZED IsEven to DERGL, which
+  ! actually uses the flag to mirror f across r=0. Even a specified
+  ! parity is not generally valid for Coulomb-cusp/RELA radial functions,
+  ! or for both a radial function and its derivative. No extrapolated
+  ! negative-radius samples are needed: SPLINE already supplies a
+  ! one-sided endpoint condition from positive-mesh divided differences.
+  ! Keep the existing cubic interpolation and twice-differentiated
+  ! strategy; this repair does NOT add physical radial response to strain.
+  ! Generic DERGL and non-stress density/force routines are untouched.
+  implicit none
+  integer,intent(in) :: n
+  real*8,intent(in) :: r(n),f(n)
+  real*8,intent(out) :: df(n)
+  real*8 :: c(n),d(n)
+  if(n.lt.4) stop 'G1 radial derivative requires at least four points'
+  call spline(n,r,f,df,c,d)
+end subroutine g1_radial_derivative

@@ -1,0 +1,440 @@
+nargs= 1
+argi=dmft2.def
+ OpeningFeSe.outputdmf2                                                                                                                                                                     
+:MATSUBARA_CUBIC_WEIGHTS:     130    2387   2.38700000E+03   2.38700000E+03   4.41751983E+00   2.90986751E+02
+:MATSUBARA_CUBIC_WEIGHTS:     130    2387   2.38700000E+03   2.38700000E+03   4.41751983E+00   2.90986751E+02
+:MATSUBARA_CUBIC_WEIGHTS:     130    2387   2.38700000E+03   2.38700000E+03   4.41751983E+00   2.90986751E+02
+ after first reading case.nsh NGAU set to         306
+ after first reading case.nsh NGAU set to         306
+ after first reading case.nsh NGAU set to         306
+  1) Finished k-point number  36   1 with #bands=  24
+  2) Finished k-point number  71   1 with #bands=  24
+  1) Finished k-point number  37   2 with #bands=  24
+  3) Finished k-point number 106   1 with #bands=  24
+  2) Finished k-point number  72   2 with #bands=  24
+  1) Finished k-point number  38   3 with #bands=  24
+  3) Finished k-point number 107   2 with #bands=  24
+  2) Finished k-point number  73   3 with #bands=  24
+  1) Finished k-point number  39   4 with #bands=  24
+  3) Finished k-point number 108   3 with #bands=  24
+  2) Finished k-point number  74   4 with #bands=  24
+  1) Finished k-point number  40   5 with #bands=  24
+  3) Finished k-point number 109   4 with #bands=  24
+  2) Finished k-point number  75   5 with #bands=  24
+  1) Finished k-point number  41   6 with #bands=  24
+  2) Finished k-point number  76   6 with #bands=  24
+  3) Finished k-point number 110   5 with #bands=  24
+  1) Finished k-point number  42   7 with #bands=  24
+  2) Finished k-point number  77   7 with #bands=  24
+  3) Finished k-point number 111   6 with #bands=  24
+  1) Finished k-point number  43   8 with #bands=  24
+  3) Finished k-point number 112   7 with #bands=  24
+  2) Finished k-point number  78   8 with #bands=  24
+  1) Finished k-point number  44   9 with #bands=  24
+  3) Finished k-point number 113   8 with #bands=  24
+  1) Finished k-point number  45  10 with #bands=  24
+  2) Finished k-point number  79   9 with #bands=  24
+  1) Finished k-point number  46  11 with #bands=  24
+  2) Finished k-point number  80  10 with #bands=  24
+  3) Finished k-point number 114   9 with #bands=  24
+  1) Finished k-point number  47  12 with #bands=  24
+  2) Finished k-point number  81  11 with #bands=  24
+  3) Finished k-point number 115  10 with #bands=  24
+  1) Finished k-point number  48  13 with #bands=  24
+  2) Finished k-point number  82  12 with #bands=  24
+  3) Finished k-point number 116  11 with #bands=  24
+  1) Finished k-point number  49  14 with #bands=  24
+  3) Finished k-point number 117  12 with #bands=  24
+  2) Finished k-point number  83  13 with #bands=  24
+  1) Finished k-point number  50  15 with #bands=  24
+  3) Finished k-point number 118  13 with #bands=  24
+  2) Finished k-point number  84  14 with #bands=  24
+  1) Finished k-point number  51  16 with #bands=  24
+  3) Finished k-point number 119  14 with #bands=  24
+  2) Finished k-point number  85  15 with #bands=  24
+  1) Finished k-point number  52  17 with #bands=  24
+  3) Finished k-point number 120  15 with #bands=  24
+  2) Finished k-point number  86  16 with #bands=  24
+  1) Finished k-point number  53  18 with #bands=  24
+  3) Finished k-point number 121  16 with #bands=  24
+  2) Finished k-point number  87  17 with #bands=  24
+  1) Finished k-point number  54  19 with #bands=  24
+  3) Finished k-point number 122  17 with #bands=  24
+  2) Finished k-point number  88  18 with #bands=  24
+  1) Finished k-point number  55  20 with #bands=  24
+  3) Finished k-point number 123  18 with #bands=  24
+  2) Finished k-point number  89  19 with #bands=  24
+  1) Finished k-point number  56  21 with #bands=  24
+  3) Finished k-point number 124  19 with #bands=  24
+  2) Finished k-point number  90  20 with #bands=  24
+  1) Finished k-point number  57  22 with #bands=  24
+  3) Finished k-point number 125  20 with #bands=  24
+  2) Finished k-point number  91  21 with #bands=  24
+  1) Finished k-point number  58  23 with #bands=  24
+  3) Finished k-point number 126  21 with #bands=  24
+  2) Finished k-point number  92  22 with #bands=  24
+  1) Finished k-point number  59  24 with #bands=  24
+  3) Finished k-point number 127  22 with #bands=  24
+  2) Finished k-point number  93  23 with #bands=  24
+  1) Finished k-point number  60  25 with #bands=  24
+  3) Finished k-point number 128  23 with #bands=  24
+  2) Finished k-point number  94  24 with #bands=  24
+  1) Finished k-point number  61  26 with #bands=  24
+  3) Finished k-point number 129  24 with #bands=  24
+  2) Finished k-point number  95  25 with #bands=  24
+  1) Finished k-point number  62  27 with #bands=  24
+  3) Finished k-point number 130  25 with #bands=  24
+  2) Finished k-point number  96  26 with #bands=  24
+  1) Finished k-point number  63  28 with #bands=  24
+  3) Finished k-point number 131  26 with #bands=  24
+  2) Finished k-point number  97  27 with #bands=  24
+  1) Finished k-point number  64  29 with #bands=  24
+  3) Finished k-point number 132  27 with #bands=  24
+  2) Finished k-point number  98  28 with #bands=  24
+  1) Finished k-point number  65  30 with #bands=  24
+  3) Finished k-point number 133  28 with #bands=  24
+  2) Finished k-point number  99  29 with #bands=  24
+  1) Finished k-point number  66  31 with #bands=  24
+  3) Finished k-point number 134  29 with #bands=  24
+  2) Finished k-point number 100  30 with #bands=  24
+  1) Finished k-point number  67  32 with #bands=  24
+  3) Finished k-point number 135  30 with #bands=  24
+  2) Finished k-point number 101  31 with #bands=  24
+  1) Finished k-point number  68  33 with #bands=  24
+  3) Finished k-point number 136  31 with #bands=  24
+  2) Finished k-point number 102  32 with #bands=  24
+  1) Finished k-point number  69  34 with #bands=  24
+  3) Finished k-point number 137  32 with #bands=  24
+  2) Finished k-point number 103  33 with #bands=  24
+  1) Finished k-point number  70  35 with #bands=  24
+  3) Finished k-point number 138  33 with #bands=  24
+  2) Finished k-point number 104  34 with #bands=  24
+  3) Finished k-point number 139  34 with #bands=  24
+  2) Finished k-point number 105  35 with #bands=  24
+  3) Finished k-point number 140  35 with #bands=  24
+  1) Finished k-point number  36   1 with #bands=  24
+  2) Finished k-point number  71   1 with #bands=  24
+  3) Finished k-point number 106   1 with #bands=  24
+  1) Finished k-point number  37   2 with #bands=  24
+  2) Finished k-point number  72   2 with #bands=  24
+  3) Finished k-point number 107   2 with #bands=  24
+  1) Finished k-point number  38   3 with #bands=  24
+  2) Finished k-point number  73   3 with #bands=  24
+  3) Finished k-point number 108   3 with #bands=  24
+  1) Finished k-point number  39   4 with #bands=  24
+  2) Finished k-point number  74   4 with #bands=  24
+  3) Finished k-point number 109   4 with #bands=  24
+  1) Finished k-point number  40   5 with #bands=  24
+  2) Finished k-point number  75   5 with #bands=  24
+  3) Finished k-point number 110   5 with #bands=  24
+  1) Finished k-point number  41   6 with #bands=  24
+  2) Finished k-point number  76   6 with #bands=  24
+  3) Finished k-point number 111   6 with #bands=  24
+  1) Finished k-point number  42   7 with #bands=  24
+  2) Finished k-point number  77   7 with #bands=  24
+  3) Finished k-point number 112   7 with #bands=  24
+  1) Finished k-point number  43   8 with #bands=  24
+  3) Finished k-point number 113   8 with #bands=  24
+  2) Finished k-point number  78   8 with #bands=  24
+  1) Finished k-point number  44   9 with #bands=  24
+  3) Finished k-point number 114   9 with #bands=  24
+  2) Finished k-point number  79   9 with #bands=  24
+  1) Finished k-point number  45  10 with #bands=  24
+  3) Finished k-point number 115  10 with #bands=  24
+  2) Finished k-point number  80  10 with #bands=  24
+  1) Finished k-point number  46  11 with #bands=  24
+  3) Finished k-point number 116  11 with #bands=  24
+  2) Finished k-point number  81  11 with #bands=  24
+  1) Finished k-point number  47  12 with #bands=  24
+  3) Finished k-point number 117  12 with #bands=  24
+  2) Finished k-point number  82  12 with #bands=  24
+  1) Finished k-point number  48  13 with #bands=  24
+  3) Finished k-point number 118  13 with #bands=  24
+  2) Finished k-point number  83  13 with #bands=  24
+  1) Finished k-point number  49  14 with #bands=  24
+  3) Finished k-point number 119  14 with #bands=  24
+  2) Finished k-point number  84  14 with #bands=  24
+  1) Finished k-point number  50  15 with #bands=  24
+  3) Finished k-point number 120  15 with #bands=  24
+  2) Finished k-point number  85  15 with #bands=  24
+  3) Finished k-point number 121  16 with #bands=  24
+  1) Finished k-point number  51  16 with #bands=  24
+  2) Finished k-point number  86  16 with #bands=  24
+  3) Finished k-point number 122  17 with #bands=  24
+  1) Finished k-point number  52  17 with #bands=  24
+  2) Finished k-point number  87  17 with #bands=  24
+  3) Finished k-point number 123  18 with #bands=  24
+  1) Finished k-point number  53  18 with #bands=  24
+  2) Finished k-point number  88  18 with #bands=  24
+  3) Finished k-point number 124  19 with #bands=  24
+  1) Finished k-point number  54  19 with #bands=  24
+  2) Finished k-point number  89  19 with #bands=  24
+  3) Finished k-point number 125  20 with #bands=  24
+  1) Finished k-point number  55  20 with #bands=  24
+  2) Finished k-point number  90  20 with #bands=  24
+  3) Finished k-point number 126  21 with #bands=  24
+  1) Finished k-point number  56  21 with #bands=  24
+  2) Finished k-point number  91  21 with #bands=  24
+  3) Finished k-point number 127  22 with #bands=  24
+  1) Finished k-point number  57  22 with #bands=  24
+  2) Finished k-point number  92  22 with #bands=  24
+  3) Finished k-point number 128  23 with #bands=  24
+  1) Finished k-point number  58  23 with #bands=  24
+  2) Finished k-point number  93  23 with #bands=  24
+  3) Finished k-point number 129  24 with #bands=  24
+  1) Finished k-point number  59  24 with #bands=  24
+  2) Finished k-point number  94  24 with #bands=  24
+  3) Finished k-point number 130  25 with #bands=  24
+  1) Finished k-point number  60  25 with #bands=  24
+  2) Finished k-point number  95  25 with #bands=  24
+  3) Finished k-point number 131  26 with #bands=  24
+  1) Finished k-point number  61  26 with #bands=  24
+  2) Finished k-point number  96  26 with #bands=  24
+  3) Finished k-point number 132  27 with #bands=  24
+  1) Finished k-point number  62  27 with #bands=  24
+  2) Finished k-point number  97  27 with #bands=  24
+  3) Finished k-point number 133  28 with #bands=  24
+  1) Finished k-point number  63  28 with #bands=  24
+  2) Finished k-point number  98  28 with #bands=  24
+  3) Finished k-point number 134  29 with #bands=  24
+  1) Finished k-point number  64  29 with #bands=  24
+  2) Finished k-point number  99  29 with #bands=  24
+  3) Finished k-point number 135  30 with #bands=  24
+  1) Finished k-point number  65  30 with #bands=  24
+  2) Finished k-point number 100  30 with #bands=  24
+  3) Finished k-point number 136  31 with #bands=  24
+  1) Finished k-point number  66  31 with #bands=  24
+  2) Finished k-point number 101  31 with #bands=  24
+  3) Finished k-point number 137  32 with #bands=  24
+  1) Finished k-point number  67  32 with #bands=  24
+  2) Finished k-point number 102  32 with #bands=  24
+  3) Finished k-point number 138  33 with #bands=  24
+  1) Finished k-point number  68  33 with #bands=  24
+  2) Finished k-point number 103  33 with #bands=  24
+  3) Finished k-point number 139  34 with #bands=  24
+  1) Finished k-point number  69  34 with #bands=  24
+  2) Finished k-point number 104  34 with #bands=  24
+  3) Finished k-point number 140  35 with #bands=  24
+  1) Finished k-point number  70  35 with #bands=  24
+  2) Finished k-point number 105  35 with #bands=  24
+:DMFT_SIGMAG_DIRECT:    36    1.771288794E-03    2.035753528E-14   -4.890009662E-03   -4.890009662E-03    2.270364308E-19
+  1) Finished k-point  36    1 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    71    3.551894516E-03    2.080854813E-14   -9.846648498E-03   -9.846648498E-03    9.621787560E-20
+  2) Finished k-point  71    1 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   106    3.520329782E-03    1.865037697E-14   -9.916783281E-03   -9.916783281E-03   -2.427634008E-19
+  3) Finished k-point 106    1 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   107    3.492062717E-03    1.856496158E-14   -9.838275826E-03   -9.838275826E-03   -1.643092018E-19
+  3) Finished k-point 107    2 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    72    3.539267584E-03    2.081599397E-14   -9.831021646E-03   -9.831021646E-03   -4.129951406E-19
+  2) Finished k-point  72    2 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    37    1.779609674E-03    1.454289993E-14   -4.931654433E-03   -4.931654433E-03    3.330607788E-21
+  1) Finished k-point  37    2 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   108    3.444957199E-03    1.905861643E-14   -9.715137301E-03   -9.715137301E-03    1.916946598E-19
+  3) Finished k-point 108    3 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    73    3.525125809E-03    1.740654265E-14   -9.816897928E-03   -9.816897928E-03    9.621792862E-20
+  2) Finished k-point  73    3 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    38    1.794328812E-03    1.841674392E-14   -4.994764145E-03   -4.994764145E-03    1.226773868E-19
+  1) Finished k-point  38    3 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   109    3.405591176E-03    2.031933681E-14   -9.616097812E-03   -9.616097812E-03   -5.210540090E-19
+  3) Finished k-point 109    4 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    74    3.511440958E-03    1.981601396E-14   -9.800945795E-03   -9.800945795E-03   -2.649696841E-19
+  2) Finished k-point  74    4 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    39    1.811795077E-03    2.213671654E-14   -5.059521541E-03   -5.059521541E-03   -1.332243115E-20
+  1) Finished k-point  39    4 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   110    1.696353985E-03    2.091978263E-14   -4.791813796E-03   -4.791813796E-03    8.474546482E-20
+  3) Finished k-point 110    5 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    75    1.753457040E-03    1.593418763E-14   -4.891812943E-03   -4.891812943E-03    3.774688826E-20
+  2) Finished k-point  75    5 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    40    9.100198424E-04    2.168891438E-14   -2.544394811E-03   -2.544394811E-03   -4.977408305E-20
+  1) Finished k-point  40    5 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   111    1.803263321E-03    2.299392755E-14   -5.051388115E-03   -5.051388115E-03   -2.460949087E-20
+  3) Finished k-point 111    6 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    76    3.536971182E-03    2.023101454E-14   -9.845690944E-03   -9.845690944E-03   -8.733584752E-20
+:DMFT_SIGMAG_DIRECT:    41    3.531361124E-03    1.948292947E-14   -9.762849039E-03   -9.762849039E-03   -4.766465737E-19
+  2) Finished k-point  76    6 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+  1) Finished k-point  41    6 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   112    1.787053491E-03    2.063960449E-14   -5.012454426E-03   -5.012454426E-03    1.036189089E-19
+  3) Finished k-point 112    7 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    42    3.534170025E-03    1.906079712E-14   -9.805841195E-03   -9.805841195E-03   -7.923152649E-19
+  1) Finished k-point  42    7 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    77    3.519523520E-03    2.159699059E-14   -9.798983721E-03   -9.798983721E-03   -8.881635982E-20
+  2) Finished k-point  77    7 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   113    1.759565365E-03    1.881774349E-14   -4.945094679E-03   -4.945094679E-03    7.993458690E-20
+  3) Finished k-point 113    8 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    43    3.549814821E-03    1.620973532E-14   -9.885458387E-03   -9.885458387E-03   -5.395589483E-19
+  1) Finished k-point  43    8 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    78    3.492275099E-03    2.054618948E-14   -9.725440966E-03   -9.725440966E-03    4.736983364E-20
+  2) Finished k-point  78    8 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   114    1.737167478E-03    1.649339284E-14   -4.895357573E-03   -4.895357573E-03   -9.843796350E-20
+  3) Finished k-point 114    9 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    79    3.466897244E-03    1.809614122E-14   -9.657996023E-03   -9.657996023E-03   -7.179306943E-19
+  2) Finished k-point  79    9 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    44    3.573768200E-03    3.075516791E-14   -9.972941479E-03   -9.972941479E-03    2.138989733E-19
+  1) Finished k-point  44    9 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   115    8.642112132E-04    2.214408711E-14   -2.437203677E-03   -2.437203677E-03    5.180945447E-21
+  3) Finished k-point 115   10 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    45    1.793009023E-03    1.537875229E-14   -5.006304034E-03   -5.006304034E-03    7.660397911E-20
+  1) Finished k-point  45   10 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    80    1.728003625E-03    2.124646418E-14   -4.814568834E-03   -4.814568834E-03    1.554283634E-20
+  2) Finished k-point  80   10 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   116    3.580608859E-03    1.980790702E-14   -1.009338695E-02   -1.009338695E-02    1.791127709E-19
+  3) Finished k-point 116   11 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    46    3.507736654E-03    1.891837173E-14   -9.725968537E-03   -9.725968537E-03   -8.437578481E-20
+  1) Finished k-point  46   11 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    81    3.495206271E-03    1.769209517E-14   -9.770839428E-03   -9.770839428E-03   -7.993544317E-20
+  2) Finished k-point  81   11 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   117    3.544376527E-03    1.772849381E-14   -1.000479845E-02   -1.000479845E-02   -4.670252186E-19
+  3) Finished k-point 117   12 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    47    3.497059524E-03    1.945517931E-14   -9.716200914E-03   -9.716200914E-03   -7.549107228E-20
+  1) Finished k-point  47   12 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    82    3.479243294E-03    1.946009595E-14   -9.715439273E-03   -9.715439273E-03   -2.738498970E-19
+  2) Finished k-point  82   12 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   118    3.486536933E-03    2.078587144E-14   -9.867726418E-03   -9.867726418E-03    2.050168603E-19
+  3) Finished k-point 118   13 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    48    3.496497237E-03    2.208223143E-14   -9.734332657E-03   -9.734332657E-03    2.664555996E-20
+  1) Finished k-point  48   13 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    83    3.448420632E-03    1.880113561E-14   -9.619480750E-03   -9.619480750E-03   -4.707257069E-19
+  2) Finished k-point  83   13 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   119    3.439412874E-03    2.119856874E-14   -9.761049955E-03   -9.761049955E-03    3.648866584E-19
+  3) Finished k-point 119   14 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    49    3.507038836E-03    2.232612118E-14   -9.762131597E-03   -9.762131597E-03   -2.368380727E-20
+  1) Finished k-point  49   14 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    84    3.418346587E-03    2.170986875E-14   -9.529416798E-03   -9.529416798E-03   -4.277982311E-19
+  2) Finished k-point  84   14 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   120    1.711864434E-03    2.196327366E-14   -4.863411920E-03   -4.863411920E-03    9.140668039E-20
+  3) Finished k-point 120   15 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    50    1.756992088E-03    1.770012655E-14   -4.888636145E-03   -4.888636145E-03   -4.440810383E-20
+  1) Finished k-point  50   15 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    85    1.703243490E-03    1.969576998E-14   -4.747002796E-03   -4.747002796E-03    1.487671478E-19
+  2) Finished k-point  85   15 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   121    3.546291899E-03    1.935392642E-14   -1.004212879E-02   -1.004212879E-02   -9.843807764E-20
+  3) Finished k-point 121   16 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    51    3.464406032E-03    2.052078289E-14   -9.637509019E-03   -9.637509019E-03   -4.751673409E-19
+  1) Finished k-point  51   16 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    86    3.463769853E-03    1.743374726E-14   -9.703752278E-03   -9.703752278E-03    5.922264799E-21
+  2) Finished k-point  86   16 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   122    3.510040866E-03    1.870904731E-14   -9.950899394E-03   -9.950899394E-03    3.486039171E-19
+  3) Finished k-point 122   17 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    52    3.452142175E-03    1.813508638E-14   -9.593583111E-03   -9.593583111E-03    2.176004669E-19
+  1) Finished k-point  52   17 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    87    3.446310370E-03    1.850154935E-14   -9.641910633E-03   -9.641910633E-03    1.035920343E-20
+  2) Finished k-point  87   17 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   123    3.453812799E-03    2.402083392E-14   -9.815434215E-03   -9.815434215E-03   -2.198193500E-19
+  3) Finished k-point 123   18 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    53    3.439290773E-03    2.290702798E-14   -9.545164481E-03   -9.545164481E-03    4.588939365E-20
+  1) Finished k-point  53   18 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    88    3.413215382E-03    2.509054916E-14   -9.534164193E-03   -9.534164193E-03    4.070753783E-19
+  2) Finished k-point  88   18 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   124    3.408275122E-03    1.928606046E-14   -9.710637759E-03   -9.710637759E-03    2.953140574E-19
+  3) Finished k-point 124   19 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    54    3.432093824E-03    2.088688870E-14   -9.512453025E-03   -9.512453025E-03    1.095400535E-18
+  1) Finished k-point  54   19 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    89    3.383050147E-03    1.970387947E-14   -9.439624935E-03   -9.439624935E-03   -3.197378077E-19
+  2) Finished k-point  89   19 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   125    1.696010904E-03    2.779482913E-14   -4.837484767E-03   -4.837484767E-03   -5.217952200E-20
+  3) Finished k-point 125   20 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    55    1.714980519E-03    2.089980833E-14   -4.750903634E-03   -4.750903634E-03   -1.295236362E-19
+  1) Finished k-point  55   20 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    90    1.686049086E-03    2.228659471E-14   -4.702383705E-03   -4.702383705E-03   -5.476999473E-20
+  2) Finished k-point  90   20 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   126    1.782973564E-03    1.911264107E-14   -5.053746418E-03   -5.053746418E-03    7.567881028E-20
+  3) Finished k-point 126   21 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    56    3.415490913E-03    2.295659359E-14   -9.523291282E-03   -9.523291282E-03    3.819098819E-19
+  1) Finished k-point  56   21 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    91    1.793604592E-03    2.283057555E-14   -4.980164947E-03   -4.980164947E-03   -8.178492456E-20
+  2) Finished k-point  91   21 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   127    1.761742209E-03    2.185728606E-14   -5.003131824E-03   -5.003131824E-03    4.681354279E-20
+  3) Finished k-point 127   22 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    57    3.406309187E-03    2.274058711E-14   -9.471887957E-03   -9.471887957E-03   -2.531265115E-19
+  1) Finished k-point  57   22 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    92    1.783433260E-03    1.726901529E-14   -4.960169100E-03   -4.960169100E-03   -4.166960410E-19
+  2) Finished k-point  92   22 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   128    1.731241512E-03    2.005964823E-14   -4.933712622E-03   -4.933712622E-03   -1.646800517E-20
+  3) Finished k-point 128   23 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    58    3.386123783E-03    1.896138658E-14   -9.382219317E-03   -9.382219317E-03    4.514823113E-19
+  1) Finished k-point  58   23 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    93    1.766171298E-03    2.392192910E-14   -4.924462270E-03   -4.924462270E-03   -4.144756358E-20
+  2) Finished k-point  93   23 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   129    1.708522779E-03    1.987839393E-14   -4.883525119E-03   -4.883525119E-03    1.842936309E-19
+  3) Finished k-point 129   24 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    59    3.363968808E-03    1.928628243E-14   -9.296005130E-03   -9.296005130E-03   -5.121735500E-19
+  1) Finished k-point  59   24 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    94    1.748587008E-03    1.712391420E-14   -4.884475250E-03   -4.884475250E-03   -3.034553762E-20
+  2) Finished k-point  94   24 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   130    8.501998730E-04    2.015205891E-14   -2.432864831E-03   -2.432864831E-03   -1.757820777E-20
+  3) Finished k-point 130   25 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    60    1.677131527E-03    2.227987274E-14   -4.630570004E-03   -4.630570004E-03    6.365161549E-20
+  1) Finished k-point  60   25 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    95    8.720269229E-04    2.002537284E-14   -2.437439982E-03   -2.437439982E-03   -8.770600507E-20
+  2) Finished k-point  95   25 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   131    3.541425154E-03    2.321269855E-14   -1.007830105E-02   -1.007830105E-02    1.594990343E-19
+  3) Finished k-point 131   26 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    61    3.386315455E-03    2.400463939E-14   -9.448672536E-03   -9.448672536E-03   -2.546070441E-19
+  1) Finished k-point  61   26 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    96    3.591905639E-03    2.063093486E-14   -1.001906220E-02   -1.001906220E-02   -3.774713905E-19
+  2) Finished k-point  96   26 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   132    3.497987172E-03    2.639351035E-14   -9.974134918E-03   -9.974134918E-03    3.090062678E-19
+  3) Finished k-point 132   27 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    62    3.378519536E-03    2.163068045E-14   -9.392754778E-03   -9.392754778E-03    3.952314762E-19
+  1) Finished k-point  62   27 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    97    3.566012694E-03    1.763005549E-14   -9.957436526E-03   -9.957436526E-03    3.152965180E-19
+  2) Finished k-point  97   27 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   133    3.439936965E-03    1.911564637E-14   -9.839944733E-03   -9.839944733E-03   -1.102800438E-19
+  3) Finished k-point 133   28 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    63    3.355226674E-03    2.264535736E-14   -9.284625931E-03   -9.284625931E-03    2.634884762E-19
+  1) Finished k-point  63   28 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    98    3.520501263E-03    1.912907935E-14   -9.846047702E-03   -9.846047702E-03    4.144647136E-20
+  2) Finished k-point  98   28 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   134    3.397353605E-03    2.042122517E-14   -9.744475440E-03   -9.744475440E-03   -1.998364860E-19
+  3) Finished k-point 134   29 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    64    3.324470972E-03    2.048193151E-14   -9.170084270E-03   -9.170084270E-03   -4.796073030E-19
+  1) Finished k-point  64   29 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    99    3.479189950E-03    1.977183038E-14   -9.743907922E-03   -9.743907922E-03   -5.328971696E-19
+  2) Finished k-point  99   29 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   135    1.691159665E-03    1.811914680E-14   -4.855693260E-03   -4.855693260E-03   -1.517276881E-20
+  3) Finished k-point 135   30 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   100    1.731828652E-03    2.279557798E-14   -4.853060097E-03   -4.853060097E-03   -2.250010594E-19
+  2) Finished k-point 100   30 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    65    1.655044942E-03    1.857978239E-14   -4.560720902E-03   -4.560720902E-03   -5.514006226E-20
+  1) Finished k-point  65   30 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   136    1.762681182E-03    2.065020418E-14   -5.033471761E-03   -5.033471761E-03    3.543396618E-20
+  3) Finished k-point 136   31 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   101    3.557013973E-03    1.719348621E-14   -9.980058174E-03   -9.980058174E-03   -3.700833844E-20
+  2) Finished k-point 101   31 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    66    1.772877764E-03    1.600406604E-14   -4.903526026E-03   -4.903526026E-03   -3.939368878E-19
+  1) Finished k-point  66   31 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   137    1.740543465E-03    2.225422570E-14   -4.980960335E-03   -4.980960335E-03   -1.817956751E-19
+  3) Finished k-point 137   32 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   102    3.530049646E-03    1.990581194E-14   -9.907972222E-03   -9.907972222E-03   -1.857738662E-19
+  2) Finished k-point 102   32 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    67    1.771457597E-03    1.893526481E-14   -4.915913558E-03   -4.915913558E-03   -5.365979213E-20
+  1) Finished k-point  67   32 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   138    1.712648590E-03    1.915806582E-14   -4.915417023E-03   -4.915417023E-03   -2.425792672E-19
+  3) Finished k-point 138   33 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   103    3.483070047E-03    1.985216197E-14   -9.788065948E-03   -9.788065948E-03   -5.847027192E-20
+  2) Finished k-point 103   33 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    68    1.772909933E-03    1.618852203E-14   -4.938079398E-03   -4.938079398E-03   -1.983561971E-19
+  1) Finished k-point  68   33 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   139    1.692978081E-03    1.757116267E-14   -4.870388711E-03   -4.870388711E-03   -6.624208822E-20
+  3) Finished k-point 139   34 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   104    3.442593201E-03    1.871422570E-14   -9.685621858E-03   -9.685621858E-03   -3.893109297E-19
+  2) Finished k-point 104   34 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    69    1.775588441E-03    1.986308450E-14   -4.957327995E-03   -4.957327995E-03    1.458066076E-19
+  1) Finished k-point  69   34 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   140    8.431061082E-04    1.773084422E-14   -2.427597789E-03   -2.427597789E-03   -4.570334020E-20
+  3) Finished k-point 140   35 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:    70    8.883396057E-04    1.438086616E-14   -2.483003330E-03   -2.483003330E-03   -6.994276354E-20
+  1) Finished k-point  70   35 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_SIGMAG_DIRECT:   105    1.713687778E-03    2.136303424E-14   -4.823929259E-03   -4.823929259E-03    2.294418698E-20
+  2) Finished k-point 105   35 with nemin=   1 nemax=  66 DM_nemin=  21 DM_nemax=  44 DM_nemaxx=  44
+:DMFT_NORMALIZATION_ADJOINT:    1    3.489280034094E-01    3.489280034094E-01    1.590905593385E-16
+:DMFT_NORMALIZATION_ADJOINT:    2    3.558127959824E-01    3.558127959824E-01    1.560122397453E-16
+:DMFT_NORMALIZATION_ADJOINT:    1    3.489280034094E-01    3.489280034094E-01    1.590905593385E-16
+:DMFT_NORMALIZATION_ADJOINT:    2    3.558127959824E-01    3.558127959824E-01    1.560122397453E-16
+:DMFT_NORMALIZATION_ADJOINT:    1    3.489280034094E-01    3.489280034094E-01    1.590905593385E-16
+:DMFT_NORMALIZATION_ADJOINT:    2    3.558127959824E-01    3.558127959824E-01    1.560122397453E-16
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+STOP  DMFT2 END
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO

@@ -1,0 +1,1330 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=23mm,headheight=15pt]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern,microtype}
+\usepackage{amsmath,amssymb,mathtools,bm,mathrsfs}
+\usepackage{booktabs,longtable,array,tabularx}
+\usepackage{enumitem,xcolor,hyperref,fancyhdr,needspace}
+\usepackage{xurl}
+\definecolor{navy}{RGB}{25,54,88}
+\definecolor{muted}{RGB}{72,89,108}
+\definecolor{pale}{RGB}{237,243,249}
+\definecolor{amber}{RGB}{252,245,226}
+\hypersetup{colorlinks=true,linkcolor=navy,citecolor=navy,urlcolor=navy,
+ pdftitle={From Blaha's Eq. 13 to a matrix-valued eDMFT stress formula},
+ pdfauthor={Technical working note prepared for Kristjan Haule}}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small\color{muted}LAPW stress: Eq. 13 to generalized G2}
+\fancyhead[R]{\small\color{muted}6 November 2026}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\setlength{\parindent}{0pt}\setlength{\parskip}{5pt plus 1pt}
+\setlist{nosep,leftmargin=1.6em}
+\allowdisplaybreaks[2]\numberwithin{equation}{section}
+\newcommand{\Tr}{\operatorname{Tr}}
+\newcommand{\Rea}{\operatorname{Re}}
+\newcommand{\Herm}{\operatorname{Herm}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\dd}{\mathrm d}
+\newcommand{\ii}{\mathrm i}
+\newcommand{\kb}{\mathbf k}
+\newcommand{\Id}{\mathbb I}
+\newcommand{\e}{\epsilon}
+\newcommand{\pa}{\partial_\mu}
+\newcommand{\Es}{\mathcal E}
+\newcommand{\Sig}{\widetilde\Sigma}
+\newcommand{\rE}{{\rho_E}}
+\newcommand{\bra}[1]{\langle #1|}
+\newcommand{\ket}[1]{|#1\rangle}
+\newcommand{\ip}[2]{\langle #1|#2\rangle}
+\newcommand{\me}[3]{\langle #1|#2|#3\rangle}
+\newcommand{\pathf}[1]{\nolinkurl{#1}}
+\newcommand{\note}[2]{\par\medskip\noindent\colorbox{#1}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{#2}}\par\medskip}
+\newcommand{\key}[1]{\note{pale}{#1}}
+\newcommand{\caution}[1]{\note{amber}{#1}}
+\newcommand{\newpart}[1]{\par\Needspace{12\baselineskip}\section{#1}}
+
+\begin{document}
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\centering
+\vspace*{18mm}
+{\Huge\bfseries\color{navy}Analytic Stress in\par DFT+eDMFT with LAPW\par}
+\vspace{9mm}
+{\LARGE From Blaha's Eq.\ (13), through Eq.\ (20),\par to a matrix-valued Appendix G2\par}
+\vspace{16mm}
+\begin{minipage}{0.88\linewidth}
+This note derives the valence part of the stationary stress before using the
+diagonal Kohn--Sham occupation identities. It retains both the density matrix
+and its energy moment, makes the volume and representation cancellations
+explicit, and gives six local matrix contractions corresponding to the six
+lines of Blaha's Eq.\ (G2).
+
+The normalized correlated projector is included in the functional derivative.
+The last sections identify the source routines to re-audit, record the scope
+of the available fixed-input tests, and distinguish derived identities from
+unresolved implementation questions.
+
+\textbf{Status: a derivation and audit reference.} This is not a claim that
+the complete analytic eDMFT stress now agrees with the strain derivative of
+the free energy. No program source was changed to prepare this document.
+\end{minipage}
+\vfill
+{\large Prepared for Kristjan Haule\par}
+\vspace{3mm}
+{\large 6 November 2026\par}
+\vspace{9mm}
+{\small Primary DFT reference: Belbase, Tr\"oster, and Blaha,\par
+\emph{Physical Review B} \textbf{104}, 174113 (2021).\par}
+\end{titlepage}
+\pagenumbering{roman}\hypersetup{pageanchor=true}
+\tableofcontents
+\clearpage\pagenumbering{arabic}
+
+\newpart{The result and how to read it}
+\label{sec:overview}
+The starting point is the derivative of the stationary DFT+eDMFT functional,
+not the derivative of the usual total-energy estimator. At the stationary
+solution its valence, one-particle contribution is
+\begin{equation}
+ D_\mu^{\rm 1p}=\sum_\kb w_\kb\Rea\Tr_b
+ \bigl[\rho_\kb\,\pa H_\kb-\rE_\kb\,\pa O_\kb\bigr].
+ \label{eq:target}
+\end{equation}
+Here $\mu$ denotes a strain channel, $H$ is the KS Hamiltonian matrix,
+$O$ is the LAPW overlap matrix in the chosen representation, and $\rho_E$
+is the energy-weighted density matrix. Stress is $D_\mu/\Omega$.
+The full derivative also contains the normalized-projector derivative,
+the remaining density-functional and ion terms, and any explicitly
+strain-dependent interaction parameters.
+
+In a fixed central-band representation the valence contribution can be
+organized as
+\begin{equation}
+ D_\mu^{\rm 1p}=\sum_\kb w_\kb\Rea\Tr_b
+ \bigl[\rho(T^\mu+V^{\mu,\rm op}+B^\mu)
+             -\rE O^{\mu,\eta}\bigr].
+ \label{eq:overview}
+\end{equation}
+$T^\mu$ is the explicit kinetic-operator strain derivative;
+$V^{\mu,\rm op}$ is the explicit potential-operator derivative in material
+coordinates; $B^\mu$ and $O^{\mu,\eta}$ contain the volume-compensated
+basis derivative. Their integral definitions are given in
+Sec.~\ref{sec:matrices}. The superscript $\eta$ distinguishes this overlap
+contribution from a derivative in an arbitrary moving representation.
+
+\key{\textbf{The principal generalization of Eq.\ (20).}
+The scalar DFT factor $f_n\epsilon_n$ must become the matrix $\rho_E$.
+It cannot in general be replaced by $\tfrac12\{\Es,\rho\}$.
+The full Hamiltonian and overlap bilinear forms must be retained before
+contraction.}
+
+Three points keep this statement from being mistaken for an ad hoc correction.
+\begin{enumerate}
+\item The normalization part of the first term in Blaha's Eq.\ (13)
+      cancels the volume Jacobian. It is not a separate $\Tr M_\Sigma$
+      pressure term.
+\item A change of band representation contributes to the one-particle
+      expression, but its pure representation part cancels against the
+      corresponding projector change. A changing truncated subspace is
+      a different matter.
+\item The six expressions derived here describe the frozen-augmentation,
+      nonrelativistic valence formula. A complete RELA implementation,
+      radial-solution response, and the final total-stress assembly still
+      require independent checks.
+\end{enumerate}
+
+Sections~\ref{sec:functional}--\ref{sec:general20} give the functional and
+geometrical derivation. Sections~\ref{sec:local}--\ref{sec:g2} expand the result
+into local radial and angular integrals. Sections~\ref{sec:projector} and
+\ref{sec:audit} connect the mathematics to the next implementation audit.
+
+\newpart{Notation, units, and what is held fixed}
+\label{sec:notation}
+\subsection{Indices and matrix spaces}
+\begin{longtable}{>{$}p{0.19\linewidth}<{$}p{0.74\linewidth}}
+\toprule
+\kb,w_\kb & Brillouin-zone point and its fixed integration weight;
+ $\partial_\mu w_\kb=0$. A spin block can be included in the index $\kb$;
+ spin multiplicity is counted once, not again in the formulas.\\
+m,n & Bands in the chosen valence space; this space may include the
+ noninteracting bands outside the DMFT window.\\
+K & LAPW basis index, including local-orbital basis functions when present.\\
+a & Atom in the unit cell, with position $\tau_a$ and muffin-tin radius $R_a$.\\
+L=(l,m_l) & Spherical-harmonic index. $m_l$ is a magnetic quantum number,
+ distinct from a band index $m$.\\
+i=(L,\lambda),j=(L',\lambda') & Local augmentation indices.
+ For the elementary LAPW pair, $\lambda=0$ denotes $u_l$ and
+ $\lambda=1$ denotes $\dot u_l=\partial u_l/\partial E$.\\
+\ell & Correlated-orbital index, including the correlated site and spin
+ structure as appropriate.\\
+\mu=(\alpha\beta) & One of six symmetric strain channels;
+ $\alpha,\beta\in\{x,y,z\}$.\\
+\Omega & Unstrained cell volume.\\
+\beta_T,T & Inverse temperature and temperature in energy units;
+ $T=1/\beta_T$. We use $\beta_T$ to avoid confusion with a Cartesian index.\\
+\omega_j,z_j & Fermionic frequency $\omega_j=(2j+1)\pi T$ and
+ $z_j=\ii\omega_j+\mu_{\rm chem}$.\\
+\bottomrule
+\end{longtable}
+
+The band matrices $H,O,G,\rho,\rho_E$ have size $N_b\times N_b$.
+At the unstrained reference $O=\Id$ and
+$H=\Es=\diag(\epsilon_1,\ldots,\epsilon_{N_b})$.
+The local coefficient matrices $A,D^\mu$ have size $N_{\rm aug}\times N_b$.
+The normalized projector $U$ and its raw counterpart $P$ have size
+$N_b\times N_c$; the gradient $C$ has size $N_c\times N_b$.
+Local matrices $S^x,H^x,V^x$ have size
+$N_{\rm aug}\times N_{\rm aug}$.
+$\Tr_b$ and $\Tr_c$ denote band and correlated-orbital traces.
+
+We define $\Herm X=(X+X^\dagger)/2$, the anticommutator
+$\{A,B\}=AB+BA$, and the commutator $[A,B]=AB-BA$.
+The elementary trace convention is
+$\Tr_b(\rho X)=\sum_{mn}\rho_{nm}X_{mn}$.
+Unless shown explicitly, all matrices in a product have the same $\kb$
+and spin block. No $k$ weight is absorbed into $\rho$ in this note.
+
+\subsection{Strain and stress conventions}
+Let $\boldsymbol\varepsilon$ be a symmetric strain tensor and define
+\begin{equation}
+ F=\Id+\boldsymbol\varepsilon,\qquad
+ \mathbf r'=F\mathbf r,\qquad J=\det F,\qquad \Omega'=J\Omega.
+\end{equation}
+For a channel $\mu=(\alpha\beta)$ use the generator
+\begin{equation}
+ S^\mu_{ij}=\tfrac12(\delta_{i\alpha}\delta_{j\beta}
+                         +\delta_{i\beta}\delta_{j\alpha}),\quad
+ \partial_\mu F=S^\mu,\quad
+ \gamma_\mu=\partial_\mu\ln J=\delta_{\alpha\beta}.
+ \label{eq:strain}
+\end{equation}
+Thus the off-diagonal channel parameter is the engineering shear:
+$F_{\alpha\beta}=F_{\beta\alpha}=s/2$. If a test instead sets both
+off-diagonal entries equal to $s$, its derivative is twice the channel
+derivative used here.
+
+The thermodynamic sign convention is
+\begin{equation}
+ \sigma_\mu=\Omega^{-1}\partial_\mu\Gamma_{\rm stat},\qquad
+ p=-\tfrac13\Tr\boldsymbol\sigma.
+ \label{eq:stress-sign}
+\end{equation}
+For isotropic linear strain $F=(1+h)\Id$,
+$\dd\Gamma/\dd h=\Omega(\sigma_{xx}+\sigma_{yy}+\sigma_{zz})$.
+Divide by $3\Omega$ when comparing the hydrostatic mean stress.
+
+Equations using $H=-\nabla^2/2+V$ are in \textbf{Hartree atomic units},
+as in the paper. The code uses \textbf{Rydberg} energies: multiply
+Hamiltonians, energy moments, and energy derivatives by two, while keeping
+overlaps unchanged. In particular the inhomogeneous energy-derivative
+radial equation must use the same energy variable as the radial function.
+Approximately $1\,\mathrm{Ry}/a_0^3=14710.5\,\mathrm{GPa}$.
+
+\subsection{Scope of the path}
+The elementary derivation holds $R_a$ fixed in bohr, moves atomic centers
+affinely, holds local axes fixed, and uses a fixed number of basis functions
+and fixed band-index window. Radial functions are frozen as functions of
+their physical radius and energy parameter, but their coordinate arguments
+are strained. The distinction is crucial: frozen augmentation does
+\emph{not} remove the $r u'(r)$ terms.
+
+A finite-difference comparison must specify what is held fixed in the
+potential, radial functions, projector, charge, self-energy, chemical
+potential, and band window. A fixed-input matrix test and a relaxed
+free-energy test are different derivatives.
+
+\newpart{Stationary functional and the two density matrices}
+\label{sec:functional}
+\subsection{Which functional is differentiated?}
+A useful auxiliary-field form of the DFT+eDMFT stationary functional is
+\begin{align}
+ \Gamma={}&\mathcal L[H_{\rm KS},O,U,\Sig]
+ -\int_\Omega\dd^3r\,[V_{\rm KS}-V_{\rm ext}]\,n
+ +E_{\rm Hxc}[n]+E_{\rm ion}\notag\\
+ &+\Phi_{\rm imp}[G_{\rm loc}]-\Phi_{\rm DC}[n_{\rm loc}]
+ -\Tr_{\omega,c}(\Sig G_{\rm loc})
+ +\mu_{\rm chem}N .
+ \label{eq:gamma}
+\end{align}
+The last term converts the grand potential to the fixed-$N$ Helmholtz
+functional; omit it when working at fixed chemical potential.
+$n(\mathbf r)$ is the charge density, $V_{\rm ext}$ the external ionic
+potential, $E_{\rm Hxc}$ the Hartree plus exchange-correlation functional,
+and $E_{\rm ion}$ the ionic electrostatic energy.
+$\Phi_{\rm imp}$ is the local many-body functional and $\Phi_{\rm DC}$ its
+double-counting subtraction. The local self-energy used for upfolding is
+$\Sig=\Sigma_{\rm imp}-V_{\rm DC}$.
+The trace $\Tr_{\omega,c}$ includes temperature and all Matsubara
+frequencies as well as local orbital/site traces.
+
+$\mathcal L$ is the \emph{regularized} lattice trace-log contribution
+associated with
+\begin{equation}
+ G_\kb(z)^{-1}=zO_\kb-H_\kb-U_\kb\Sig(z)U_\kb^\dagger.
+ \label{eq:dyson}
+\end{equation}
+It represents $-T\sum_{\kb j}w_\kb\ln\det[-G_\kb^{-1}(z_j)]$ with the
+high-frequency reference and basis-measure normalization included.
+The raw unnormalized determinant is not a definition of the thermodynamic
+functional in a nonorthogonal basis.
+Only its finite, consistently regularized derivative is needed below.
+
+At stationarity, variations of the auxiliary fields and local Green
+function cancel. In particular
+$\delta(\Phi_{\rm imp}-\Phi_{\rm DC})
+=\Tr_{\omega,c}(\Sig\delta G_{\rm loc})$
+cancels the corresponding term in
+$-\delta\Tr_{\omega,c}(\Sig G_{\rm loc})$;
+the lattice trace-log supplies the opposite
+$\Tr_{\omega,c}(G_{\rm loc}\delta\Sig)$.
+The explicit KS-potential variation cancels through the density-functional
+part. This statement does not discard changes of $U$ induced by a changing
+KS potential, band subspace, or radial functions: these remain in the
+specified total projector derivative. No impurity two-particle vertex
+is required for this first derivative at stationarity.
+
+\caution{Equation~\eqref{eq:gamma} is a stationary functional, not a claim
+that every frozen-self-energy path is stationary. A numerical frozen-$\Sigma$
+check must use the agreed linear impurity-functional correction and a
+consistent charge-relaxation path.}
+
+\subsection{Density and energy moment}
+At the central orthonormal KS representation define
+\begin{equation}
+ \rho_\kb=T\sum_j^{\rm reg}G_\kb(z_j),\qquad
+ \rE_\kb=T\sum_j^{\rm reg}z_jG_\kb(z_j).
+ \label{eq:moments}
+\end{equation}
+The superscript ``reg'' includes the convergence prescription, the
+high-frequency contact subtraction, and analytically summed reference.
+It must be identical to that used in the trace log. It is fixed so that
+for $\Sig=0$,
+\begin{equation}
+ \rho_{mn}=f_n\delta_{mn},\qquad
+ (\rE)_{mn}=f_n\epsilon_n\delta_{mn},
+ \label{eq:dftmoments}
+\end{equation}
+where $f_n$ is the Fermi occupation at the chosen temperature.
+Both matrices in Eq.~\eqref{eq:moments} are Hermitian after the complete
+frequency sum.
+
+The finite derivative of the lattice term is
+\begin{equation}
+ \delta\mathcal L=\sum_\kb w_\kb\Rea\Tr_b
+ \left(\rho\delta H-\rE\delta O
+       +T\sum_j^{\rm reg}G(z_j)\,\delta\Sigma^{\rm emb}(z_j)\right),
+ \label{eq:logderiv}
+\end{equation}
+with $\Sigma^{\rm emb}=U\Sig U^\dagger$. The part involving
+$\delta\Sig$ cancels in Eq.~\eqref{eq:gamma}; the explicit $\delta U$
+part remains. This gives Eq.~\eqref{eq:target} and the projector term
+derived in Sec.~\ref{sec:projector}.
+
+\subsection{What is \texorpdfstring{$M_\Sigma$}{M-Sigma}?}
+Left and right Dyson identities give
+\begin{align}
+ B_L&=\rE-\Es\rho
+     =T\sum_j^{\rm reg}\Sigma^{\rm emb}(z_j)G(z_j),\\
+ B_R&=\rE-\rho\Es=B_L^\dagger,\\
+ M_\Sigma&=\tfrac12(B_L+B_R)
+   =\rE-\tfrac12\{\Es,\rho\}.
+ \label{eq:msigma}
+\end{align}
+The symbol $B_L$ is a Dyson residual moment, not the basis derivative
+matrix $B^\mu$ introduced later. Explicitly,
+\begin{equation}
+ M_\Sigma=\frac T2\sum_j^{\rm reg}
+       [\Sigma^{\rm emb}G+G\Sigma^{\rm emb}].
+\end{equation}
+$M_\Sigma$ has energy units and vanishes in the noninteracting limit
+with the same Hamiltonian reference. The decomposition
+\begin{equation}
+ \rE=\tfrac12\{\Es,\rho\}+M_\Sigma
+ \label{eq:momentdecomp}
+\end{equation}
+is exact. Replacing $\rho_E$ by a symmetrized band energy omits
+$M_\Sigma$ and is not justified by merely Hermitizing the DFT formula.
+
+\newpart{Recovering Blaha's Eq. (13) without discarding a term}
+\label{sec:eq13}
+Let $\phi_K[\varepsilon](\mathbf r')$ be a strained LAPW basis function and
+$c_{Kn}[\varepsilon]$ a coefficient. The material-coordinate wave function is
+\begin{equation}
+ \widetilde\psi_n[\varepsilon](\mathbf r)
+ =\psi_n[\varepsilon](F\mathbf r)
+ =\sum_K c_{Kn}[\varepsilon]\,
+             \phi_K[\varepsilon](F\mathbf r).
+\end{equation}
+All derivatives below are evaluated at zero strain; a tilde is suppressed
+after this definition. Define three derivatives:
+\begin{align}
+ b_n^\mu(\mathbf r)&=\sum_K(\pa c_{Kn})\phi_K(\mathbf r),
+ \label{eq:bdef}\\
+ \eta_n^\mu(\mathbf r)&=\sum_K\frac{c_{Kn}}{\sqrt\Omega}
+ \pa\!\left[\sqrt{\Omega[\varepsilon]}
+           \phi_K[\varepsilon](F\mathbf r)\right]_0,
+ \label{eq:etadef}\\
+ \zeta_n^\mu&=b_n^\mu-\frac{\gamma_\mu}{2}\psi_n.
+\end{align}
+The product rule now gives exactly the separation in the paper:
+\begin{equation}
+ \boxed{\pa\psi_n=b_n^\mu-\frac{\gamma_\mu}{2}\psi_n+\eta_n^\mu
+                   =\zeta_n^\mu+\eta_n^\mu.}
+ \label{eq:13}
+\end{equation}
+Blaha's first term is $\zeta_n^\mu$, not just $b_n^\mu$.
+It combines the derivative of the expansion coefficients and the derivative
+of $\Omega^{-1/2}$. His second term is $\eta_n^\mu$.
+
+\subsection{Why the first term vanishes in the DFT derivation}
+In a finite LAPW basis the KS eigenproblem implies
+\begin{equation}
+ \me{\phi_K}{H_{\rm KS}-\epsilon_n}{\psi_n}=0\quad\hbox{for every }K.
+ \label{eq:galerkin}
+\end{equation}
+This is a projected variational equation; it does not say that the
+finite-basis wave function solves the continuum differential equation
+pointwise. Since $\zeta_n^\mu$ lies in the same basis space,
+$\me{\zeta_n^\mu}{H-\epsilon_n}{\psi_n}=0$.
+That is the precise reason for the sentence below Eq.\ (13) in the paper.
+
+In DMFT the relevant contraction contains $\rho$ and $\rho_E$, not a
+separate factor $f_n(H-\epsilon_n)$ for each state. One must therefore
+return to the matrix derivative before making this simplification.
+The next section does so, including the Jacobian that is already canceled
+in the DFT Rayleigh quotient leading to the paper's Eq.\ (12).
+
+\subsection{Interstitial behavior}
+For an interstitial plane wave,
+\begin{equation}
+ \sqrt{\Omega[\varepsilon]}\phi_{\kb K}[\varepsilon](F\mathbf r)
+ =\exp[\ii F^{-T}(\kb+\mathbf K)\cdot F\mathbf r]
+ =\exp[\ii(\kb+\mathbf K)\cdot\mathbf r].
+ \label{eq:plane}
+\end{equation}
+Hence $\eta_n^\mu=0$ there. This is the content of Appendix D1.
+It does \emph{not} set the interstitial kinetic stress to zero: the
+kinetic operator itself changes under the pullback.
+
+\newpart{The volume cancellation and generalized Eq. (20)}
+\label{sec:general20}
+\subsection{Differentiate the matrix integrals first}
+Write $\dot\psi_n=\pa\psi_n$ and let
+$H^{\mu,\rm op}$ denote the derivative of the pulled-back differential
+operator, with the wave functions held fixed. Differentiating the
+whole-cell matrix integrals gives
+\begin{align}
+ (\pa H)_{mn}={}&\gamma_\mu H_{mn}
+ +\me{\dot\psi_m}{H}{\psi_n}
+ +\me{\psi_m}{H}{\dot\psi_n}
+ +\me{\psi_m}{H^{\mu,\rm op}}{\psi_n},
+ \label{eq:Hprime}\\
+ (\pa O)_{mn}={}&\gamma_\mu O_{mn}
+ +\ip{\dot\psi_m}{\psi_n}+\ip{\psi_m}{\dot\psi_n}.
+ \label{eq:Oprime}
+\end{align}
+These formulas use the complete periodic cell. If a calculation instead
+differentiates separate moving MT/interstitial domains, their boundary
+terms must reconstruct these identities. The elementary formulas assume
+continuous LAPW functions with the required matching; APW derivative jumps
+and associated surface terms need separate care.
+
+For a set of variations $x_n$ define the real linear contraction
+\begin{equation}
+ \mathcal P_\mu[x]=2\Rea\sum_{mn}\left[
+ \rho_{nm}\me{x_m}{H}{\psi_n}
+ -(\rE)_{nm}\ip{x_m}{\psi_n}\right].
+ \label{eq:Pdef}
+\end{equation}
+At one $\kb$, Eq.~\eqref{eq:target} becomes
+\begin{equation}
+ D_\mu^{\rm 1p}=\gamma_\mu\Tr_b(\rho H-\rE O)
+                +\mathcal P_\mu[\dot\psi]
+                +\Rea\Tr_b(\rho H^{\mu,\rm op}).
+ \label{eq:prevolume}
+\end{equation}
+Hermiticity makes the displayed traces real where appropriate.
+
+Insert Eq.~\eqref{eq:13}. Its normalization contribution satisfies
+\begin{equation}
+ \mathcal P_\mu[-\gamma_\mu\psi/2]
+       =-\gamma_\mu\Tr_b(\rho H-\rE O).
+ \label{eq:volcancel}
+\end{equation}
+Therefore
+\begin{equation}
+ \boxed{D_\mu^{\rm 1p}=\Rea\Tr_b(\rho H^{\mu,\rm op})
+                        +\mathcal P_\mu[\eta]
+                        +\mathcal P_\mu[b].}
+ \label{eq:postvolume}
+\end{equation}
+The cancellation is valid also when $[\rho,\Es]\ne0$ and
+$M_\Sigma\ne0$. At the central orthonormal reference,
+$\Tr(\rho H-\rE)=-\Tr M_\Sigma$. Restoring only the
+$-\gamma\psi/2$ piece would produce $+\gamma\Tr M_\Sigma$;
+the omitted Jacobian is exactly its negative.
+
+\key{\textbf{No standalone volume correction follows from Eq.\ (13).}
+Keep the Jacobian and wave-function normalization together. Their
+cancellation is a whole-cell identity and must precede restricting
+$\eta$ to muffin-tin integrals.}
+
+\subsection{The matrix-valued valence correction}
+With fixed central coefficients, $b=0$. Since $\eta=0$ in the
+interstitial, the generalized counterpart of the paper's Eq.\ (20) is
+\begin{equation}
+ \boxed{\sigma_\mu^{\rm corr}=
+ \frac{2}{\Omega}\Rea\sum_{a\kb}w_\kb\sum_{mn}
+ \left[\rho_{nm}\me{\eta_m^\mu}{H_{\rm KS}}{\psi_n}_a
+       -(\rE)_{nm}\ip{\eta_m^\mu}{\psi_n}_a\right].}
+ \label{eq:20dmft}
+\end{equation}
+The subscript $a$ means integration over the central MT sphere of atom $a$.
+For Eq.~\eqref{eq:dftmoments}, this reduces to
+\begin{equation}
+ \sigma_\mu^{\rm corr,DFT}
+ =\frac{2}{\Omega}\Rea\sum_{a\kb n}w_\kb f_n
+       \me{\eta_n^\mu}{H_{\rm KS}-\epsilon_n}{\psi_n}_a,
+ \label{eq:20dft}
+\end{equation}
+which is precisely the structure of Eq.\ (20).
+
+The potential in the matrix element in Eq.~\eqref{eq:20dmft} is part
+of the basis derivative and must remain there. Cancellation of the
+\emph{induced potential variation} in the stationary functional is not
+permission to delete this potential from the Pulay matrix element.
+
+\newpart{Band representation versus physical subspace response}
+\label{sec:representation}
+Suppose a part of the coefficient response can be expressed inside the
+chosen band span as
+\begin{equation}
+ b_n=\sum_m\psi_m L_{mn}.
+\end{equation}
+Then the term retained in Eq.~\eqref{eq:postvolume} is
+\begin{align}
+ \mathcal P_\mu[b]
+ &=2\Rea\Tr_b[L^\dagger(\Es\rho-\rE)]\notag\\
+ &=2\Rea\Tr_b\!\left[L^\dagger
+           \left(\tfrac12[\Es,\rho]-M_\Sigma\right)\right]
+ =-2\Rea\Tr_b(L^\dagger B_L).
+ \label{eq:bterm}
+\end{align}
+This vanishes in DFT. It generally does not vanish in the DMFT
+one-particle term alone. That fact does not establish a new physical
+stress, because the same change of representation also changes $U$.
+
+Let
+\begin{equation}
+ C=T\sum_j^{\rm reg}\Sig(z_j)U^\dagger G(z_j),\qquad
+ UC=B_L.
+ \label{eq:C}
+\end{equation}
+For a pure orthonormal change of band frame, $L^\dagger=-L$ and
+$\delta U=L^\dagger U$. Its projector contribution is
+\begin{equation}
+ \delta D^{\rm proj}=2\Rea\Tr_c(C\delta U)
+      =2\Rea\Tr_b(L^\dagger UC)
+      =2\Rea\Tr_b(L^\dagger B_L),
+ \label{eq:gaugecancel}
+\end{equation}
+which cancels Eq.~\eqref{eq:bterm}. The same covariance holds for a
+nonorthogonal frame when its overlap metric and projector normalization
+are transformed consistently; see Sec.~\ref{sec:projector}.
+
+\subsection{Two consistent ways to organize the calculation}
+\begin{enumerate}
+\item \textbf{Fixed reference coefficients.} Use the central coefficients
+      to build $\partial H$ and $\partial O$ as basis derivatives.
+      Then $b=0$ in these matrix derivatives. Compute the projector
+      derivative in the same representation, including metric factors.
+\item \textbf{A moving KS basis.} Retain its coefficient response in both
+      the one-particle and projector derivatives. Remove the common
+      pure-frame contribution only after demonstrating the cancellation.
+\end{enumerate}
+Mixing the first convention for one part and the second for another
+can leave a large, unphysical residual even when the separate matrix
+derivatives are accurate.
+
+For a fixed-index window $W_\kb$, rotation entirely within $W_\kb$ is a
+change of frame. Mixing with states outside $W_\kb$ changes the physical
+subspace selected by the window and cannot be discarded by the preceding
+argument. A constant number of bands does not imply
+$\partial_\mu\Pi_{W_\kb}=0$, where $\Pi_{W_\kb}$ is its projector.
+If the window cuts a degeneracy, this derivative may not be uniquely
+smooth; include the degenerate multiplet or otherwise define a smooth
+subspace.
+
+\newpart{Local form of the basis derivative}
+\label{sec:local}
+\subsection{Augmentation coefficients and radial functions}
+Within atom $a$ use $\mathbf r_a=\mathbf r-\tau_a$,
+$r=|\mathbf r_a|$, and $\widehat{\mathbf r}=\mathbf r_a/r$. Write
+\begin{equation}
+ f_i^a(\mathbf r_a)=u_i^a(r)Y_{L_i}(\widehat{\mathbf r}),\qquad
+ \psi_n(\mathbf r_a)=\sum_i A^a_{in}f_i^a(\mathbf r_a),\qquad
+ A^a_{in}=\sum_K c_{Kn}a^a_{iK}.
+ \label{eq:localA}
+\end{equation}
+$a_{iK}$ are the LAPW matching coefficients. The symbol $A$ here is
+Blaha's local augmentation coefficient, not the full LAPW eigenvector $c$.
+For the basic LAPW pair
+\begin{equation}
+ u_{l0}=u_l(r,E_l),\qquad u_{l1}=\dot u_l(r,E_l),
+ \qquad \dot u_l=\partial u_l/\partial E.
+\end{equation}
+A prime always means $\dd/\dd r$; a dot means an energy derivative.
+The spherical-harmonic normalization is
+$\int\dd\widehat{\mathbf r}\,Y_L^*Y_{L'}=\delta_{LL'}$.
+
+Define the volume-compensated matching derivative at fixed $c$:
+\begin{equation}
+ D^{a\mu}_{in}=\sum_K\frac{c_{Kn}}{\sqrt\Omega}
+        \pa[\sqrt{\Omega[\varepsilon]}a^a_{iK}[\varepsilon]]_0.
+ \label{eq:D}
+\end{equation}
+This is Blaha's G3--G4. If $s_{in}^\mu$ is the \emph{physical}
+fixed-$c$ derivative of $A_{in}$, including $\Omega^{-1/2}$, then
+\begin{equation}
+ D^\mu=s^\mu+\tfrac12\gamma_\mu A.
+ \label{eq:DvsS}
+\end{equation}
+One must not identify a routine returning $s^\mu$ with a routine
+returning $D^\mu$ without this conversion.
+
+\subsection{Radial and angular coordinate derivatives}
+Define the scalar angular multiplier and angular differential operator
+\begin{equation}
+ p_\mu(\widehat{\mathbf r})=\hat r_\alpha\hat r_\beta,\qquad
+ \mathscr A_\mu=\tfrac12
+  (\hat r_\beta\nabla_{\Omega,\alpha}
+       +\hat r_\alpha\nabla_{\Omega,\beta}).
+ \label{eq:angular}
+\end{equation}
+$\boldsymbol\nabla_\Omega$ is the dimensionless tangential gradient
+on the unit sphere. Since
+$\boldsymbol\nabla=\widehat{\mathbf r}\,\partial_r
+                     +r^{-1}\boldsymbol\nabla_\Omega$,
+\begin{equation}
+ (S^\mu\mathbf r_a)\cdot\boldsymbol\nabla
+          [u_i(r)Y_i(\widehat{\mathbf r})]
+ =r u_i'(r)p_\mu Y_i+u_i(r)\mathscr A_\mu Y_i.
+ \label{eq:coordderiv}
+\end{equation}
+Here $Y_i$ abbreviates $Y_{L_i}$.
+For isotropic dilation, summing the three diagonal channels gives
+$\sum_\alpha p_{\alpha\alpha}=1$ and
+$\sum_\alpha\mathscr A_{\alpha\alpha}=0$.
+
+Combining the matching and coordinate derivatives gives
+\begin{equation}
+ \boxed{\eta_n^\mu=\sum_i\left[
+ D^\mu_{in}u_iY_i
+ +A_{in}\,r u_i'p_\mu Y_i
+ +A_{in}\,u_i\mathscr A_\mu Y_i\right].}
+ \label{eq:eta3}
+\end{equation}
+These are the three channels that produce the six terms in G2 when
+$H_{\rm KS}=H_{\rm sph}+V_{\rm ns}$ is used.
+
+\subsection{What is omitted by frozen augmentation?}
+An explicit response of the radial solution would add
+\begin{equation}
+ \eta_n^{\mu,\rm rad\,resp}
+       =\sum_i A_{in}(\pa u_i)_{r\,\rm fixed}Y_i,
+ \label{eq:radialresponse}
+\end{equation}
+together with the consistent response of matching coefficients,
+linearization energies, local orbitals, and normalized projector.
+This is distinct from the $r u_i'$ term already in Eq.~\eqref{eq:eta3}.
+The present note does not establish that this omitted response is the
+source of the remaining total-stress discrepancy.
+
+\newpart{Local integral matrices: definitions without diagonal assumptions}
+\label{sec:integrals}
+Suppress $a,\mu$ temporarily and introduce three bra functions:
+\begin{equation}
+ g_i^0=u_iY_i,\qquad
+ g_i^r=r u_i'p_\mu Y_i,\qquad
+ g_i^{\rm ang}=u_i\mathscr A_\mu Y_i.
+ \label{eq:gfunctions}
+\end{equation}
+For $x\in\{0,r,\mathrm{ang}\}$ define
+\begin{align}
+ S^x_{ij}&=\int_{r<R_a}\dd^3r\,(g_i^x)^*f_j,\label{eq:Slocal}\\
+ H^x_{ij}&=\int_{r<R_a}\dd^3r\,(g_i^x)^*H_{\rm sph}f_j,
+              \label{eq:Hlocal}\\
+ V^x_{ij}&=\int_{r<R_a}\dd^3r\,(g_i^x)^*V_{\rm ns}f_j.
+              \label{eq:Vlocal}
+\end{align}
+These are \emph{one-sided} bilinear forms, with the differential
+Hamiltonian acting on the ket. They need not individually be Hermitian.
+The final band matrices are Hermitian sums, not individually symmetrized
+local factors. Integration by parts changes the radial volume matrix
+and introduces a surface term; both must be changed together.
+
+\subsection{Overlap integrals}
+The three local overlaps are
+\begin{align}
+ S^0_{ij}&=\delta_{L_iL_j}\int_0^{R_a}r^2\dd r\,u_i^*u_j,
+                  \label{eq:S0}\\
+ S^r_{ij}&=\left[\int_0^{R_a}r^3\dd r\,u_i'^*u_j\right]
+              \int\dd\widehat{\mathbf r}\,Y_i^*p_\mu Y_j,
+                  \label{eq:Sr}\\
+ S^{\rm ang}_{ij}&=\left[\int_0^{R_a}r^2\dd r\,u_i^*u_j\right]
+              \int\dd\widehat{\mathbf r}\,
+                          (\mathscr A_\mu Y_i)^*Y_j.
+                  \label{eq:Sa}
+\end{align}
+The angular derivative can connect different $l$ values. The radial
+integral in Eq.~\eqref{eq:Sa} must therefore be evaluated for its actual
+pair $(l_i,l_j)$. The familiar same-$l$ identities
+$\langle u_l|u_l\rangle=1$ and
+$\langle u_l|\dot u_l\rangle=0$ cannot be applied across different $l$.
+
+\subsection{Spherical Hamiltonian action}
+In Hartree units the radial equations imply
+\begin{equation}
+ H_{m sph}(u_lY_L)=E_lu_lY_L,\qquad
+ H_{m sph}(\dot u_lY_L)=E_l\dot u_lY_L+u_lY_L.
+ \label{eq:radialeq}
+\end{equation}
+For any channel $x$,
+\begin{equation}
+ \boxed{H^x_{ij}=E_{l_j}S^x_{ij}
+                  +\delta_{\lambda_j,1}S^x_{i,j_0},}
+ \label{eq:HfromS}
+\end{equation}
+where $j_0=(L_j,0)$. No band eigenvalue has entered this local identity.
+It is therefore safe to use before taking an interacting density-matrix
+trace. Actual radial-normalization and energy-unit conventions must
+match Eq.~\eqref{eq:radialeq}.
+
+\subsection{Nonspherical potential integrals}
+Write
+\begin{equation}
+ V_{\rm ns}(\mathbf r)=\sum_{L''\ne0}V_{L''}(r)Y_{L''}(\widehat{\mathbf r}).
+\end{equation}
+Then
+\begin{align}
+ V^0_{ij}&=\sum_{L''\ne0}
+ \left[\int_0^{R_a}r^2\dd r\,u_i^*V_{L''}u_j\right]
+ \int\dd\widehat{\mathbf r}\,Y_i^*Y_{L''}Y_j,\label{eq:V0}\\
+ V^r_{ij}&=\sum_{L''\ne0}
+ \left[\int_0^{R_a}r^3\dd r\,u_i'^*V_{L''}u_j\right]
+ \int\dd\widehat{\mathbf r}\,Y_i^*p_\mu Y_{L''}Y_j,\label{eq:Vr}\\
+ V^{\rm ang}_{ij}&=\sum_{L''\ne0}
+ \left[\int_0^{R_a}r^2\dd r\,u_i^*V_{L''}u_j\right]
+ \int\dd\widehat{\mathbf r}\,(\mathscr A_\mu Y_i)^*Y_{L''}Y_j.
+ \label{eq:Va}
+\end{align}
+Expanding $p_\mu$ and $\mathscr A_\mu Y_i$ in spherical harmonics gives
+the Gaunt-coefficient sums of G2. The integral form fixes all conjugations
+and derivative placements without depending on a particular Gaunt table.
+
+\newpart{The six generalized lines of Appendix G2}
+\label{sec:g2}
+Insert Eq.~\eqref{eq:eta3} into Eq.~\eqref{eq:20dmft}, split
+$H=H_{\rm sph}+V_{\rm ns}$, and use the local matrices above.
+For one atom and one $\kb$, define the six real energy derivatives:
+\begin{align}
+ d_1^\mu&=2\Rea\Tr_b[\rho D^{\mu\dagger}H^0A
+                             -\rE D^{\mu\dagger}S^0A],\label{eq:g21}\\
+ d_2^\mu&=2\Rea\Tr_b[\rho A^\dagger H^rA
+                             -\rE A^\dagger S^rA],\label{eq:g22}\\
+ d_3^\mu&=2\Rea\Tr_b[\rho A^\dagger H^{\rm ang}A
+                             -\rE A^\dagger S^{\rm ang}A],\label{eq:g23}\\
+ d_4^\mu&=2\Rea\Tr_b[\rho D^{\mu\dagger}V^0A],\label{eq:g24}\\
+ d_5^\mu&=2\Rea\Tr_b[\rho A^\dagger V^rA],\label{eq:g25}\\
+ d_6^\mu&=2\Rea\Tr_b[\rho A^\dagger V^{\rm ang}A].\label{eq:g26}
+\end{align}
+Their sum is
+\begin{equation}
+ \boxed{\sigma_\mu^{\rm corr}
+ =\frac1\Omega\sum_{a\kb}w_\kb\sum_{q=1}^6d_q^{a\kb,\mu}.}
+ \label{eq:G2full}
+\end{equation}
+The $H^x,S^x,V^x$ for $x=r,\mathrm{ang}$ depend on $\mu$ through
+their angular functions even though this superscript is suppressed.
+
+\begin{tabularx}{\linewidth}{@{}c l X@{}}
+\toprule
+G2 line & Basis derivative & Local operator / overlap content\\
+\midrule
+1 & Matching, $D^\mu$ & $H^0$ and $S^0$\\
+2 & Radial coordinate, $r u'$ & $H^r$ and $S^r$\\
+3 & Angular coordinate & $H^{\rm ang}$ and $S^{\rm ang}$\\
+4 & Matching, $D^\mu$ & Nonspherical potential $V^0$\\
+5 & Radial coordinate, $r u'$ & Nonspherical potential $V^r$\\
+6 & Angular coordinate & Nonspherical potential $V^{\rm ang}$\\
+\bottomrule
+\end{tabularx}
+
+\subsection{An explicit index expression}
+The first line, after using the radial equation, is
+\begin{align}
+ d_1^\mu=2\Rea\sum_{mnij}(D^\mu_{im})^*A_{jn}
+ \Big[&(E_{l_j}\rho_{nm}-(\rE)_{nm})S^0_{ij}\notag\\
+       &+\rho_{nm}\delta_{\lambda_j,1}S^0_{i,j_0}\Big].
+ \label{eq:g21index}
+\end{align}
+The second and third lines have exactly the same bracket, with
+$D^\mu_{im}$ replaced by $A_{im}$ and $S^0$ replaced by $S^r$ or
+$S^{\rm ang}$. In DFT, $\rho_{nm}=f_n\delta_{nm}$ and
+$(\rE)_{nm}=f_n\epsilon_n\delta_{nm}$, so the bracket contains
+$f_n(E_{l_j}-\epsilon_n)$ and recovers the corresponding G2 factors.
+
+The off-diagonal generalization therefore does require changing one
+band index on the bra relative to the ket, as suggested in the discussion.
+It also requires replacing the entire energy-weighted occupation by
+$\rho_E$, including $M_\Sigma$. The latter information cannot be
+recovered from occupations alone.
+
+\subsection{Where the symmetric combination belongs}
+For any Hermitian $\rho$ and any band matrix $X$,
+\begin{equation}
+ 2\Rea\Tr_b(\rho X)=\Tr_b[\rho(X+X^\dagger)]
+                         =2\Tr_b(\rho\Herm X).
+ \label{eq:hermitize}
+\end{equation}
+For example, the Hermitian matching-potential band matrix is
+\begin{equation}
+ D^\dagger V^0A+A^\dagger(V^0)^\dagger D.
+\end{equation}
+In components this produces the paired $D_m^*A_n$ and $A_m^*D_n$
+terms. Using $\Herm X=(X+X^\dagger)/2$ is equally correct if the
+external factor two is retained. Applying a half and then dropping that
+factor loses half the contribution. Hermitize the \emph{complete band
+matrix}, not a local radial factor whose bra and ket play different roles.
+
+\newpart{Explicit band matrices \texorpdfstring{$T^\mu$, $B^\mu$, and $O^\mu$}{T, B, and O}}
+\label{sec:matrices}
+Define the one-sided band matrices
+\begin{align}
+ Y^\mu={}&\sum_a\left[D^{a\mu\dagger}S^{a0}A^a
+       +A^{a\dagger}S^{ar}A^a+A^{a\dagger}S^{a,\rm ang}A^a\right],\\
+ Z^\mu={}&\sum_a\left[D^{a\mu\dagger}(H^{a0}+V^{a0})A^a
+       +A^{a\dagger}(H^{ar}+V^{ar})A^a\right.\notag\\
+       &\hspace{29mm}\left.+A^{a\dagger}(H^{a,\rm ang}
+                                            +V^{a,\rm ang})A^a\right].
+\end{align}
+Then
+\begin{equation}
+ \boxed{O^{\mu,\eta}=Y^\mu+Y^{\mu\dagger},\qquad
+        B^\mu=Z^\mu+Z^{\mu\dagger}.}
+ \label{eq:BO}
+\end{equation}
+Equation~\eqref{eq:G2full} is equivalently
+\begin{equation}
+ \sigma_\mu^{\rm corr}=\frac1\Omega\sum_\kb w_\kb
+ \Rea\Tr_b[\rho B^\mu-\rE O^{\mu,\eta}].
+\end{equation}
+These are definitions of the full off-diagonal matrices, not just their
+diagonal entries. They identify which local information is needed even
+if an implementation contracts the matrices without storing them.
+
+For the explicit kinetic operator,
+\begin{equation}
+ T^\mu_{mn}=\frac12\int_\Omega\dd^3r\,
+ \psi_m^*(\partial_\alpha\partial_\beta
+                  +\partial_\beta\partial_\alpha)\psi_n.
+ \label{eq:T}
+\end{equation}
+This is the off-diagonal bilinear form underlying Eqs.\ (19) and (G1).
+For smooth periodic functions, integration by parts gives the equivalent
+form
+\begin{equation}
+ T^\mu_{mn}=-\frac12\int_\Omega\dd^3r\,
+ [(\partial_\alpha\psi_m)^*(\partial_\beta\psi_n)
+  +(\partial_\beta\psi_m)^*(\partial_\alpha\psi_n)].
+ \label{eq:Tgrad}
+\end{equation}
+When splitting the domain or using derivative-discontinuous basis
+functions, keep the corresponding surface contributions consistently.
+
+The explicit potential-operator matrix is
+\begin{equation}
+ V^{\mu,\rm op}_{mn}=
+ \int_\Omega\dd^3r\,\psi_m^*(\mathbf r)
+ \pa[V_{\rm KS}[\varepsilon](F\mathbf r)]_0\psi_n(\mathbf r).
+\end{equation}
+In the fixed-$c$, whole-cell convention, within the specified basis
+approximation,
+\begin{equation}
+ \boxed{\pa O=O^{\mu,\eta},\qquad
+        \pa H=T^\mu+V^{\mu,\rm op}+B^\mu.}
+ \label{eq:matrixderivs}
+\end{equation}
+A moving representation adds $L^\dagger+L$ to $\partial O$ and
+$L^\dagger\Es+\Es L$ to $\partial H$. These additions lead to
+Eq.~\eqref{eq:bterm}.
+
+\subsection{What an energy-linear ``kernel'' means}
+A diagonal DFT routine can encode a bilinear form as
+\begin{equation}
+ K^\mu(E)=T^\mu+B^\mu-E O^{\mu,\eta}.
+ \label{eq:kernel}
+\end{equation}
+Here ``kernel'' means a matrix representing this quadratic/bilinear form;
+it is not a two-particle vertex. If Eq.~\eqref{eq:kernel} has been
+established for the \emph{full} matrix, then in a chosen energy unit
+$K^\mu(0)-K^\mu(1)=O^{\mu,\eta}$.
+Knowing only $\langle n|K^\mu(\epsilon_n)|n\rangle$ does not prove
+that this subtraction reconstructs the off-diagonal overlap derivative.
+Rearrangements valid on KS eigenstates may remove information needed
+for that inference. The integral definitions above provide the direct
+audit target.
+
+\newpart{Normalized projectors and consistency of the representation}
+\label{sec:projector}
+\subsection{The projector is not just a raw overlap}
+For raw projected local orbitals $\varphi_\ell$, define in an
+orthonormal window basis
+\begin{equation}
+ P_{n\ell}(\kb)=\ip{\psi_{n\kb}}{\varphi_\ell},\quad
+ \mathcal S=\sum_\kb w_\kb P_\kb^\dagger P_\kb,\quad
+ X=\mathcal S^{-1/2},\quad U_\kb=P_\kb X.
+ \label{eq:U}
+\end{equation}
+This notation represents one normalization block; site/symmetry blocks
+must be treated as in the actual projector construction.
+The metric $\mathcal S$ is an orbital-space matrix and must not be
+confused with the band overlap $O$ or the local integrals $S^x$.
+When symmetry is used after the $k$ sum, the same symmetry operation
+must be applied to its derivative. Fixed local frames make those
+rotation matrices fixed; moving frames add their derivatives.
+
+For fixed weights,
+\begin{align}
+ \pa U_\kb&=(\pa P_\kb)X+P_\kb\pa X,\label{eq:Uprime}\\
+ \pa\mathcal S&=\sum_\kb w_\kb
+       [(\pa P_\kb)^\dagger P_\kb+P_\kb^\dagger\pa P_\kb].
+ \label{eq:Sprimeorth}
+\end{align}
+Writing $Y=\mathcal S^{1/2}=X^{-1}$, differentiating
+$X\mathcal S X=\Id$ gives the Sylvester equation
+\begin{equation}
+ Y\pa X+(\pa X)Y=-X(\pa\mathcal S)X.
+ \label{eq:Xprime}
+\end{equation}
+In an eigenbasis of $\mathcal S$ with positive eigenvalues $s_i$,
+\begin{equation}
+ (\pa X)_{ij}=-\frac{(\pa\mathcal S)_{ij}}
+        {\sqrt{s_i}\sqrt{s_j}(\sqrt{s_i}+\sqrt{s_j})}.
+\end{equation}
+This is well behaved for coincident positive eigenvalues. A singular
+global normalization block requires a specified rank treatment;
+differentiability can fail when that rank changes.
+
+\subsection{An essential qualification for a fixed-coefficient frame}
+The temporary strained states obtained by holding central LAPW
+coefficients fixed are not, in general, orthonormal. In that frame the
+same physical normalization is
+\begin{equation}
+ \mathcal S=\sum_\kb w_\kb P_\kb^\dagger O_{W,\kb}^{-1}P_\kb,
+ \label{eq:metricS}
+\end{equation}
+where $O_W$ is the overlap within the chosen window span and $P$ is the
+covariant overlap with its basis functions. At the central point $O_W=\Id$,
+\begin{equation}
+ \pa\mathcal S=\sum_\kb w_\kb\left[
+ (\pa P)^\dagger P+P^\dagger\pa P-P^\dagger(\pa O_W)P\right].
+ \label{eq:metricSprime}
+\end{equation}
+Equations~\eqref{eq:Sprimeorth} and \eqref{eq:metricSprime} express
+the same normalization in different frames. The last term in
+Eq.~\eqref{eq:metricSprime} is \emph{not} an extra term to add to a
+correct derivative already evaluated in a moving orthonormal KS basis.
+
+For a pure frame transformation $\psi\mapsto\psi(\Id+L)$,
+$\delta P=L^\dagger P$ and $\delta O=L^\dagger+L$ at the reference.
+Equation~\eqref{eq:metricSprime} then gives $\delta\mathcal S=0$.
+Consequently $\delta X=0$, $\delta U=L^\dagger U$, and the cancellation
+in Eq.~\eqref{eq:gaugecancel} holds also for this nonorthogonal
+relabeling. This is a useful representation-consistency test, not a
+claim that the current code has omitted this term.
+
+\subsection{Projector stress and the direct gradient}
+The remaining explicit projector contribution is
+\begin{equation}
+ \boxed{D_\mu^{\rm proj}
+     =2\Rea\sum_\kb w_\kb\Tr_c[C_\kb\pa U_\kb],\qquad
+ C_\kb=T\sum_j^{\rm reg}\Sig(z_j)U_\kb^\dagger G_\kb(z_j).}
+ \label{eq:projstress}
+\end{equation}
+There is no dagger between $C$ and $\partial U$: their rectangular
+orientations already make the product an orbital matrix. The frequency
+sum has the same regularization as the density moments.
+
+One can infer $C$ from $UC=B_L$ using
+$C=(U^\dagger U)^+U^\dagger B_L$, where $+$ denotes a
+Moore--Penrose pseudoinverse. If $U$ has deficient column rank at one
+$\kb$, this reconstructs only the part of $C$ visible through multiplication
+by $U$. The Matsubara expression in Eq.~\eqref{eq:projstress} defines
+the direct gradient without such an inversion. Agreement of contracted
+gradients is a test; it is not a replacement for the derivative of $X$.
+
+\newpart{The projector boundary and other extensions}
+\label{sec:extensions}
+\subsection{A finite projector at the MT boundary}
+Suppose a projector is represented as
+$\varphi_\ell(\mathbf r)=\theta(R_a-r_a)\,q_\ell(\mathbf r_a)$,
+where $q_\ell$ does not vanish at $R_a$. A moving-domain overlap obeys
+the transport formula
+\begin{equation}
+ \delta\!\int_{B_a}\dd^3r\,\psi^*q
+ =\int_{B_a}\dd^3r\,\delta(\psi^*q)
+   +\int_{\partial B_a}\dd S\,v_n\psi^*q.
+ \label{eq:reynolds}
+\end{equation}
+Here $B_a$ is the integration ball and $v_n$ is the boundary's normal
+displacement per unit perturbation in the coordinates being used.
+Equivalently, at fixed coordinate $\mathbf r$,
+\begin{equation}
+ \delta\theta(R_a-r_a)=\delta(R_a-r_a)
+           [\delta R_a+\widehat{\mathbf r}_a\cdot\delta\tau_a].
+ \label{eq:theta}
+\end{equation}
+For fixed-radius physical spheres, $\delta R_a=0$ but the sphere
+translates with its center. In atom-centered physical coordinates that
+translation is transferred into the derivative of the wave function;
+there is no additional translating-boundary term to add a second time.
+In a material pullback the same fixed physical sphere becomes a
+deformed integration region, so its shape derivative must be handled.
+
+The fact that $q(R_a)\ne0$ means a boundary contribution cannot be
+discarded merely by declaring the projector localized. It does not
+prove a missing term in an existing radial/matching implementation:
+the same contribution may already be contained in its coordinate
+transformation. A direct overlap derivative in a specified coordinate
+system is the decisive audit. This projector boundary issue is distinct
+from basis continuity used in deriving Eq.~\eqref{eq:Hprime}.
+
+\subsection{Local orbitals}
+Local orbitals can be included by enlarging the radial primitive set and
+the matrices $A,D,S,H,V$. For an extra primitive $u_l(r,E_{\rm LO})$,
+$H_{\rm sph}u_l=E_{\rm LO}u_l$. For a linear combination defining an LO,
+apply the Hamiltonian to every primitive and differentiate every
+coefficient and normalization constraint. Do not reuse the elementary
+$\delta_{\lambda,1}$ term for an arbitrary LO without deriving its
+radial action. APW+lo also requires its own boundary bookkeeping.
+
+\subsection{Scalar relativity and local-axis constraints}
+The cancellation of Jacobian, basis representation, and projector
+normalization is representation algebra and survives RELA.
+Equations~\eqref{eq:radialeq} and \eqref{eq:T}, however, use the
+nonrelativistic differential operator. A RELA extension requires the
+actual scalar-relativistic radial Hamiltonian, small-component metric,
+and their strain derivatives. Successful RELA fixed-input matrix tests
+do not by themselves establish every term in the physical strain path.
+
+If the self-energy is restricted to be diagonal in local correlated
+axes, changing those axes changes the approximation. A co-moving
+frame requires the derivative of its orbital rotation in $P,U$ and
+the corresponding treatment of the imposed self-energy constraint.
+The present formulas use fixed local axes. Merely rotating a diagonal
+self-energy after truncation is not equivalent to a fully rotationally
+covariant calculation.
+
+\newpart{What comes directly from the paper, and what is new here}
+\label{sec:paper}
+\begin{longtable}{p{0.18\linewidth}p{0.73\linewidth}}
+\toprule
+Paper location & Role in this derivation\\
+\midrule
+Eq.\ (10) & DFT Rayleigh quotient. Its normalization cancels the volume
+ factor before Eq.\ (12); it cannot be reused unchanged with a general
+ interacting energy moment.\\
+Eq.\ (11) & Explicit nonrelativistic operator derivative, including
+ the kinetic expression in Eq.~\eqref{eq:T}.\\
+Eq.\ (13) & Product-rule decomposition. Rewritten exactly as
+ $b-\gamma\psi/2+\eta$ in Eq.~\eqref{eq:13}.\\
+Eq.\ (20) & DFT incomplete-basis correction. Generalized to independent
+ $\rho$ and $\rho_E$ in Eq.~\eqref{eq:20dmft}.\\
+Appendix D & Volume-compensated interstitial invariance and local
+ radial/angular differentiation.\\
+Eq.\ (G1) & Diagonal-occupation expansion of the kinetic bilinear form.
+ Its off-diagonal definition is Eq.~\eqref{eq:T}.\\
+Eq.\ (G2) & Six diagonal-occupation local contractions. Their matrix
+ versions are Eqs.~\eqref{eq:g21}--\eqref{eq:g26}.\\
+Eqs.\ (G3--G4) & Matching coefficient derivative $D$, including the
+ compensating $\sqrt\Omega$ factor.\\
+\bottomrule
+\end{longtable}
+
+Blaha's paper does not state the interacting $\rho_E$, $M_\Sigma$,
+normalized-projector gradient, or the matrix formulas in the notation
+used here. Those are the generalizations derived in this note. The
+diagonal DFT result is a necessary limit; it does not by itself determine
+all off-diagonal matrix elements.
+
+\subsection{Two places where the integral definitions are safer}
+In the supplied PDF, the definition of the radial quantity $W$ below
+G4 prints radial derivatives on both radial functions. The direct
+derivation of G2 line 5, Eq.~\eqref{eq:Vr}, instead gives
+\begin{equation}
+ W_{i,L'',j}=\int_0^{R_a}r^3\dd r\,u_i'^*(r)V_{L''}(r)u_j(r),
+ \label{eq:W}
+\end{equation}
+with a derivative only on the bra. This follows because only the bra
+wave function is differentiated in the one-sided term; its conjugate
+is supplied by the outer $2\Rea$. The printed two-prime definition
+appears to be a typographical error. The inspected
+\pathf{src/dftKS/atpar.f90} already implements and documents the
+single-prime form, so this observation is not a newly discovered code bug.
+
+The third line of G2 also uses compact same-channel radial norm notation.
+When its angular operator connects different $l$, use the cross-$l$
+overlap of Eq.~\eqref{eq:Sa}, rather than extending same-$l$
+orthogonality identities to that case. The inspected stress-integral
+code already stores such cross-$l$ integrals. This is an audit of the
+meaning of the printed simplification, not evidence that those
+integrals are absent from the implementation.
+
+\subsection{Beyond simply changing one band index}
+The radial and angular operator structures in G2 need no new
+DMFT-specific angular algebra. The essential changes are (i) full
+bilinear band matrices, (ii) the independent energy moment, (iii)
+consistent volume and band-frame cancellation, and (iv) the derivative
+of the normalized correlated projector. Additional radial response,
+boundary handling, and relativity are separate approximations to audit.
+
+\newpart{Implementation map and the next audit}
+\label{sec:audit}
+The paths below are relative to
+\pathf{/Users/haule/projects/eDMFT_new/} and refer to the inspected
+working tree on 6 November 2026. They locate relevant code; they do
+not certify that its total assembly is correct.
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.36\linewidth}p{0.56\linewidth}}
+\toprule
+Source location & Mathematical responsibility / audit question\\
+\midrule
+\pathf{src/dmft2/cmp_dmft_stress.f90}
+ & Contracts density and energy-moment information with the existing
+ stress kernels. Check the complete off-diagonal bilinear form against
+ $T^\mu,B^\mu,O^{\mu,\eta}$, not only its DFT diagonal.\\
+\pathf{cmp_dmft_paired_matching_matrix}
+ in the same file & Diagnostic fixed-input matching derivatives,
+ with separate spherical, surface, nonspherical, and interstitial
+ pieces. These form a distinct derivative convention that must be
+ mapped to the material-coordinate formula before substitution.\\
+\pathf{src/dmft2/alm_blm_clm.f90},
+ \pathf{cmp_alm_blm_clm_strain}
+ & Matching derivatives include physical volume-normalization terms.
+ Determine explicitly whether each consumer needs $s^\mu$ or Blaha's
+ $D^\mu=s^\mu+\gamma_\mu A/2$.\\
+\pathf{src/dmft2/stress_integrals.f90}
+ & Radial derivative and overlap integrals, including cross-$l$
+ $J$ and $I$ channels. Compare with Eqs.~\eqref{eq:Sr} and
+ \eqref{eq:Sa}, including small-component conventions.\\
+\pathf{src/dftKS/atpar.f90}
+ & Nonspherical $V$ and single-prime $W$ radial integrals;
+ confirm all bra/ket and LO channels.\\
+\pathf{src/dmft2/l2main.f90}
+ & Construction and assembly of diagnostic density/moment contractions.
+ Keep complete total-stress assembly separate from a successful
+ fixed-input derivative check.\\
+\pathf{src/dmft2/stress_modules.f90}
+ & Diagnostic switches, including
+ \pathf{EDMFT_STRESS_PAIRED_DIAG} and
+ \pathf{EDMFT_STRESS_PAIRED_ASSEMBLY}. A diagnostic reconstruction
+ is not a validated production replacement.\\
+\bottomrule
+\end{longtable}
+
+\subsection{A concrete order for re-auditing}
+\begin{enumerate}[itemsep=5pt]
+\item \textbf{Fix the derivative convention in writing.} For every
+ routine record its coordinates, physical sphere motion, normalization,
+ $c$ treatment, potential held fixed, and Hartree/Ry and shear conventions.
+\item \textbf{Construct local integral reference matrices.} Compare all
+ six G2 channels with Eqs.~\eqref{eq:g21}--\eqref{eq:g26} before
+ assembling the final stress. Test both real and imaginary off-diagonal
+ Hermitian density matrices; real test vectors alone cannot expose every
+ complex off-diagonal error.
+\item \textbf{Recover full $H'$ and $O'$ in one frame.} Check
+ Eq.~\eqref{eq:matrixderivs}, including whole-cell volume cancellation,
+ MT surfaces, interstitial terms, and all LO contributions. Do not infer
+ $O'$ from an energy-linear kernel without establishing its full
+ bilinear identity.
+\item \textbf{Close the projector derivative in the same frame.}
+ Include $X'$, window response, and the metric form of normalization
+ when appropriate. Verify $UC=B_L$ and compare the direct gradient
+ against pseudoinverse reconstruction. Check projector boundary motion
+ through a direct overlap derivative.
+\item \textbf{Verify exact invariances.} A pure band-frame rotation must
+ cancel between Eqs.~\eqref{eq:bterm} and \eqref{eq:gaugecancel}; a
+ fixed-coefficient test has no coefficient-response term. In the
+ noninteracting limit $M_\Sigma=0$ and the DFT result must return.
+\item \textbf{Only then assemble the physical functional derivative.}
+ Keep the KS field-response cancellation and density-functional terms
+ consistent with the chosen path. Compare NREL first, then RELA, with
+ the prescribed frozen-$\Sigma$ reference functional and relaxed charge.
+ Use at least two strain magnitudes and test a shear or nonhydrostatic
+ channel as well as isotropic strain.
+\end{enumerate}
+
+\key{The present evidence supports deriving and testing the complete
+off-diagonal bilinear forms. It does not support adding an isolated
+$M_\Sigma O'$ contribution to a total stress whose overlap and projector
+bookkeeping has not yet been shown to use the same convention.}
+
+\newpart{What the recent fixed-input tests establish}
+\label{sec:tests}
+The recent diagnostic contracts the central interacting moments with
+Hamiltonian and overlap derivatives formed on a specified fixed-input
+path. Define
+\begin{equation}
+ \rho_o=\rho-\diag\rho,\qquad
+ D_\mu^{\rm extra}=\Rea\Tr_b\left[
+ \rho_o H'_\mu-
+ \left(\tfrac12\{\Es,\rho_o\}+M_\Sigma\right)O'_\mu\right].
+ \label{eq:extra}
+\end{equation}
+The $k$ sum and weights are implicit in this equation only.
+The quantity called ``extra'' is a diagnostic difference from a chosen
+diagonal reference. It is not the total DMFT stress and not an
+independently justified addition to the production result.
+The recorded paired diagnostic uses the raw valence-stress assembly
+sign, opposite to the energy-derivative sign of this table; for example,
+the MnO tag \pathf{PAIRED_MAIN_CORRECTION_COMPLETE_MEAN_GPA} is
+$-101.143097512$, corresponding to $+101.143097512$ here.
+
+For isotropic linear strain $h=0.001$, the recorded hydrostatic means
+in the physical energy-derivative sign convention are:
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Material & Analytic & Central difference & Analytic $-$ FD\\
+ & \multicolumn{3}{c}{GPa, $D^{\rm extra}/(3\Omega)$}\\
+\midrule
+SrVO$_3$ & $-5.701366$ & $-5.695318$ & $-0.006048$\\
+FeSe, RELA & $17.599107$ & $17.600406$ & $-0.001299$\\
+MnO & $101.143098$ & $101.101274$ & $0.041823$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The decomposition of the finite-difference contractions was
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Material & $\rho_o H'-\tfrac12\{\Es,\rho_o\}O'$ & $-M_\Sigma O'$\\
+ & \multicolumn{2}{c}{GPa after $k$ sum and division by $3\Omega$}\\
+\midrule
+SrVO$_3$ & $-8.066304$ & $2.370986$\\
+FeSe, RELA & $-1.690087$ & $19.290493$\\
+MnO & $-11.585019$ & $112.686293$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+These values were obtained before preparation of this PDF; no electronic
+structure calculation was rerun for this documentation task.
+The large MnO and FeSe components demonstrate why an isolated moment
+term is not a reliable physical correction. A complete derivative may
+contain large canceling terms.
+
+\textbf{Established within these tests:} the reported analytic
+fixed-input contraction is close to the corresponding central matrix
+difference in these hydrostatic examples.
+
+\textbf{Not established:} convergence with strain step, all individual
+matrix elements, shear channels, the full normalized-projector
+derivative in the same frame, or agreement of the complete stationary
+free-energy derivative. One-sided derivatives show appreciable curvature
+in some cases. The MnO diagnostic process also reported IEEE
+invalid/divide-by-zero flags at exit; its printed contractions were
+finite, but the flags were not traced. This remains a diagnostic
+limitation rather than a clean numerical-validation claim.
+
+\subsection{Recorded locations for reproducibility}
+The checker is
+\pathf{src/python/check_oneparticle_stress_fd.py}.
+The following paths identify the diagnostic snapshots used; temporary
+directories are not a durable archive and may later be removed.
+\begin{itemize}[itemsep=4pt]
+\item SrVO$_3$: center and moments under
+ \pathf{/private/tmp/sr_fixedpot_center_case/fd/}; displaced matrices under
+ \pathf{/private/tmp/sr_fixed_joint_minus.LMwYDZ/fd/} and
+ \pathf{/private/tmp/sr_fixed_joint_plus.J6UBtd/fd/}.
+ Reference volume $382.70904\,a_0^3$.
+\item FeSe RELA: center and moments under
+ \pathf{/private/tmp/fese_rela_fullq.QNEvK6/center/fd/}; displaced
+ matrices under
+ \pathf{/private/tmp/edmft_fixedpot_oracle_20261106/fese_minus/fd/}
+ and the corresponding \pathf{fese_plus/fd/} directory.
+ Reference volume $528.96251\,a_0^3$.
+\item MnO: center and moments under
+ \pathf{/private/tmp/mno_projector_closure.hEJUBK/center/fd/}; displaced
+ matrices under
+ \pathf{/private/tmp/edmft_fixedpot_oracle_20261106/mno_minus/fd/}
+ and the corresponding \pathf{mno_plus/fd/} directory.
+ Reference volume $148.11716\,a_0^3$.
+ Analytic diagnostic output:
+ \pathf{/private/tmp/mno_paired_review.y3ZYV4/MnO.outputdmf2}.
+\end{itemize}
+
+\newpart{Compact formula sheet for the next discussion}
+\label{sec:sheet}
+With all quantities in one representation and the same regularization,
+\begin{align}
+ D_\mu^{\rm 1p}&=\sum_\kb w_\kb\Rea\Tr_b
+                   (\rho\pa H-\rE\pa O),\\
+ \rE&=\tfrac12\{\Es,\rho\}+M_\Sigma,\\
+ \pa\psi&=b-\tfrac12\gamma_\mu\psi+\eta,\\
+ \gamma_\mu\Tr(\rho H-\rE O)
+     +\mathcal P_\mu[-\gamma_\mu\psi/2]&=0,\\
+ \eta_n^\mu&=\sum_i[D^\mu_{in}u_iY_i
+               +A_{in}r u_i'p_\mu Y_i
+               +A_{in}u_i\mathscr A_\mu Y_i],\\
+ D^\mu&=s^\mu+\tfrac12\gamma_\mu A,\\
+ \sigma_\mu^{\rm corr}
+ &=\frac2\Omega\Rea\sum_{a\kb}w_\kb
+       \sum_{x=0,r,\mathrm{ang}}
+       \Tr_b[\rho Q_x^\dagger(H^x+V^x)A
+                        -\rE Q_x^\dagger S^x A],\\
+ Q_0&=D^\mu,\qquad Q_r=Q_{\mathrm{ang}}=A,\\
+ D_\mu^{\rm proj}&=2\Rea\sum_\kb w_\kb\Tr_c[C\pa U],\\
+ U&=PX,\qquad \pa U=(\pa P)X+P\pa X,\\
+ Y\pa X+(\pa X)Y&=-X(\pa\mathcal S)X,\qquad Y=\mathcal S^{1/2},\\
+ UC&=\rE-\Es\rho=B_L,\\
+ \mathcal P_\mu[b]+D_\mu^{\rm proj,frame}&=0
+       \quad\text{for a consistent pure frame change}.
+\end{align}
+In the compact $Q_x$ notation, $H^0,V^0,S^0$ pair with $D^\mu$;
+the other two channels pair with $A$. This sheet is a restatement of
+the derived formulas, not an independent shortcut for the omitted
+potential, core, ion, boundary, or relativistic terms.
+
+\begin{thebibliography}{9}
+\bibitem{blaha}
+Belbase, Tr\"oster, and Blaha,
+\emph{Stress tensor in the linearized augmented plane wave method},
+Physical Review B \textbf{104}, 174113 (2021).
+\href{https://doi.org/10.1103/PhysRevB.104.174113}{doi:10.1103/PhysRevB.104.174113}.
+Source inspected: \pathf{/Users/haule/papers_to_read/Blahas_stress_tensor.pdf}.
+Equations (10)--(13), (19)--(20), Appendix D, and Appendix G.
+
+\bibitem{forces}
+K. Haule, project documentation on the DFT+eDMFT force functional,
+\pathf{/Users/haule/projects/eDMFT/src/doc/Forces_LAPW.pdf}.
+Background for the stationary-functional and normalized-projector
+discussion; the strain derivation is given explicitly in this note.
+
+\bibitem{previous}
+Earlier project working note,
+\pathf{src/doc/stress/edmft_stress_implemented_equations.tex}
+and \pathf{Analytic_Stress_DFT_eDMFT_Implemented_Equations.pdf},
+5 November 2026. The present note supplements that record and makes
+the Eq.\ (13) cancellation and local G2 matrix definitions explicit.
+
+\bibitem{source}
+Local working tree \pathf{/Users/haule/projects/eDMFT_new/},
+read-only source inspection, 6 November 2026.
+The source map in Sec.~\ref{sec:audit} identifies relevant routines;
+implementation correctness remains subject to the stated audit.
+\end{thebibliography}
+\end{document}

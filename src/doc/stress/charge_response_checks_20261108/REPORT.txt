@@ -1,0 +1,89 @@
+CHARGE CONSISTENCY AND FIXED-N NATIVE VALENCE RESPONSE
+8 November 2026
+
+The existing FeSe RELA and SrVO3 NREL RKMAX=8 one-k fixtures were used. No user
+material directory was changed. These are density-response controls, not new
+pressures and not a full Brillouin-zone screened calculation.
+
+1. BAND NUMBER VERSUS SPATIAL INTEGRATION
+
+In the central generalized basis, the exact matrix particle-number variation is
+  delta N=Tr(delta rho_RR+rho_R delta O_RR).
+The complement cross blocks have zero central trace. At fixed N this vanishes
+to roundoff for all three tested native potential directions.
+
+For the combined spherical+nonspherical+interstitial direction:
+                                      FeSe                  SrVO3
+  matrix delta N                      -1.78e-15             -8.88e-16
+  spatial delta N, native l<=8          1.606e-6              1.408e-6
+  spatial delta N, all basis l<=10      1.036e-7              3.302e-8
+
+The radial integration in those spatial rows uses the actual native RINT13
+metric, including its origin convention. The older charge-assembly cubic-spline
+integral gives closely similar results, recorded in the JSON files.
+
+The central integrated charge minus band trace is:
+  FeSe:  -1.962e-5 electrons with l<=8; -4.050e-8 with l<=10.
+  SrVO3: -2.211e-5 electrons with l<=8;  2.879e-8 with l<=10.
+
+Integrating the complete alias-free Fourier product instead of the stored
+native density-star list does not change these numbers to displayed precision.
+The dominant discrepancy is therefore the l<=8 spatial-density truncation
+relative to the l<=10 LAPW basis. The full-angular reconstruction is a diagnostic
+and was not substituted silently for the native production density. A smaller
+remaining discrete/assembly residual is not fully attributed here.
+
+This does not justify adding a new projector or stress term. The fast map must
+continue to follow the explicitly chosen native spatial representation, and
+charge normalization remains a separate operation after core assembly.
+
+2. FIXED-N ENDPOINTS WITH NATIVE DMFT2
+
+The same joint potential perturbation used in the general-input checkpoint was
+applied at h=0.001 and 0.0005. Native vectors/potentials were reused. dmft2 was
+run with recomputeEF=1, fresh projector normalization and a common target N equal
+to the central one-k band count (59.6304906272382 / 41.13459318723834). These
+noninteger targets belong only to the isolated one-k controls.
+
+Relative spatial-density derivative error:
+                          FeSe                SrVO3
+  native EF, h=0.001       4.026e-7            1.762e-6
+  native EF, h=0.0005      8.504e-7            2.557e-4
+
+The small-step SrVO3 anomaly was traced to endpoint chemical-potential accuracy.
+cmp_EF in l2mainSubs.f90 sets fatol=1e-10 electrons, xatol=xrtol=1e-9 Ry. A
+mu error permitted by the latter tolerances can dominate a small finite
+difference, even when ordinary SCF convergence is satisfactory.
+
+An independent nonlinear particle-count root was therefore solved at each
+endpoint using its exported KS energies, normalized projectors, Sigma, Matsubara
+quadrature and static restoration. This uses the nonlinear density evaluator,
+not the analytic tangent being tested. High states are thermally empty; the
+retained space contains all occupied states and the complete DMFT window.
+Root residuals are <=7.11e-15 electrons. Native dmft2 was then rerun with
+recomputeEF=0 at those independently polished chemical potentials.
+
+                          FeSe                SrVO3
+  polished mu, h=0.001     4.054e-7            1.762e-6
+  polished mu, h=0.0005    4.300e-7            1.061e-6
+
+The problematic SrVO3 plus endpoint needed a correction of only 5.95e-9 eV.
+The resulting dmu/dh is about 0.5308852 eV in FeSe and 0.5292491 eV in SrVO3.
+The production chemical-potential solver and its tolerances were NOT changed.
+For future small finite-difference controls, endpoint mu accuracy must be
+checked together with density convergence rather than assumed sufficient.
+
+3. SCOPE AND FILES
+
+This extends the general potential-response validation from fixed mu to fixed N.
+It does not validate a complete Hartree/XC/core charge map or pressure. Full
+material gauge shifts still require an explicit policy for shifting radial and
+LO energies with the potential; existing native radial shift-cancellation tests
+pass, but the entire material gauge test is not yet complete.
+
+JSON files retain the raw and full-angular charge checks, ordinary native EF
+endpoints, and polished endpoints. Drivers use scratch copies and explicit case
+names. Native endpoints are under
+  /private/tmp/edmft_valence_charge_checks_20261108/{FeSe,SrVO3}/.
+Earlier potential endpoints and central fixtures remain in their dated scratch
+directories. No ordinary eDMFT input or executable was modified by these tests.

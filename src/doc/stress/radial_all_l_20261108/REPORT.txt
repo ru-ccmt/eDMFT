@@ -1,0 +1,152 @@
+OPTIONAL RESPONSE ENGINE — INSTALLED CHECKPOINT, 8 NOVEMBER 2026
+
+STATUS
+User approval: "yes, you can". The reviewed first-stage patches and the
+subsequently validated alternate-basis probes have been applied and installed.
+Sources are in ~/projects/eDMFT_new/src/dftKS and ~/wien2k_24/SRC_lapw1.
+Executables are ~/dbin/lapw1[c] and ~/wien2k_24/lapw1[c].
+Installation manifests and exact preceding sources/executables are retained in
+this directory and ../response_engine_plan_20261108/.
+No production dmft2 stress formula was changed in this pass. Original material
+runs were read, not overwritten. All new calculations used isolated copies.
+
+WHAT IS IMPLEMENTED
+1. DFTKS_MATRICES_ONLY=1 assembles H/O without eigensolving, vector output,
+   or eigenvector gathering. DFTKS_OVERLAP_DUMP supplies the output prefix.
+2. DFTKS_BASIS_VSP supplies an alternate spherical potential for constructing
+   the radial basis; the physical VSP remains the ordinary input. The difference
+   Vphysical-Vbasis is restored in the Hamiltonian in all angular channels.
+   The MPI worker can therefore probe radial-basis derivatives without extra
+   diagonalizations. It still writes ordinary output1/scf1/log files: use a
+   separate response workspace with local DEF paths.
+3. The corresponding WIEN_LAPW1_BASIS_VSP probe now restores channels above
+   LNSMAX. WIEN_LAPW1_MATRIX_DUMP provides a native H/O reference. WIEN's matrix
+   exporter is currently serial-only. The low-l-only and disabled-high-l options
+   are diagnostic controls, not recommended physical corrections.
+4. stress_response_result.py is installed in ~/dbin, with independent
+   --radial-mode and --projector-mode off|diagnostic|on flags. This is a report
+   selector, not an automatic execution hook or SCF writer. Diagnostic reports
+   candidates without including them in the selected total. On requires a
+   matching, explicitly production-validated correction record. Radial defaults
+   to off. No new STRT/STRFT input mode is active yet.
+
+WHY THE ALL-ANGULAR REPAIR WAS REQUIRED
+The old alternate-basis probe changed u_l through the wavefunction cutoff,
+while its L=0 physical-potential restoration went through HNS, whose orbital
+legs stop at LNSMAX (4 in these cases). High-l functions therefore saw an
+unrestored change of potential. This was a defect of the optional probe, not
+of ordinary WIEN execution. It contaminated the old radial reference test.
+
+Let B denote the scalar potential used to generate a trial radial basis, and
+V the physical spherical potential. For each l>LNSMAX the repair computes
+  R_uu = <u_l | V-B | u_l>,
+  R_dd = <udot_l | V-B | udot_l>,
+  R_ud = <u_l | V-B | udot_l>,
+using exactly the program's radial integration metric. In code the potential
+is 2*(VR-VRB)/r in Ry; VR stores r*V in Hartree. The plane-wave augmentation
+matrix receives the ordinary angular/phase prefactor times
+  R_uu A_i* A_j + R_dd B_i* B_j
+              + R_ud (A_i* B_j + B_i* A_j).
+The high-l angular sum contains (2l+1) P_l(Khat_i.Khat_j), not sqrt(4*pi).
+The existing low-l/LO path does use the Y_00 factor sqrt(4*pi). LOs outside
+LNSMAX are rejected by the probe. APW BL=0 is included by the same formula.
+This repairs the uncovered potential channels; the remaining RELA comparison
+below still requires an audit of the scalar-relativistic operator convention.
+
+INDEPENDENT CHECKS
+* Normal vector/energy/NSH outputs are bitwise identical to the previous
+  executables with the probes disabled (real FeSe and complex SrVO3).
+* One- and four-rank dftKS worker matrices equal its ordinary assembled matrices
+  exactly; existing vector/energy/NSH files are untouched in matrix-only mode.
+* Native matrices satisfy C^dagger O C=I and C^dagger H C=diag(epsilon), with
+  errors around 1e-14 to 1e-13. Both H and epsilon are in Ry.
+* All-angular restoration was assembled independently through (a) low-l HNS
+  plus high-l Legendre channels and (b) all-l HNS/Gaunt channels. The nonspherical
+  MT harmonics were zeroed only for this algebraic comparison. Max difference:
+  WIEN SrVO3 1.42e-14 Ry, FeSe 8.17e-14 Ry; dftKS exactly zero in both cases.
+  dftKS's zero alternate-potential perturbation is bitwise identical to no hook.
+* The report policy's ten tests pass, including stale references, sign/unit
+  metadata, independent switches, invalid validation, and double counting.
+
+RADIAL CONTRACTION CLOSURE (GPa)
+All entries are mean TENSILE stress contributions, already divided by three.
+These are isolated radial directional derivatives, NOT new total pressures.
+The reference uses a truly symmetric B0 +/- h*B' path, h=5e-6, fixed physical
+cell/potential, fixed IN1 Fermi reference, identical G/LO gauges, and fixed
+central DFT weights. The automatic radial energy search remains active.
+
+material/mode    native H/O      eigenvalue FD    existing contraction
+SrVO3 NREL       +0.107674377    +0.107678871       +0.107639591
+FeSe RELA        -0.040664373    -0.040674833       -0.007478906
+FeSe NREL        -0.040360445    -0.040363254       -0.040473920
+
+The FeSe NREL row is an operator control using the same physical potential
+with NREL radial functions and newly computed NREL central weights. It is not
+a newly converged NREL material calculation and cannot replace a total stress.
+
+For the native reference we explicitly assemble H+/O+ and H-/O-, then project
+into the central KS basis C:
+  dH_band = C^dagger (H+ - H-)/(2h) C,
+  dO_band = C^dagger (O+ - O-)/(2h) C,
+  dE_weighted = sum_kn w_kn [(dH_band)_nn - epsilon_kn (dO_band)_nn].
+Divide this directional derivative by 3*Omega and convert Ry/Bohr^3 to GPa.
+The independent eigenvalue derivative uses the same fixed central weights.
+No inverse eigenvector reconstruction is used.
+
+Reducing h from 1e-5 to 5e-6 reduces native matrix/eigenvalue disagreement by
+about four in SrVO3 and FeSe RELA. The absolute FeSe reference shifts about
+0.00067 GPa over this step change: the values should not be interpreted as
+converged to every displayed digit. The remaining ~0.0332 GPa RELA contraction
+mismatch is much larger. In NREL the mismatch is only about 0.00011 GPa.
+This points to the relativistic radial treatment, but does not yet establish
+which expression is wrong. It is not justification to add a fitted constant.
+
+CORRECTION TO THE PREVIOUS INTERPRETATION
+The earlier claim that the radial contraction failed badly in SrVO3 was too
+strong: its comparison reference omitted high-l potential restoration. The
+new matched-path SrVO3 closure is about 4e-5 GPa. Previous radial-corrected
+DFT/eDMFT total-stress tables remain provisional; they have not all been
+recomputed with this corrected reference, and some used a moving IN1 Fermi
+reference rather than the fixed reference used in the table above.
+
+SEPARATE dftKS/WIEN CONSISTENCY ISSUE
+dftKS OUTWINC still uses fourth-order radial propagation; WIEN and dmft2 use
+fifth order. Matching IN1 radial energies explicitly did NOT eliminate the
+native cross-code matrix difference. A temporary fifth-order dftKS control
+reduced FeSe's maximum overlap difference from 2.82e-5 to 8.04e-7 and its H
+matrix difference from 2.29e-5 to 1.59e-5 Ry. It did not close the comparison.
+This control was NOT installed. These numbers compare representations across
+codes and are not stress errors. A response must use a center and derivatives
+from the same basis convention; mixed-code matrices are not yet certified.
+The independent same-code worker and restoration checks above do pass.
+
+NEXT WORK, IN ORDER
+1. Audit the RELA radial bilinear form, including its energy dependence,
+   small-component normalization, and APW boundary flux. Compare the actual
+   assembled H/O derivative, not just the nonrelativistic identity
+   (H-E_l)udot=u, against the radial contraction on the same path.
+2. Finish matching radial propagation/quadrature conventions between dftKS,
+   dmft2 and WIEN. Do not switch production radial integrators based only on
+   an improved matrix norm. Repeat matched-center operator tests.
+3. Validate the paired normalized-projector response. For U=P X,
+   X=(sum_k w_k P_k^dagger P_k)^(-1/2), keep both P' X and P X'. The Frechet
+   inverse-square-root derivative, band-window mixing and symmetry averaging
+   must be evaluated with the same radial and KS-basis response. This is
+   separate from the radial one-body correction tested here.
+4. Build the prepared dmft2 -> response -> lcore -> SCF assembly -> mixer
+   executor, preserving editable prepared inputs. Add stress cadence and
+   independent radial/projector policy. Mixer need not change for reporting.
+5. Remove large intermediate matrix files by projecting/contracting within
+   the k-point worker; reuse the central eigensystem and cached radial/angular
+   integrals. The new matrix-only MPI worker is a first building block, not a
+   completed speedup of the full screened-response loop.
+6. Recheck complete SrVO3 and FeSe DFT/eDMFT stresses before enabling the new
+   corrections by default. Magnetic/SOC/general tensor support follows.
+
+REPRODUCIBILITY
+INSTALLATION.json records exact source and executable hashes and backups.
+radial_probe_evidence.tar.gz contains source snapshots, scripts, logs, JSON
+checks, projected derivatives and selected inputs. The large coefficient-space
+matrix/vector files remain in /private/tmp/edmft_radial_all_l_20261108.
+The archived research scripts contain original absolute scratch paths; they
+are diagnostic records, not portable production orchestration commands.

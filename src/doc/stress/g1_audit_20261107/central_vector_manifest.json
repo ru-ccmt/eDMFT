@@ -1,0 +1,4768 @@
+{
+  "DFT_SrVO3": {
+    "vector_sha256": "b337f4bbb9adc0955ce765ff4108fa5def3d7cc8a206001c045c9b2648a28f1f",
+    "nk": 75,
+    "bands": [
+      43
+    ],
+    "kpoints": [
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.05
+        ],
+        "size": 491,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "acd72973c56ab85bf48935b890b20def2d6b8121a8e5ece95242bc2263f9b441"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.15
+        ],
+        "size": 484,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "30e84c6d666e0c1c5044af0f93c584415d79d585520ac82bae2b5e0ed95926b0"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.25
+        ],
+        "size": 478,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "bfda690fa12fac8c731ebd8f271e71f56a4ed9f50671b25a4d708a4eb7336cd6"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.35
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b17a3a9d391e26faff3c6e608ce0170b69c8add60851622d0e06a573bd4d2e5c"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.45
+        ],
+        "size": 482,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "012481ab9e875ed7ac3284f4592d21fd425e7462bb9d3c9434fd344c58bede94"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.05
+        ],
+        "size": 484,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ecec1fc15d3915b7b809e4c993b01464c66600076b80dadb04980de392ef6a7f"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.15
+        ],
+        "size": 485,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d4b9e8836bfcf17087dde7b6880f4b3715cc1b82510d216619a7a8e9d3e7ecb0"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.25
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "4c7b4844029c816c588c06b6209fba7e79c6e23645fabf16dd2b8721a1cd24cc"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.35
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ed3f962d840eca7e7aa63a7d11aac4e5ace3e935205829a734d9224bc5c0b46d"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.45
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "aac6f8683bb0a7bde6a1064098397561809a03c0ee50b4e61265d9df97c5eee6"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.05
+        ],
+        "size": 478,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "2c77494a54e6436df7400aacfbb8f670e23a312144c66c2fe6bfd0cdc26388cb"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.15
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7f4db4ecff6b3adee9caa52129a3ca0898463b9d4cc6ac340a43633553b1597d"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.25
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7f3f80b014b4c11fe0c2378addb45d977cb28ddea29863a1de7d2c4298496ae5"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.35
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3e09545c84221169e3b48360c66105efacde8fd97aa67c3eec1ac0d82cb37bb5"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.45
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3fd595e22758ce643fa2ba85c3d46adb4a73e39c821b876b3c7b7b45d74d661c"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.05
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d552b6da864d5621a455b3d4e44550fb78066ab2b82f83bd277ba8756a15845b"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.15
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d6537e703e6933fc9d2e8432a075f86682c8dd44492c5b95f6b0f48fa7f252c9"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.25
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "562cfe0803f1bde5cf854b49c734bdbdb1466338d36a5d51bf9dbd2bc0f2b5da"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.35
+        ],
+        "size": 474,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "415163234133a7d87d770470ace0644a42e74c386b5cdec83543697cabd6299b"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.45
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b8ec3a1eb57e13d6687f3a453671005a62a3c377ed7d8ffee836fc82226273f1"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.05
+        ],
+        "size": 482,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d141a4d1f843629093721629fe4198c3ea090069365c8bdc4f33b7b064a05a2d"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.15
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e71df25fa8189a07244625caede65bc56fb04691f849ad1cc8f718454a9544c0"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.25
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b1c5afc2aa35b765382a30ecb0681fd275281cb309966a4b686919ab5d2f47fe"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.35
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "90db1b5be3238fb55f525c7407a31a1750fdc8ab65a3053efc104d088d7536b8"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.45
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "9c3e1553dedaf40db6186641bfca0a8eee6317949610ec8f6b97da0584f48f6e"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.05
+        ],
+        "size": 485,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "af9cea228e69938fb06fa8769e2866d53c4f120c41e929f7937e94ec92fe2474"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.15
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "44d0b22a77e4af2874893ab1f293a474d1c0618906e5695d8c9a75d3a4b90a51"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.25
+        ],
+        "size": 478,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "0e735ba8c1920587d27e4ea3fbcbc63ceab2351eb6b53b3de215119a9af8b125"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.35
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "dd3e40b77bfe864b622c649002be8f81084fe8dbb470c8adb44b40b8605df674"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.45
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b510193a12bef1eabb313fe1786401603ecfa34a9d68ae279a469ec4f1750918"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.05
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7e67de0e6d7bbba2042c995b1fd782ad972b0733bb04b57ffc2c60a950b28a96"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.15
+        ],
+        "size": 478,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "8f4bfa9fca8ce01d02225c6fc9ec5814a69dac29c74a9bcf0845d6840f39133f"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.25
+        ],
+        "size": 475,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "0a6e54bc62d552730f056f7a1b535ab93a7529909333e877947d4f716d02981b"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.35
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "48668ee2ae8af96a2f4df021ddcc061e09a1146bf38a6815da200c772231ed93"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.45
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "43c78b574f245db142b0fa34bf4598848f0323d17abc846df9daa7801053dbdb"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.05
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "475a38464cf2864972e4e01729261dd8228393e2e7a264b1c4deab8ab9aad16d"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.15
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "8dfe9637a6643629b9e6d3d863c5bda0707d77535e370569f4d4854c7bbb06ff"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.25
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "13843b35bab4b2807434bb3310739b529b210a6642bf3383ca74b7bf735c5ee1"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.35
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b1d214d6202eb0b4801a8e012720b32cfdbf914c56770182e12b6b02f93c9963"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.45
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f600f7c9729333f5d197c298736d2b10cbec6b6fad4d3fc54913fc3bdbc1de70"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.05
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "0967d64fd72512f849a373d18633ac42aa3c08c0e3afe0cb28acb0eb12f4bea7"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.15
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "bbc70195966fe49d1a4f41724a5ad11b6fbcfea7322d922a4ca77328f7a9fb7c"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.25
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a5ad882fbb6438ee8af8453f78f074fc0b3cb77290d4b007bf990d8310f9e167"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.35
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "98a3c6e40a1adc11f0cf92db0fb4b3b37018ec33a1693940b13900a2d80ee0ce"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.45
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c661aebde069806aaa702dbd56a421aef42872207a3630a970668fd279c0550a"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.05
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "104b6709f6435691d03ceecafc5bb145da398bd45237e9c4cfe5968ccf17e180"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.15
+        ],
+        "size": 475,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "9d0ae460337576074d8e1edfb7478dbc9fe7a454bc5411d2d04b5ad7335e53c7"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.25
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "874388da0c48e10db846e4b27ede3d2155d617ae20f423470ec06e2594bdab59"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.35
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ec363f72da468be7ada099b0d1d04e872b1dd1f0d68a498f5ef8d666a1c411ca"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.45
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ef321c16cbc26e6b2f686978ecd77e2a8e7c53d5ac3657558d282f4da8d116c0"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.05
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e7a9a3d8f237db57acd47efeed2dc51ce3c513ebc81f7118aa35c50124a431aa"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.15
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c3341c532269ae334a4b16caed376adcc13caa55f9ca6f21678306313ad8a78e"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.25
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "35dad994adc1ae1736858bc6f5bf8385f867ef90400e0f9f0d11e353bcd1384e"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.35
+        ],
+        "size": 484,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "8d351b6f0d1cd8a80653505aa11d85db9c0c46eb79d26a943011f65cbd6672fb"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.45
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c58f9d4eb9be722a207e581cf28542fd2e833b8406c9d2d8004389ccb6a5a5cb"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.05
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "fa686d5c85dab23decdfe08a22d039e7388f8e09273f9403ab55fad6d67e4adc"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.15
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a3ad34095d154f110cf55aed8e70383aa072aa00de57a6c3aa6d0909d4c7ba42"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.25
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "945204e4811bbae1b4177e2d0ade0db15655bd40b08d9cdd2a70c473d0413545"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.35
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "73dafcf19043dfa432711043ea63b092951949f43d900db8a71414b165f5e55f"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.45
+        ],
+        "size": 473,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7fcd1209a7594430a7b55191d31c6e4784afbd90eba3b3331876fc241b62fa4b"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.05
+        ],
+        "size": 474,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "3afeec8de56ae52dab670249fafc900625f760432fe6909a8b8bb8bd4a0b4918"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.15
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "9beffa1e874956c202121d2f04f0ff0a272d21803141400a069b826db155e66a"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.25
+        ],
+        "size": 484,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "8850437e8331f19133f8c47f69f8a710b1d543625ab6c07be036d18ab722cd3d"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.35
+        ],
+        "size": 486,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "948ff92fbb21aa39e335b151909dfa3363c985f7f240824b3a565f82c20dfcb7"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.45
+        ],
+        "size": 482,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "8c771e527fa970cf7cefe233cf178df73332b6ac440e6f43e69fcec0be8ad42c"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.05
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "77aa6d82584e223a2f11f882201c5bed78bf847ce6e2dab4eaf024ed0c610be6"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.15
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "bd0502701d856604391847f8a17fcdd62f1af8293ac12c95f51fc5822344d191"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.25
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "03d08f904e1363baf1604fa08771cca95dfff4f5311c1667018e3a2d33ff0491"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.35
+        ],
+        "size": 482,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e43436ac241dd3982a24b6b05a978660dfc73ee07700bb4ace9fa60d75f2091c"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.45
+        ],
+        "size": 486,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "32eb1828ea0d50c95fe325a4ab3bec0dcff2419049924013b474582c612ff904"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.05
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "043822f7e4bacd114e6f4108915fef2b5077c70c5ed85f8813625c49dc438240"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.15
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "cf2ed2e9e41d3440576828aba0b028baeff83984cf275ec69b681ceddd8a80b5"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.25
+        ],
+        "size": 473,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "914062e735a4e04d0fa7c467cb172eb7ea22bd6fefec29a9f4269a55faf2933c"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.35
+        ],
+        "size": 486,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "7186830e33cf518940724fe1b1555ef89624501b85cb019034f8d1e6afdd3ed8"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.45
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "308ec1fedcca3c1f7911a49d30673410ccfd3b8b60ae6f47acb872adcc128d95"
+      }
+    ]
+  },
+  "DFT_FeSe": {
+    "vector_sha256": "6091259b8e24cc43eee272de626a3d39ffa295d04bb708bcbd583e76fe4481ab",
+    "nk": 140,
+    "bands": [
+      66
+    ],
+    "kpoints": [
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.05555555555555555
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "da0a6669f5f6e00b2123218d9fa019bbd2f07101e4d841655b12daba3be8a54a"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.16666666666666666
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "6a20a7fda29fd52d7975303344aa31b573e657f1649d8c25cfdc4062d2fe102e"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.2777777777777778
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ef00784965724d947e880c28591749e7f08ee3c96af200a7ffdd526e8731a352"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.3888888888888889
+        ],
+        "size": 494,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "1a306d2ddadb67d511d436037d11523ea9c03b310f3576c27840347bfb8f71f3"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.5
+        ],
+        "size": 494,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "dd614534c33f50b4cdf6f10477e85164cb22b1671720658789750e6b348f9f0a"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.05555555555555555
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "cc7c1fb5c3d5d7f1a4750dce33f40d3af5406c4f5da4bfd1f1fc6b4efae3ccca"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "496ae05216f3d3a88a885e08021939e9f3c50321138f3c3dd1a17cc7def43f92"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "364130610dafafb723f9ec42f5895b1b8ce3f36e75e86cf491ac0f61fd52af8b"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.3888888888888889
+        ],
+        "size": 497,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "2ab79acbfcc468a3997c8703d29d62b8af82493eca3fb50980a88861f550cef8"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.5
+        ],
+        "size": 494,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "447d70f9a8ccd0b27b7776e5067249a5c881b74c5e179d7ff8f48dfdfb678b33"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "29a46641c61e21a30be7fdb5b485806df23bc4fc14289695a43c37b4a3df4a6a"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.16666666666666666
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "67334d9823956fa1ca1c8d52f919aa7e0c03449bba4e0c678212c2217f660498"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.2777777777777778
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "efc356a02d3c6378a4ff0967a48cce8f64cf0aabbe214758255b65a5e1ace044"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.3888888888888889
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e7ae4e3b257a45fe52c7e62d026ad2dd90978a51d04531a6cfd7bfd276798a58"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.5
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "74b41faf7a881031afbd02be9e9035e63c0070a1ef72bc2630f249a23e0cbba4"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.05555555555555555
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f1c07cf94b847863076f0a49b1c89d5eaf9feeebe2583429d73ea77d9d85965f"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.16666666666666666
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e95f936809cdb98ba6ba0e8e2fae2bc12c1fc2a309e2128ae8713a4e76662bc0"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "82c5497abd4a3d241090a2276808f6e7ccf7796d56dc0cf6e0340284bc6af598"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.3888888888888889
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "965f936a3f1efed1697ef76e51eef6b71f9ac4ff8beb26bf3a1e3b4625e7e192"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.5
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "e34c1ac7e2d5a0af4bcb6cbbc07e448ff5dde57917766a15e835ac480d06b7e8"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "133028e19e8e20c6538008fa5907091445527828a7fa438c9716316a7c202618"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f68dab54f51c11d30bf7a3950660571acfe166ed1e5da776c14f39dae3d678ea"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "38bea229c801c299ffe4ca9e0f985c4eb816d87008fdb75193a4f095a41f1964"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a9662d189b3a0cdd4afe577bb246e4b5cfee100c492a2c8e6b07820840a9a173"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "106b66218634be268451aa06f1f0ca5d87f44aa7f327b327c815fc442203b784"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "bf377a22f99af9de408f9ec3070674b690907d5ddef8eedd298f4f224f501c9d"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "86e36572dbc3dbc79838fa5a81884f532947a8ee4c8ffe2dd0c5db7ac845c692"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "4f7ca35a7168a7f7f99b22dbde8d39f452755c5de15a8fb293ed13e0d4ab5357"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "9f187ae28776021a2f77e4326cf33c3f328cf0fc84a7c4bd1699b40900c56f22"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "2755a383c2a308e678b90197708fc1d9a53f9cb13a0ed885e86e269ae42ca2bd"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b2903516e692431e4886ac8a0a27017b4533476b34ba9fab5352d6d996f79ba7"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c9540b2bf077c63be1a69f6a57b6f8fe819fdda159b9dec70ce892f4f5c882e7"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d00fb59b129e4aef684ab4c0c23ad4348dd9b076bf7e7a473c2d45644c80f27e"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "8cdce2ff4c00ea02411865082d503425d798cf08c640cdf625febd45b6486dda"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 512,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "559e0737db7922393a482b7c0820b3a4ace0a5d21cec203a841a021dba1601c7"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.05555555555555555
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "e471ca7978380770b644f1191d5b8101fc397735dba61a8251f70488cb99e203"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.16666666666666666
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "65f0aa1dcb8d5464ac6d1fd32866a418763cee4acd186ae61bbd746729ab87bf"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "50dbce8ee45abe4e0c71bd6a9c2ebd6e2bb468a469351781aa091cb98c5ab9c0"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.3888888888888889
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "d9ee9095be67a388a4f30fd08ffc04a5cc1b2d13b221561bf77b6408069e20c8"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.5
+        ],
+        "size": 492,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "55fd08e0cd94222ff8d9d56ed03eb0c9f419c3454fac97a69633879782e4d780"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.05555555555555555
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7a4c0e34e3397b18c59f0320ed92ecbeb4cbf73707dfcaff077f2dc1ce645cae"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.16666666666666666
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "0e9836e7c4f221ef7094fe17c26808cb78dc2e44e041001b67cba9b033ce2ebd"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "5c321d0c0725393804a8f37e9453efecfbbcfd8832337513d9b94c3940929dc2"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.3888888888888889
+        ],
+        "size": 497,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d9e8eb90f728004f73877a065424e93427b196f2ffd7ff7b93a1ecb65c11a350"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.5
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "649229a8387245d9b859d2130304de030efd629e67f335582e7e802a57c1fc4d"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.05555555555555555
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f9e505d204e6019e02183b20be1fbe81883a7ba938aa0a30cd6e45c1eb100af4"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.16666666666666666
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d122acf772dfc2c501d8664a69bc3b73e33fdf79acf84794329486bdf34f7882"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "92ab41a1d302e39ffe19168f62b82b4a4265cb89516447c9895b18cdc9a5bcfa"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.3888888888888889
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f7d2e01bf1ab305a14b2b60f33caee2fb682edd62d4d8fa046e024492966d8f3"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.5
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "9bcb497a1d4b929896e2a3fa02abbf49bfd7c41a2a720c2a24793263af2f13c9"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "705509b13f83f32631b11043a7440186041d2080be6203980b6dd5fc031b7b43"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ec9e462086278f6eb01ecd1119d11c2d2fd4171dcfef7a3b30787a5b1be51582"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "92c01b66310e355b1073681191eb48b88808a6d1d92bd86b3f69a44dc4f55791"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "adec5e28011e3e217e091036a1c7534f94a90451589ef9bdf048c3f95084f352"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "5b5b71be14ab94efe08b457a4889aaef5dfc29ea2b51c9fd4a868fbdf921f549"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "1a795482f704f2afff5ded8c4ac7bba5a934d12e3fae9e01fd026437abfd82ad"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "abc53854d698f6246b1188a90d511e5fa159b12b4fef1d49e89f1df8eeae7ebb"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 507,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "25c21953478bb7419daa5ef327360d7997d90c60164b84e7ecba5a3de436a3f6"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 507,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a07c3fae2b190dbfd08e6434398c8613455b9911b436473b28e1ce3ce4b88a02"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "fa1ea2b8b6a1dcdaeb878ce419b85543df00da68aa3c1f98e1147fb1c8905c45"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e65c3804675f33f45d9e80287c6ba08921ce5b5859dd2089954b9cabbf38059b"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "4c80431eadfcdb451f197b2fa151564e1003743ab3dd12d9d2ebdf0747706212"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a0f0c3f6762acab2c05ee54830255e35db67aa20c3d8a36be4176f8a05e398ab"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 512,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "8000d82b567d3cf4e9bb6fcbe228d62e72835e4d08212d53e610210ecaa05494"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "3e03f63eb6498448ab9c77577151ef321eb14128621c288b1c11e449af5478d1"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.05555555555555555
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "1ce87a4ce29d2729617c1378195ed5d0416e7ba1f2aa0ce5ca435a431391f5f9"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.16666666666666666
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "808c054ea4ab07e5ebc93be80941af6bd3ec52251012c1e4d56a23a58cf3cf63"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "14929af19cc2da6c3916cc879956db4e03fb2674789fe8335899ad19cbae0bbe"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.3888888888888889
+        ],
+        "size": 496,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "f1aded61f32319253bdaf68e5682fb5e65270bf04f95d54d7f166bbcb657b1c5"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.5
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "e5f45fea9082e0ec791ea4a3d8f144cbe2614f79a3bee4f9204a0561df3fd52d"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.05555555555555555
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7ed811ebffe6782a26b3f3a65bcd1a53e9937206a6253bc5f46020103da2a3a2"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.16666666666666666
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a6744e988db9aaa79e85ef95ae6542643e5f178c0d7247ab7805dc74a88193df"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "9cccbf145dd86c7361822650989c6c037a58aea8a41f0e987c0343f66f408cbc"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.3888888888888889
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "cab27c1a262cf688d7e443e59ef9759cba91c039fc87055ecc6250f10f7dda69"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.5
+        ],
+        "size": 496,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "8a9c80140a034e3753af52e44440c94789a6049e19be3544c941ee144e73d16f"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "4cdfbfba05ebe777607228014efd1a21696eccd37a26cda9d60ccf7f79852392"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c7a06d8b576a7a378171d2e0fe19d88bd604054758e2a69d96ff9759553fb8ad"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ccedfda381975a7a734b0668e7a1509398c6d787a68c0539a42f40c83a5d6c17"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "97356b28408a8ac33fdbe90cd9c94a83d76123af2a7afd3aa9bca384b095ad00"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "c96de09b08b20228de2de9d2cfbc7488a79114570933ff08544b8947ab86c3f3"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "9af9bbce6c29cadeb8fbaabc8f42aae919c5f3e1341ea01ac602cf751f2305a3"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3b746ddb00682e9db4eae1fdab4128a8d57c4f00d54064b5e1597c7517608d4a"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 507,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "dfc5996e1d3a3e9930b884d2f48efcc81cb247aa00f4f4b15676cbe4ded44c16"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "eccf09e0e9fc799c8085d6efda15a9eae15fd3b78ba1b2029df75097defde745"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "bc8032ae8f77d50f68481ac0ec0838ae88ce8b22751796d75610fe6c5571eea8"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "155f8596714f2cc80b8d25086aecdca47b213a775e3dff664d497c1ffd61e48a"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "07ac21c228a761538f619f3b6bf9c6d007181bf2013a83857333b2feb65a63af"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e5e936f41d3726d627133158c7370369411dead62e1cee66f35da2915c695ce9"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "1a77b09832b6e847fd26a86a888aff89a48c6b6ec0820e8d94f3ee27690ca026"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "7d687eb3e1e7c7129288cfc3dbce932f718108130311159323e5c0bfa2a2199c"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.05555555555555555
+        ],
+        "size": 497,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "c7659f48c6ed699ba34d41a99c62cd775a74f1c812796b0473cb2260c1ee226f"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.16666666666666666
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "7ec1f08f78730e9688e4b697cb9dd6f23943a28cf002acada50b6e758fad4815"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "9e31b0fd00d246c3d736a998ebd36394ba0178869f6cd69dd607ca9c40b4433e"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.3888888888888889
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "66802d22bda7675f70c7fd11fc1ad7fa5f1edc4e8e71b8a859009d2556606294"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.5
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "20ac2d1aa52b81eb69a69b548928c87c422dae12a62afcbe257f693139b13981"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "de48553c69499f7bdbc453c19aa956002b320d5379d4163da3389abdda098dfb"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ffc7b10db04526faa340780679cc1bc722791d69b20cebfd22dc52ce334b2330"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "9ae9bf8354a785c64e8bfe10f09c8325109e4a96a3dec9085b580c63f11cd7f2"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 507,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "eaade3abaa3fa7889f8c7e13869c9e342001a796e38ae848acc81eec90306612"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "bcc03005f475e3f397d7ee66ced323e4361ee0b7896bd07e56b27b0bf26516d8"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c291e601452079051a22197baa8514fed5aa59e2d1262903b5efbe12b5737029"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c66d278c6bee21c2e4272bdbb118cc05174bb23414817e9bceb7c5e0b726dfac"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "cef5cf4cf15ebe5248ea210c3775d4c77f0dcccba461a1edbbbe07ea17ef1d95"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f67dc273b380b4b7fe00dd7914fade606dbc59eef34c35ccf8c837dd3adc7a87"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "145ddab8f1ca99163165851ed0f1395ccbec5b4275b0178f040f3365ee7ec5eb"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e1c5b453740b80618a13bd985c33bdcd61c48f0bc162d2ece8df89d97d4e74d3"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3bc3b519c092404e87805bb643b11082cb706a8902760051cf22ddcd7275c13c"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "abb1b5a310678d5ea01520135c1d024c411608a3ad94eda48a4204eee872d4d2"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 511,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "494d0dd5604b5dfcee73cf45ccc20acf0afa6476dc8c0be48f8bea9e4e9fc017"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 516,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "83e9c9885f1d27e58a16e7079208f951578f1f1438cf572fb7d3a14eda8d9554"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "8d145245bd9514622087f5298128a42853888be2c59051998025e6a504ed0ebc"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ac4cb3267516184debcc36edd96bc7bc8cd882b6ad76250f33e5b3b3b884aec6"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "bde4a1bf173959514f02b266b93389462846306347c7428ea8670352255b7c73"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "f675ac7af0a6d9ec1ac025d0b448baca5dd06611edee285177c93e4018f27063"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 514,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "b97bc0a31097163453ece2a88098148e9367fd5cfd398d5e6fe9374893749407"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b845badd1336d62278a6d7b781eda76b5fe59850534cc046d9ec163538b0e287"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "34f828a9dfd6afa5a1de23eaebf0c2f4086cc58778f6a6b8880b8f9c7857f8d1"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b1f0868a886191efec6ec20d503fa6032ca4ebbbb1b0a1aa8681bf88942c8e3e"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "290f7807aaa8af017cd10199c5a760eda3039e7abac11535f5f7b82fb0baad74"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 514,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ffd877c6e86a3d0c2e0298ea3ab6525da3c9fbc461dfa510b98a77b341446b73"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b131bfca373762ca9f4a48cbb1e3056f21eeeda5528ce694c835433d8850a6bf"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ac3365866574383174df85b1ae992049de351b0ae279f2469a8082f41119abee"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "705a6b999089c21aa15cc304b0a60c5b033c13e4804d8f979a34a223aa9e32f9"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d78935aa8819eb958bbc62c8b10a53163b23bdf3b5e230c16fbe8c0efb3750e3"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "7785b18622ec7d198814f4c151f5b542ac5674f4589d445dee83d305530e71e5"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "cd13e2b2212254403e478b02206970387fa06a7b21c91737c42e19b9b2a11c24"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "0722da6efa48f39ea09e9d34f3455cf33c2e948b383aedc1c6c9873df2d53034"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "7939316103e3cde33919f7e09d6130e593ce776f151b21edcc736fdd89142419"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "a9ace19011d10397ae0aebfc50cc307d7f73a5fce5d85e38bfcc55c262da796f"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "80d3e704ff79a33aa5456d0a787ed2222216db7e92cd12445af6d366471e3afd"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7e2d16fa63a67901e60593f00625b276d1e3e99e4c468afa90f18673e8c2caea"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "cf9dbb03e3f16c7a57571838dd23cf037285cdf0f8cdd4951711d5a071208641"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "2672cc4d597aa0d84b92265fdf5e8971dc6fd9bbff937908c97189b0230e4586"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "74cf9aa421e9cf6a01347f7acec1d72707e7a0a05d5b752d45cb78b99a48c99c"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "bcb619e8b7f90fd0e15fa8ae047d26fa05fd98e7905ab9146e74d10b2531c869"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "185c15a922957e5805af0e65ada836b7de7d3b6dc4a340cefbe15254071ca6da"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "f1ab31eae95485e3f8e6a16b24b975ca5d088afffa4c19a24ba6d499d3e11376"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "35e3d7176a54dc5c814639330ba28c11c698f0e12c5e3d41008636d2f4e40e94"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "d5142d1bd041f51145200cf3e7e4009d1dffb348101a9e08a140df3e6dfe03b1"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 496,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "4438c50959ba2dfe52b6083ee1fd617a71e6baa0f465e6cf7ab02c82543dc2d7"
+      }
+    ]
+  },
+  "DMFT_SrVO3": {
+    "vector_sha256": "b8a44af439f5e7df0a8d2cd825b3544db81d517ba5ed8a703926e9813cc1d6dd",
+    "nk": 75,
+    "bands": [
+      43
+    ],
+    "kpoints": [
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.05
+        ],
+        "size": 491,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "acd72973c56ab85bf48935b890b20def2d6b8121a8e5ece95242bc2263f9b441"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.15
+        ],
+        "size": 484,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b7437e5985b1bb60931d08d99f8d59d236d9bbbf1b6db940faddec108fae6473"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.25
+        ],
+        "size": 478,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b31543d156eaf4dafe73285a962a3adc9be7ee147664c46db318fe1924e81dea"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.35
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "fbe2d6a84cf2137c30b0d70e43f5ebc5b640de829fb7dae1cd157c5238282cc0"
+      },
+      {
+        "k": [
+          0.05,
+          0.05,
+          0.45
+        ],
+        "size": 482,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "012481ab9e875ed7ac3284f4592d21fd425e7462bb9d3c9434fd344c58bede94"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.05
+        ],
+        "size": 484,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "324bfdf2d907052ee914674e5a2e87f073cc57f38cd0034955f0542981839712"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.15
+        ],
+        "size": 485,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d4b9e8836bfcf17087dde7b6880f4b3715cc1b82510d216619a7a8e9d3e7ecb0"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.25
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "29bf3cf00a5c4bd44ec6eb0ce7ad57c2237a5ff0637ddb383424874398b9d040"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.35
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ed3f962d840eca7e7aa63a7d11aac4e5ace3e935205829a734d9224bc5c0b46d"
+      },
+      {
+        "k": [
+          0.05,
+          0.15,
+          0.45
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "aac6f8683bb0a7bde6a1064098397561809a03c0ee50b4e61265d9df97c5eee6"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.05
+        ],
+        "size": 478,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e61a640049f4187c1120b8cfe80811d73d6d0355b12d166aad3d49cf67b7ab0b"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.15
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "01b27b18cbcf08dfd2bf6415a6e8e1303de4aed16ef31fa7663678b752467fac"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.25
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3a7b0ebdc2d446fea762ed423c39f885954a50ec46cb71582c0c1393f2cc9a85"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.35
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "72f2b509fb83135690f787f9861d33e4583ff6a7378404974bb0fe3d768bec0e"
+      },
+      {
+        "k": [
+          0.05,
+          0.25,
+          0.45
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7136e274201b8ce301f9181f72218d34ae3192df62cf4e7d21ff7eed95a1b915"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.05
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b49710bbeb5bbecb72423376470bc212334aade5558abde34476e87b3f2d6df2"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.15
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "65d3cbe9149b41269a117755cb5fd62b27be0e7857797d76804ffbbbba7f7209"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.25
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3abe75b58993ea7bd5d6f9c0b6bfabdf758138139811c0063bed4fb2754eac4b"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.35
+        ],
+        "size": 474,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "967bc71da6f4d9a9016c5b41bda34ea96c740de7ead4bdff51fe996982dd1d26"
+      },
+      {
+        "k": [
+          0.05,
+          0.35,
+          0.45
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "9f8e693ef29ec8ce223c8331dcbc2b38067de3df051d320171df3131db7a45ad"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.05
+        ],
+        "size": 482,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "fe55602632bf2a08d87a0240605ae4766d1a41f80646060a24aa2b1bdb4e1247"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.15
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "0b73cabef4cdb6d734b536bf19491ad5bbcdc99a1b7e50a456ea2263d51413db"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.25
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "36eb4337d29649019f786eebaf59afcb4c4471e02ddd092e72c7dc65d7a3c789"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.35
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "4305670c728b76a235a2fcdccf3fd9cda0fa85e9b4acb03ea9f3b590b41ebb1b"
+      },
+      {
+        "k": [
+          0.05,
+          0.45,
+          0.45
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "8c5e345d48ec1099bbb82fb2017a8ecaaa492016c8816941a69db73bb8d45340"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.05
+        ],
+        "size": 485,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "af9cea228e69938fb06fa8769e2866d53c4f120c41e929f7937e94ec92fe2474"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.15
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ff838ef6dc2d851ef24a95f1284bee3671a18a3907f550cce365c7fc55cf5fd7"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.25
+        ],
+        "size": 478,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ccf85373f2313c134f6471264a500693efdcddb5cf99f261572419a921c83a64"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.35
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "a9aa719c5657fd93a3d595062b01b1fb173c1bafb4f96e975bae01f9d8d2eac8"
+      },
+      {
+        "k": [
+          0.15,
+          0.15,
+          0.45
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "6cc2d0eeebd7f48dd9eb133021afcc72fe890b8769f9c8e551dad169a6fc9dff"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.05
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b71fbe2aa55f143e414cee3abc113d1c6d0449ba228d78ef379e3fe2442d25eb"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.15
+        ],
+        "size": 478,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e603638099f29e8ae92eb8e529ed713197affd8959a55e9a43feb3c85afe6bfb"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.25
+        ],
+        "size": 475,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "31050cf0f55b05b452727275fffef93791d3f94b9e8f51842c0e10681ce1ba90"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.35
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "80969b48a39c25ed2e24c540623badaf6f842bc092ddb740cb42623688952707"
+      },
+      {
+        "k": [
+          0.15,
+          0.25,
+          0.45
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "43c78b574f245db142b0fa34bf4598848f0323d17abc846df9daa7801053dbdb"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.05
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "5792b29ce607ba59c23f02254812a400e40031bd8524c4d7d372c971a7777c99"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.15
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d670348e7252dcc877a90ef6d38d52ef9677ee308b6e711ac27b02018669ac1a"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.25
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b8132a5a975422ab77e3b514eaa3b25e2f57673feca6a71fbf4deb5108de6e94"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.35
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b1d214d6202eb0b4801a8e012720b32cfdbf914c56770182e12b6b02f93c9963"
+      },
+      {
+        "k": [
+          0.15,
+          0.35,
+          0.45
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "48a61bb1068a38bf594004191b3c45341110d49e42382885520c243e5e1454eb"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.05
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3e47e7ca190c8f75d4ea0e721bdd11e7daa9df1861b35142304612dd12ee7b83"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.15
+        ],
+        "size": 483,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "37a8c576319f83692ab9b31e575e4f2c925d8b0c431324904bed67a294e8d6e1"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.25
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7644f9a05a8ef0b4013c04c863de27be72238359966e0a17968ceb498345e256"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.35
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ea44a1a11f82092bd0882336cf75e1ea5d8d524bc2b523a843752d0ba1afe698"
+      },
+      {
+        "k": [
+          0.15,
+          0.45,
+          0.45
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a77ab9ca259f46ac09b27ef898c7e0a36b30f833af6fa59f66b0a771c79f0656"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.05
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b3787270d0a9688f7f29067bb7f582dd033ed6d2a6da5f0e6266ed44b4baa7a6"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.15
+        ],
+        "size": 475,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "997091a72bf37f3802ac790231d6a343e9368a9e0168fd27d2809cd52d090015"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.25
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "9db66e084677492e6a56154ff741194689cad2eeba0375a9315c030df1c58d71"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.35
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ec363f72da468be7ada099b0d1d04e872b1dd1f0d68a498f5ef8d666a1c411ca"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.45
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "f7bed362c795a19ba494204ec437cf08041e0be55e4c189cbdbedcb820f090df"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.05
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d1d9637f2e972ed978895e46f7de52deaf3cd107eea01cc639f39abeeae93cdf"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.15
+        ],
+        "size": 476,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ad728e5881ddc1694d0a9e9e9bdee91bc82d1cea49e26e97cd4cee4348e8a11a"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.25
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7f1866371d9e9d9b6ae285e90f69c6c635bd2323f371909dc9e7d2beea764512"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.35
+        ],
+        "size": 484,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7a17d4ad535905fd42fdc12a7677be3a72fea5a2b8283aafbb555751d929b2e1"
+      },
+      {
+        "k": [
+          0.25,
+          0.35,
+          0.45
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "28f589026d4a983f81313a783e57a2eb09eaf0669e19811eadd1c4a78d1c80a2"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.05
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "6082448ff69d32a8d0ff27d1e0444357a34c8e7615ee624f69db05af4a5c771a"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.15
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "fe4366d0317f7aad1ee6e27c48c01c66c43a5b9ad5c339362557a4da2aaaa7ec"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.25
+        ],
+        "size": 481,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "34235a00a2a99081d3918629e36db0e166f6304ca76e7b5fc31a85ece167b524"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.35
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c0e0c372637d63e0cbac0c2f3f37fda0fc1ac15b0df0c4f9bbd45f3019f54b06"
+      },
+      {
+        "k": [
+          0.25,
+          0.45,
+          0.45
+        ],
+        "size": 473,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f35c0d23ba2efa53ae16f02231256275d70318313d858a9e7bf608734c141bfa"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.05
+        ],
+        "size": 474,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "081466b2e073ed8acd390dd624e1d0bb671c3d6f93cec95c4376dcf34a1edb49"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.15
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "def68aedd095751ece47cef444a361200e3e8d3c15003967e3270bdbe2c43993"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.25
+        ],
+        "size": 484,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ef4d784634d29b84b737c5a41c284b989814a4ce727406f4a82d51b8bacc4845"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.35
+        ],
+        "size": 486,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "290ab2d5609e307bbc2391231ba1ccbbdec8edbde27c0debae7adae77d8d5e04"
+      },
+      {
+        "k": [
+          0.35,
+          0.35,
+          0.45
+        ],
+        "size": 482,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "63a0171e49fad265e49213e9279215f9d8997e4cea8bab82b6e8975e91276cf6"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.05
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "6ade02e4fdbb42f072ad20a423c9f6e6d8474cc244b4ee0db7c4a1dad9368e2e"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.15
+        ],
+        "size": 479,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "77431bf7c72b82dc238fbea858ab66b5c4a9c47985fa71bc35e8489997399384"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.25
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "1c3416e2012d926ab23966d77b97e4fe7b11aaafd3d63c147644fd7e363e1bff"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.35
+        ],
+        "size": 482,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "9f7ad09011452b05c40fe633cee7714d09559f622b737986ef1bc191c9d8ac71"
+      },
+      {
+        "k": [
+          0.35,
+          0.45,
+          0.45
+        ],
+        "size": 486,
+        "bands": 43,
+        "weight": 16.0,
+        "all_g_labels_sha256": "78a7cf2f9040ad6f00b3b1fa234aa856c8055a690300a570f352fe7ea814c3af"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.05
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b5f0e32fd8d5e1e6bf4315cb7ef7a92042fc42332a906705d5746b5e3d432a68"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.15
+        ],
+        "size": 477,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ffa3539bf1b7d2da5a833c6c7c3560abd5915f2eb91a9df195526ac15727edfc"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.25
+        ],
+        "size": 473,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "da4db48521cf99339a5a7706465d92203738c104c4c4c3665fdbb6057f90c56b"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.35
+        ],
+        "size": 486,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "0066557f7702d76052dfff8084cd406bf4a3f01c530dcab5863ad89619c17d27"
+      },
+      {
+        "k": [
+          0.45,
+          0.45,
+          0.45
+        ],
+        "size": 480,
+        "bands": 43,
+        "weight": 8.0,
+        "all_g_labels_sha256": "301304868e17bea17f07adb0e91909246a77e89434a94975cf52c6cc71661bef"
+      }
+    ]
+  },
+  "DMFT_FeSe": {
+    "vector_sha256": "1e658cabfe7812f64779f0089f0c35cae761f2822d7cbb1331acb3ec50ce017a",
+    "nk": 140,
+    "bands": [
+      66
+    ],
+    "kpoints": [
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.05555555555555555
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "154a0d8a2c0194787d51f05c42ad7f9566d87d3eff689df6214c2889f1da2451"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.16666666666666666
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "1fddb4975537c431551bd35fd2335edd4104da86d5fba75ed1957802137afd1d"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.2777777777777778
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "849cc9ca87a70f6edc11ce97f6408a20af4884c2e49d83d0c1f8434c1a300995"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.3888888888888889
+        ],
+        "size": 494,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b51279867b61a0315d228e9378b24aa9f15fe2231e283b7550db71e8fb3f4885"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.03571428571428571,
+          0.5
+        ],
+        "size": 494,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "5b7576b28778c2fce30c2711e32b17182539aee92bbee6d9ae56438d1410916b"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.05555555555555555
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "601143331c5cf965330a1bc44f3b58bdc21492fb2f9aa9da01e2256d12175672"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "da2203fda77c8f0c1cf0e6efb1a8d2a827c27cade7be1c4f64314a7392379e72"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "50af382f16a803e3c0dc33cf8c9b70b4e090738379b62b7e4957e5b102eac53b"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.3888888888888889
+        ],
+        "size": 497,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "fa68fda7f774013e1b9d6a4db624e4bbd8dd3980b3582fd71709cc5ec3653d52"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.10714285714285714,
+          0.5
+        ],
+        "size": 494,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "916a32d7978f0fdd2e61629ddab4f9797764c38518a5a86ab3f7a738fe8c280c"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "64c5064038a6fea6a4540d48d64fbf91cc5609918b2552a78f2548e5e20980bb"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.16666666666666666
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "6619958e3d0e8badfacd493663a3cf1b7b4d46b2cf5370fed8a852a11ee6afdb"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.2777777777777778
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "2c16a5ae38e338f530bbdf94110d79e8e74ef54883df21400b4ea349103809f6"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.3888888888888889
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f84b0e17f03a2a32a35383c89dfde7021b5116b473db3b1bc5e1d70f31a148bc"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.17857142857142858,
+          0.5
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "c7bf80a7d56163c274789a3d731ffb4c1a6c58dec168aadbd860d669832930fe"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.05555555555555555
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "6519f7cb202f5b99c298f0892a8f37ba49a7a408f31053bbbab85eba68ecb33a"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.16666666666666666
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "8ee5feea949341ac9ae6ba0d1dd726632a1524612edf06a2404420ca4a8311ff"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "0a4a1b0b2b3439674a6d28eebdfba6a824539cdd523982284f00d64d7f700fbb"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.3888888888888889
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a022b8f15eed574e61cca4a00e8d4efaa213bdddfc79abcfa634ba836b203c69"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.25,
+          0.5
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "4c74074fcd848035a0426f7f2a6852894dffd248ff22e6f71050c90d0ad0bb32"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f76bf4041524407cab79d8b3125b876059394443917cefc50fff66ac2c333e12"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c8eba5367262672213c71bab48cc94a25eab103b44fe6b7aa69f809ce488cf60"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "44f4f477b0014a5d8f85444d18947a52b774c18b485df2e00b0b0a86590bbda4"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e770cee843c022c0ca78a9a955cd4799e3cc6b24b2541f5d3abb0c53ab50bafd"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "f6e60af1fe5c7fdc4389614854ef64577bbf767b4ab28031aa8f46d641e056cc"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a379caffb5dd9eb49af361c47fd0435d81b520dca63b9af98ca5812a981e5d6d"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e16cf939078c9869f09b4b9eed55553e5578476f58611cf77aca949c3e88cf99"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "1a3a551559b43ba0e8a998de74f69fd9e6ddea40001753c7e5797acdc70f584e"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "92c2694b2304cc9102b058ba0dd98800f551d41b1dbdf2e08464cfdc3f77330e"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "07428a1901c2f55e0fbf3ab618f91f6a91f906ff2dee77174d042a5dbde0315a"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "0780398eace2adc3c068305423ccef1e3dd25ebb52449b03fa4260eef866cf24"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "4bc763d542f8b0ccc175ea0931816eed233c9dd01ce004471b0a43cbb273444a"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "705df4fea302520ac26c13d87c8f5a8b583ec913797daf2bc35d8926cf650e5e"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e6e3b125663649a446df410d6cd680eb85db27ff3a6b7738ad7a738963e6bd6a"
+      },
+      {
+        "k": [
+          0.03571428571428571,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 512,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "a4155daddd7c05dd322a886934c05460c6fb0d5f34dcfaf9f7d59b8213f0d5da"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.05555555555555555
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "6aa2b299609b967bbb8ed6ef26756118e3c069cb570d897309d9b7f00ded54ae"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.16666666666666666
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "790247193f25dbd3a6673cea4c24c2c5857cbc0c2ecced9b401be7da3d97da5e"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b92381bda806c83cf05d581d96d7db08c856ac1adbd5407244bd356b314f930d"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.3888888888888889
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "65b71bf54cb15d70fcf96c557bbc03cef888d7c7217442875276cfabe345059a"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.10714285714285714,
+          0.5
+        ],
+        "size": 492,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "20388b337f5a3fb5681455a5e456fd8db8f17fb2cf0d44c1b3dfd8357c1f9b86"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.05555555555555555
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "2c1433da4f3dc32992ccbfe143169cf5e5f9bfebd1ee4f5f3111a0024ec2354d"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.16666666666666666
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e1822e4889fc0706e5ea7a919142128fab3adfd298ac6618b0cc2d45c0bd8db3"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b73b05219ea5c0ed6b7ec8f5312ebdb274ff6e93f259e35154e20fc819c537b4"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.3888888888888889
+        ],
+        "size": 497,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "58ba9d69bc1686cdc3da2649a2a8e99b0b45fe4c880dce20d6a49589993c4a56"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.17857142857142858,
+          0.5
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "0b3e248323a21ff8289f1b1408a1aa8b1f8257ad87f24714cc305ba4129426b6"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.05555555555555555
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "6a16f5231e1db65c797390f357236c78c42fcc726fc745a293261c536f1de4b2"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.16666666666666666
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "27923c3777e8f076805966dc26952d0765623d8af9e66a543237bb962f4f657c"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "49a7f2ca416de68a6562099aff65abb1abbd277ace353c93b499568d2d24b792"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.3888888888888889
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "6cf603be390769ee471e865d08e05dd2ee5c5f441f92b82211e39b39279c16a6"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.25,
+          0.5
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "f5236cd0d02a403a165a635db78f2a98d36cd1df01f43bde3e4e355309e046f2"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "7cf45b9692d288aba71150907fa23327c86942abf1e26f80254cb0887d67b544"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "16e2edfed78799c0a5346a65d18789bd39141f9e28b367c914f764c112f36c55"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "124a13baf810e2eb46aa256b9c5bf88142651b9ce7a257b48f066bb9311b731c"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "0554cb5b56a9784a1248f3e99987c43ac2cf421b5ec8ea410f28e5f34ab2176e"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "e395868cf7a40a7580846284fa4e0ee4bb4372b66c3db66d107780da1cce3cda"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a3508a38c9a2ecf9dd2c48edffc35a1711da55d595558c044a6d6e817fe72f43"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "61153f0fde6ce6beae02bdebc52309d8b0ce8427f7f5d60651213013dc0fb22e"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 507,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "af9f8a7429a3543512c73d8355df6a4e22b37b4cb1e2c7335c0c338a27d7f1db"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 507,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c840da700accb681daef69322562a799f7dd315c3f6bdedd42f8cbd4e379fb20"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "08d322750d1aaec3d2f47625b793a9f929c10080f8291eb17d0aee7341997176"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "51c8313ca4a53bd0be660fbb7fc12479bbe68ef50ef291d80bd77c5177420811"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b6248417393048a21cbc79523fdc1f413ce723c4196c7736cdc134413b2c54f7"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "5296823d929dcc6273dd8c7a17de4b893683381829483b26a3c69e51fe038f8f"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 512,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b4ff5e9e1aa421c165dcdab800b35bc9f0328048f335051174c9a54c83a7bafa"
+      },
+      {
+        "k": [
+          0.10714285714285714,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "2545918a136cb70bd44ca30ddc40956dcf6fb15645b7ca6a3acf9f9f99c4442b"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.05555555555555555
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "cddd2f8d24be08b4aef1eb3fc1180f0510fb715b0173191cdcd4c0610c2801fa"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.16666666666666666
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "9bf35113328bc84efa1adb85d0d1476bd4493c5bbc4e1381a2a9fb593140a2b4"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "578cf2bf082cdd96cad9f75db86239ea4e607fa45cb8d9ed5ae6a7b9dc4dc8de"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.3888888888888889
+        ],
+        "size": 496,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "ce095f22228123b24937eb64ae74945b983949d833945fed93ca389eaac902f2"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.17857142857142858,
+          0.5
+        ],
+        "size": 498,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "da7b745255d8be10e474f6994b0156b15df16d2fe45d157badfb081afedff8f9"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.05555555555555555
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b88adf1b85750cabdea2c2ed3871136553ef0983ac738598cfd7b20c3c8f7b4d"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.16666666666666666
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "87704c1763a2d1c60535f3bb428f2de10b49fe173e7057957194dc454e55262a"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.2777777777777778
+        ],
+        "size": 499,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b9df793f97c62e1e7cb376a2b188361696537c6606a0db88fcced57ba459131e"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.3888888888888889
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "6d714ff003e145b98c71a79d79ef774f0222c83fd6730cbc909559caae6c7d4c"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.25,
+          0.5
+        ],
+        "size": 496,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "25d4f85b817a5a6d4395f10dbd75832a50c8b8d54e4ad78eb7065aea8030dfca"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "852a8c18e13ca1c419b04d3fb4a2b3a45caac0918f629bbc0977319216b85fbc"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3fb001f3bc82aa26ae1a2b8cf37a1453978d0b1bc2c39498d80136fda2e54eba"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "22c6dc51fe1969db4d4d8662105c1898e33ef4299e88795e2ebb8bb9564f8d9d"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e3e383b9f4f90dcd067ebafc293b1af7819eb6fd999b6e60e86ad0dc5be88bed"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "2fa5f674264240162fa250f56c493cfb9909b125542f7a754246d2b97da1dfcf"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "85da5f468c75f034d0b50347a062ddcd47c4fd10a13c422c7c4da7967e1be494"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "4dec3e8c0dc7779557cec6877608517c3ae8413ec983ce96fdef63b124b2624e"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 507,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "f2d08f93c023ca13af1a21c49097d968f52937821103d22ec8ea247b57b2e568"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "16bd6a7f4133cf7a445e2728b903e71ecf423a1fe24bf6c353b0a9aff126aa40"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "23e29517b7a17f538671ad04917becf1ec1fd9c593513ee779c2f04f5c7d02a7"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c19e50401c0b38534499196a56afafeea50896ed859966ff8120f803c6b6e96b"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "251464d1709ac7c8c8e9e1405f8a140cf90eb8048adc9f95bc1befed20e129aa"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e86a10dc56bcbac60f76e0c6d0b78ac7138ad7a686c1374ffdd59d1a5ac21efe"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "1dd3f253e0a12670ec81bf8d68cf9874e3399a7cabfc75d561c13f0dff522d0a"
+      },
+      {
+        "k": [
+          0.17857142857142858,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "0ed1e5ac28bb61bbee15fab15d34573e83e11b57bbae5ac5f1fd4e17a7eef5d4"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.05555555555555555
+        ],
+        "size": 497,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "560cbeaeee85fe1344d9fd19436c7e94950eb452ae75a3c1c592252bb25e1341"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.16666666666666666
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "9dfe1e1ca2ab2b4a11b2e71ef241bfe260717b29812492e98bdff96117fe95e5"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "d5240cf1054a9c6ae99650f1f4bd3dbfa74b944ee9c4b33d0f6adfa3196a6015"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.3888888888888889
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b9d5425b72ee95478df3f50f1cc631cd6d410363d360904b34c2dde75ffffa45"
+      },
+      {
+        "k": [
+          0.25,
+          0.25,
+          0.5
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "99d348f9cfa02353fb2066b37a9c934fa6aa0171e54c90c0740fc312973340a3"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "2a79794da0446484d455d2c3446175c49c8c3137aed77ba00ecc1288e9391e5a"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3cedc79cc4cef2bb0785fc2d2786fe09bae77f570bdd24c8c885df9ddd3fc86b"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b164d141d1c8c29c02e8009d337bc45ce9d88015ec51743654e807a8df901ab5"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 507,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "33b2b60fe9fc60e086929bac3cf31beb7a0574aa53118b0a6308de8fcf331d1c"
+      },
+      {
+        "k": [
+          0.25,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "031fb172dbc0dab1404587b3b15447808d07e2f23b3a86078742c11257068542"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "55399d14645ac140bb5fb6f128893da20ff3bd86242fa3b0bc848244f554a473"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "2ccd52c35c29baa0ad2cf0f04b9e69b1d208a019059e38fd7d49f645d268d442"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "2d44ac7c66c7662671bf79c531b01b7eb5f680ebe592f890e598617b8f0e4e28"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 509,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "a6abcb4fbf30e01d90bb98ff874547245131dde4d53a5bacd773faabcbbd11e9"
+      },
+      {
+        "k": [
+          0.25,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "4c0d6ed8c6f8e54fa6a3158a022d4b492d207316bee0ba2976257d6ebb3dcd0a"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 506,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "b134dda88738d53daeb4ee6b4d42bbcd989b9837cb6f568731f637f9abfe23d2"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e6c8949283b21162d2a3cec3065db6c69eeac4e3e2521023c6a1c62b7857c006"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "dee0edb4382cc8e1a230366e07473572a5fefe5cc18d81178f9aeb9e63fccb9a"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 511,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "e7037fb33c597872e78eba72f82ef2b9264b8e82df4426ce6bc4a823eabd6a29"
+      },
+      {
+        "k": [
+          0.25,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 516,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "8574c1a8f3f80c370472056a2d10181fdee07b3e3ef8463d8c914c46f41432a2"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.05555555555555555
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "0d11c4c5307552b047772afe439bb2aaef638c3ba91a92672e058c6f0f1a37d3"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "f35d69b5ec26f6fb62e31076e48ff398981e813fca4b306b1752be3e4e0d76d2"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.2777777777777778
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "e2f0e0c27da7c60122b47368c8134e64d6558ff54ae36faded0c1770f7c60fa5"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "dc5a314ecae08d1ecd648e30940a57b62b79c720e5e843d3fd9bbb9d361d9e21"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.32142857142857145,
+          0.5
+        ],
+        "size": 514,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "b5bf7213f6213ef3c7678d47f274b492f02b498d4c50d31351c1c9ccf8f4e500"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "5a34d135bd33f3362fab09d8ba96bdfbfc368e9c4d16f8eeccde046162979388"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "610073424fdf3c74877d3eba99bcae29253d0c934e6d02a0572222df9601c4f5"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "ef44225bb9e28ed476e618b1b543c3d7d1a679b5aa87c3d00736b1e2b3ab2e86"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "9df6a06f831c1a78529bd05ad91d872103f4f4940be67eff37eff634de800b10"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 514,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "b78a2af837154542b2862956956648d1820e0097077a211699da551ca01de98a"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "9adf4403f2bff5d8f879139af8e9f7f83f740ef5112fcd99f9e5379c15b37120"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "c1ede4324e0167ec357cb41f35cfa24d55bf1439151008ec78ffa6e2687631f1"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "31f31f1063dbdfe9252d05c238095f2909da462a982f1b8069016669c551a07d"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "08602e7e1f5a91da5021f567ed5d2084f52bf39532ad88f0be821431bcbf3265"
+      },
+      {
+        "k": [
+          0.32142857142857145,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "0c3127e40f779450041bd8baddbf8f7a35edf58dfa39dd129165e7e813f06114"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.05555555555555555
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "47a43f029a3c038d62ece1c1712e68ddb9f708caebb363b0762973b03e03bbdb"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.16666666666666666
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "85530cf7475e234df9f9e28f124858cd551ea7d9aa70d2d9b072bde2889a6fd9"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.2777777777777778
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "84ed649c9d6c6abe3592b48a180822cda56b1775ba278f0c18024486ac45cd28"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.3888888888888889
+        ],
+        "size": 508,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "f198d9ba5ce11735242919e3bad703edb7b8c5624ebb711fd4d11856efc48cc4"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.39285714285714285,
+          0.5
+        ],
+        "size": 510,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "ac7dd9f384b56b75d3d9feaa82ae9890fdbe7d13e766e8c4460f337941c4bb87"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "3cf4c29e115a9f3f9d796c664a15a1c18d57952b5a758471cbfefaa18013b01c"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 503,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "90379e948978fb8df2f93710b0aa5fa7c80aa69c2c929aa79121d26652f66fe1"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "4642b84404d650d7e1cc85a908f267c9b8db856574477662caea151198c44ee0"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 501,
+        "bands": 66,
+        "weight": 16.0,
+        "all_g_labels_sha256": "d26876590920cd662de5e882346610768ea24ee2dfc07afeba95ec9acedce115"
+      },
+      {
+        "k": [
+          0.39285714285714285,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "a58fed0ed2d7a34291ebab4c3b458aee695de8a45684f72a8955842b21a2ceeb"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.05555555555555555
+        ],
+        "size": 504,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "c1355652d5d16490b92724be6db0a58349837aab65eb87b4111dd5dac28f7890"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.16666666666666666
+        ],
+        "size": 505,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "8fe643b647ebcaa57c6cb2ff813160e8dd48aebc3ce1529271e9b7ecd0743d7f"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.2777777777777778
+        ],
+        "size": 502,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "e73160680d45b454875de82b9468c13e531bca19ef70a0a9e50e8fa2482b5060"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.3888888888888889
+        ],
+        "size": 500,
+        "bands": 66,
+        "weight": 8.0,
+        "all_g_labels_sha256": "1401c94b5c463449ce9f3ab590986af124cbd4cf26af13c7c0077464f5c88622"
+      },
+      {
+        "k": [
+          0.4642857142857143,
+          0.4642857142857143,
+          0.5
+        ],
+        "size": 496,
+        "bands": 66,
+        "weight": 4.0,
+        "all_g_labels_sha256": "2cda8cb00f062c5f2b76a0fff607e65a24af14c1cd72ec2e5b578c556b90ab2a"
+      }
+    ]
+  }
+}

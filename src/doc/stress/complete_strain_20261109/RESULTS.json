@@ -1,0 +1,65 @@
+{
+  "convention": "mean tensile stress; native :PRESSURE: convention; compression-positive pressure has opposite sign",
+  "results": [
+    {
+      "material": "SrVO3",
+      "model": "NREL/LDA",
+      "RKMAX": 8,
+      "kpoints": 75,
+      "retained_bands": 43,
+      "analytic_mean_GPa": 2.9339551498909917,
+      "numeric_mean_GPa": 2.933152904042455,
+      "strain_step": 0.001,
+      "difference_GPa": 0.0008022458485368311,
+      "stress_GPa": [
+        [
+          2.9421212840516304,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2.9421212840516304,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          2.9176228815697143
+        ]
+      ],
+      "seconds": 605.0990992919542,
+      "peak_GB": 13.766754304
+    },
+    {
+      "material": "FeSe",
+      "model": "RELA/PBE",
+      "RKMAX": 8,
+      "kpoints": 140,
+      "retained_bands": 66,
+      "analytic_mean_GPa": -1.0485926461684623,
+      "numeric_mean_GPa": -1.0487113778804622,
+      "strain_step": 0.0005,
+      "difference_GPa": 0.00011873171199994204,
+      "stress_GPa": [
+        [
+          -0.6236950013274657,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -0.6236950013274657,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          -1.8983879358504552
+        ]
+      ],
+      "seconds": 964.8807397501078,
+      "peak_GB": 17.119789056
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+--- a/SRC_lapw2/val_corr_integrals.F
++++ b/SRC_lapw2/val_corr_integrals.F
+@@ -9,14 +9,15 @@
+                         jlaplo1_02
+                                          
+    IMPLICIT NONE
+-   logical             :: REL
++   logical             :: REL,REL_PULAY
+    integer,intent(in)  :: jatom,imax
+    real*8 ,intent(in)  :: rrad1(nrad,0:lmax2),rrad2(nrad,0:lmax2), &     !before increase the radial points
+                           rade1(nrad,0:lmax2),rade2(nrad,0:lmax2), &
+                           a1lo(nrad,nloat,0:lomax),b1lo(nrad,nloat,0:lomax), &
+                           dx
+ 
+-   integer             :: i,l,jlo,lp,jlop
++   integer             :: i,l,jlo,lp,jlop,pulay_small_status
++   character(len=32)   :: pulay_small_env
+ 
+    real*8              :: dul(nrad),dus(nrad),dudl(nrad),duds(nrad), r1(nrad), &
+                           dulol(nrad),dulos(nrad), ddulol(nrad),ddulos(nrad)
+@@ -28,6 +29,34 @@
+    real*8              :: CIN,CINP,g0,TC                          
+                           
+                           
++    ! The published stress formula is nonrelativistic.  Historically these
++    ! radial Pulay integrals were nevertheless evaluated by RINT13 with the
++    ! scalar-relativistic small component added as if it carried the same
++    ! scalar Y_lm angular dependence as the large component.  That is not the
++    ! Koelling-Harmon transformation law: the small component is generated
++    ! by sigma.p acting on the large component.  Keep the historical result
++    ! as the production default while exposing a tightly scoped diagnostic
++    ! that suppresses only this questionable small-component part.  It is
++    ! used to measure the sector before replacing it by the derived
++    ! derivative-generated overlap; NONE is never a production setting.
++    REL_PULAY=REL
++    pulay_small_env=''
++    call get_environment_variable('WIEN_STRESS_RELA_PULAY_SMALL', &
++                                  pulay_small_env, &
++                                  status=pulay_small_status)
++    if(pulay_small_status.eq.0 .and. len_trim(pulay_small_env).gt.0) then
++       select case(trim(adjustl(pulay_small_env)))
++       case('FULL','full')
++          REL_PULAY=REL
++       case('NONE','none','0')
++          REL_PULAY=.false.
++       case default
++          write(6,*) 'Invalid WIEN_STRESS_RELA_PULAY_SMALL: ', &
++                     trim(pulay_small_env)
++          stop 'RELA_PULAY_SMALL must be FULL or NONE'
++       end select
++    endif
++
+     CIN = 1.d0/137.0359895d0**2
+     CINP = 1.d0/137.0359895d0
+     if(.not.REL) CIN = 1E-22                       
+@@ -59,15 +88,15 @@
+              duds(i) = r1(i)*r1(i)*duds(i)
+           ENDDO   
+           
+-          CALL RINT13(rel, dul(1), dus(1),rrad1(1,lp),rrad2(1,lp),  Jllp00(l,lp), jatom)
+-          CALL RINT13(rel,dudl(1),duds(1),rrad1(1,lp),rrad2(1,lp),  Jllp10(l,lp), jatom)
+-          CALL RINT13(rel, dul(1), dus(1),rade1(1,lp),rade2(1,lp),  Jllp01(l,lp), jatom)
+-          CALL RINT13(rel,dudl(1),duds(1),rade1(1,lp),rade2(1,lp),  Jllp11(l,lp), jatom)
++          CALL RINT13(rel_pulay, dul(1), dus(1),rrad1(1,lp),rrad2(1,lp),  Jllp00(l,lp), jatom)
++          CALL RINT13(rel_pulay,dudl(1),duds(1),rrad1(1,lp),rrad2(1,lp),  Jllp10(l,lp), jatom)
++          CALL RINT13(rel_pulay, dul(1), dus(1),rade1(1,lp),rade2(1,lp),  Jllp01(l,lp), jatom)
++          CALL RINT13(rel_pulay,dudl(1),duds(1),rade1(1,lp),rade2(1,lp),  Jllp11(l,lp), jatom)
+              
+-          CALL RINT13(rel,rrad1(1,l),rrad2(1,l),rrad1(1,lp),rrad2(1,lp),  Illp00(l,lp), jatom)
+-          CALL RINT13(rel,rrad1(1,l),rrad2(1,l),rade1(1,lp),rade2(1,lp),  Illp01(l,lp), jatom)
+-          CALL RINT13(rel,rade1(1,l),rade2(1,l),rrad1(1,lp),rrad2(1,lp),  Illp10(l,lp), jatom)
+-          CALL RINT13(rel,rade1(1,l),rade2(1,l),rade1(1,lp),rade2(1,lp),  Illp11(l,lp), jatom)                    
++          CALL RINT13(rel_pulay,rrad1(1,l),rrad2(1,l),rrad1(1,lp),rrad2(1,lp),  Illp00(l,lp), jatom)
++          CALL RINT13(rel_pulay,rrad1(1,l),rrad2(1,l),rade1(1,lp),rade2(1,lp),  Illp01(l,lp), jatom)
++          CALL RINT13(rel_pulay,rade1(1,l),rade2(1,l),rrad1(1,lp),rrad2(1,lp),  Illp10(l,lp), jatom)
++          CALL RINT13(rel_pulay,rade1(1,l),rade2(1,l),rade1(1,lp),rade2(1,lp),  Illp11(l,lp), jatom)                    
+           
+        ENDDO
+     ENDDO
+@@ -77,9 +106,9 @@
+        DO jlo = 1, ilo(l)
+           IF(.NOT. loor(jlo,l)) CYCLE  
+           
+-          call rint13(rel,rade1(1,l),rade2(1,l),a1lo(1,jlo,l),b1lo(1,jlo,l),TC,jatom)
++          call rint13(rel_pulay,rade1(1,l),rade2(1,l),a1lo(1,jlo,l),b1lo(1,jlo,l),TC,jatom)
+             jlaplo1_12(jlo,l)  = TC
+-          call rint13(rel,rrad1(1,l),rrad2(1,l),a1lo(1,jlo,l),b1lo(1,jlo,l),TC,jatom)  
++          call rint13(rel_pulay,rrad1(1,l),rrad2(1,l),a1lo(1,jlo,l),b1lo(1,jlo,l),TC,jatom)  
+             jlaplo1_02(jlo,l)  = TC
+             
+           DO lp = 0, lmax2n          
+@@ -102,9 +131,9 @@
+                 dudl(i) = r1(i)*r1(i)*dudl(i)
+                 duds(i) = r1(i)*r1(i)*duds(i)
+              ENDDO   
+-             CALL RINT13(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dul(1),dus(1),TC,jatom)     
++             CALL RINT13(REL_PULAY,a1lo(1,jlo,l),b1lo(1,jlo,l),dul(1),dus(1),TC,jatom)     
+                 jr3upu_20(jlo,l,lp) = TC
+-             CALL RINT13(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dudl(1),duds(1),TC,jatom) 
++             CALL RINT13(REL_PULAY,a1lo(1,jlo,l),b1lo(1,jlo,l),dudl(1),duds(1),TC,jatom) 
+                 jr3upu_21(jlo,l,lp) = TC
+           ENDDO  !lp loop
+           
+@@ -129,14 +158,14 @@
+                 dulos(i) = dulos(i)*r1(i)*r1(i)
+              ENDDO
+              
+-             CALL RINT13(REL,rrad1(1,l),rrad2(1,l),dulol(1),dulos(1),TC,jatom)   
++             CALL RINT13(REL_PULAY,rrad1(1,l),rrad2(1,l),dulol(1),dulos(1),TC,jatom)   
+                jr3upu_02(jlop,lp,l) = TC
+-             CALL RINT13(REL,rade1(1,l),rade2(1,l),dulol(1),dulos(1),TC,jatom)
++             CALL RINT13(REL_PULAY,rade1(1,l),rade2(1,l),dulol(1),dulos(1),TC,jatom)
+                jr3upu_12(jlop,lp,l) = TC 
+              
+              DO jlo = 1, ilo(l)
+                 IF(.NOT. loor(jlo,l)) CYCLE
+-                  CALL RINT13(REL,a1lo(1,jlo,l),b1lo(1,jlo,l),dulol(1),dulos(1),TC,jatom)
++                  CALL RINT13(REL_PULAY,a1lo(1,jlo,l),b1lo(1,jlo,l),dulol(1),dulos(1),TC,jatom)
+                   jr3upu_22(jlo,jlop,l,lp) = TC
+              ENDDO
+              

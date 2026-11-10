@@ -1,0 +1,29 @@
+{
+  "normalization_functional_fd": -0.1619030917332509,
+  "production_adjoint": -0.16190309178064205,
+  "without_symmetry_adjoint": 0.11391370446681083,
+  "absolute_error": 4.7391146562603126e-11,
+  "global_frame_fd_errors": [
+    4.34551367491907e-11,
+    2.2375303664618475e-11,
+    4.665228259788561e-11,
+    3.453812961158044e-11,
+    2.0173492520126855e-11,
+    4.2327200737464736e-11
+  ],
+  "legacy_frame_errors": [
+    0.0,
+    1.962615573354719e-17,
+    7.97218214573518e-17,
+    2.8609792490763984e-17,
+    0.6494856503418686,
+    0.5089197284444767
+  ],
+  "source_hashes": {
+    "symmetrize.f90": "bbfe739472beb5e1dff1548db41f89da695a1505728bf0d728be9783ea61e9b4",
+    "l2mainSubs.f90": "c31ec7fa6f9bc347707159d06b20d991c1aacc0be84e9e67191c2d7711fc32e5",
+    "lomain.f90": "f58ddb34bc2071feb0b05e12601af23b14523c3dbf890da6e27c92ff1679f44c",
+    "inverss.f90": "8598099d5d8038d2a686619aa63be307d110877c74256406098fb38a97a1f8d0"
+  }
+}
+PASS: exact symmetry adjoint, default/diagnostic modes, fixed physical axes

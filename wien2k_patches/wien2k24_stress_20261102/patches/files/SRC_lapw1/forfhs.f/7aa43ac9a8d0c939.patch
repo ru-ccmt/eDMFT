@@ -1,0 +1,213 @@
+--- a/SRC_lapw1/forfhs.f
++++ b/SRC_lapw1/forfhs.f
+@@ -2,8 +2,11 @@
+ !
+       use loabc, only : nloat_new
+       use lolog, only : loor, lapw,ilo
+-      use atspdt, only  : LMMAX, LQIND, LM, LQNS, VNS1, VNS2, VNS3, GFAC
+-      use loint, only : VNS1LO, VNS2LO, VNS3LO
++      use atspdt, only  : LMMAX, LQIND, LM, LQNS, LQMM, VNS1, VNS2, VNS3, &
++                          WNS1, WNS2, WNS3, WNS4, GFAC
++      use loint, only : VNS1LO, VNS2LO, VNS3LO, WNS1LO, WNS2LO, WNS3LO, &
++                        WNS4LO, WNS5LO
++      use struk, only : IATNR
+       use parallel, only: MYID
+       IMPLICIT NONE
+       INTEGER JATOM
+@@ -18,16 +21,34 @@
+ !
+ !        Local Scalars
+ !
+-      INTEGER            L0, Ll, LP, LM1
++      INTEGER            L0, Ll, LLL, LP, LM1
+       INTEGER            LQX, M, MP, MM
+-      COMPLEX*16         TUU, TUD, TDU, TDD
++      INTEGER            G2_DIAG_STATUS,G2_BAD_COUNT
++      COMPLEX*16         TUU, TUD, TDU, TDD, WUU, WUD, WDU, WDD
++      COMPLEX*16         HPHASE, VPUU, VPDD, VPUD, VPDU, &
++                          WPUU, WPDD, WPUD, WPDU
+       COMPLEX*16, allocatable :: TUU21(:), TUU12(:), TUD21(:), TDU12(:), TUU22(:,:)
++      COMPLEX*16, allocatable :: WUU21(:), WUU12(:), WUD21(:), WDU12(:), WUU22(:,:)
++      COMPLEX*16, allocatable :: VPUU21(:),VPUU12(:),VPUD21(:),VPDU12(:),VPUU22(:,:), &
++                                 WPUU21(:),WPUU12(:),WPUD21(:),WPDU12(:),WPUU22(:,:)
+       LOGICAL            LOORL0
++      LOGICAL            G2_DIAG_ENABLED
++      CHARACTER*32       G2_DIAG_ENV
+       integer jlo,klo
+       !
+ 
+       nloat = nloat_new
+       allocate(TUU21(nloat),TUU12(nloat),TUD21(nloat),TDU12(nloat),TUU22(nloat,nloat))
++      allocate(WUU21(nloat),WUU12(nloat),WUD21(nloat),WDU12(nloat),WUU22(nloat,nloat))
++      allocate(VPUU21(nloat),VPUU12(nloat),VPUD21(nloat),VPDU12(nloat),VPUU22(nloat,nloat))
++      allocate(WPUU21(nloat),WPUU12(nloat),WPUD21(nloat),WPDU12(nloat),WPUU22(nloat,nloat))
++      G2_DIAG_ENV=''
++      CALL GET_ENVIRONMENT_VARIABLE('WIEN_STRESS_G2_DIAG',G2_DIAG_ENV, &
++                                    STATUS=G2_DIAG_STATUS)
++      G2_DIAG_ENABLED=(G2_DIAG_STATUS.EQ.0 .AND. &
++                       LEN_TRIM(G2_DIAG_ENV).GT.0 .AND. &
++                       TRIM(G2_DIAG_ENV).NE.'0')
++      G2_BAD_COUNT=0
+       DO 10 LQX = 1, LQIND(JATOM)
+          L0 = LQNS(1,LQX,JATOM) - 1
+          LL = LQNS(2,LQX,JATOM)
+@@ -38,19 +59,85 @@
+          LM1 = LQNS(4,LQX,JATOM)
+          M = LQNS(5,LQX,JATOM)
+          MP = LQNS(6,LQX,JATOM)
++         LLL = LM(1,LM1,JATOM)
++         ! LQNS(4) identifies a real lattice harmonic but its LM table entry
++         ! stores only nonnegative M.  ATPAR also creates the conjugate -M
++         ! channel; use the explicitly preserved sign so the force-file
++         ! metadata, HPHASE and GFAC all describe the same harmonic.
++         MM = LQMM(LQX,JATOM)
++         IF (-M+MM+MP.NE.0) THEN
++            G2_BAD_COUNT=G2_BAD_COUNT+1
++            IF (G2_DIAG_ENABLED.AND.MYID.EQ.0.AND. &
++                G2_BAD_COUNT.LE.20) WRITE(6,*) &
++                 ':DBG_G2_FORFHS_M:',JATOM,LQX,M,MM,MP
++         ENDIF
++
++         ! Phase/normalization converting a complex spherical harmonic into
++         ! the real or cubic potential harmonic stored in VLM.  Writing the
++         ! phase-weighted *bare radial* matrix avoids dividing by an
++         ! accidental zero of the original Gaunt when LAPW2 needs a different
++         ! angular coupling in stress Eq. (G2).
++         HPHASE = (1.0d0,0.0d0)
++         IF (IATNR(JATOM).GT.0) THEN
++            IF (LL.EQ.3 .OR. LL.EQ.5 .OR. LL.EQ.7 .OR. LL.EQ.9) THEN
++               IF (MM.LT.0) THEN
++                  HPHASE = (0.0d0,1.0d0)
++               ELSE
++                  HPHASE = (0.0d0,-1.0d0)
++               ENDIF
++            ENDIF
++         ELSEIF (MM.NE.0) THEN
++            IF (LLL.LT.0) THEN
++               HPHASE = (0.0d0,1.0d0)
++               IF (MOD(MM,2).EQ.0 .AND. MM.GT.0) HPHASE=-HPHASE
++            ELSE
++               IF (MOD(MM,2).EQ.1 .AND. MM.GT.0) HPHASE=-HPHASE
++            ENDIF
++            HPHASE = HPHASE/SQRT(2.0d0)
++         ENDIF
+          tuu=gfac(lqx,jatom)*vns1(l0+1,lm1,lp+1,jatom)
+          tdd=gfac(lqx,jatom)*vns2(l0+1,lm1,lp+1,jatom)
+          tud=gfac(lqx,jatom)*vns3(l0+1,lm1,lp+1,jatom)
+          tdu=gfac(lqx,jatom)*vns3(lp+1,lm1,l0+1,jatom)
++         wuu=gfac(lqx,jatom)*wns1(l0+1,lm1,lp+1,jatom)
++         wdd=gfac(lqx,jatom)*wns2(l0+1,lm1,lp+1,jatom)
++         wud=gfac(lqx,jatom)*wns3(l0+1,lm1,lp+1,jatom)
++         ! W has the radial derivative on the bra and is therefore not
++         ! Hermitian under bra/ket exchange.  WNS4 is the independent
++         ! differentiated-udot-bra/u-ket channel; transposing WNS3 would put
++         ! the derivative on the wrong radial function.
++         wdu=gfac(lqx,jatom)*wns4(l0+1,lm1,lp+1,jatom)
++         vpuu=hphase*vns1(l0+1,lm1,lp+1,jatom)
++         vpdd=hphase*vns2(l0+1,lm1,lp+1,jatom)
++         vpud=hphase*vns3(l0+1,lm1,lp+1,jatom)
++         vpdu=hphase*vns3(lp+1,lm1,l0+1,jatom)
++         wpuu=hphase*wns1(l0+1,lm1,lp+1,jatom)
++         wpdd=hphase*wns2(l0+1,lm1,lp+1,jatom)
++         wpud=hphase*wns3(l0+1,lm1,lp+1,jatom)
++         wpdu=hphase*wns4(l0+1,lm1,lp+1,jatom)
++         ! Appending W to this unformatted record is backward compatible:
++         ! older LAPW2 versions read the original prefix and skip the rest.
+          IF(myid.eq.0) write(71) &
+-               l0,ll,lp,m,lm(2,lm1,jatom),mp, &
+-               tuu,tdd,tud,tdu
++               l0,ll,lp,m,mm,mp, &
++               tuu,tdd,tud,tdu,wuu,wdd,wud,wdu, &
++               vpuu,vpdd,vpud,vpdu,wpuu,wpdd,wpud,wpdu
+          IF ((L0 .LE. LOMAX).OR.(LP .LE. LOMAX)) THEN
+             tuu21=(0.0d0,0.0d0)
+             tuu12=(0.0d0,0.0d0)
+             tuu22=(0.0d0,0.0d0)
+             tud21=(0.0d0,0.0d0)
+             tdu12=(0.0d0,0.0d0)
++            wuu21=(0.0d0,0.0d0)
++            wuu12=(0.0d0,0.0d0)
++            wuu22=(0.0d0,0.0d0)
++            wud21=(0.0d0,0.0d0)
++            wdu12=(0.0d0,0.0d0)
++            vpuu21=(0.0d0,0.0d0); vpuu12=(0.0d0,0.0d0)
++            vpud21=(0.0d0,0.0d0); vpdu12=(0.0d0,0.0d0)
++            vpuu22=(0.0d0,0.0d0)
++            wpuu21=(0.0d0,0.0d0); wpuu12=(0.0d0,0.0d0)
++            wpud21=(0.0d0,0.0d0); wpdu12=(0.0d0,0.0d0)
++            wpuu22=(0.0d0,0.0d0)
+            
+             IF (L0 .LE. LOMAX) THEN
+ 
+@@ -62,6 +149,12 @@
+ 
+                      tuu21(jlo)=gfac(lqx,jatom)*vns1lo(l0+1,lm1,lp+1,jlo,jatom)
+                      tud21(jlo)=gfac(lqx,jatom)*vns2lo(l0+1,lm1,lp+1,jlo,jatom)
++                     wuu21(jlo)=gfac(lqx,jatom)*wns1lo(l0+1,lm1,lp+1,jlo,jatom)
++                     wud21(jlo)=gfac(lqx,jatom)*wns2lo(l0+1,lm1,lp+1,jlo,jatom)
++                     vpuu21(jlo)=hphase*vns1lo(l0+1,lm1,lp+1,jlo,jatom)
++                     vpud21(jlo)=hphase*vns2lo(l0+1,lm1,lp+1,jlo,jatom)
++                     wpuu21(jlo)=hphase*wns1lo(l0+1,lm1,lp+1,jlo,jatom)
++                     wpud21(jlo)=hphase*wns2lo(l0+1,lm1,lp+1,jlo,jatom)
+ 
+                      IF (LP .LE. LOMAX) THEN
+ 
+@@ -70,6 +163,9 @@
+ 
+                            IF (LOOR(LP,jatom)) THEN
+                               tuu22(jlo,klo)= gfac(lqx,jatom)*vns3lo(l0+1,lm1,lp+1,jlo,klo,jatom)
++                              wuu22(jlo,klo)= gfac(lqx,jatom)*wns3lo(l0+1,lm1,lp+1,jlo,klo,jatom)
++                              vpuu22(jlo,klo)=hphase*vns3lo(l0+1,lm1,lp+1,jlo,klo,jatom)
++                              wpuu22(jlo,klo)=hphase*wns3lo(l0+1,lm1,lp+1,jlo,klo,jatom)
+                            endif
+                         enddo
+                      endif
+@@ -86,21 +182,43 @@
+                   if (.not.lapw(lp,jatom).and.klo.eq.1) cycle
+                   tuu12(klo)=gfac(lqx,jatom)*vns1lo(lp+1,lm1,l0+1,klo,jatom)
+                   tdu12(klo)=gfac(lqx,jatom)*vns2lo(lp+1,lm1,l0+1,klo,jatom)       
++                  ! APW-bra/LO-ket channels are independent for W: the
++                  ! derivative stays on the APW bra.  WNS4LO/WNS5LO store
++                  ! u'-LO and udot'-LO, respectively.
++                  wuu12(klo)=gfac(lqx,jatom)*wns4lo(l0+1,lm1,lp+1,klo,jatom)
++                  wdu12(klo)=gfac(lqx,jatom)*wns5lo(l0+1,lm1,lp+1,klo,jatom)
++                  vpuu12(klo)=hphase*vns1lo(lp+1,lm1,l0+1,klo,jatom)
++                  vpdu12(klo)=hphase*vns2lo(lp+1,lm1,l0+1,klo,jatom)
++                  wpuu12(klo)=hphase*wns4lo(l0+1,lm1,lp+1,klo,jatom)
++                  wpdu12(klo)=hphase*wns5lo(l0+1,lm1,lp+1,klo,jatom)
+                enddo
+             ENDIF
+ 
+             IF(myid.eq.0) then
+-               write(71) (tuu21(jlo),jlo=1,nloat)
+-               write(71) (tuu12(jlo),jlo=1,nloat)
+-               write(71) (tud21(jlo),jlo=1,nloat)
+-               write(71) (tdu12(jlo),jlo=1,nloat)
+-               write(71) ((tuu22(jlo,klo),jlo=1,nloat),klo=1,nloat)
++               write(71) (tuu21(jlo),jlo=1,nloat),(wuu21(jlo),jlo=1,nloat), &
++                         (vpuu21(jlo),jlo=1,nloat),(wpuu21(jlo),jlo=1,nloat)
++               write(71) (tuu12(jlo),jlo=1,nloat),(wuu12(jlo),jlo=1,nloat), &
++                         (vpuu12(jlo),jlo=1,nloat),(wpuu12(jlo),jlo=1,nloat)
++               write(71) (tud21(jlo),jlo=1,nloat),(wud21(jlo),jlo=1,nloat), &
++                         (vpud21(jlo),jlo=1,nloat),(wpud21(jlo),jlo=1,nloat)
++               write(71) (tdu12(jlo),jlo=1,nloat),(wdu12(jlo),jlo=1,nloat), &
++                         (vpdu12(jlo),jlo=1,nloat),(wpdu12(jlo),jlo=1,nloat)
++               write(71) ((tuu22(jlo,klo),jlo=1,nloat),klo=1,nloat), &
++                         ((wuu22(jlo,klo),jlo=1,nloat),klo=1,nloat), &
++                         ((vpuu22(jlo,klo),jlo=1,nloat),klo=1,nloat), &
++                         ((wpuu22(jlo,klo),jlo=1,nloat),klo=1,nloat)
+             ENDIF
+ 
+          endif
+ 10    CONTINUE
+ 
++      IF (G2_DIAG_ENABLED.AND.MYID.EQ.0) WRITE(6,*) &
++           ':DBG_G2_FORFHS_M_SUM:',JATOM,LQIND(JATOM),G2_BAD_COUNT
++
+       deallocate(TUU21,TUU12,TUD21,TDU12,TUU22)
++      deallocate(WUU21,WUU12,WUD21,WDU12,WUU22)
++      deallocate(VPUU21,VPUU12,VPUD21,VPDU12,VPUU22)
++      deallocate(WPUU21,WPUU12,WPUD21,WPDU12,WPUU22)
+ 
+       RETURN
+       END

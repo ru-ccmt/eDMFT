@@ -1,0 +1,50 @@
+{
+  "case": "SrVO3",
+  "rows": [
+    {
+      "label": "minus",
+      "directory": "/private/tmp/edmft_complete_strain_20261109/SrVO3/native_live/minus",
+      "DEN_Ry": -3609.209443590154,
+      "core_Ry": -4955.1506625071315,
+      "VSUM_Ry": -27.855996363,
+      "K_Ry": -8592.216102460285,
+      "timings": {
+        "lapw0": 1.0967949170153588,
+        "lapw1": 22.70504662510939,
+        "dmft2": 9.990043916041031,
+        "lcore": 0.04373133392073214
+      }
+    },
+    {
+      "label": "center",
+      "directory": "/private/tmp/edmft_complete_strain_20261109/SrVO3/native_live/center",
+      "DEN_Ry": -3608.957681802573,
+      "core_Ry": -4955.300876904727,
+      "VSUM_Ry": -27.957336088,
+      "K_Ry": -8592.215894795301,
+      "timings": {
+        "lapw0": 1.2114400421269238,
+        "lapw1": 22.31897091702558,
+        "dmft2": 9.923285499913618,
+        "lcore": 0.045185166876763105
+      }
+    },
+    {
+      "label": "plus",
+      "directory": "/private/tmp/edmft_complete_strain_20261109/SrVO3/native_live/plus",
+      "DEN_Ry": -3608.706709042048,
+      "core_Ry": -4955.450581570517,
+      "VSUM_Ry": -28.058354009,
+      "K_Ry": -8592.215644621565,
+      "timings": {
+        "lapw0": 1.1264833339955658,
+        "lapw1": 20.943724874872714,
+        "dmft2": 8.481948375003412,
+        "lcore": 0.043585042003542185
+      }
+    }
+  ],
+  "derivative_Ry": 0.22891935986990575,
+  "mean_tensile_GPa": 2.9330549939254964,
+  "scope": "fresh energy replay at supplied densities, not reconvergence"
+}

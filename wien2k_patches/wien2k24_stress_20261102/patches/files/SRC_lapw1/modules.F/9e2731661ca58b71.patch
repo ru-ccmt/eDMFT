@@ -1,0 +1,129 @@
+--- a/SRC_lapw1/modules.F
++++ b/SRC_lapw1/modules.F
+@@ -1135,13 +1135,31 @@
+ !                         VNS3(l,L,l') ...
+ !                            ... integral(u_{l'}_dot*V_{L}*u_{l} dr)
+ 
++        ! Alternate-basis diagnostics must keep the physical operator fixed.
++        ! The L=0 correction routed through HNS covers only l<=LNSMAX.
++        ! Store the three remaining spherical radial integrals separately;
++        ! HAMILT adds them using its existing Legendre/addition-theorem path.
++        ! Channels are uu, udot-udot, u-udot, in Ry (no Y00 factor).
++        logical :: basis_restore_high_l=.false.
++        integer :: basis_restore_lmin=0
++        real*8, allocatable :: basis_restore_spherical(:,:,:)
+         INTEGER                       :: INS, NL, NGAU
+         INTEGER, allocatable          :: LMMAX(:), LQIND(:), LM(:,:,:)
+         DOUBLE PRECISION, allocatable :: DP(:,:), DPE(:,:), E(:,:), P(:,:), PE(:,:), PEI(:,:)
+-        DOUBLE PRECISION, allocatable :: VNS1(:,:,:,:), VNS2(:,:,:,:), VNS3(:,:,:,:)
++        DOUBLE PRECISION, allocatable :: VNS1(:,:,:,:), VNS2(:,:,:,:), VNS3(:,:,:,:), &
++                                         WNS1(:,:,:,:), WNS2(:,:,:,:), WNS3(:,:,:,:), &
++                                         WNS4(:,:,:,:)
+         DOUBLE COMPLEX,   pointer     :: GFAC(:,:)
+         COMPLEX*16,       pointer     :: MGGA_FAC(:,:,:)
+         INTEGER,          pointer     :: LQNS(:,:,:)
++        ! Signed magnetic quantum number M of the potential harmonic for
++        ! every LQNS record.  LQNS(4) stores only the index of WIEN2k's
++        ! lattice-harmonic table, whose LM(2,...) entry is nonnegative.
++        ! ATPAR also generates the conjugate -M channel, so reconstructing M
++        ! from that table later loses its sign.  Keep it explicitly for the
++        ! force/stress auxiliary file without changing the long-established
++        ! six-field LQNS interface used by HNS/LMSORT.
++        INTEGER,          pointer     :: LQMM(:,:)
+ 
+ !       Matrix elements required for mgga calculation        
+         DOUBLE PRECISION, allocatable :: INT_U___VTAU_U__(:,:,:,:)  ! like VNS1
+@@ -1161,10 +1179,14 @@
+         SUBROUTINE init_atspdt(NATO, LMMX, LMAX, NSLMAX)
+           IMPLICIT NONE
+           integer NATO, LMMX, LMAX, NSLMAX
++          allocate(basis_restore_spherical(3,LMAX,NATO))
++          basis_restore_spherical=0.d0
++          basis_restore_high_l=.false.
+           allocate( LMMAX(NATO) )
+           allocate( LQIND(NATO) )
+           allocate( LM(2,0:LMMX,NATO) )
+           allocate( LQNS(6,NGAU,NATO) )
++          allocate( LQMM(NGAU,NATO) )
+           allocate( DP(LMAX,NATO) )
+           allocate( DPE(LMAX,NATO) )
+           allocate( E(LMAX,NATO) )
+@@ -1174,12 +1196,22 @@
+           allocate( VNS1(NSLMAX,0:LMMX,NSLMAX,NATO) )
+           allocate( VNS2(NSLMAX,0:LMMX,NSLMAX,NATO) )
+           allocate( VNS3(NSLMAX,0:LMMX,NSLMAX,NATO) )
++          ! Stress Eq. (G2): W contains r*u'_bra rather than u_bra.  It is
++          ! therefore not symmetric under interchange of bra and ket.  Four
++          ! APW channels are required: uu, udot-udot, u-udot, and udot-u.
++          ! Keeping them next to VNS guarantees identical potential and
++          ! radial-mesh conventions.
++          allocate( WNS1(NSLMAX,0:LMMX,NSLMAX,NATO) )
++          allocate( WNS2(NSLMAX,0:LMMX,NSLMAX,NATO) )
++          allocate( WNS3(NSLMAX,0:LMMX,NSLMAX,NATO) )
++          allocate( WNS4(NSLMAX,0:LMMX,NSLMAX,NATO) )
+           allocate( GFAC(NGAU,NATO) )
+           allocate(MGGA_FAC(1,1,1))
+           LMMAX=0
+           LQIND=0
+           LM=0
+           LQNS=0
++          LQMM=0
+           DP=0.0D0
+           DPE=0.0D0
+           E=0.0D0
+@@ -1189,6 +1221,10 @@
+           VNS1=0.0D0
+           VNS2=0.0D0
+           VNS3=0.0D0
++          WNS1=0.0D0
++          WNS2=0.0D0
++          WNS3=0.0D0
++          WNS4=0.0D0
+           GFAC=(0.0D0,0.0D0)
+         END SUBROUTINE init_atspdt
+ 
+@@ -1494,6 +1530,10 @@
+ !      COMMON  /COMI/     NVAA, NE, NBELW, NAT, NT, LNSMAX
+ !      SAVE    /COMI/
+         INTEGER :: NVAA, NE, NBELW, NAT, NT, LNSMAX,nemax_it
++!       Explicit opt-in for selecting a fixed number of lowest bands.
++!       This must remain separate from nemax_it so input files without the
++!       FIXED_NBANDS keyword retain WIEN2k's historical behavior.
++        LOGICAL :: fixed_nbands
+         INTEGER :: NSLMAX
+       end module comi
+ 
+@@ -1659,7 +1699,9 @@
+         
+         !      COMMON  /LOINT/    VNS1LO, VNS2LO, VNS3LO
+ !      SAVE    /LOINT/
+-        DOUBLE PRECISION, allocatable :: VNS1LO(:,:,:,:,:), VNS2LO(:,:,:,:,:), VNS3LO(:,:,:,:,:,:)
++        DOUBLE PRECISION, allocatable :: VNS1LO(:,:,:,:,:), VNS2LO(:,:,:,:,:), VNS3LO(:,:,:,:,:,:), &
++                                         WNS1LO(:,:,:,:,:), WNS2LO(:,:,:,:,:), WNS3LO(:,:,:,:,:,:), &
++                                         WNS4LO(:,:,:,:,:), WNS5LO(:,:,:,:,:)
+         
+         DOUBLE PRECISION, allocatable :: INT_Ulo__VTAU_U__(:,:,:,:,:)
+         DOUBLE PRECISION, allocatable :: INT_Ulo__VTAU_UD_(:,:,:,:,:)
+@@ -1682,9 +1724,22 @@
+           allocate( VNS1LO(LOMAX+1, 0:LMMX, NSLMAX, nloat, NATO) )
+           allocate( VNS2LO(LOMAX+1, 0:LMMX, NSLMAX, nloat, NATO) )
+           allocate( VNS3LO(LOMAX+1, 0:LMMX, NSLMAX, nloat, nloat,NATO) )
++          allocate( WNS1LO(LOMAX+1, 0:LMMX, NSLMAX, nloat, NATO) )
++          allocate( WNS2LO(LOMAX+1, 0:LMMX, NSLMAX, nloat, NATO) )
++          allocate( WNS3LO(LOMAX+1, 0:LMMX, NSLMAX, nloat, nloat,NATO) )
++          ! WNS1LO/WNS2LO/WNS3LO have a differentiated LO on the bra.
++          ! WNS4LO/WNS5LO are the independent differentiated APW-bra,
++          ! LO-ket channels; they cannot be obtained by transposition.
++          allocate( WNS4LO(NSLMAX, 0:LMMX, LOMAX+1, nloat, NATO) )
++          allocate( WNS5LO(NSLMAX, 0:LMMX, LOMAX+1, nloat, NATO) )
+           VNS1LO=0.0D0
+           VNS2LO=0.0D0
+           VNS3LO=0.0D0
++          WNS1LO=0.0D0
++          WNS2LO=0.0D0
++          WNS3LO=0.0D0
++          WNS4LO=0.0D0
++          WNS5LO=0.0D0
+ !todo          ! write(6,'(a20,f12.1,a,a,6i6)') "Allocating VNS3LO ",&
+           !      & (LOMAX+1)*LMMX*NSLMAX*nloat*nloat*NATO,' MB ', &
+           !      & 'dimensions', LOMAX+1, LMMX, NSLMAX, nloat, nloat,NATO
