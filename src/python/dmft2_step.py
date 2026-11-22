@@ -459,11 +459,8 @@ def preflight(case, req, root, mpi):
         .expanduser()
         .resolve()
     )
-    exe = (
-        Path(solver.get("dmft2", str(Path(root) / ("dmft2" if spinor else "dmft2_response"))))
-        .expanduser()
-        .resolve()
-    )
+    # The ordinary dmft2 writes the response data when preparation sets EDMFT_RESPONSE_EXPORT.
+    exe = Path(solver.get("dmft2", Path(root) / "dmft2")).expanduser().resolve()
     # Inherit the ordinary dmft2 MPI prefix automatically. Python's mpi4py
     # and the Fortran workers may link different MPI implementations, so the
     # shared resolver verifies/adapts the Python launcher without changing

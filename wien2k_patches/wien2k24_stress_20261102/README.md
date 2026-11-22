@@ -170,18 +170,14 @@ The source patch is `patches/build/response-workers.patch`. These exports were
 originally documented under `src/doc/stress/xc_core_response_20261108/`.
 That development archive is no longer needed to build the WIEN workers.
 
-The response drivers in `src/python/` and `liblapw_response.so` from
-`src/dmft2/atpar/` are installed with **eDMFT**. Non-SOC eDMFT response
-also expects the current eDMFT `dmft2` executable under the name
-`dmft2_response` in `WIEN_DMFT_ROOT`. On a fresh eDMFT install, if that name
-is absent, install a copy of the matching build:
+eDMFT installs its response drivers, `liblapw_response.so`, and `dmft2`.
+For screened eDMFT calculations, the driver uses the installed `dmft2` for
+both the ordinary charge calculation and the response export, with or without
+spin–orbit coupling. The installation commands above supply the four additional
+WIEN workers. Users testing a different eDMFT executable can set `solver.dmft2`
+in the case response JSON to its path.
 
-```bash
-install -m 755 "$WIEN_DMFT_ROOT/dmft2" "$WIEN_DMFT_ROOT/dmft2_response"
-```
-
-Keep the two executables from the same build when updating eDMFT. The optional
-`--install-helpers` installs two standalone radial diagnostics only.
+The optional `--install-helpers` installs two standalone radial diagnostics.
 
 In matched DFT finite-difference tests, the mean-stress discrepancy decreased
 from 0.226 to 0.00126 GPa for cubic SrVO3 (NREL) and from 0.112 to

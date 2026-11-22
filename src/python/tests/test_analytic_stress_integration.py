@@ -24,7 +24,6 @@ def fixture():
                     bin,
                     [
                         "dmft2",
-                        "dmft2_response",
                         "lapw0_response",
                         "lapw1_response",
                         "lcore_response",
@@ -87,11 +86,31 @@ class IntegrationTests(unittest.TestCase):
                 self.assertEqual(result["backend"], "analytic")
                 self.assertEqual(result["mpi"], ["python-mpiexec", "-n", "4"])
                 self.assertEqual(result["native_mpi"], ["mpirun", "-np", "4"])
+                self.assertEqual(result["dmft2"], str(bin / "dmft2"))
                 self.assertEqual(result["lapw1_worker"], str(bin / "lapw1_response"))
                 req["config"]["solver"]["mpi"] = []
                 result = step.preflight("sample", req, bin, "mpirun -np 4")
                 self.assertEqual(result["mpi"], [])
                 self.assertEqual(result["native_mpi"], ["mpirun", "-np", "4"])
+
+    def test_response_executable_override(self):
+        with fixture() as (_, bin, _, req):
+            structure = SimpleNamespace(
+                a=4., b=5., c=6., lattyp="P", alpha=90., beta=90., gamma=90.,
+                ReadStruct=lambda _: None,
+            )
+            # An older installation can contain a separate response binary.
+            alternate = bin / "dmft2_response"
+            alternate.touch(mode=0o755)
+            with patch("wstruct.Struct", return_value=structure), patch(
+                "lapw_total_stress.invariant_strains"
+            ):
+                self.assertEqual(step.preflight("sample", req, bin, "")["dmft2"], str(bin / "dmft2"))
+                req["config"]["solver"]["dmft2"] = str(alternate)
+                self.assertEqual(step.preflight("sample", req, bin, "")["dmft2"], str(alternate))
+                alternate.unlink()
+                with self.assertRaisesRegex(ValueError, "missing executable"):
+                    step.preflight("sample", req, bin, "")
 
     def test_screened_force_method_defaults_and_displaced_override(self):
         with fixture() as (_, bin, _, req):
@@ -124,7 +143,7 @@ class IntegrationTests(unittest.TestCase):
                 backend="analytic",
                 physical_policy=dict(magnetic=False,ferro=False,fixed_number=True,normalization_enabled=True),
                 wien_root=str(wi),
-                dmft2=str(bin / "dmft2_response"),
+                dmft2=str(bin / "dmft2"),
                 library=str(bin / "liblapw_response.so"),
             )
             for label in ["lapw0", "lapw1", "lcore"]:
@@ -137,6 +156,7 @@ class IntegrationTests(unittest.TestCase):
                 script = Path(command[1]).name
                 if script == "lapw_response_prepare.py":
                     cfg = json.loads(Path(command[2]).read_text())
+                    self.assertEqual(cfg["dmft2"], str(bin / "dmft2"))
                     self.assertEqual(Path(cfg["reference"]).name, "reference")
                     self.assertEqual(Path(cfg["workspace"]).name, "central")
                     self.assertNotEqual(Path(cfg["reference"]), root)
@@ -182,7 +202,7 @@ class IntegrationTests(unittest.TestCase):
                 backend="analytic",
                 physical_policy=dict(magnetic=False,ferro=False,fixed_number=True,normalization_enabled=True),
                 wien_root=str(wi),
-                dmft2=str(bin / "dmft2_response"),
+                dmft2=str(bin / "dmft2"),
                 library=str(bin / "liblapw_response.so"),
             )
             for label in ["lapw0", "lapw1", "lcore"]:
@@ -206,7 +226,7 @@ class MPIIntegrationTests(unittest.TestCase):
                 backend="analytic",
                 physical_policy=dict(magnetic=False,ferro=False,fixed_number=True,normalization_enabled=True),
                 wien_root=str(wi),
-                dmft2=str(bin / "dmft2_response"),
+                dmft2=str(bin / "dmft2"),
                 library=str(bin / "liblapw_response.so"),
                 mpi=["python-mpiexec", "-n", "4"],
                 native_mpi=["native-mpirun", "-np", "2"],

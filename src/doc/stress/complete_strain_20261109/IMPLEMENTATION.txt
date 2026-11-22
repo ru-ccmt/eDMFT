@@ -146,7 +146,9 @@ Explicit solver paths can be configured in case.stress_response.json:
    "lapw0_worker": "/path/to/lapw0_response",
    "lapw1_worker": "/path/to/lapw1_response",
    "lcore_worker": "/path/to/lcore_response",
-   "dmft2": "/path/to/dmft2_response", "library": "/path/to/liblapw_response.so"}}
+   "library": "/path/to/liblapw_response.so"}}
+Response preparation uses the installed dmft2 by default. Set solver.dmft2 only
+when selecting an alternate executable.
 Complex vectors use lapw1c_response by default. Native reference screening is
 still available with backend=native, but it does not publish a complete tensor.
 
