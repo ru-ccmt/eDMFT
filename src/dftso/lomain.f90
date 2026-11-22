@@ -1,4 +1,5 @@
-subroutine lomain(a,bkx,bky,bkz,fac,ne,lfirst,indj,jatom,n,isi)
+subroutine lomain(a,bkx,bky,bkz,fac,ne,lfirst,indj,jatom,n,isi,u,coefficient_tangent,central)
+  use soc_displacement, only: legacy_lo_filter
   USE param, ONLY: nmat,nume, labc, labc2, lomax
   USE abcd, ONLY: abcdlm
   USE loabc, ONLY: alo, blo, clo
@@ -7,6 +8,12 @@ subroutine lomain(a,bkx,bky,bkz,fac,ne,lfirst,indj,jatom,n,isi)
   IMPLICIT NONE
   REAL*8, intent(in) :: BKX(NMAT),BKY(NMAT),BKZ(NMAT)
   REAL*8, intent(in) :: FAC
+  logical, intent(in) :: coefficient_tangent
+  complex*16, intent(in) :: central(nmat,nume)
+  logical :: moving
+  real*8, intent(in) :: u(3)
+  real*8 :: qdot
+  complex*16 :: dpt
   INTEGER, intent(in):: NE, lfirst, indj, jatom, n, isi
   COMPLEX*16, intent(in):: A(NMAT,NUME)
   !
@@ -24,6 +31,7 @@ subroutine lomain(a,bkx,bky,bkz,fac,ne,lfirst,indj,jatom,n,isi)
   !                                                                       
   !.initiales a,b,c of lo                                      
   !	
+  moving=any(u/=0.d0)
   PI=ACOS(-1.0D0)                                                   
   TWOPI=2.D0*PI
   i=n-(nlo(jatom)+nlon(jatom)) 
@@ -47,11 +55,26 @@ subroutine lomain(a,bkx,bky,bkz,fac,ne,lfirst,indj,jatom,n,isi)
               ARGT = dot_product(BK0,TAUIJ(:,indj))*twopi
               !
               PHSHEL=EXP(IMAG*(ARG1+ARGT))
+              if(moving) qdot=dot_product(matmul(BR1,BK0),u)
               DO NUM=1,NE
-                 PHS(NUM)=0.d0
                  PT=PHSHEL*A(I,NUM)
-                 if(dabs(dreal(pt)).gt.tol1)phs(num)=phs(num)+dreal(pt)
-                 if(dabs(dimag(pt)).gt.tol1)phs(num)=phs(num)+dimag(pt)*imag
+                 dpt=pt
+                 if(coefficient_tangent) then
+                    ! dPt was formed using dA; apply the tiny-component
+                    ! tests to the original, unperturbed local orbital.
+                    pt=phshel*central(i,num)
+                 else if(moving) then
+                    dpt=imag*qdot*pt
+                 endif
+                 ! Matching must be complex linear: multiplying a scalar state
+                 ! by a phase must multiply its matched LO by the same phase.
+                 phs(num)=dpt
+                 if (legacy_lo_filter) then
+                    ! Old vectorso files used separate cutoffs for the two
+                    ! components. Use the parent branches only on legacy replay.
+                    phs(num)=cmplx(merge(dreal(dpt),0.d0,abs(dreal(pt))>tol1), &
+                                   merge(dimag(dpt),0.d0,abs(dimag(pt))>tol1),kind=8)
+                 end if
               ENDDO
               do m=-l,+l                                                    
                  index=l*(l+1)+m+1 

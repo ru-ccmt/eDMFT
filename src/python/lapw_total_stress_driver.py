@@ -44,12 +44,20 @@ def run_prepared(
     parallel=SERIAL,
     cache_mb=256.0,
     basis_cache_mb=128.0,
+    disk_matching=False,
     full_sources=False,
+    adjoint_only=False,
+    atomic_forces=False,
+    force_atoms=None,
     save_geometry=False,
     ensemble="auto",
     diagnostic_gap_cutoff=None,
 ):
-    """Prepare once, form invariant sources, solve one adjoint, save evidence."""
+    """Prepare once, solve one adjoint, optionally form invariant stress sources."""
+    if atomic_forces and full_sources:
+        raise ValueError("atomic forces require a shared adjoint readout")
+    if adjoint_only and full_sources:
+        raise ValueError("adjoint-only and full-sources modes conflict")
     thread_policy = limit_blas_threads()
     start = time.perf_counter()
     snapshot = Path(snapshot).resolve()
@@ -64,12 +72,14 @@ def run_prepared(
     from lapw_response_policy import detect_policy
     from lapw_magnetic_response import combine_valence
     provenance = snapshot / "preparation.json"
-    override = json.loads(provenance.read_text()).get("physical_policy", {}) if provenance.is_file() else {}
+    preparation = json.loads(provenance.read_text()) if provenance.is_file() else {}
+    override = preparation.get("physical_policy", {})
+    electronic_model = preparation.get("electronic_model", "dmft")
     if ensemble not in ("auto", "fixed-n", "fixed-mu"):
         raise ValueError("invalid electronic ensemble")
     if ensemble != "auto":
         override["fixed_number"] = ensemble == "fixed-n"
-    policy = detect_policy(snapshot, case, override=override)
+    policy = detect_policy(snapshot, case, override=override, electronic_model=electronic_model)
     files = {
         name: snapshot / (case + "." + name)
         for name in ["struct", "clmsum", "in0", "vsp", "inc"]
@@ -97,8 +107,9 @@ def run_prepared(
         branches = [stack.enter_context(load_native_valence_state(
             snapshot, case, complex_vectors=complex_vectors, energy_policy="fixed",
             matrix_quadrature="wien2k24", library=library, parallel=parallel,
-            cache_mb=cache_mb, basis_cache_mb=basis_cache_mb, spin_channel=channel,
+            cache_mb=cache_mb, basis_cache_mb=basis_cache_mb, disk_matching=disk_matching, spin_channel=channel,
             diagnostic_gap_cutoff=diagnostic_gap_cutoff,
+            electronic_model=electronic_model,
         )) for channel in policy.channels]
         for branch in branches:
             warning = branch.model.window_gap_warning()
@@ -129,7 +140,7 @@ def run_prepared(
         timings["prepare_functional_search_seconds"] = time.perf_counter() - t
         # Profiling is development-only and default-off. It measures a warm
         # action, not context construction or six repeated adjoint solves.
-        from stress_response_adjoint import PairedOperator
+        from stress_response_adjoint import PairedOperator, ScreenedResponse
 
         operator = total.energy.jacobian
         action_times = []
@@ -154,21 +165,24 @@ def run_prepared(
             else:
                 answer = operator.rmatvec(x)
             action_times.append(time.perf_counter() - before)
-            progress(f"Adjoint action {len(action_times)}: {action_times[-1]:.3f} s")
             return answer
 
-        total.energy.screened.jacobian = PairedOperator(
+        timed_jacobian = PairedOperator(
             operator.input_size,
             operator.output_size,
             operator.matvec,
             transpose,
             "timed total adjoint",
         )
+        total.energy.screened = ScreenedResponse(
+            timed_jacobian, progress=progress if parallel.root else None
+        )
         solved = None
         readout = None
         if not full_sources:
             t = time.perf_counter()
-            progress("Solving one screened adjoint for all strain directions")
+            progress("Solving one shared screened adjoint" if adjoint_only
+                     else "Solving one screened adjoint for all strain directions")
             solved = total.energy.screened.solve(
                 total.energy.charge_gradient,
                 adjoint=True,
@@ -180,11 +194,21 @@ def run_prepared(
             timings["adjoint_solve_seconds"] = time.perf_counter() - t
             progress("Adjoint converged; preparing shared source readout")
             t = time.perf_counter()
-            readout = PreparedChargeSourceContraction(state, solved[0])
+            if getattr(v.model, "electronic_model", "dmft") == "dft":
+                readout = PreparedChargeSourceContraction(state, solved[0][:-1])
+                readout.reference_adjoint = float(solved[0][-1])
+            else:
+                readout = PreparedChargeSourceContraction(state, solved[0])
             timings["source_readout_seconds"] = time.perf_counter() - t
         sources = []
         timings["source_seconds"] = []
-        for i, e in enumerate(total.strains):
+        atomic_report = None
+        if atomic_forces:
+            from lapw_atomic_force import atomic_force_report
+            t = time.perf_counter()
+            atomic_report = atomic_force_report(total, readout, force_atoms, progress)
+            timings["atomic_sources_seconds"] = time.perf_counter() - t
+        for i, e in enumerate([] if adjoint_only else total.strains):
             progress(f"Preparing strain source {i+1}/{len(total.strains)}")
             t = time.perf_counter()
             x = total.prepare_source(e, readout=readout)
@@ -213,8 +237,25 @@ def run_prepared(
                     geometry=x.geometry,
                 )
             progress(f"Prepared strain source {i+1}/{len(total.strains)}")
-        progress("Combining explicit and induced derivatives into the complete tensor")
-        sigma, lam, report = total.contract(sources, solved_adjoint=solved)
+        if adjoint_only:
+            if solved is None or not solved[1].get("converged"):
+                raise RuntimeError("atomic-force adjoint did not converge")
+            lam, solver_report = solved
+            report = dict(
+                observable="complete native frozen-Sigma Klein tangent",
+                adjoint=solver_report,
+                central=state.metadata,
+                search_details=total.energy.details,
+                diagnostic_only=total.diagnostic_only,
+                charge_fixed_point=total.charge_fixed_point,
+                window_gap_treatment=total.window_gap_treatment,
+                full_tensor_within_symmetry=False,
+                stress_ready=False,
+                scope="common charge adjoint for symmetry-preserving atomic forces",
+            )
+        else:
+            progress("Combining explicit and induced derivatives into the complete tensor")
+            sigma, lam, report = total.contract(sources, solved_adjoint=solved)
         timings["adjoint_action_seconds"] = action_times
         parallel.root_call(
             lambda: np.savez_compressed(
@@ -227,6 +268,8 @@ def run_prepared(
             raise RuntimeError("central snapshot changed during response")
         if parallel.fingerprints(v.fingerprint_paths) != v.fingerprints:
             raise RuntimeError("native valence snapshot changed during response")
+        if atomic_report is not None:
+            report["atomic_forces"] = atomic_report
         report.update(
             converged=True,
             case=case,
@@ -234,6 +277,7 @@ def run_prepared(
             snapshot=str(snapshot),
             source_fingerprints=expected,
             valence_fingerprints=v.fingerprints,
+            disk_matching=disk_matching,
             radial_library_sha256=hashlib.sha256(library.read_bytes()).hexdigest(),
             timings=timings | dict(total_seconds=time.perf_counter() - start),
             peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -247,6 +291,7 @@ def run_prepared(
             peak_rss_bytes=report["peak_rss_bytes"],
             timings=report["timings"],
             electronic_cache=[b.model.cache_info() for b in branches],
+            matching_scratch_bytes=sum(b.matching_scratch_bytes for b in branches),
         )
     )
     report["parallel"] = dict(
@@ -265,7 +310,10 @@ def run_prepared(
             json.dumps(report, indent=2, allow_nan=False) + "\n"
         )
     )
-    progress("Mean tensile stress: %.9f GPa" % report["mean_tensile_stress_GPa"])
+    if not adjoint_only:
+        progress("Mean tensile stress: %.9f GPa" % report["mean_tensile_stress_GPa"])
+    else:
+        progress("Shared atomic-force adjoint ready; stress sources skipped")
     return report
 
 
@@ -298,6 +346,15 @@ def main():
         help="diagnostic: build every charge source instead of its adjoint contraction",
     )
     p.add_argument(
+        "--adjoint-only", action="store_true",
+        help="force mode: solve shared adjoint without preparing stress directions",
+    )
+    p.add_argument("--disk-matching", action="store_true",
+                   help="store inactive matching arrays in rank-local temporary files")
+    p.add_argument("--atomic-forces", action="store_true",
+                   help="evaluate internal-coordinate derivatives on the central state")
+    p.add_argument("--force-atoms", type=int, nargs="+", help="1-based inequivalent atoms")
+    p.add_argument(
         "--save-geometry",
         action="store_true",
         help="diagnostic: retain local band-geometry arrays (large)",
@@ -325,8 +382,11 @@ def main():
         progress=report_progress,
         parallel=parallel,
         cache_mb=a.cache_mb,
-        basis_cache_mb=a.basis_cache_mb,
+        basis_cache_mb=a.basis_cache_mb, disk_matching=a.disk_matching,
         full_sources=a.full_sources,
+        adjoint_only=a.adjoint_only,
+        atomic_forces=a.atomic_forces,
+        force_atoms=a.force_atoms,
         save_geometry=a.save_geometry,
         ensemble=a.ensemble,
         diagnostic_gap_cutoff=a.diagnostic_gap_cutoff,

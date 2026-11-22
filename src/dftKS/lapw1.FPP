@@ -256,7 +256,8 @@ PROGRAM LAPW1
            NE=0
         else
            CALL START_TIMER(time_diag)
-           CALL Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, nume2, Qprint)
+           CALL Diagonalize(Elow, Eup, NE, HS, HSDIAG, Z, EIGVAL, HSROWS, nume2, Qprint, &
+                kpoint,KZZ,K3(:,kpoint),nlo,trim(filename_vector))
            CALL STOP_TIMER(time_diag)
            if (Qprint) call print_times()
            CALL PRTKPT(kpoint, KZZ, Eigval, Z, HSrows, NE, Qprint)

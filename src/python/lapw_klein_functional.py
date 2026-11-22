@@ -64,8 +64,10 @@ class PreparedKleinFunctional:
         )
 
     def _report(self, explicit, induced, parts):
+        dft = getattr(self.state.valence.model, 'electronic_model', 'dmft') == 'dft'
         return dict(
-            observable="complete frozen-Sigma native Klein tangent",
+            observable=("complete Mermin DFT native tangent" if dft
+                        else "complete frozen-Sigma native Klein tangent"),
             units="Ry per supplied perturbation parameter",
             explicit_Ry=explicit.tolist(),
             induced_Ry=induced.tolist(),

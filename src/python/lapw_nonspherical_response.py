@@ -7,7 +7,7 @@ l/l' pairs are kept, so the transpose never guesses a factor of two.
 
 import numpy as np
 from lapw_augmentation_response import RadialAngularLayout
-from lapw_density_response import checked, herm
+from lapw_density_response import checked, herm, stored_coefficients
 from lapw_compact_blocks import (
     checked_columns,
     hermitian_columns,
@@ -16,7 +16,7 @@ from lapw_compact_blocks import (
 
 
 class PreparedNonspherical:
-    def __init__(self, primitive, metric, harmonics, potential, matching, *, gaunt_matrices=None):
+    def __init__(self, primitive, metric, harmonics, potential, matching, *, gaunt_matrices=None, share_matching=False):
         if not primitive:
             raise ValueError("empty nonspherical radial set")
         arrays = {l: np.asarray(p) for l, p in primitive.items()}
@@ -64,10 +64,8 @@ class PreparedNonspherical:
             z = np.asarray(z)
             if z.ndim != 2:
                 raise ValueError("invalid nonspherical matching dimensions")
-            z = np.array(
-                checked(z, (self.layout.size, z.shape[1]), "nonspherical matching"),
-                complex,
-                copy=True,
+            z = stored_coefficients(
+                z, (self.layout.size, z.shape[1]), "nonspherical matching", share=share_matching
             )
             self.entries.append((z, channels, lo, lapw, self.kernel @ z))
         if not self.entries:

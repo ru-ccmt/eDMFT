@@ -5,7 +5,7 @@ LFLIBS = $(WLDFLAGS) $(WLIBS) -L./lattice -L./atpar -llattice -latpar
 FFLAGS = $(WFOPT)  -I./lattice -I./atpar
 LDFLAGS = $(WFOPT)
 
-OBJS = mpi.o modules.o abclm.o couple.o errclr.o  errflg.o garadme.o gtfnam.o  \
+OBJS = mpi.o modules.o soc_displacement.o abclm.o couple.o errclr.o  errflg.o garadme.o gtfnam.o  \
 	harmon2.o  atpar.o    read_inso.o  find_nlos.o   \
         lapwso.o   cali.o    sphbes.o vnsrint.o  \
         lomain.o        cputim.o  dvbes1.o     lagder.o  \
@@ -15,7 +15,10 @@ OBJS = mpi.o modules.o abclm.o couple.o errclr.o  errflg.o garadme.o gtfnam.o  \
         dergl.o    hscalc.o   dergl2.o  vderiv.o  read_def_file.o read_orbital.o \
         symop.o garadorb.o hns.o hsocalc.o horbcalc.o vorblo.o euler.o hmsec.o get_nloat.o get_new_nloat.o
 
-all : llattice latpar lapwso 
+all : llattice latpar lapwso
+
+soc_displacement.o: modules.o
+hmsec.o lapwso.o lomain.o: soc_displacement.o
 
 llattice:
 	cd lattice && ${MAKE} liblattice.a

@@ -14,11 +14,16 @@ weights in their forward/pullback maps; no continuum metric is assumed here.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from inspect import signature
 import time
 from typing import Callable
 
 import numpy as np
 from scipy.sparse.linalg import LinearOperator, gmres
+
+# SciPy 1.11 calls the relative tolerance tol. Keep the same explicit
+# absolute tolerance and independent residual check on both GMRES interfaces.
+_GMRES_RTOL = "rtol" if "rtol" in signature(gmres).parameters else "tol"
 
 RY_BOHR3_TO_GPA = 14710.507641078
 STRAIN_COMPONENTS = ("xx", "yy", "zz", "yz", "xz", "xy")
@@ -183,10 +188,11 @@ class ScreenedResponse:
     result. No nonlinear charge loop or impurity solve occurs in this layer.
     """
 
-    def __init__(self, jacobian):
+    def __init__(self, jacobian, *, progress=None):
         if jacobian.input_size != jacobian.output_size:
             raise ValueError("charge Jacobian must be square")
         self.jacobian = jacobian
+        self.progress = progress
 
     def solve(
         self,
@@ -215,26 +221,58 @@ class ScreenedResponse:
         started = time.monotonic()
         action = self.jacobian.rmatvec if adjoint else self.jacobian.matvec
 
+        source_norm = float(np.linalg.norm(source))
+        threshold = max(atol, rtol * source_norm)
+        direction = "Adjoint" if adjoint else "Forward"
+        action_seconds = 0.0
+
         def apply(x):
-            nonlocal count
+            nonlocal count, action_seconds
             count += 1
-            return x - action(x)
+            before = time.perf_counter()
+            result = x - action(x)
+            action_seconds = time.perf_counter() - before
+            return result
+
+        # Compare like units even if the absolute tolerance sets the target.
+        # For a zero source only an absolute residual is meaningful.
+        scale = source_norm or 1.0
+        metric = "relative" if source_norm else "absolute"
+
+        def log_residual(label, scaled_norm):
+            self.progress(
+                f"{direction} action {count} ({action_seconds:.3f} s), {label} "
+                f"{metric} residual {scaled_norm:.4e} (target {threshold / scale:.4e})"
+            )
+
+        def record_iteration(relative_norm):
+            # Without a preconditioner SciPy's pr_norm estimates ||r||/||source||.
+            # Its callback reuses the Arnoldi factorization. No new J action is needed.
+            norms.append(float(relative_norm))
+            if self.progress is not None:
+                log_residual(f"GMRES iteration {len(norms)}, estimated", norms[-1])
 
         operator = LinearOperator((n, n), matvec=apply, dtype=float)
         answer, info = gmres(
             operator,
             source,
             x0=initial,
-            rtol=rtol,
+            **{_GMRES_RTOL: rtol},
             atol=atol,
             restart=min(restart, n),
             maxiter=max_cycles,
-            callback=lambda norm: norms.append(float(norm)),
+            callback=record_iteration,
             callback_type="pr_norm",
         )
+        if self.progress is not None:
+            self.progress(
+                f"{direction} GMRES finished {len(norms)} inner iterations "
+                f"using {count} operator actions. Checking the true residual."
+            )
         residual = source - apply(answer)
         norm = float(np.linalg.norm(residual))
-        threshold = max(atol, rtol * float(np.linalg.norm(source)))
+        if self.progress is not None:
+            log_residual("recomputed true", norm / scale)
         report = dict(
             converged=bool(info == 0 and norm <= threshold),
             gmres_info=int(info),

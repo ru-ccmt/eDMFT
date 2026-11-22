@@ -10,6 +10,11 @@ def TOTtoFOR(case):
     case_in2s = glob.glob(case+'.in2*')
     for fin2 in case_in2s:
         mode = open(fin2,'r').readline().split()[0]
+        # These modes already produce native forces. In particular, blindly
+        # replacing the first three letters of STRFT creates the invalid
+        # FORFT mode and loses the final screened stress/force request.
+        if mode in ('FOR', 'FORT', 'STRF', 'STRFT'):
+            continue
         if mode!='FOR':
             fw = open(fin2,'r')
             data = fw.readlines()   # reads the entire file

@@ -56,6 +56,14 @@ def literal_coefficients(boundary, lo, lapw, data):
 
 
 class AugmentationTests(unittest.TestCase):
+    def test_harmonic_angle_order_and_negative_m(self):
+        q = np.array([[1.0, 2.0, 3.0], [-2.0, 1.0, -1.0]])
+        x, y, z = (q / np.linalg.norm(q, axis=1)[:, None]).T
+        amplitude = np.sqrt(3.0 / (8.0 * np.pi))
+        expected = [amplitude * (x - 1j*y), np.sqrt(2.0)*amplitude*z,
+                    -amplitude * (x + 1j*y)]
+        np.testing.assert_allclose(harmonics(1, q), expected, atol=1e-14)
+
     def test_prepared_sums_match_full_native_coefficients(self):
         rng, ch, b, lo, data = fixture()
         for lapw in (False, True):

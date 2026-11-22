@@ -47,7 +47,7 @@ contains
     integer(c_int),intent(out) :: handle
     integer :: i
     status=2;handle=0
-    if(quadrature<0.or.quadrature>1)return
+    if(quadrature<0.or.quadrature>2)return
     if(quadrature==1.and.n<8)return
     if(n<6.or.nlo<0.or.ell<0.or.(rel/=0.and.rel/=1).or.(lapw/=0.and.lapw/=1))return
     if(.not.all(ieee_is_finite([r0,dx,rmt,energy,charge])))return

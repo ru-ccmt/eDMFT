@@ -1,0 +1,16 @@
+--- a/SRC_lapw2/lapw2.F
++++ b/SRC_lapw2/lapw2.F
+@@ -360,6 +360,13 @@
+ !                                                                       
+ !.....READ INPUT AND POTE                                               
+       READ(5,1003)  MODUS,MODUS1,coord                                        
++!  STRT/STRFT request final screened stress from the run driver.  LAPW2
++!  itself still computes the native STR/STRF terms and valence charge in
++!  every iteration; the driver adds the response only after convergence.
++!  Keeping this mapping at input parsing makes all existing native branches
++!  (including valence stress and force) see their established modes.
++      IF(MODUS.EQ.'STRT ') MODUS='STR  '
++      IF(MODUS.EQ.'STRFT') MODUS='STRF '
+ ! QDMFT !! read the mode, if MODUS==QDMFT reset it to TOT and set ifqdmft=.T.
+ #ifndef Parallel
+       ifqdmft=.FALSE.

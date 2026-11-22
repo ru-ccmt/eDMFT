@@ -15,7 +15,8 @@ LDMTest SIMP/NCEM are not supported. XC, core and screening are separate.
 
 from lapw_lattice import NativeLattice
 import numpy as np
-from scipy.special import spherical_jn, sph_harm_y, factorial2
+from scipy.special import spherical_jn, factorial2
+from lapw_scipy_compat import sph_harm_y
 from lapw_hartree_radial import NativeCoulombIntegral, RadialHartreeDirichlet
 from lapw_density_response import checked
 from stress_response_adjoint import PairedOperator

@@ -43,19 +43,77 @@ def search_root_terms(energy, bottom, top):
     return [(bottom, 2, 0.5), (top, 0, 0.5)]
 
 
-def searched_energy_derivatives(directory, case, *, complex_vectors, library):
+def dftks_search_inputs(path, nat):
+    """Input energies passed to dftKS SELECT, in ATOM/shell/occurrence order."""
+    from collections import defaultdict, deque
+    lines = Path(path).read_text().splitlines()
+    match = re.search(r"\bEF=\s*([-+0-9.EeDd]+)", lines[0], re.I)
+    ef = float(match.group(1).replace('D','E')) if match else .5
+    result = defaultdict(deque)
+    pos = 2
+    for a in range(nat):
+        count = int(lines[pos].split()[1])
+        rows = [row.split() for row in lines[pos+1:pos+1+count]]
+        for j,row in enumerate(rows):
+            l,e,step = int(row[0]),float(row[1]),float(row[2])
+            mode = int(row[4]) if len(row)>4 else 0
+            prior = int(rows[j-1][0]) if j else -1
+            following = rows[j+1] if j+1<count else None
+            if abs(e-.3)<1e-6 and following and l==int(following[0]):
+                other=float(following[1])
+                if other < -2 or other > ef:
+                    e=ef-.2
+                elif len(following)<5 or int(following[4])!=2:
+                    e=ef+.2
+            if abs(e-.3)<1e-6:
+                e=ef-.2 if prior!=l else ef+.2
+            if step < -1e-8:
+                step=-step/10000.
+            if step>1e-9 and mode!=2:
+                result[a,l].append(e)
+        pos += count+1
+    return result
+
+
+def searched_energy_derivatives(directory, case, *, complex_vectors, library, scalar_solver="wien2k24"):
+    if scalar_solver not in ("wien2k24", "dftKS"):
+        raise ValueError("unknown radial search solver")
     directory = Path(directory)
-    m = _snapshot_inputs(case, directory, complex_vectors)
+    # Native DFT snapshots have no impurity projector control file.
+    m = _snapshot_inputs(
+        case, directory, complex_vectors,
+        dft=not (directory / (case + ".indmfl")).is_file(),
+    )
     pattern = r":E(\d+)_(\d+):\s*E\(\s*\d+\)=\s*(\S+)\s+E\(BOTTOM\)=\s*(\S+)\s+E\(TOP\)=\s*(\S+)"
     rows = re.findall(pattern, (directory / (case + ".scf1")).read_text())
+    searches = (dftks_search_inputs(directory / (case + (".in1c" if complex_vectors else ".in1")), m.s.nat)
+                if scalar_solver == "dftKS" else {})
     if not rows:
+        # A perfectly valid fixed-energy basis has no SELECT roots to
+        # transport. Its energy-coordinate derivative vanishes exactly.
+        if scalar_solver == "dftKS" and not searches:
+            return {}, []
         raise ValueError("no successful native radial searches found")
     result = {}
     details = []
     for ls, as_, es, bs, ts in rows:
         l, a = int(ls), int(as_) - 1
         e0, b0, t0 = map(float, (es, bs, ts))
-        root_terms = search_root_terms(e0, b0, t0)
+        # dftKS SELECT prints the missing-root sentinel -200 Ry; native
+        # WIEN2k prints -520 Ry. Preserve treatment of real core levels.
+        if scalar_solver == "dftKS":
+            b0 = -520. if b0 == -200. else b0
+            t0 = -520. if t0 == -200. else t0
+        if scalar_solver == "dftKS":
+            initial = searches[a,l].popleft()
+        if scalar_solver == "dftKS" and t0 == -520. and b0 != -520.:
+            # Contiguous branch of max(bottom, input). Check the active root
+            # against the exact vector energy below; abort at a possible kink.
+            if abs(b0-initial)<0.0006:
+                raise ValueError("unresolved dftKS CONT branch near the input energy")
+            root_terms = [(b0,2,1.)] if b0>initial else []
+        else:
+            root_terms = search_root_terms(e0, b0, t0)
         if not root_terms:
             continue
         s = m.s
@@ -70,7 +128,7 @@ def searched_energy_derivatives(directory, case, *, complex_vectors, library):
             charge=s.Znuc[a],
             relativistic=s.mode.strip() == "RELA",
             lapw=True,
-            quadrature="wien2k24",
+            quadrature=("lapwso" if scalar_solver == "dftKS" else "wien2k24"),
             library=library,
         )
         derivatives = []

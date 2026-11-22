@@ -98,7 +98,8 @@ class NativeRadialContext:
     these primitives to ordinary LOs; APW+lo's first LO uses u and udot.
     quadrature="atparn" preserves dmft2's RINT13 rule. "wien2k24" uses
     native LAPW1's default CHARGE rule (extended Simpson, not a cubic spline).
-    This policy affects radial normalization, udot, ABC and all derivatives.
+    "lapwso" selects the fourth-order native LAPWSO radial integration and
+    its RINT13 metric. Each policy applies to the value and both derivatives.
     Returned values are read-only. Forward and reverse use real Euclidean
     pairings; the native radial quadratures are already inside the derivative.
     """
@@ -120,8 +121,8 @@ class NativeRadialContext:
         quadrature="atparn",
         library=None,
     ):
-        if quadrature not in ("atparn", "wien2k24"):
-            raise ValueError("quadrature must be atparn or wien2k24")
+        if quadrature not in ("atparn", "wien2k24", "lapwso"):
+            raise ValueError("quadrature must be atparn, wien2k24, or lapwso")
         self.quadrature = quadrature
         if np.any(dirac_lo):
             raise NotImplementedError(
@@ -151,17 +152,17 @@ class NativeRadialContext:
         self.lo_energies = elo.copy()
         self.lo_energies.setflags(write=False)
         self._lib = _library(library)
-        if quadrature == "wien2k24" and not hasattr(
+        if quadrature != "atparn" and not hasattr(
             self._lib, "edmft_radial_create_policy"
         ):
             raise RuntimeError(
-                "WIEN2k24 quadrature requires the updated response library"
+                "requested radial policy requires the updated response library"
             )
         create = self._lib.edmft_radial_create
         policy_args = []
-        if quadrature == "wien2k24":
+        if quadrature != "atparn":
             create = self._lib.edmft_radial_create_policy
-            policy_args = [1]
+            policy_args = [1 if quadrature == "wien2k24" else 2]
         handle = ct.c_int()
         with _LOCK:
             _status(

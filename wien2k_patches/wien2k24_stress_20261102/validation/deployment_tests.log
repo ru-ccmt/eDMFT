@@ -12,8 +12,15 @@ test_11_all_reviewable_cumulative_patches (__main__.BundleTests.test_11_all_revi
 test_12_failed_install_rolls_back (__main__.BundleTests.test_12_failed_install_rolls_back) ... ok
 test_13_current_sources_missing_object_is_repaired (__main__.BundleTests.test_13_current_sources_missing_object_is_repaired) ... ok
 test_14_legacy_entry_points_are_current (__main__.BundleTests.test_14_legacy_entry_points_are_current) ... ok
+test_15_final_driver_and_worker_preflight (__main__.BundleTests.test_15_final_driver_and_worker_preflight) ... ok
+test_16_unknown_driver_or_worker_refused_before_apply (__main__.BundleTests.test_16_unknown_driver_or_worker_refused_before_apply) ... ok
+test_17_failed_worker_build_preserves_binaries (__main__.BundleTests.test_17_failed_worker_build_preserves_binaries) ... patching file 'SRC_lcore/resld.f'
+patching file 'SRC_lapw0/xcpot1.f'
+patching file 'SRC_lapw0/lapw0.F'
+ok
+test_18_mpi_lapw0_is_opt_in (__main__.BundleTests.test_18_mpi_lapw0_is_opt_in) ... ok
 
 ----------------------------------------------------------------------
-Ran 14 tests in 12.012s
+Ran 18 tests in 13.145s
 
 OK

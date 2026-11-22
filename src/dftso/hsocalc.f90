@@ -4,7 +4,7 @@ subroutine hsocalc(h,ri_mat,ne,nnrlo,jspin,indj,ity)
   USE param, ONLY: nume2, nloat, nato, labc
   USE lolog, ONLY: mrf
   IMPLICIT NONE
-  complex*16, intent(out) :: h(nume2,nume2)
+  complex*16, intent(inout) :: h(nume2,nume2)
   real*8, intent(in)  :: ri_mat(nloat,nloat,0:labc,nato,2,2)   
   INTEGER, intent(in) :: ne(2), nnrlo, jspin, indj, ity
   ! locals

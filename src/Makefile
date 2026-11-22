@@ -32,7 +32,7 @@ install :
 	cp impurity/bctqmc/bctqmc ${DESTDIR}/
 	cp impurity/*.py ${DESTDIR}/
 	cp impurity/link/link.py ${DESTDIR}/
-	cp dmft2/dmft2 ${DESTDIR}/
+	cp dmft2/dmft2 dmft2/atpar/liblapw_response.so ${DESTDIR}/
 	cp dmft2/fermif ${DESTDIR}/
 	cp dmft2/combineud ${DESTDIR}/
 	cp python/*.py ${DESTDIR}/

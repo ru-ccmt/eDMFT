@@ -93,6 +93,30 @@ class IntegrationTests(unittest.TestCase):
                 self.assertEqual(result["mpi"], [])
                 self.assertEqual(result["native_mpi"], ["mpirun", "-np", "4"])
 
+    def test_screened_force_method_defaults_and_displaced_override(self):
+        with fixture() as (_, bin, _, req):
+            structure = SimpleNamespace(
+                a=4., b=5., c=6., lattyp="P", alpha=90., beta=90., gamma=90.,
+                nat=1, ReadStruct=lambda _: None,
+            )
+            with patch("wstruct.Struct", return_value=structure), patch(
+                "lapw_total_stress.invariant_strains"
+            ), patch("force_response_modes.internal_modes", return_value=[object()]), patch(
+                "force_response_modes.check_force_frame"
+            ):
+                for mode in ("FORT", "STRFT"):
+                    req["mode"] = mode
+                    for source in (None, "displaced"):
+                        with self.subTest(mode=mode, source=source):
+                            solver = req["config"]["solver"]
+                            if source is None:
+                                solver.pop("force_source", None)
+                            else:
+                                solver["force_source"] = source
+                            result = step.preflight("sample", req, bin, "")
+                            self.assertEqual(result["force_source"], source or "analytic")
+                            self.assertEqual(result["backend"], "analytic")
+
     def test_preparation_and_driver_are_isolated_then_ready_not_applied(self):
         with fixture() as (root, bin, wi, req):
             before = {p: p.read_bytes() for p in root.iterdir() if p.is_file()}
@@ -126,6 +150,7 @@ class IntegrationTests(unittest.TestCase):
                         json.dumps(
                             {
                                 "converged": True,
+                                "adjoint": {"converged": True},
                                 "full_tensor_within_symmetry": True,
                                 "stress_Ry_Bohr3": [
                                     [0.1, 0, 0],
@@ -186,7 +211,7 @@ class MPIIntegrationTests(unittest.TestCase):
                 mpi=["python-mpiexec", "-n", "4"],
                 native_mpi=["native-mpirun", "-np", "2"],
                 cache_mb=64.0,
-                basis_cache_mb=32.0,
+                basis_cache_mb=32.0, disk_matching=True,
             )
             for label in ["lapw0", "lapw1", "lcore"]:
                 solver[label + "_worker"] = str(bin / (label + "_response"))
@@ -201,6 +226,7 @@ class MPIIntegrationTests(unittest.TestCase):
                 else:
                     self.assertEqual(command[:3], solver["mpi"])
                     self.assertIn("--mpi", command)
+                    self.assertIn("--disk-matching", command)
                     self.assertEqual(command[command.index("--cache-mb") + 1], "64.0")
                     self.assertEqual(
                         command[command.index("--basis-cache-mb") + 1], "32.0"
@@ -210,7 +236,7 @@ class MPIIntegrationTests(unittest.TestCase):
                     (out / "report.json").write_text(
                         json.dumps(
                             dict(
-                                converged=True,
+                                converged=True, adjoint={"converged": True},
                                 full_tensor_within_symmetry=True,
                                 stress_Ry_Bohr3=[[0.1, 0, 0], [0, 0.1, 0], [0, 0, 0.1]],
                             )

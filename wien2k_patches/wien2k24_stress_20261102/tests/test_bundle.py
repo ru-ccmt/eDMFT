@@ -53,12 +53,17 @@ class BundleTests(unittest.TestCase):
         cls.top = Path(cls.storage.name)
         cls.base = cls.top / 'original'
         for relative in [*REG['sources'], *[r['path'] for r in REG['makefiles']],
+                         *REG['response_workers']['sources'], 'SRC/run_lapw', 'run_lapw',
                          'SRC_3ddens/Makefile', 'SRC_hf/Makefile']:
             source = OPTIONS.pristine_root / relative
             if source.is_file():
                 dest = cls.base / relative
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, dest)
+        if not (cls.base / 'SRC/run_lapw').is_file():
+            (cls.base / 'SRC').mkdir(exist_ok=True)
+            shutil.copy2(cls.base / 'run_lapw', cls.base / 'SRC/run_lapw')
+        (cls.base / 'run_lapw').unlink(missing_ok=True)
         for line in (B / 'BASE_SOURCES.sha256').read_text().splitlines():
             digest, relative = line.split(None, 1)
             assert installer.sha((cls.base / relative).read_bytes()) == digest, relative
@@ -108,22 +113,27 @@ class BundleTests(unittest.TestCase):
         self.run_tool('--apply')
         self.assertEqual(snapshot(self.root), first)
 
+    def historical_tree(self, state):
+        shutil.rmtree(self.root)
+        shutil.copytree(self.base, self.root)
+        if state == 'pristine':
+            return
+        if state.startswith('legacy'):
+            for p in sorted((B / 'patches/required').glob('*.patch')):
+                patch(self.root, p)
+            if state == 'legacy-full':
+                for p in sorted((B / 'patches/optional').glob('010*.patch')):
+                    patch(self.root, p)
+        else:
+            h = B / 'patches/history/20261105'
+            patch(self.root, h / '0001-wien2k24-complete-stress.patch')
+            if state == 'complete-pre-cache':
+                patch(self.root, h / '0004-upgrade-complete-to-operator-cache.patch', True)
+
     def test_03_all_historical_whole_tree_upgrades(self):
         for state in ['legacy-required', 'legacy-full', 'complete-pre-cache', 'complete-20261105']:
             with self.subTest(state=state):
-                shutil.rmtree(self.root)
-                shutil.copytree(self.base, self.root)
-                if state.startswith('legacy'):
-                    for p in sorted((B / 'patches/required').glob('*.patch')):
-                        patch(self.root, p)
-                    if state == 'legacy-full':
-                        for p in sorted((B / 'patches/optional').glob('010*.patch')):
-                            patch(self.root, p)
-                else:
-                    h = B / 'patches/history/20261105'
-                    patch(self.root, h / '0001-wien2k24-complete-stress.patch')
-                    if state == 'complete-pre-cache':
-                        patch(self.root, h / '0004-upgrade-complete-to-operator-cache.patch', True)
+                self.historical_tree(state)
                 self.run_tool('--apply')
                 self.assert_current()
 
@@ -193,13 +203,15 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(before, snapshot(self.root))
 
     def test_11_all_reviewable_cumulative_patches(self):
-        for p in sorted((B / 'patches/current').glob('*.patch')):
-            with self.subTest(patch=p.name):
-                # Recover the advertised baseline from the target, then replay.
-                self.run_tool('--apply')
-                patch(self.root, p, True)
-                patch(self.root, p)
-                self.assert_current()
+        for state in ('pristine', 'legacy-required', 'legacy-full', 'complete-pre-cache', 'complete-20261105'):
+            with self.subTest(state=state):
+                self.historical_tree(state)
+                (upgrade,) = (B / 'patches/current').glob('*-' + state + '-to-current.patch')
+                patch(self.root, upgrade)
+                for name, record in REG['sources'].items():
+                    if not record['optional']:
+                        self.assertEqual(installer.sha((self.root / name).read_bytes()),
+                                         record['target_sha256'], name)
 
     def test_12_failed_install_rolls_back(self):
         plan = installer.prepare(self.root, REG)
@@ -233,6 +245,69 @@ class BundleTests(unittest.TestCase):
                             '--apply', str(self.root)], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assert_current()
+
+    def test_15_final_driver_and_worker_preflight(self):
+        destination = self.root.parent / 'workers'
+        flags = ('--with-run-lapw', '--install-response-workers', str(destination))
+        before = snapshot(self.root)
+        self.run_tool('--check', '--install', '--install-helpers', str(destination), *flags)
+        self.assertEqual(snapshot(self.root), before)
+        self.assertFalse(destination.exists())
+        script = self.root / 'SRC/run_lapw'
+        mode = script.stat().st_mode
+        (self.root / 'run_lapw').symlink_to('SRC/run_lapw')
+        self.run_tool('--apply', '--with-run-lapw')
+        self.assertTrue((self.root / 'run_lapw').is_symlink())
+        self.assertEqual(script.stat().st_mode, mode)
+        self.assertEqual(installer.sha(script.read_bytes()), REG['run_lapw'][0]['target_sha256'])
+        after = snapshot(self.root)
+        self.run_tool('--verify', *flags)
+        self.run_tool('--apply', '--with-run-lapw')
+        self.assertEqual(snapshot(self.root), after)
+        self.assertFalse(destination.exists())
+
+    def test_16_unknown_driver_or_worker_refused_before_apply(self):
+        for name in ('run_lapw', 'SRC_lcore/resld.f'):
+            with self.subTest(name=name):
+                self.historical_tree('pristine')
+                file = self.root / name
+                file.write_bytes((file.read_bytes() if file.exists() else b'') + b'# site change')
+                before = snapshot(self.root)
+                self.run_tool('--apply', '--with-run-lapw', '--install-response-workers',
+                              str(self.root.parent / 'workers'), good=False)
+                self.assertEqual(snapshot(self.root), before)
+
+    def test_17_failed_worker_build_preserves_binaries(self):
+        self.run_tool('--apply')
+        destination = self.root.parent / 'workers'
+        destination.mkdir()
+        (destination / 'lcore_response').write_bytes(b'previous build')
+        (self.root / 'SRC_Globals').mkdir()
+        before = snapshot(self.root)
+        recipe = REG['response_workers']
+        exports = installer.prepare_worker_sources(self.root, recipe, [])
+        # Fail at the third target, after two new products have been built.
+        def make(args, check):
+            component = Path(args[args.index('-C') + 1])
+            name = {'seq': 'lapw0', 'lcore': 'lcore'}.get(args[-1])
+            if name is None:
+                raise subprocess.CalledProcessError(1, args)
+            path = component / name
+            path.write_bytes(b'test executable')
+            path.chmod(0o755)
+        with mock.patch.object(installer.subprocess, 'run', side_effect=make):
+            with self.assertRaises(subprocess.CalledProcessError):
+                installer.install_workers(self.root, destination, exports)
+        self.assertEqual(list(destination.iterdir()), [destination / 'lcore_response'])
+        self.assertEqual((destination / 'lcore_response').read_bytes(), b'previous build')
+        self.assertEqual(snapshot(self.root), before)
+
+    def test_18_mpi_lapw0_is_opt_in(self):
+        for enabled in (False, True):
+            with mock.patch.object(installer.subprocess, 'run') as run:
+                installer.build(self.root, False, enabled)
+                targets = [call.args[0][-1] for call in run.call_args_list]
+                self.assertEqual(targets.count('para'), int(enabled))
 
 
 if __name__ == '__main__':

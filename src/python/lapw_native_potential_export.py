@@ -8,6 +8,7 @@ No material names, temporary paths, or external Python scripts are required.
 
 from pathlib import Path
 import re
+from lapw_xc_response import PBE_PARAMETERS
 from lapw_lattice import NativeLattice, native_structure
 import numpy as np
 from wstruct import Struct
@@ -32,9 +33,9 @@ def prepare_native_potential_core(directory, case, output):
     density = Density(folder / (case + ".clmsum"), folder / (case + ".struct"))
     in0 = (folder / (case + ".in0")).read_text().splitlines()
     token = in0[0].split()[1].upper()
-    functional = {"XC_LDA": "LDA", "XC_PBE": "PBE"}.get(token)
+    functional = {"XC_LDA": "LDA", "XC_PBE": "PBE", "XC_PBESOL": "PBESOL"}.get(token)
     if functional is None:
-        raise NotImplementedError("explicit XC_LDA or XC_PBE required")
+        raise NotImplementedError("explicit XC_LDA, XC_PBE or XC_PBESOL required")
     ncon = re.search(r"\bNCON\s+(\d+)", in0[2].upper())
     ncon = int(ncon[1]) if ncon else 9
     with (folder / "xc_native.bin").open("rb") as f:
@@ -76,7 +77,7 @@ def prepare_native_potential_core(directory, case, output):
                 angular=_read(f, "f8", nl * ng).reshape(ng, nl),
                 weights=_read(f, "f8", ng),
             )
-            if functional == "PBE":
+            if functional in PBE_PARAMETERS:
                 entry.update(
                     sine=_read(f, "f8", ng),
                     cosine=_read(f, "f8", ng),

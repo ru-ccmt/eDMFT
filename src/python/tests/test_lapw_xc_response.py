@@ -49,7 +49,7 @@ def test_pbe_uniform_density_limit():
     np.testing.assert_allclose(pbe, lda, rtol=4e-16, atol=4e-14)
 
 
-@cases("LDA", "PBE")
+@cases("LDA", "PBE", "PBESOL")
 def test_local_jacobian_finite_difference(functional):
     x = np.array(
         [[0.2, 0.3, -0.1, 0.12], [0.001, 0.01, 0.003, -0.001], [1e-5, 0.03, 0.05, 0.01]]
@@ -69,8 +69,19 @@ def test_local_jacobian_finite_difference(functional):
     )
 
 
+def test_pbesol_native_energy_and_potential():
+    # WIEN2k PBEX/PBEC at rho_up=rho_dn=0.085 with total gradient norm
+    # 0.21, Laplacian 0.035, grad(rho).grad(|grad rho|)=0.001. Values in Ry.
+    args = (0.17, 0.21, 0.035, 0.001)
+    values = [unpolarized_xc(*args, functional="PBESOL", charge_cut=1e-9,
+                             quantity=quantity)
+              for quantity in ("energy_per_electron", "potential")]
+    np.testing.assert_allclose(values, [-0.9312395335681731, -1.2293029928232553],
+                               rtol=1e-13, atol=1e-14)
+
+
 def test_zero_density_and_functional_guard():
-    for f in ["LDA", "PBE"]:
+    for f in ["LDA", "PBE", "PBESOL"]:
         assert unpolarized_xc(0, 0, 0, 0, functional=f, charge_cut=1e-8) == 0
     with unittest.TestCase().assertRaises(NotImplementedError):
         unpolarized_xc(1, 0, 0, 0, functional="SCAN", charge_cut=1e-8)
@@ -139,7 +150,7 @@ def mt(functional, center=None):
     )
 
 
-@cases("LDA", "PBE")
+@cases("LDA", "PBE", "PBESOL")
 def test_mt_response_and_transpose(functional):
     op, c = mt(functional)
     d = c * np.array([0.2, -0.3])
@@ -179,7 +190,7 @@ def ir(functional, center=None, rho_min=(2e-8, 1e-9)):
     )
 
 
-@cases("LDA", "PBE")
+@cases("LDA", "PBE", "PBESOL")
 def test_ir_response_and_transpose(functional):
     op, c = ir(functional)
     d = np.array([0.01, -0.02, 0.005, 0.002], complex)

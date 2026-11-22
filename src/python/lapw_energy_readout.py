@@ -28,7 +28,7 @@ def band_energy_gradient(spherical, vector):
         for l, c in cs.items()
     }
     for a, l, k, op in spherical.spherical:
-        p, m, e, el, _ = op.pullback(hc[k], oc[k])
+        p, m, e, el, _ = op.pullback(hc[k], oc[k], orbit_sum=True)
         gp[a][l] += p
         gm[a][l] += m
         ge[a, l] += np.r_[e, el]

@@ -12,7 +12,7 @@ KS eigenvectors and normalized window through the electronic response.
 """
 
 import numpy as np
-from lapw_density_response import checked, herm
+from lapw_density_response import checked, herm, stored_coefficients
 from lapw_complement_response import (
     ComplementMatrixCoordinates,
     ComplementPerturbationCoordinates,
@@ -46,7 +46,7 @@ class NativeInterstitialPotential:
         rotations,
         translations,
         *,
-        complex_values
+        complex_values, share_coefficients=False
     ):
         c, g, rep, rot, tau = map(
             np.asarray, (coefficients, labels, representatives, rotations, translations)
@@ -78,7 +78,7 @@ class NativeInterstitialPotential:
         checked(tau, (len(rot), 3), "native translations", real=True)
         if not isinstance(complex_values, (bool, np.bool_)):
             raise ValueError("complex_values must be explicit")
-        self.c = np.array(c, complex, copy=True)
+        self.c = stored_coefficients(c, c.shape, "interstitial coefficients", share=share_coefficients)
         self.nband = c.shape[1]
         self.nstar = len(rep)
         self.complex_values = bool(complex_values)

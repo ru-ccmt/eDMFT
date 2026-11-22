@@ -292,16 +292,22 @@ def checkSigmas(cixs, sig='sig.inp'):
 
 
 
-def runExternal(widmf, ROOT, MPI, nom, ntail, dmft_exe='dmft', m_ext='',performSplit=True, response_config=None, no_response=False):
+def split_command(root,nom,ntail,extension,tail_tol):
+    cmd = [sys.executable,os.path.join(root,'ssplit.py'),'-t',str(ntail)]
+    if nom is not None:
+        cmd += ['-n',str(nom)]
+    if extension:
+        cmd += ['-l',extension]
+    if tail_tol is not None:
+        cmd += ['--tail-tol',str(tail_tol)]
+    return cmd
+
+def runExternal(widmf, ROOT, MPI, nom, ntail, dmft_exe='dmft', m_ext='',performSplit=True, response_config=None, no_response=False, tail_tol=None):
     "Runs external executable"
     if performSplit:
-        cmd = ROOT+'/ssplit.py -n '+str(nom)+' -t '+str(ntail)
-        if len(m_ext)>0: cmd += ' -l '+m_ext
-        print('..... running:', cmd)
-        if dmft_exe == 'dmft2':
-            subprocess.check_call(cmd, bufsize=1, shell=True)
-        else:
-            subprocess.call(cmd, bufsize=1, shell=True)
+        cmd = split_command(ROOT,nom,ntail,m_ext,tail_tol)
+        print('..... running:', ' '.join(cmd))
+        subprocess.check_call(cmd)
 
     deffile = widmf+m_ext+'.def'
     if dmft_exe == 'dmft2':
@@ -365,8 +371,9 @@ if __name__=='__main__':
     parser.add_option("-b", "--band",     dest="_band",    action="store_true", default=False, help="use case.klist_band instead of case.klist")
     parser.add_option("-g", "--no_group", dest="_no_group",action="store_true", default=False, help="not use symmetry operations nsymop when writing out projector.")
     parser.add_option("-m",               dest="recomputeEF", type="int", default=1, help="Recompute EF in dmft2 step [0|1|2]")
-    parser.add_option("-n", "--nom",      dest="nom",      type="int", default=100, help="Number of matsubara points in log mesh before the tail")
-    parser.add_option("-t", "--tail",     dest="ntail",    type="int", default=30,  help="Number of matsubara points in the tail of the log mesh")
+    parser.add_option("-n", "--nom",      dest="nom",      type="int", default=None, help="Number of matsubara points in log mesh before the tail")
+    parser.add_option("-t", "--tail",     dest="ntail",    default="30", help="Logarithmic tail count or auto")
+    parser.add_option("--tail-tol",type="float",default=None,help="Relative probe tolerance for an automatic Matsubara mesh")
     parser.add_option("-v", "--verbose",  dest="verbose",  action="store_true", default=False, help="print verbose messages to stdout")
     parser.add_option("-l", "--lext",     dest="m_ext",    default='',   help="For magnetic calculation, it can be 'dn'.")
     parser.add_option("-x", "--mixEF",    dest="mixEF",    default=1.0,  help="Chemical potential can be mixed with mixEF<1.0")
@@ -488,7 +495,7 @@ if __name__=='__main__':
 
         if not options.def_only:
             #checkSigmas(cixs)
-            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft')
+            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft',tail_tol=options.tail_tol)
             
     elif args[0] == 'dmft1':
         idmf = '1'
@@ -500,7 +507,7 @@ if __name__=='__main__':
 
         if not options.def_only:
             #checkSigmas(cixs)
-            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft', options.m_ext)
+            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft', options.m_ext,tail_tol=options.tail_tol)
             
     elif args[0] == 'dmft2':
         idmf = '2'
@@ -522,8 +529,8 @@ if __name__=='__main__':
                 down.read()
                 PrepareDefinitionFile_dmft2('2dn', mode, w2k.case, list(down.siginds.keys()), updn, dnup, so, para, w2k.SCRATCH, cmplx, 'dn')
                 PrepareInFile('2dn', mode, w2k.case, updn, 0, 0, options.mixEF, options.WL, Temperature, options.Q_ETOT)
-                subprocess.check_call([sys.executable, os.path.join(dmfe.ROOT,'ssplit.py'), '-n', str(options.nom), '-t', str(options.ntail), '-l', 'dn'])
-            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft2', options.m_ext, response_config=options.response_config, no_response=options.no_response)
+                subprocess.check_call(split_command(dmfe.ROOT,options.nom,options.ntail,'dn',options.tail_tol))
+            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft2', options.m_ext, response_config=options.response_config, no_response=options.no_response,tail_tol=options.tail_tol)
             
     elif args[0] == 'dmftu':
         idmf = 'u'
@@ -539,7 +546,7 @@ if __name__=='__main__':
         PrepareDefinitionFile_dmft1(idmf, mode, w2k.case, cixs, updn, dnup, so, para, w2k.SCRATCH, cmplx, k_band)
         PrepareInFile(idmf, mode, w2k.case, updn, nsymop)
         if not options.def_only:
-            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft')
+            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft',tail_tol=options.tail_tol)
         
     elif args[0] == 'mu':
         # See if working on imaginary or real axis
@@ -603,7 +610,7 @@ if __name__=='__main__':
             om0 =[]
             sig0=[]
             for line in data:
-                dd = list(map(float,line.split()))
+                dd = list(map(float,line.partition('#')[0].split()))
                 om0.append( dd[0] )
                 sig0.append( dd[1:] )
             sig0=array(sig0).transpose()
@@ -623,7 +630,7 @@ if __name__=='__main__':
             osig.close()
 
         if not options.def_only:
-            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft',options.m_ext,False)
+            runExternal('dmft'+idmf, dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft',options.m_ext,False,tail_tol=options.tail_tol)
 
         ####
     elif args[0] == 'dmftgk':
@@ -643,7 +650,7 @@ if __name__=='__main__':
         #### dmftu
         PrepareDefinitionFile_dmft1('u', 'u', w2k.case, cixs, updn, dnup, so, para, w2k.SCRATCH, cmplx, k_band)
         PrepareInFile('u', 'u', w2k.case, updn, nsymop)
-        runExternal('dmftu', dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft')
+        runExternal('dmftu', dmfe.ROOT, dmfe.MPI2, options.nom, options.ntail, 'dmft',tail_tol=options.tail_tol)
         #### prepare sigmas
         prepSigs(inl.om_npts, inl.om_emin, inl.om_emax, dmfe.ROOT, options.m_ext, k_band)
         fsigmas = ' '.join(['sig.inp'+str(c)+options.m_ext+k_band for c in cixs])

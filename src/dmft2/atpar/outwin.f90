@@ -1,4 +1,14 @@
 subroutine outwin(a, b, ap, bp, nodes, val, slo, rel, v, rnot, dh, jri, eh, fl, z, nrad)
+  implicit none
+  integer, intent(in) :: jri,nrad
+  real(8), intent(out) :: a(nrad),b(nrad),ap(nrad),bp(nrad),val,slo
+  integer, intent(out) :: nodes
+  logical, intent(in) :: rel
+  real(8), intent(in) :: v(nrad),rnot,dh,eh,fl,z
+  call outwin_ordered(a,b,ap,bp,nodes,val,slo,rel,v,rnot,dh,jri,eh,fl,z,nrad,5)
+end subroutine outwin
+
+subroutine outwin_ordered(a, b, ap, bp, nodes, val, slo, rel, v, rnot, dh, jri, eh, fl, z, nrad, order)
   ! Integrate the scalar-relativistic radial equations on a logarithmic mesh.
   !
   ! The propagated quantities A and B are r times the large and (unscaled)
@@ -48,7 +58,7 @@ subroutine outwin(a, b, ap, bp, nodes, val, slo, rel, v, rnot, dh, jri, eh, fl, 
   real(dp), parameter :: twice_speed_of_light = 2.0_dp * 137.0359895_dp
   real(dp), parameter :: nonrelativistic_c     = 1.0e10_dp
 
-  integer, intent(in) :: jri, nrad
+  integer, intent(in) :: jri, nrad, order
   logical, intent(in) :: rel
   real(dp), intent(in) :: v(nrad)
   real(dp), intent(in) :: rnot, dh, eh, fl, z
@@ -126,7 +136,7 @@ subroutine outwin(a, b, ap, bp, nodes, val, slo, rel, v, rnot, dh, jri, eh, fl, 
      coupling_x = -dr_di / radius
      coupling_y = -ell_factor * coupling_x * coupling_x / coupling_u + phi
 
-     if (k == 4) then
+     if (k == 4 .or. order == 4) then
         ! A fifth-order multistep formula needs four previous derivatives.
         ! At k=4 only f_1, f_2, and f_3 exist, so start with fourth order.
         step_scale = am4_scale
@@ -178,4 +188,4 @@ subroutine outwin(a, b, ap, bp, nodes, val, slo, rel, v, rnot, dh, jri, eh, fl, 
   val = a(jri) / radial_mesh(jri)
   slo = ap(jri) / radial_mesh(jri)
 
-end subroutine outwin
+end subroutine outwin_ordered

@@ -19,6 +19,7 @@ from wien_response_density import Density
 from lapw_density_response import checked
 from lapw_hartree_periodic import PeriodicHartreeResponse
 from lapw_xc_response import (
+    PBE_PARAMETERS,
     MuffinTinXCResponse,
     InterstitialXCResponse,
     PeriodicXCResponse,
@@ -106,8 +107,8 @@ def _prepare(metadata, arrays):
         raise ValueError("unsupported potential/core state version")
     if m.get("policy") != POLICY:
         raise NotImplementedError("unsupported central response policy")
-    if m.get("functional") not in ("LDA", "PBE"):
-        raise NotImplementedError("only native unpolarized LDA/PBE supported")
+    if m.get("functional") != "LDA" and m.get("functional") not in PBE_PARAMETERS:
+        raise NotImplementedError("only native unpolarized LDA, PBE and PBEsol supported")
     if not isinstance(m.get("inversion"), bool):
         raise ValueError("explicit potential reality flag required")
     if m.get("mode") not in ("NREL", "RELA"):
@@ -141,7 +142,7 @@ def _prepare(metadata, arrays):
     }
     for a in range(nat):
         required.update(f"{name}_{a}" for name in ["angular", "weights", "vsp"])
-        if m["functional"] == "PBE":
+        if m["functional"] in PBE_PARAMETERS:
             required.update(
                 f"{name}_{a}" for name in ["sine", "cosine", "angular_derivatives"]
             )
@@ -217,7 +218,7 @@ def _prepare(metadata, arrays):
         r = np.exp(d.grids[a])
         rho = np.array([d.rad[a, l, mm] for l, mm in lm]).T
         extra = {}
-        if m["functional"] == "PBE":
+        if m["functional"] in PBE_PARAMETERS:
             extra = dict(
                 sine=arrays[f"sine_{a}"],
                 cosine=arrays[f"cosine_{a}"],
@@ -316,7 +317,7 @@ def save_potential_core_state(
 ):
     """Validate, prepare, and atomically save caller-provided native central data.
 
-    angular_data[a] contains angular, weights and (for PBE) sine, cosine,
+    angular_data[a] contains angular, weights and (for a GGA) sine, cosine,
     angular_derivatives, in the exact density harmonic order. core_data[a]
     contains vsp (r*V Ry), shift_Ry and states with energy_Ha, kappa,
     occupation and zero-based match/end indices. An empty state list is an

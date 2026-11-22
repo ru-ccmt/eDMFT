@@ -62,16 +62,16 @@ class StrainFieldTests(unittest.TestCase):
                 pc = save_potential_core_state(Path(tmp) / "state.npz", **aa)
                 # MT is fixed here, so either central MT XC convention gives
                 # zero explicit geometry. Replace only IR by a full PBE fit.
-                if functional == "PBE":
+                if functional in ("PBE", "PBESOL"):
                     pc.xc.ir = InterstitialXCResponse(
                         pc.hartree.reanalysis,
                         np.array(list(d.pw.values())),
                         [pc.structure.a, pc.structure.b, pc.structure.c],
-                        functional="PBE",
+                        functional=functional,
                     )
                 return pc
 
-            for functional in ["LDA", "PBE"]:
+            for functional in ["LDA", "PBE", "PBESOL"]:
                 pc = prepare(0, functional)
                 actual, _ = diagonal_strain_potential(pc, e, transport_rate=0)
                 ends = [

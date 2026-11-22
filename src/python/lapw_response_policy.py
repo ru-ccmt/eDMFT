@@ -66,23 +66,30 @@ def literal_parameters(path):
     return out
 
 
-def detect_policy(directory, case, *, control=None, override=None):
+def detect_policy(directory, case, *, control=None, override=None, electronic_model="dmft", native_soc=False):
     """Detect the second DMFT branch; it does not imply a spin-polarized KS map."""
     directory = Path(directory)
     nonempty = lambda suffix: (directory/(case+suffix)).is_file() and (directory/(case+suffix)).stat().st_size > 0
-    if any(nonempty(s) for s in ('.inso', '.clmup', '.clmdn', '.incup', '.incdn')):
+    if (nonempty('.inso') and not native_soc) or any(nonempty(s) for s in ('.clmup', '.clmdn', '.incup', '.incdn')):
         raise NotImplementedError('response requires no SOC and one unpolarized KS/core potential')
-    magnetic = bool(nonempty('.indmfldn'))
-    _, _, words = control_fields(control or directory/(case+'.indmf2'))
-    mode = int(words[2])
-    if mode not in (0, 1):
-        raise NotImplementedError('response ensemble for gap-search recomputeEF=2 is not defined')
+    if electronic_model not in ('dmft', 'dft'):
+        raise ValueError('unknown electronic response model')
+    magnetic = bool(nonempty('.indmfldn')) if electronic_model == 'dmft' else False
+    if electronic_model == 'dmft':
+        _, _, words = control_fields(control or directory/(case+'.indmf2'))
+        mode = int(words[2])
+        if mode not in (0, 1):
+            raise NotImplementedError('response ensemble for gap-search recomputeEF=2 is not defined')
+    else:
+        if nonempty('.indmfldn'):
+            raise ValueError('DFT response cannot use DMFT magnetic channels')
+        mode = 1
     override = {} if override is None else dict(override)
     if set(override) - {'magnetic', 'ferro', 'fixed_number', 'normalization_enabled'}:
         raise ValueError('unknown physical response policy')
     if any(not isinstance(value, bool) for value in override.values()):
         raise ValueError('physical policy flags must be booleans')
-    params = {} if {'ferro', 'fixed_number'} <= set(override) else literal_parameters(directory/'params.dat')
+    params = {} if electronic_model == 'dft' or {'ferro', 'fixed_number'} <= set(override) else literal_parameters(directory/'params.dat')
     ferro = override.get('ferro', params.get('Ferro', False))
     if not isinstance(ferro, bool):
         raise ValueError('Ferro must be True or False')
@@ -96,6 +103,8 @@ def detect_policy(directory, case, *, control=None, override=None):
         raise ValueError('fixed_number must be a boolean')
     if ferro and not magnetic:
         raise ValueError('Ferro=True requires the second DMFT channel')
+    if electronic_model == 'dft' and (ferro or not fixed):
+        raise ValueError('Mermin DFT response requires a nonmagnetic fixed-N ensemble')
     fields = (directory/(case+'.inm')).read_text().splitlines()[0].split()
     if len(fields) < 3 or fields[2].upper() not in ('YES', 'NO'):
         raise ValueError('explicit INM YES/NO normalization required')

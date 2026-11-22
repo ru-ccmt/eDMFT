@@ -13,7 +13,8 @@ are supported here. QQ density vanishes under the electronic empty-Q checks.
 """
 
 import numpy as np
-from lapw_density_response import checked, herm
+from lapw_density_response import checked, herm, stored_coefficients
+from lapw_response_scratch import StoredMatrix
 from lapw_spherical_potential_response import SphericalPotentialBands
 from lapw_complement_response import (
     ComplementMatrixCoordinates,
@@ -85,7 +86,7 @@ class CompactSphericalPotentialBands(SphericalPotentialBands):
         self.input_size = offset
         covered = set()
         for a, l, k, op in self.spherical:
-            if not 0 <= k < nk or op.triangle.shape != (nr + matrix.shapes[k][0], nr):
+            if not 0 <= k < nk or op.band_shape != (nr + matrix.shapes[k][0], nr):
                 raise ValueError("inconsistent compact spherical layout")
             if not np.array_equal(op.phi, contexts[a][l].primitive):
                 raise ValueError("inconsistent spherical radial context")
@@ -138,7 +139,7 @@ class CompactSphericalPotentialBands(SphericalPotentialBands):
         oq = [np.zeros_like(q) for q in hq]
         raw = np.zeros(c.raw_shape, complex)
         for a, l, k, op in self.spherical:
-            dh, do = op.action(*t[a][l])
+            dh, do = op.action(*t[a][l], orbit_sum=True)
             h[k] += dh[:nr]
             hq[k] += dh[nr:]
             o[k] += do[:nr]
@@ -168,7 +169,7 @@ class CompactSphericalPotentialBands(SphericalPotentialBands):
             for a, cs in self.contexts.items()
         }
         for a, l, k, op in self.spherical:
-            p, m, *_ = op.pullback(hc[k], oc[k])
+            p, m, *_ = op.pullback(hc[k], oc[k], orbit_sum=True)
             gp[a][l] += p
             gm[a][l] += m
         for a, op, ks in self.nonspherical:
@@ -218,7 +219,7 @@ class CompactSpatialValenceDensity:
     """
 
     def __init__(
-        self, retained_spatial, complement_sizes, mt_complement, ir_complement
+        self, retained_spatial, complement_sizes, mt_complement, ir_complement, *, share_coefficients=False
     ):
         self.retained = retained_spatial
         self.template = retained_spatial.template
@@ -238,27 +239,22 @@ class CompactSpatialValenceDensity:
                 raise ValueError("missing complement site entries")
             self.mt[a] = []
             for q, (k, z, w) in zip(qs, atom.entries):
-                v = np.array(
-                    checked(
-                        q,
-                        (len(z), self.coordinates.shapes[k][0]),
-                        "MT complement matching",
-                    ),
-                    complex,
+                if isinstance(q, StoredMatrix):
+                    if q.shape != (len(z), self.coordinates.shapes[k][0]) or q.dtype != np.complex128:
+                        raise ValueError("stored MT complement matching dimensions disagree")
+                    self.mt[a].append(q)
+                    continue
+                v = stored_coefficients(
+                    q, (len(z), self.coordinates.shapes[k][0]), "MT complement matching",
+                    share=share_coefficients,
                 )
-                v.setflags(write=False)
                 self.mt[a].append(v)
         self.ir = []
         for k, (q, op) in enumerate(zip(ir_complement, retained_spatial.interstitial)):
-            v = np.array(
-                checked(
-                    q,
-                    (len(op.c), self.coordinates.shapes[k][0]),
-                    "IR complement coefficients",
-                ),
-                complex,
+            v = stored_coefficients(
+                q, (len(op.c), self.coordinates.shapes[k][0]), "IR complement coefficients",
+                share=share_coefficients,
             )
-            v.setflags(write=False)
             self.ir.append(v)
         self.operator = PairedOperator(
             self.coordinates.size,
@@ -277,6 +273,8 @@ class CompactSpatialValenceDensity:
         for a, atom in self.retained.atoms.items():
             dd = np.zeros((atom.kernel.layout.size,) * 2, complex)
             for (k, z, w), q in zip(atom.entries, self.mt[a]):
+                if isinstance(q, StoredMatrix):
+                    q = q.read()
                 cross = (q @ qr[k]) @ z.conj().T
                 dd += w * ((z @ rr[k]) @ z.conj().T + cross + cross.conj().T)
             radial[a] = atom.kernel.component_action(herm(dd))
@@ -298,6 +296,8 @@ class CompactSpatialValenceDensity:
             ym = np.array([y.rad[(a, *h)] for h in atom.kernel.layout.harmonics])
             bar, _ = atom.kernel.component_pullback(ym, include_radial=False)
             for (k, z, w), q in zip(atom.entries, self.mt[a]):
+                if isinstance(q, StoredMatrix):
+                    q = q.read()
                 bz = bar @ z
                 rr[k] += w * herm(z.conj().T @ bz)
                 # coordinates.pack supplies the QR+RQ pairing, so no factor 2 here.

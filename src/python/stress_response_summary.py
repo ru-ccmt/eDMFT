@@ -57,15 +57,19 @@ def progress(path, message):
 @best_effort
 def begin(case, status, *, directory=".", reconstructed=False):
     """Start the latest-run view. Completed runs also keep an archived copy."""
+    mode = status.get("requested_mode")
+    ordinary = mode == "FOR"
+    title = "EXPLICIT SOC FORCE" if ordinary else "SCREENED RESPONSE"
     text = (
-        f"DFT+eDMFT STRESS RESPONSE -- {case}\n"
+        f"DFT+eDMFT {title} -- {case}\n"
         + "=" * 78 + "\n"
         + f"Run ID: {_run_id(status)}\n"
         + f"Summary created: {_time()}\n"
         + f"Execution: {status.get('phase', 'unknown')}; IN2 mode: "
           f"{status.get('requested_mode', 'unknown')}\n"
         + "Workflow: dmft2 -> isolated response -> lcore -> SCF assembly -> mixer\n"
-        + "run_dmft: response is deferred until the final measurement pass.\n"
+        + ("The explicit SOC force is evaluated on each requested FOR pass.\n" if ordinary else
+           "run_dmft: screened response is deferred until the final measurement pass.\n")
         + "Stress convention: tensile positive; compression pressure = -trace/3.\n"
         + "The native :PRESSURE: line currently prints trace/3 (mean tensile stress).\n"
         + "This file is informational; status/report JSON controls publication.\n\n"
@@ -237,24 +241,58 @@ def finish(case, status, *, directory="."):
         report = json.loads(Path(status["report"]).read_text())
         if "stress_Ry_Bohr3" in report:
             _append(path, _report_text(report))
+        elif report.get("symmetry_fixed"):
+            _append(path, "All selected atomic forces vanish by site symmetry.\n")
+        elif report.get("application") == "add_soc_operator":
+            _append(path, "Explicit SOC operator differentiated at frozen radial shape.\n")
+        elif status.get("backend") == "native_soc_forward":
+            _append(path, "Native spinor charge response converged for the selected displacements.\n")
+        elif status.get("force_ready"):
+            _append(path, "Shared charge adjoint converged; stress directions were skipped for FORT.\n")
         else:
             _append(path, "Legacy response backend: no complete stress tensor supplied.\n")
+        if status.get("force_ready"):
+            force = json.loads(Path(status["force_report"]).read_text())
+            method = force.get("source_method", "displaced")
+            source_text = (f"Atomic source step sizes (Bohr): {force['steps_Bohr']}" if method == "displaced"
+                           else f"Atomic source method: {method}")
+            selected = set(force.get("selected_atoms", range(1, len(force["force_mRy_Bohr"]) + 1)))
+            title = ("EXPLICIT SOC FORCE ADDITIONS" if force.get("application") == "add_soc_operator"
+                     else "SCREENED ATOMIC FORCES")
+            _append(path, f"\n{title} (mRy/Bohr, Cartesian)\n" +
+                    "-" * 78 + "\n" +
+                    "".join(f"Atom {i:3d}: " + " ".join(f"{v:15.9f}" for v in row) + "\n"
+                            for i, row in enumerate(force["force_mRy_Bohr"], 1) if i in selected) +
+                    "Scope: " + force["scope"] + "\n" +
+                    source_text + "\n" +
+                    "Force report: " + status["force_report"] + "\n")
         if status.get("workspace"):
             work = Path(status["workspace"])
             prep = work / "central/preparation.json"
+            if not prep.is_file():
+                prep = work / "preparation.json"
             if prep.is_file():
-                times = json.loads(prep.read_text()).get("timings", [])
+                preparation = json.loads(prep.read_text())
+                times = preparation.get("timings", [])
+                if "soc_lo_matching" in preparation:
+                    _append(path, f"LAPWSO local-orbital matching: {preparation['soc_lo_matching']}\n")
                 _append(path, "\nIsolated native preparation (before response driver):\n" +
                         "".join(f"  {r['program']:30s}{r['seconds']:12.3f} s\n" for r in times))
             _append(path, "\nDETAILED RECORDS\n" +
                     f"Workspace: {work}\nReport: {status['report']}\n" +
-                    f"Progress log: {work/'response.log'}\nNative preparation log: {work/'prepare.log'}\n" +
                     f"Input/executable hashes: {work/'reference.json'}\n" +
-                    f"Saved inputs: {work/'reference'}\nNative exports: {work/'central'}\n")
+                    f"Saved inputs: {work/'reference'}\n")
+            if status.get("backend") == "native_soc_forward":
+                _append(path, f"Native charge and energy by pass: {work/'soc_forward/native_passes.jsonl'}\n")
+            else:
+                _append(path, f"Progress log: {work/'response.log'}\nNative preparation log: {work/'prepare.log'}\n")
+                if (work / "central").is_dir():
+                    _append(path, f"Native exports: {work/'central'}\n")
+                elif prep.is_file():
+                    _append(path, f"Native preparation record: {prep}\n")
         _append(path, f"Status/SCF publication record: {Path(directory).resolve()/(case+'.stress_response.status.json')}\n")
-        if not status.get("stress_applied"):
-            progress(path, "NEXT: lcore and SCF assembly. Original stress and net correction "
-                     "will be recorded here after successful assembly.")
+        if not status.get("stress_applied") and not status.get("force_applied"):
+            progress(path, "NEXT: lcore and SCF assembly will publish the requested response.")
         else:
             progress(path, "Status JSON records successful SCF publication; see comparison below.")
     _archive(case, status, directory)

@@ -15,6 +15,8 @@ Thermal Q occupations are neglected only after explicit occupation AND slope
 bounds pass. This module supplies a reusable analytic response component; it
 does not change production dmft2 or assemble a screened stress tensor.
 """
+from __future__ import annotations
+
 
 from dataclasses import dataclass
 import time
@@ -78,7 +80,9 @@ class ShiftedComplement:
         self.nq, self.nr = len(h), len(e)
         reduced, self.rotation = hessenberg(self.h, calc_q=True, check_finite=False)
         d = np.diag(reduced).real.copy()
+        self._band_diagonal = d
         b = np.diag(reduced, -1).copy()
+        self._band_lower = b
         tri = np.diag(d).astype(complex) + np.diag(b, -1) + np.diag(b.conj(), 1)
         self.reduction_error = float(
             np.linalg.norm(reduced - tri) / max(1.0, np.linalg.norm(h))
@@ -138,22 +142,45 @@ class ShiftedComplement:
         for array in (self.h, self.energies, self.rotation, self.diagonal, self.lower, self.active_columns):
             array.setflags(write=False)
 
+    def use_tridiagonal_basis(self, basis):
+        """Rotate the empty basis once, before assembling matching and density.
+
+        U is the unitary from H_Q = U T U†. In the basis Q U the Hamiltonian
+        is already tridiagonal, and every later RHS uses that same gauge.
+        The empty subspace and its resolution are unchanged. Drop the two
+        dense Nq by Nq matrices once their information has been transferred.
+        """
+        if self.rotation is None:
+            raise ValueError("complement basis is already tridiagonal")
+        rotated = basis @ self.rotation
+        self.rotation = None
+        self.h = None
+        return rotated
+
     def action(self, rhs):
         """Return T with H_Q T-T eps_R=-rhs; also the real-Frobenius transpose."""
         rhs = checked(rhs, (self.nq, self.nr), "complement right-hand side")
-        x = -(self.rotation.conj().T @ (rhs * self.active_columns))
+        x = -(rhs * self.active_columns).astype(complex, copy=False)
+        if self.rotation is not None:
+            x = self.rotation.conj().T @ x
         for i in range(1, self.nq):
             x[i] -= self.lower[i - 1] * x[i - 1]
         x /= self.diagonal
         for i in range(self.nq - 2, -1, -1):
             x[i] -= self.lower[i].conj() * x[i + 1]
-        return self.rotation @ x
+        return x if self.rotation is None else self.rotation @ x
 
     def residual(self, tangent, rhs):
         checked(tangent, (self.nq, self.nr), "complement tangent")
         checked(rhs, (self.nq, self.nr), "complement right-hand side")
+        if self.h is None:
+            applied = np.multiply(self._band_diagonal[:, None], tangent, dtype=complex)
+            applied[1:] += self._band_lower[:, None] * tangent[:-1]
+            applied[:-1] += self._band_lower.conj()[:, None] * tangent[1:]
+        else:
+            applied = self.h @ tangent
         return float(
-            np.linalg.norm((self.h @ tangent - tangent * self.energies + rhs) * self.active_columns)
+            np.linalg.norm((applied - tangent * self.energies + rhs) * self.active_columns)
             / max(np.linalg.norm(rhs * self.active_columns), np.finfo(float).tiny)
         )
 
@@ -170,7 +197,8 @@ class ShiftedComplement:
             reduction_relative_error=self.reduction_error,
             preparation_seconds=self.preparation_seconds,
             stored_bytes=sum(
-                a.nbytes for a in (self.h, self.rotation, self.diagonal, self.lower)
+                a.nbytes for a in (self.h, self.rotation, self.diagonal, self.lower,
+                                    self._band_diagonal, self._band_lower) if a is not None
             ),
         )
 
@@ -189,6 +217,7 @@ class LAPWComplementBasis:
     complement: np.ndarray
     solver: ShiftedComplement
     checks: dict
+    coefficients: np.ndarray | None = None
 
     @classmethod
     def prepare(
@@ -201,6 +230,7 @@ class LAPWComplementBasis:
         mu,
         temperature,
         eigen_tolerance=1e-8,
+        tridiagonal_basis=False,
         **controls
     ):
         h, o, c, e = map(np.asarray, (hamiltonian, overlap, retained, energies))
@@ -239,14 +269,17 @@ class LAPWComplementBasis:
         solver = ShiftedComplement(
             herm(q.conj().T @ h @ q), e, mu=mu, temperature=temperature, **controls
         )
-        c = np.array(c, complex, copy=True)
-        c.setflags(write=False)
-        q.setflags(write=False)
+        if tridiagonal_basis:
+            q = solver.use_tridiagonal_basis(q)
+        # Every geometry source projects into these same mixed coordinates.
+        # Keep one buffer and expose its two blocks as immutable views.
+        mixed = np.column_stack((c, q)).astype(complex, copy=False)
+        mixed.setflags(write=False)
+        count = c.shape[1]
         return cls(
-            c,
-            q,
-            solver,
+            mixed[:, :count], mixed[:, count:], solver,
             dict(orthonormality_error=gram_error, eigenpair_relative_error=eigen_error),
+            coefficients=mixed,
         )
 
     def project_matrix(self, matrix):

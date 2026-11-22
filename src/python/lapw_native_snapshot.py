@@ -21,6 +21,22 @@ class BasisMatrix:
     matrix: np.ndarray
 
 
+def vector_k_from_matrix_header(k, structure):
+    """Convert the EDMFTOV1/HV1 k header to the coordinates of its G labels.
+
+    The matrix dump records LAPW1's internal K3. TAPEWF writes the same
+    G labels but transforms K3 for a centered monoclinic CXZ cell. DMFT2
+    constructs k+G from that vector header. Apply exactly TAPEWF's mapping
+    and LATGEN's angular tolerance when reconstructing the basis or projector.
+    The version-1 export is already in widespread use.
+    """
+    if (structure.lattyp.strip() == "CXZ"
+            and abs(np.deg2rad(structure.gamma - 90.0)) >= 1.e-4):
+        x, y, z = k
+        return np.array([x + z, y, z - x])
+    return np.asarray(k).copy()
+
+
 def read_basis_matrix(path, magic):
     """Read EDMFTHV1/EDMFTOV1; reject incomplete, unsupported or nonfinite data."""
     if magic not in (b"EDMFTHV1", b"EDMFTOV1"):

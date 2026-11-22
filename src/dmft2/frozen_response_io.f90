@@ -130,3 +130,36 @@ SUBROUTINE ExportFrozenResponseK(prefix,ikp,n0,iso,nmat,nume,nstored, &
   write(fh)k3(:,1:n0-nnlo),k3lo
   close(fh)
 END SUBROUTINE ExportFrozenResponseK
+
+! Preserve the spin and orbital frame used to construct the central U.
+subroutine ExportSpinorResponseFrame(prefix,rspin,cfx,m,n)
+  use com_mpi, only: myrank,master
+  use iso_fortran_env, only: int32,real64
+  implicit none
+  character(*),intent(in) :: prefix
+  integer,intent(in) :: m,n
+  complex(real64),intent(in) :: rspin(2,2,n),cfx(m,m,n,n)
+  integer :: unit
+  if(myrank/=master) return
+  open(newunit=unit,file=trim(prefix)//'.spin',status='replace',access='stream',form='unformatted')
+  write(unit) 'RSPIN001',int([m,n],int32),rspin,cfx
+  close(unit)
+end subroutine
+
+! Direct ordinary SOC forces require only these already-summed quantities.
+! Orbitals below the fixed DMFT window are filled with the supplied 2*w_k.
+! The consumer checks all band indices against the central projector record.
+subroutine ExportSOCForceReadout(prefix,ik,first,lo,hi,n,m,norb,w,rho,c)
+  use iso_fortran_env, only: int32, real64
+  implicit none
+  character(*),intent(in) :: prefix
+  integer,intent(in) :: ik,first,lo,hi,n,m,norb
+  real(real64),intent(in) :: w
+  complex(real64),intent(in) :: rho(n,n),c(n,m,norb)
+  character(2048) :: path
+  integer :: unit
+  write(path,'(A,A,I8.8,A)') trim(prefix),'.operator.k',ik,'.bin'
+  open(newunit=unit,file=trim(path),status='replace',access='stream',form='unformatted')
+  write(unit) 'SOCFOR01',int([ik,first,lo,hi,n,m,norb],int32),w,rho,c
+  close(unit)
+end subroutine

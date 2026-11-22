@@ -53,7 +53,7 @@ class EnergyScreeningTests(unittest.TestCase):
         state = NS(
             chain=chain,
             jacobian=operator(F @ K),
-            valence=None,
+            valence=NS(model=NS(electronic_model="dmft")),
             potential_core=NS(hartree=NS(keys=[(0, 0, 0)], slices=[slice(0, m)])),
         )
         obs = NS(charge_gradient=c0, lattice=NS(joint_gradient=g))

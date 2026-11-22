@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # @Copyright 2007 Kristjan Haule
 import sys, subprocess
+import shlex, tempfile
+from pathlib import Path
 import re, os, glob, shutil, socket, time
 from os.path import getsize
 from scipy import *
@@ -62,6 +64,154 @@ def CheckError(step):
         return True
     else:
         return False
+
+def spinor_scf(up_file, down_file):
+    """Trace the charge and vector observables written by nonmagnetic LAPW2."""
+    # Ordinal atom labels and field widths are part of the WIEN SCF interface.
+    # Band energies, entropy and occupations refer to a *single* common SOC
+    # spectrum. Keep those records once. Match local quantities by atom tag.
+    rows = up_file.read_text().splitlines(keepends=True)
+    local_tag = re.compile(r'^:(CHA(?:\d{3}|  )|QTL\d{3}|EP[LH]\d{3}|VZZ\d{3}|F(?:VA|SU)\d{3}|STR_VAL\d{3}):')
+    down = {}
+    for line in down_file.read_text().splitlines(keepends=True):
+        tag = local_tag.match(line)
+        if tag:
+            if tag[1] in down:
+                raise ValueError(f'Duplicate LAPW2 record {tag[1]} in {down_file}')
+            down[tag[1]] = line
+    if 'CHA  ' not in down:
+        raise ValueError(f'Missing total valence charge in {down_file}')
+    for i, line in enumerate(rows):
+        match = local_tag.match(line)
+        if not match:
+            continue
+        key = match[1]
+        other = down.pop(key)
+        if line == other:
+            continue
+        prefix = match[0]
+        if key.startswith('CHA') or (key.startswith('VZZ') and '=' in line):
+            # The first '=' precedes the charge. Preserve RMT and atom labels.
+            left, field = line.split('=', 1)
+            a = re.match(r'(\s*[-+\d.]+)(.*)', field.rstrip('\n'))
+            b = float(other.split('=', 1)[1].split()[0])
+            v = (float(a[1]) + b) / 2
+            prec = len(a[1].split('.')[1])
+            rows[i] = f'{left}={v:{len(a[1])}.{prec}f}{a[2]}\n'
+            continue
+        fields = line[len(prefix):].split()
+        fields_dn = other[len(prefix):].split()
+        if key.startswith(('FVA', 'FSU')):
+            if fields[0] != fields_dn[0]:
+                raise ValueError(f'Inconsistent LAPW2 atom labels for {key}')
+            force = (numpy.array(fields[2:], float) + numpy.array(fields_dn[2:], float)) / 2
+            # Average the Cartesian components first: |(Fu+Fd)/2| can be zero
+            # even if both one-component force magnitudes are large.
+            rows[i] = prefix + f'{fields[0]:>9}' + ''.join(
+                f'{v:20.12f}' for v in (numpy.linalg.norm(force), *force)) + '\n'
+            continue
+        a, b = numpy.array(fields, float), numpy.array(fields_dn, float)
+        avg = (a + b) / 2
+        if key.startswith(('EPL', 'EPH')):
+            # LAPW1 can use the partial-charge energy centers. Combine their
+            # first moments, then divide by the combined partial charge.
+            q = a[::2] + b[::2]
+            e = numpy.divide(a[::2]*a[1::2] + b[::2]*b[1::2], q,
+                             out=avg[1::2].copy(), where=q != 0)
+            body = '  '.join(f'{w:8.4f}{v:8.4f}' for w, v in zip(q/2, e))
+        elif key.startswith('QTL'):
+            body = ''.join(f'{v:7.4f}' for v in avg)
+        elif key.startswith('VZZ'):
+            body = ' '*8 + ''.join(f'{v:12.5f}' for v in avg[:-1]) + f'{avg[-1]:12.3f}'
+        else:  # STR_VAL: Cartesian components of one tensor row
+            body = '  ' + ''.join(f'{v:20.12f}' for v in avg)
+        rows[i] = prefix + body + '\n'
+    if down:
+        raise ValueError(f'Unpaired lower-spinor SCF records: {sorted(down)}')
+    return ''.join(rows)
+
+
+def stage_soc_in1(in1, merged_scf, work):
+    """Stage the WIEN2k global linearization-energy update for the next mixer.
+
+    The two direct lapw2c calls bypass the postprocessing in x lapw2.
+    Both spinors share one Fermi level. Use that level once, after the spin
+    trace, and leave every radial, cutoff and band-selection record intact.
+    """
+    header, newline, basis = in1.read_bytes().partition(b'\n')
+    if not newline:
+        raise ValueError(f'Incomplete LAPW1 input in {in1}')
+    # Older WIEN inputs may omit EF entirely. LAPW1 then uses 0.5 Ry.
+    field = re.search(rb'\bEF\s*=\s*([^\s,]+)', header)
+    old = float(field[1].replace(b'D', b'E').replace(b'd', b'e')) if field else 0.5
+    records = [row for row in merged_scf.read_text().splitlines() if row.startswith(':FER  :')]
+    if len(records) != 1 or '=' not in records[0]:
+        raise ValueError(f'Expected one common :FER record in {merged_scf}')
+    raw = records[0].split('=', 1)[1].split()[0]
+    # Keep the x lapw2 fallback for a native output field full of asterisks.
+    ef = 1.5 if raw == '**************' else float(raw.replace('D', 'E').replace('d', 'e'))
+    if not numpy.isfinite([old, ef]).all():
+        raise ValueError(f'Non-finite linearization reference in {in1} or {merged_scf}')
+
+    # Normal x lapw2 step: mix two thirds of the change, bounded by 0.6 Ry.
+    # MIXER reads the three numbers in order: proposed, previous, raw EF.
+    mixed = old + numpy.clip((ef - old) * (2.0 / 3.0), -0.6, 0.6)
+    values = f'  EF={mixed:.13f} Old {old:.13f} {ef:.13f}'.encode('ascii')
+    updated = work / in1.name
+    updated.write_bytes(header[:5] + values + b'  (WFFIL, WFPRI, ENFIL, SUPWF)\n' + basis)
+    shutil.copymode(in1, updated)
+    return updated
+
+
+def complex_soc_lapw2(case, wienroot, dmftroot, fday):
+    """Use both components of the same nonmagnetic, complex SOC eigensystem."""
+    # In a complex cell the two spinor components at a representative k
+    # need not have the same spatial density or force. LAPW2 takes one vector
+    # file per invocation. Its nonmagnetic convention gives each pass the
+    # full scalar degeneracy, hence the spin trace is the arithmetic mean.
+    # Both passes must keep the *same* occupation, scalar potential, and
+    # nonmagnetic normso convention (selecting -dn changes those inputs).
+    Step(shlex.join([str(Path(wienroot)/'x'), 'lapw2', '-d', '-c', '-so', '-f', case]), fday)
+    lines = Path('lapw2.def').read_text().splitlines(keepends=True)
+    with tempfile.TemporaryDirectory(prefix='soc2_', dir='.') as stage:
+        work = Path(stage)
+        scf_files = []
+        for suffix in ('', 'dn'):
+            scf_file = work / (case + '.scf2' + suffix)
+            scf_files.append(scf_file)
+            names = {8: work / (case + '.clmval' + suffix), 21: scf_file}
+            definition = work / ('lapw2' + suffix + '.def')
+            updated = []
+            for line in lines:
+                unit, filename, rest = line.split("'", 2)
+                number = int(unit.strip().rstrip(','))
+                if number in (10, 30):
+                    filename += suffix
+                    if not Path(filename).is_file() or Path(filename).stat().st_size == 0:
+                        raise FileNotFoundError(f'Missing SOC input {filename}')
+                elif number in names:
+                    filename = str(names[number])
+                elif number == 6 and suffix:
+                    filename += suffix  # keep the two detailed LAPW2 logs
+                updated.append(f"{unit}'{filename}'{rest}")
+            definition.write_text(''.join(updated))
+            Step(shlex.join([str(Path(wienroot)/'lapw2c'), str(definition)]), fday)
+            if CheckError(str(definition.with_suffix(''))):
+                raise RuntimeError(f'LAPW2 failed for {definition.stem}')
+        merged = work / 'spin_trace.scf2'
+        merged.write_text(spinor_scf(*scf_files))
+        (work / (case + '.struct')).symlink_to(Path(case + '.struct').resolve())
+        subprocess.run([str(Path(dmftroot)/'combineud'), case], cwd=work, check=True)
+        charge = work / (case + '.clmval_aver')
+        if not charge.stat().st_size:
+            raise RuntimeError('Empty SOC spin-traced valence charge')
+        # Publish only after both native runs and the charge/SCF merges succeed.
+        in1 = Path(case + '.in1c')
+        updated_in1 = stage_soc_in1(in1, merged, work)
+        charge.replace(case + '.clmval')
+        merged.replace(case + '.scf2')
+        updated_in1.replace(in1)
+
 
 def scf(case, wopt, outfile='.scf'):
     def SearchScf(ist,KEY,dat):
@@ -193,9 +343,7 @@ def scf(case, wopt, outfile='.scf'):
             dat += '\n------- '+case+'.scf2'+' --------\n'
             dat += open(case+'.scf2','r').readlines()
             
-    if os.path.exists('Eorb_imp.dat'):
-        dat += '\n---------- Eorb_imp.dat --------------\n'
-        dat += open('Eorb_imp.dat','r').readlines()
+    # Pure DFT must not inherit a stale DMFT impurity energy from a copied case.
         
     scfs = ['1s','2s','c']
     if wopt['updn']: scfs = ['cup','cdn']
@@ -296,10 +444,13 @@ if __name__ == '__main__':
         if so:
             Step(rt+'/x_dmft.py lapwso', fday)
             if CheckError('lapwso'): break
-            Step(rw+'/x lapw2'+cc+' -so -f '+case, fday)
+            if cc:
+                complex_soc_lapw2(case, rw, rt, fday)
+            else:
+                Step(rw+'/x lapw2 -so -f '+case, fday)
         else:
             Step(rw+'/x lapw2'+cc+' -f '+case, fday)
-        if CheckError('lapw2'): break
+        if not (so and cc) and CheckError('lapw2'): break
         Step(rw+'/x lcore -f '+case, fday)
         if CheckError('lcore'): break
         
@@ -312,5 +463,14 @@ if __name__ == '__main__':
         scfm(case)
         drho,dene = Diff(case, fday)
         succi = (drho<options.cc and dene<options.ec)
-        if succi: break
+        if succi:
+            # MIXER has just saved the density used by this last LAPW cycle as
+            # case.clmsum_old.  The DFT response helper uses that density in
+            # an isolated snapshot, so its stress is paired with this cycle's
+            # LAPW1 vectors and LAPW2 valence stress.  Never pay for the
+            # screened response during unconverged charge iterations.
+            in2 = case + '.in2' + wopt['cmplx']
+            if open(in2).readline().split()[0].upper() in ('STRT', 'STRFT'):
+                Step(sys.executable+' '+rt+'/dft_stress_step.py --case '+case, fday)
+            break
         

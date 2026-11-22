@@ -140,7 +140,7 @@ class NativePotentialFileLayout:
             raise ValueError("active interstitial potential cutoff differs")
         sphere = np.concatenate([vsp.radial[a, 0, 0] for a in range(len(self.lengths))])
         ns = {
-            a: np.array([vns.radial[a, *lm] for lm in ls]).T
+            a: np.array([vns.radial[(a, *lm)] for lm in ls]).T
             for a, ls in self.harmonics.items()
         }
         ir = np.array([vns.interstitial[g] for g in self.representatives])
@@ -206,7 +206,7 @@ def hydrostatic_mt_transport(radial, log_grids):
     return result
 
 
-def strain_mask_derivative(reanalysis, reciprocal, positions, radii, volume, strain):
+def strain_mask_derivative(reanalysis, reciprocal, positions, radii, volume, strain, *, displacements=None):
     """Analytic derivative of the native fixed-RMT interstitial mask.
 
     A_eta=(I+eta*strain)A; fractional sites and integer G labels are fixed.
@@ -241,11 +241,19 @@ def strain_mask_derivative(reanalysis, reciprocal, positions, radii, volume, str
         where=norm != 0,
     )
     result = np.zeros(reanalysis.shape, complex)
-    for p, r in zip(positions, radii):
+    for site, (p, r) in enumerate(zip(positions, radii)):
         x = norm * r
         f = np.divide(spherical_jn(1, x), x, out=np.full_like(x, 1 / 3), where=x != 0)
         xfprime = spherical_jn(0, x) - 3 * f
         phase = np.exp(2j * np.pi * (labels @ p))
+        if displacements is not None:
+            # The removed sphere in REAN0 carries exp(+i G.R); REAN4
+            # conjugates downstream. Differentiate before taking a real part.
+            derivative = -1j * (g @ displacements[site]) * phase
+            if reanalysis.stars.inversion:
+                derivative = derivative.real
+            result += (4 * np.pi * r**3 / volume) * f * derivative
+            continue
         if reanalysis.stars.inversion:
             phase = phase.real
         result += (

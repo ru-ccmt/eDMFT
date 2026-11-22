@@ -10,7 +10,7 @@ FFLAGS  = $(WFOPT)
 #  Object files 
 #
 # These routines are completely general and decoupled from particular code. Can be reused in other parts of the code
-GEN = cputim.o zeroin.o romb.o splines.o spline.o reallocate.o zinv.o \
+GEN = cputim.o zeroin.o romb.o splines.o adaptive_matsubara.o spline.o reallocate.o zinv.o \
       c3fft.o ifflim.o ffts.o deter.o dvbes1.o gaunt.o \
       fermi.o notri.o errclr.o errflg.o outerr.o \
       sphbes.o ylm.o stern.o sortag.o readselfenergy.o eigsys.o dfrad.o sorttodiag.o inverss.o
@@ -31,7 +31,7 @@ OBJS = $(GEN) $(OBJSMOD)
 all : latpar dmft2 combineud rdVec.so fermif
 
 latpar :
-	cd atpar && ${MAKE} libatpar.a
+	${MAKE} -C atpar libatpar.a response
 
 dmft2 : $(OBJS)
 	$(FORT) $(LDFLAGS) -o dmft2 $(OBJS) $(WLDFLAGS) $(WLIBS) -L./atpar -latpar
@@ -73,3 +73,6 @@ l2main.o: stress_g2_matrices.o
 
 # Module interface for the shared local-orbital/projector strain geometry.
 l2mainSubs.o alm_blm_clm.o: lomain.o
+
+adaptive_matsubara.o: splines.o
+l2main.o cmp_dmft_weights.o: adaptive_matsubara.o

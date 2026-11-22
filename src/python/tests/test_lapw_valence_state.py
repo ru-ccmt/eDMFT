@@ -36,6 +36,19 @@ class ValenceStateTests(unittest.TestCase):
             (path / name).write_bytes(b"policy-test placeholder")
         return {name: path / name for name in names}
 
+    def test_centered_monoclinic_vector_k_header(self):
+        from lapw_native_snapshot import vector_k_from_matrix_header
+
+        k = np.array([.25, .5, .75])
+        monoclinic = SimpleNamespace(lattyp="CXZ", gamma=90.693)
+        # Recorded in Ta2NiSe5M.vector for this EDMFTOV1 header.
+        np.testing.assert_array_equal(vector_k_from_matrix_header(k, monoclinic), [1., .5, .5])
+        for kind, gamma in [("CXZ", 90.0), ("CXZ", 90.001), ("P", 90.693),
+                            ("H", 120.), ("F", 90.), ("R", 120.)]:
+            with self.subTest(kind=kind, gamma=gamma):
+                structure = SimpleNamespace(lattyp=kind, gamma=gamma)
+                np.testing.assert_array_equal(vector_k_from_matrix_header(k, structure), k)
+
     def test_native_matrix_reader_endian_and_length(self):
         from lapw_native_snapshot import read_basis_matrix
 

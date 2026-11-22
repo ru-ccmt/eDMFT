@@ -1,33 +1,43 @@
 # Complete WIEN2k-24 stress and response patch bundle
 
-Updated 9 November 2026. The supported installer now reproduces the **current
-36 audited Fortran sources** in LAPW0, LAPW1, LAPW2, LCORE and MIXER, plus the
-two necessary Makefile object-list additions. All prerequisites of the old
-supplements are included. No full licensed WIEN distribution is included.
-
-This bundle packages existing, tested local source changes. It does not alter
-the physics or rebuild the currently installed executables by itself. The
-Python eDMFT screened-response engine is distributed separately in
-`src/python/`, with native support in `src/dmft2/atpar/`.
+Updated 21 November 2026 for WIEN2k 24.1. The bundle covers the 36 audited
+Fortran sources in LAPW0, LAPW1, LAPW2, LCORE and MIXER, the two Makefile
+object-list additions, the final screened DFT stress hook in `run_lapw`, and
+the sources and build procedure for four WIEN response executables. Two FFTW
+interface changes for 3ddens and HF are available separately.
 
 ## Install or upgrade
 
-Use a **complete private WIEN2k-24 source/build tree**. The system installation
-previously inspected on rupc had incomplete LCORE/MIXER sources. Do not replace
-site compiler/MPI/library settings with the laptop Makefiles.
+Start in this bundle directory. Set `WIENROOT` to a **complete, private and
+configured WIEN2k 24.1 source/build tree**. It must contain the component
+sources, Makefiles and `SRC_Globals`. On RUPC, first run
+`source ~/wmodules.sh` to load the compilers and libraries, then set `WIENROOT`
+explicitly because that module selects the system installation. Set
+`WIEN_DMFT_ROOT` to the directory containing the installed eDMFT programs.
+For example, after installing eDMFT in `~/dbin`:
 
 ```bash
-source ~/wmodules                         # on rupc
-./apply_wien2k24_stress_patches.sh --check /path/to/private/wien2k_24
-./apply_wien2k24_stress_patches.sh --apply /path/to/private/wien2k_24
-./verify_wien2k24_stress_patches.sh /path/to/private/wien2k_24
+export WIEN_DMFT_ROOT="$HOME/dbin"
+export WIENROOT=/path/to/private/configured/wien2k_24
+./apply_wien2k24_stress_patches.sh --check --with-run-lapw \
+    --install-response-workers "$WIEN_DMFT_ROOT" "$WIENROOT"
+./apply_wien2k24_stress_patches.sh --apply --with-run-lapw --install \
+    --install-response-workers "$WIEN_DMFT_ROOT" "$WIENROOT"
+./verify_wien2k24_stress_patches.sh --with-run-lapw \
+    --install-response-workers "$WIEN_DMFT_ROOT" "$WIENROOT"
 ```
 
-The default is `--check`: it verifies the package, recognizes all source hashes,
-applies candidate changes in a temporary tree, and checks every resulting hash
-without modifying WIENROOT. `--apply` performs the same complete preflight,
-creates timestamped backups and a transaction manifest, then replaces the
-reviewed files. It refuses unknown source contents and source symlinks.
+The middle command updates the sources and driver, rebuilds the ordinary
+executables, then builds the four response workers in a clean temporary tree.
+The first and third commands are read-only source checks. Verification checks
+the proposed worker source hashes. The install step also checks that all four
+new binaries exist and are executable before replacing any workers in the
+destination. Backups of replaced sources, scripts and workers have their own
+transaction records. If a compiler or linker fails, correct the build settings
+and repeat the install command.
+
+For ordinary stress alone, omit the driver and worker options. Running the
+installer with only the source-tree argument performs a read-only preflight.
 
 Recognition is **per file**, so documented mixtures of pristine, legacy
 required/full, pre-cache, cached, and supplement/audit states can be upgraded
@@ -50,11 +60,12 @@ Optional commands, after a source check:
 ./apply_wien2k24_stress_patches.sh --install-helpers ~/dbin /path/to/private/wien2k_24
 ```
 
-Builds use sequential `make -j1` because upstream module dependencies are
-incomplete. LAPW1 and LAPW2 real/complex targets are built in order. This does
-not restrict MPI execution of the programs. Cross-compiler and cluster builds
-still need validation on the destination machine. Never copy macOS binaries
-or `.so` libraries onto Linux.
+Builds use `make -j1` because upstream Fortran module dependencies are
+incomplete. LAPW1 and LAPW2 real/complex targets are built in order. On sites
+with MPI-configured LAPW0 Makefiles, add `--with-lapw0-mpi` to the install
+command to build and install `lapw0_mpi` as well. The four response workers
+are serial native exporters. The eDMFT Python driver distributes the response
+over k points. Build platform-specific executables and libraries on each host.
 
 `WIEN_STRESS_BACKUP_DIR` can select the parent of the unique backup directory.
 `PYTHON` can select the Python 3 interpreter. The installer uses the standard
@@ -68,7 +79,7 @@ per-file transitions. The default-off native debug controls remain included;
 |---|---|
 | LAPW0 | Built-in PBE/PBEsol stress derivatives; complete GGA metric tensor; signed/cubic harmonic and precision fixes; correct spin/atom indexing; FFTW interface hardening; earlier allocation/declaration prerequisites |
 | LAPW1 | Fixed-G diagnostic; complete explicit `FIXED_NBANDS` parsing and serial/parallel selection; matching radial data; native H/O exports and radial-response probe controls |
-| LAPW2 | Final G1 product-rule and LO multiplicity corrections; deterministic radial derivatives; G2 LO-index/angular conjugation/intermediate-channel fixes; safe bounds; RELA corrections/cache; complete local-orbital radial diagnostic export |
+| LAPW2 | Final G1 product-rule and LO multiplicity corrections; deterministic radial derivatives; G2 LO-index/angular conjugation/intermediate-channel fixes; safe bounds; RELA corrections/cache; complete local-orbital radial diagnostic export; STRT and STRFT input modes |
 | LCORE | Correct integration boundary, normalization, harmonic handling and precision; fresh RELA stress output |
 | MIXER | Correct total stress sign and assembly; existing debug output |
 
@@ -118,19 +129,63 @@ are site settings, not portable stress fixes. A blank-line-only change in
 - `patches/current/`: reviewable source-only cumulative upgrades from five
   historical states. Makefile object additions are handled by the installer.
 - `patches/files/`: the exact per-file transitions used by the installer.
-- `patches/build/`: reviewable pristine Makefile object-list patch.
+- `patches/build/`: reviewable Makefile object-list patch and the separate XC/core response-worker patch.
 - `tests/test_bundle.py`: reproducibility, idempotence, preservation and refusal
   tests against a supplied pristine tree; no installed source is changed.
 - `VALIDATION.txt`: results of the local packaging validation.
 - `history/` and `patches/history/20261105/`: earlier installer/documentation and
   cumulative patches, retained for provenance rather than deployment.
 
-The old `patches/required`, `patches/optional/010*` and `supplements/` are retained
-as historical evidence. **Do not apply them after the current installer.** Their
-changes, including missing prerequisites, are already incorporated. The old
-root `*_legacy.sh` entry points now delegate to the current installer so they
-cannot accidentally install the superseded G1 implementation.
+The legacy stress patches and older supplements are retained for provenance.
+The current installer applies all selected changes itself. The
+`*_legacy.sh` entry points delegate to it.
 
-Historical numerical reports remain under `src/doc/stress/`. They refer to
-specific geometries, density snapshots, cutoff values and stages of the audit;
-packaging the sources does not create new physical validation results.
+## Screened response and its dependencies
+
+`--with-run-lapw` installs the final-step hook for the distributed WIEN2k
+24.1 script or the previously supported private script. It updates the active
+`run_lapw` when present, or the `SRC/run_lapw` template in an unpacked tree.
+A site-modified script with an unknown checksum requires manual review against
+`supplements/run_lapw_dft_response.patch`. In split installations, deploy the
+updated driver and ordinary executables from the build tree to the runtime
+tree using the site's usual procedure.
+
+LAPW2 accepts `STRT` and `STRFT` as `STR` and `STRF` during charge
+iterations. After convergence, `run_lapw` calls `dft_stress_step.py` once.
+It uses `case.clmsum_old` to match the last vectors and potential. The eDMFT
+DFT driver `run_dft.py` also supports this final step. Use `TEMPS` smearing
+for a comparison to the derivative of the stationary Mermin free energy.
+
+`--install-response-workers DIR` builds the following executables with the
+configured native compiler. The XC/core exporter changes are applied **only
+in the temporary worker build**.
+
+| Executable installed in DIR | Data used by screened response |
+|---|---|
+| `lapw0_response` | Native XC potential, muffin-tin XC quadrature, and interstitial FFT data |
+| `lcore_response` | Core radial mesh, potential and large/small components |
+| `lapw1_response`, `lapw1c_response` | Real/complex LAPW1 Hamiltonian and overlap exports |
+
+The source patch is `patches/build/response-workers.patch`. These exports were
+originally documented under `src/doc/stress/xc_core_response_20261108/`.
+That development archive is no longer needed to build the WIEN workers.
+
+The response drivers in `src/python/` and `liblapw_response.so` from
+`src/dmft2/atpar/` are installed with **eDMFT**. Non-SOC eDMFT response
+also expects the current eDMFT `dmft2` executable under the name
+`dmft2_response` in `WIEN_DMFT_ROOT`. On a fresh eDMFT install, if that name
+is absent, install a copy of the matching build:
+
+```bash
+install -m 755 "$WIEN_DMFT_ROOT/dmft2" "$WIEN_DMFT_ROOT/dmft2_response"
+```
+
+Keep the two executables from the same build when updating eDMFT. The optional
+`--install-helpers` installs two standalone radial diagnostics only.
+
+In matched DFT finite-difference tests, the mean-stress discrepancy decreased
+from 0.226 to 0.00126 GPa for cubic SrVO3 (NREL) and from 0.112 to
+0.000574 GPa for tetragonal FeSe (RELA). The response includes the
+Fermi-level-relative IN1 radial-energy path. These are tested cases, not a
+general error bound. See `src/doc/stress/DFT_screened_response_validation_20261118.md`
+in the local development tree for inputs and response reports.

@@ -1,0 +1,382 @@
+Spin–orbit contributions to atomic forces in second-variational LAPW
+==================================================================
+
+Central analytic spinor forces (November 2026)
+--------------------------------------------
+
+FORT on a nonmagnetic second-variational spinor calculation with normalized
+projector 5 and fixed DMFT band indices evaluates the frozen-self-energy
+Klein derivative from one geometry. Put FORT on the first line of the active
+case.in2 or case.in2c and run x_dmft.py dmft2. In run_dmft.py the screened
+measurement is deferred to the final charge pass. A case.inso, lapw1.def,
+lapwso.def and both physical spinor components must describe the parent run.
+The supported scalar solver is dftKS. The spinor projector uses one
+unshifted correlated shell per impurity block with fixed local axes and
+a radial projector confined to the muffin tin. Magnetic KS potentials, relativistic
+p1/2 local orbitals and an LAPWSO orbital potential require extra operators.
+An explicit solver.backend of native_soc_forward selects the independently
+displaced reference used for validation.
+
+The wrapper prepares one private case.response_runs/<run>/central. The native
+programs export scalar H, O, the two spin components, site/spin rotations,
+radial SOC integrals, projector and Matsubara metadata, and potential/core
+data. The original vectors supply the native k-point ranks and a digest of
+their ordered G labels. This matters for an energy cutoff whose band count
+varies with k. The driver checks the normalized projector and the spinor
+valence density against the native exports. case.outputdmf2_response contains
+the component forces and the GMRES residual history. total_force/report.json
+contains the fixed-charge force, the induced force, and the complete force
+to be published by merge_scf.py or run_dmft.py before mixer.
+
+For an atomic displacement u and fixed input charge coefficients n, define
+
+   a = partial_u F,      s = partial_u M,      c = partial_n F,      J = partial_n M,
+
+where M is one unmixed charge-map iteration at fixed impurity self-energy.
+The dimensionless electronic density operator, occupied core levels, native
+density integral and normalized projector use the same central charge. With
+Ry energy, velocity in Bohr per unit displacement, and m equivalent atoms,
+
+   (I - J^T) lambda = c,    force(u) = -1000 (a + lambda^T s) / m   [mRy/Bohr].
+
+One adjoint serves every requested symmetry-compatible direction. A force at
+fixed charge coefficients is already a whole derivative. The report adds
+the induced force to that whole derivative and replaces the total on selected
+sites at SCF assembly. Values for other sites come from the ordinary force.
+The default relative GMRES tolerance is 1.e-8. Because c contains large
+canceling contributions, a relative residual of 1.e-3 can give a poor force.
+
+The finite scalar and spinor spaces
+----------------------------------
+
+A contains the retained scalar LAPW eigenvectors, O is the LAPW metric, and
+e is the diagonal matrix of scalar energies. In the parallel-transport gauge
+
+   Z_ai = [A_a^H (dH0 - e_i dO) A_i] / (e_i - e_a),
+   dA   = A_out Z - A (A^H dO A)/2,
+   de_mat = A^H dH0 A - {e,A^H dO A}/2 .
+
+Indices i are retained and a are outside the scalar window. The complement
+is diagonalized in the native LAPW metric. A denominator at or below 1.e-10 Ry
+is omitted; the report counts such pairs. Next differentiate the complete
+second-variational matrix diag(de_mat,de_mat) + d(B^H R_SO B). The native
+spin angular matrices multiply all four (down,up) blocks. Radial changes
+enter both R_SO and the matching matrix B, including APW/LO coefficients,
+the LAPWSO fourth-order radial integration and the dftKS energy search.
+The native LAPW energy stencil for the radial energy derivative is evaluated
+at one atomic position. Its geometry derivative propagates analytically through
+each radial solve at its own energy. The central XC response caches local
+LDA/PBE partial derivatives computed by complex-step differentiation.
+Neither operation requires geometries at displaced atomic positions.
+The Bloch phases translate each atom, with radial integration limits fixed
+in its own frame. A separate MT surface term for that translation would
+duplicate the two moving matching legs.
+
+For one (atom,l), let g label a point on the logarithmic radial mesh and
+i,j the packed LAPWSO primitive radial functions. Use the native Rydberg
+potential V_g (the spherical potential file contains r_g V_g), energies E_i,
+large radial components P_gi, C0=2c, and D the five-point radial derivative
+used by VDERIV. Put
+
+    L_gi = C0 + (E_i - V_g)/C0,      Y_gi = P_gi/L_gi,
+    R_ij = sum_g w_g (D V)_g Y_gi Y_gj .
+
+The weights w_g include the native CALI prefactor and endpoint rule. At
+fixed R_MT an atomic displacement preserves this radial grid. Consequently
+
+    dY_gi = [dP_gi - Y_gi(dE_i-dV_g)/C0]/L_gi ,
+    dR_ij = sum_g w_g [(D dV)_g Y_gi Y_gj
+                          + (D V)_g(dY_gi Y_gj + Y_gi dY_gj)] .
+
+The regular radial solution and its energy derivative have the same E_i.
+A genuine local orbital carries its own energy. The native radial tangent
+also gives the boundary data for dB. The explicit potential response is
+evaluated at fixed density coefficients for the atomic source. The adjoint
+contracts the change induced by the density. The two potential responses
+can give large, opposing radial forces in a screened calculation.
+
+If C contains the retained second-variational eigenvectors, the spinor
+derivative is dpsi_s = dA C_s + A dC_s. The spinor complement determines
+dC with the same cross-window formula, now in an orthonormal scalar-band
+basis. Rotations internal to a degenerate retained block are a gauge.
+Projecting the perturbed spinors and orbitals gives the raw overlap. Its
+window and globally normalized inverse square root are differentiated
+before the Matsubara density and energy. A stored nonmagnetic DMFT2 band
+density includes 2*w_k, so the physical trace over both spinor components
+uses a factor of one half. Each transpose uses the real Frobenius product.
+
+Writing U = U_raw X, the normalization differentiated here is the same
+one used in the scalar force. At fixed k weights,
+
+    S = sum_k w_k U_raw(k)^H U_raw(k)       (rows inside the DMFT window),
+    dS = sum_k w_k [dU_raw^H U_raw + U_raw^H dU_raw],
+    S^(1/2) dX + dX S^(1/2) = -X dS X,      X=S^(-1/2).
+
+The normalization is evaluated in the active native orbital frame. The
+window acts in spinor band space; the earlier scalar-band cutoff belongs to
+LAPWSO. Differentiating both selections is essential even for a paramagnet.
+
+Explicit operator in ordinary FOR
+--------------------------------
+
+In the full scalar coefficient space put Q=A A^H O. The retained SOC
+operator has covariant matrix Q^H W_MT Q. Differentiating in this frame
+at frozen radial shape gives A^H dW_MT A and two scalar-window legs
+proportional to (dQ)A=A_out Z. The ordinary scalar H/O force already
+contains the retained metric connection through its energy-weighted density.
+Only the external leg belongs in this operator term. The native force
+contracts its angular and radial derivatives for each spin component with
+the scalar Hamiltonian. A derivative of W_MT couples the two components
+and has to be provided separately. Its energy covector includes the density,
+the normalized DMFT-window gradient and the rotation of the retained spinors
+in the raw projector. No additional radial-potential response is added to FOR.
+
+An ordinary FOR automatically evaluates this contribution for supported
+spinor calculations. A TOT run with force_last=True evaluates it on the
+final private FOR. The normal DMFT2 run exports its actual density and
+projector moments after the chemical-potential search. A private dftKS
+pass supplies the scalar LAPW H and O. LAPWSO exports its angular and
+radial integrals before spinor diagonalization. The operator contracts
+these quantities once; it needs no second DMFT2, LAPW0, LCORE or charge
+adjoint. The SCF merger publishes the additional FVA in site-local axes.
+Set {"solver":{"soc_operator_force":false}} in case.stress_response.json
+to reproduce the old ordinary force. Explicit true requires a supported
+configuration. In automatic mode an unsupported spinor input retains the
+native force and the wrapper prints the reason. Large per-k FOR intermediates
+are temporary. The input identity, preparation record, force components and
+publication report remain under case.response_runs/<run>. FORT differentiates the
+whole coupled Hamiltonian including the same operator and the radial
+and charge response. It replaces the selected forces.
+
+Finite-displacement validation on the physical Ce meshes
+------------------------------------------------------
+
+Force on site 1 along z at +0.020 Bohr, in mRy/Bohr. Each 2x2x2 cell
+uses 171 irreducible k points, the same scalar and spinor band ranks
+at each geometry, and a frozen impurity self-energy. The energy slope
+uses independently charge-relaxed endpoints at +0.016 and +0.024 Bohr.
+
+phase      FOR     fixed charge   charge response      FORT   energy slope  FORT - slope
+alpha  -1.23567       -1.93057           0.62933   -1.30124      -1.30110      -0.00014
+gamma  -1.23772       -1.05503           0.15038   -0.90465      -0.90494       0.00029
+
+The two middle force contributions sum to FORT. The FOR column is the
+ordinary site force after the explicit rigid and scalar-window SOC
+contribution has been included. All central derivatives in these two
+production modes are analytic. The displaced endpoints test their values.
+
+On the one-k alpha-Ce pilot, the seven allowed directions on the five
+inequivalent sites use one adjoint. Rotating to all eight physical sites
+gives a net force of (0, 0, 0.00000494) mRy/Bohr without imposing
+the acoustic sum rule.
+
+Checking the native local-orbital phase convention
+--------------------------------------------------
+
+For scalar phases D_ii=exp(i theta_i), matching obeys B[A D]=B[A] D.
+In spinor space let D2=diag(D,D). The second-variational Hamiltonian then
+transforms as D2^H H_so D2. Its eigenvalues and the free energy are invariant
+under these arbitrary phases. The historical cutoff applied separately to
+the real and imaginary parts of small LO coefficients violates B[A D]=B[A] D.
+Consequently even a smoothly transported analytic derivative on historical
+vectors can differ from a native energy slope that follows other phases.
+To check the corrected force, regenerate the spinors at every geometry using
+the same matching rule.
+
+The native regression repeats LAPWSO after
+randomizing the phases of the complex scalar vectors at one k point. It copies
+the input into a temporary directory. From src/python run
+
+    PYTHONPATH=.:$EDMFT_ROOT EDMFT_TEST_SOC_CASE=/path/to/complex/SOC/case \
+        EDMFT_TEST_LAPWSO=$EDMFT_ROOT/lapwso EDMFT_TEST_SOC_K=86 \
+        python -m unittest discover -s tests -p test_native_lapwso_phase.py
+
+The input is an unsplit, nonmagnetic dftKS/LAPWSO case with the scalar vector,
+energy, potentials and lapwso.def. Choose a k index in that mesh. New native
+spinors carry the :SOC_LO_MATCHING: LINEAR marker in case.scfso.
+
+Earlier isolated measurements and the signed reference
+-----------------------------------------------------
+
+Native geometry and the two explicit matrix derivatives
+
+Let A_i solve H_0 A_i = O A_i e_i in the scalar LAPW basis, with A_i^dagger O
+A_j = delta_ij. S selects the scalar bands passed to LAPWSO. W is the sum of
+the spherical spin–orbit operators over MT sites. The second-variational
+Hamiltonian is diag(e_i) + W_SS, including both spin components. The eDMFT
+window is a separate selection on the resulting spinors.
+
+In coordinates attached to an atom write its projected W as B^dagger R B.
+B contains the LAPW/LO matching coefficients. R contains native radial SOC
+and angular integrals. At fixed scalar coefficients and radial profiles, rigid
+translation gives
+
+    dW_rigid = (dB)^dagger R B + B^dagger R dB.
+
+In the lab frame differentiating the sphere indicator produces a surface
+distribution. In the moving coordinates the integration limits are fixed and
+the same translation enters through the matching legs. Adding a separate
+surface term to this expression would count it twice. Changes of R due to the
+radial potential and wave functions are distinct.
+
+Even with W held fixed, the finite scalar space can rotate. Its external
+component at an isolated cutoff is
+
+    Z_ai = A_a^dagger (dH_0 - e_i dO) A_i / (e_i - e_a),
+    dA_i(out) = sum_{a outside S} A_a Z_ai,       i inside S.
+
+In a linear matching map this gives Z_s^dagger W_out,in + W_in,out Z_s, where
+Z_s = diag(Z,Z) in spin. The in–out scalar H_0 block vanishes by the scalar
+eigenproblem. Internal rotations are a basis choice; handle them consistently
+in the density and all other matrices. The external contribution vanishes for
+a complete scalar LAPW space. W may still have an explicit translation derivative.
+Current LAPWSO keeps each complex local-orbital coefficient and records
+:SOC_LO_MATCHING: LINEAR in case.scfso. Previous versions clipped its real
+and imaginary parts independently at 1e-6. This changed spinor eigenvalues
+under a pure scalar-band phase rotation and introduced discontinuities near
+the threshold. Private replays use the parent's marker; an unmarked old
+case.scfso selects the historical branches. Keep case.scfso with vectorso.
+A legacy replay can also be requested at the LAPWSO level with
+EDMFT_SOC_LEGACY_LO_FILTER=1.
+
+Each force is minus the trace of its derivative with the central spinor
+density. DFT uses normalized k weights and thermal occupations. DMFT2 stores
+2*w_k times its band density and the physical nonmagnetic spinor trace uses
+a factor of 1/2. Both spinor gauges are verified for off-diagonal traces.
+These isolated contractions use the spinor density. The production FOR
+expression above also carries the normalized DMFT projector gradient and
+uses the geometry derivative of the scalar subspace in the same frame.
+
+Measuring the two terms
+
+For rigid motion, create an absolute control path containing 'matrix' (eDMFT)
+or 'diagonal' (DFT) on line one and one Cartesian velocity vector per physical
+site in STRUCT order. Set EDMFT_SOC_DISPLACEMENT to this path for a normal
+LAPWSO run. For the scalar-window contribution generate the control instead:
+
+    soc_scalar_window.py --structure Ce.struct --vector Ce.vector \
+        --central central/native --plus plus/native --minus minus/native \
+        --step 0.0005 --output-dir scalar_tangent
+
+Each prefix is dftKS DFTKS_OVERLAP_DUMP output. H is in Ry and the step in
+Bohr. The matrix frame, k mesh, G/LO ordering and radial policy must match.
+For a clamped-charge displacement keep the input density coefficients fixed
+and run LAPW0 and dftKS on each side. Alternatively pass --derivative prefix
+for precomputed dH and dO in the native formats. The helper streams over k
+and diagonalizes the complement in the O metric. It accepts a fresh output
+directory and detects a degenerate scalar cutoff. For this run set
+EDMFT_SOC_DISPLACEMENT to the absolute path of scalar_tangent/subspace.
+The native diagnostic supports nonmagnetic scalar input, WFFIL and no
+relativistic p1/2 LOs. Use --layout diagonal for a DFT-only derivative.
+
+For eDMFT set EDMFT_ONEPARTICLE_DUMP to an absolute prefix (e.g. /tmp/rho) on
+a native DMFT2 FOR pass using precisely the exported LAPWSO spinors. Then run
+
+    soc_translation_force.py /path/to/control --klist Ce.klist --moments /tmp/rho
+
+For DFT give --mu and --temperature (both Ry) instead of --moments. The result
+is mRy/Bohr per displacement pattern. A force per equivalent atom requires
+division by the multiplicity when the pattern moves the full orbit.
+
+Optional finite-displacement reference for a screened force
+
+Set FORT in the active case.in2[c] of a converged charge calculation. Prepare
+unsplit lapw1.def, lapwso.def and dmft2.def. For a nonmagnetic SOC reference
+include this solver in case.stress_response.json:
+
+    {"solver":{"backend":"native_soc_forward","force_atoms":[1],
+               "force_steps_Bohr":[0.006,0.003],"tolerance":0.001,
+               "max_iterations":50}}
+
+Run x_dmft.py dmft2 --execute-only, lcore, merge_scf.py and mixer as usual.
+force_atoms contains inequivalent site indices. Omitting it selects all sites.
+The code builds symmetry-compatible unit Cartesian displacement patterns and
+divides their force by orbit multiplicity. FORT replaces the complete forces
+on selected sites at SCF assembly. Other sites retain ordinary FOR. The sum
+over a mixture of the two forces cannot test the screened acoustic sum rule.
+
+For one pattern u, n_* is the fixed point of the native unmixed charge map M.
+The directional charge q is computed to O(h^2) from
+
+    q = [ M(R+h*u,n_*+h*q) - M(R-h*u,n_*-h*q) ] / (2h).
+
+Each map pass executes LAPW0, dftKS, LAPWSO, DMFT2 and LCORE in isolation;
+self-energy and double counting are fixed. The normalized projector, radial
+orbitals, scalar space, both spin components, and native chemical-potential
+and charge normalization policy enter each calculation. The varying energy
+readout for this tangent is the native density integral (:DEN), the occupied
+core eigenvalue sum, and :VSUM. Displacement-independent terms cancel.
+Anderson mixing solves for q. The larger-step solution seeds the smaller
+step and its residual is reevaluated. The code extrapolates in h^2. Examine
+the residual histories and step dependence, especially for a small force.
+The charge tolerance is not itself a bound on force error.
+
+case.outputdmf2_response reports progress and selected forces. The run
+directory contains soc_forward/native_passes.jsonl with energy components
+and charge normalizations, and total_force/report.json with residuals,
+explicit and induced forces, and step/extrapolation comparisons. This is
+a directional numerical reference. Select backend native_soc_forward explicitly
+to reproduce it. The central analytic SOC solver described above uses one shared adjoint.
+The reference costs two native passes per nonzero response iteration and
+direction at each step size.
+
+Earlier Ce checks with the historical matching rule
+
+Eight-site alpha-Ce pilot, one k. A finite rotation in the exact scalar
+eigenbasis reproduces the in–out matrix contraction. Differentiating the
+literal native SOC matrix (including LO clipping) gives a maximum absolute
+matrix error of 1.6e-8 Ry/Bohr at step 1e-7 Bohr. Its scalar-window force is
++0.002566 mRy/Bohr with thermal DFT occupations on the pilot potential and
++0.003823 with the eDMFT density. The native rigid-force routine on a separate
+three-k test matches matrix differences to 4.1e-9 Ry/Bohr.
+
+For the selected atom the pilot's screened FORT through x_dmft.py and the
+WIEN mixer gives -4.73561 mRy/Bohr. Independent nonlinear endpoint charge
+convergences at +/-0.004 Bohr give -4.74038. Starting each response solve
+from zero gives -4.74439. The two response solutions differ by 0.009
+mRy/Bohr at the tested 0.001 relative charge tolerance. This one-k test
+checks screening and publication; a phonon calculation needs its physical
+mesh. The isolated explicit terms use different held-fixed quantities and
+must not be added on top of FORT.
+
+171-k physical meshes at the positive 0.020-Bohr Ce displacement (mRy/Bohr):
+
+                         alpha eDMFT      gamma eDMFT
+    rigid SOC matrix     -0.03526983      -0.04913601
+    scalar-window term   +0.01314997      -0.00235459
+    earlier discrepancy  -0.024986        +0.392085
+
+The first two rows use the central spinor density at the positive displacement.
+The scalar H and O tangents use +/-0.0005 Bohr about that geometry at clamped
+input charge. The separate gamma k-point terms sum to 0.05255 in absolute
+value before cancellation; the corresponding alpha sum is 0.05346. Their
+minimum scalar in–out gaps are 0.000663 and 0.000645 Ry, respectively. On this
+short interval gamma retains the same scalar band count at every k; alpha gains
+or loses one at k=165 on the positive side. The derivative follows the smoothly
+continued central rank and uses the full scalar H and O on both sides.
+
+The last row comes from a different comparison, F_energy(h) - F_odd(h), where
+F_odd(h) = (F(+h)-F(-h))/2 and F_energy(h) = -1000*(E(+h)+E(-h)-2E(0))/h.
+Here h=0.020 Bohr and E is in Ry. The older three-geometry comparison changes
+the scalar rank at three k points in alpha and five in gamma. It measures a
+curvature-based force residual, not the derivative at +h at fixed rank.
+The two isolated SOC terms sum to -0.02212 in alpha and -0.05149 in gamma.
+The agreement of the first sum with the old alpha discrepancy does not establish
+that these terms should be added to ordinary FOR. In gamma even the sign differs.
+The matched-rank energy-slope tests above supersede that comparison.
+
+A separate pilot check isolates changes in the spherical KS potential. Holding
+the central scalar vector, positions, nonspherical potential and radial energy
+parameters fixed, substitute the two clamped-density LAPW0 spherical potentials
+from +/-0.0005 Bohr in LAPWSO and difference the native spin–orbit matrices.
+The one-k eDMFT contraction gives +0.02253 mRy/Bohr. This measures the change
+of the local SOC radial matrix and matching data when the radial electric field
+changes. It is distinct from rotating the scalar space, and is already sampled
+by the total forward reference. The quoted isolated value is for the pilot mesh.
+
+Repeating the full-mesh H/O differences at +/-0.00025 Bohr gives a
+scalar-window force of +0.01307237 mRy/Bohr in alpha and -0.00214217 in
+gamma. At alpha k=165 the retained counts are (422,422,423) on the larger
+step and (422,422,422) on the smaller step. A nondegenerate band can cross
+a fixed energy cutoff and change the rank even when the scalar in–out gap
+is finite. Such a finite jump is separate from the smooth Pulay force.

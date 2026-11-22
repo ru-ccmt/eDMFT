@@ -221,7 +221,7 @@ def lcore(fday, case, WIEN, wopt, fh_info):
 def mixer(fday, case, WIEN, fh_info):
     AStep(fday, case, 'mixer', 'inm', WIEN, '', fh_info)
 
-def dmft2(fday, case, fh_info, dmfe, m_extn='', response_phase='defer'):
+def dmft2(fday, case, fh_info, dmfe, m_extn='', response_phase='defer', final_force=False):
     inp_name = 'indmf2'+m_extn
     name = 'dmft2'+m_extn
     if not os.path.isfile(case+'.'+inp_name):
@@ -242,7 +242,7 @@ def dmft2(fday, case, fh_info, dmfe, m_extn='', response_phase='defer'):
     # EF-only calls; the one final measurement below opts into phase='final'.
     with open('dmft2_info.out', 'a') as output:
         dmft2_step.execute(case, dmfe.ROOT, dmfe.MPI2, name+'.def',
-                           phase=response_phase, output=output)
+                           phase=response_phase, output=output, final_force=final_force)
 
     dat = open(case+'.scf2').readlines()
     dEF=0
@@ -253,20 +253,63 @@ def dmft2(fday, case, fh_info, dmfe, m_extn='', response_phase='defer'):
     
     return dEF
     
-def final_response_pass(fday, case, fh_info, dmfe, WIEN, wopt):
-    """Measure response once, after the outer loop has actually terminated.
+def lattice_charge_step(fday, w2k, fh_info, dmfe, p, para, wopt, matsubara, final_force=False):
+    """Prepare both spin channels exactly as in the normal charge loop."""
+    recomputeEF = p['recomputeEF']
+
+    if p['Ferro'] and wopt['m_extn'] and recomputeEF:
+        # In case of ferromagnetic or ferrimagnetic metal, we need to compute common EF for up and dn spins
+        FermiF(dmfe, w2k, p, para, wopt, fh_info, fday, matsubara)
+        recomputeEF = 0
+
+    Prepare_dmft2(dmfe, p, para, wopt, fh_info, recomputeEF, 'c')
+    SSplit(dmfe.ROOT, matsubara, p, fh_info)
+    phase = 'final' if final_force else 'defer'
+    dEF = dmft2(fday, w2k.case, fh_info, dmfe, response_phase=phase, final_force=final_force)
+    fday.flush()
+    if wopt['m_extn']:
+        SSplit(dmfe.ROOT, matsubara, p, fh_info, wopt['m_extn'])
+        dmft2(fday, w2k.case, fh_info, dmfe, wopt['m_extn'],
+              response_phase=phase, final_force=final_force)
+        fday.flush()
+        combineud(w2k.case, dmfe.ROOT, wopt, fh_info)
+    return dEF, recomputeEF
+
+
+def mixer_moves_atoms(case):
+    # WIEN2k reads five characters. Alongside MSR1a and MSECa it accepts
+    # 'b' variants and position updates with DIIS, MSGB, and DHBR.
+    _, mode = fstc.AreWeRelaxingStructure2(case)
+    return mode[4:5] in ('a', 'b')
+
+
+def final_response_pass(fday, w2k, fh_info, dmfe, p, para, wopt, matsubara):
+    """Measure the requested native force or screened response once at the final charge.
 
     Convergence is decided after mixer, so it cannot be predicted reliably
     before the last ordinary dmft2 call. The loop leaves final lapw0/lapw1
     outputs ready; use those in one final pass with no impurity solve and no
     regenerated inputs. A failed response raises before lcore or mixer.
     The executor detects both DMFT channels, establishes their common mu,
-    averages charge once and computes one shared complete stress tensor.
+    averages charge once and computes the requested shared stress/force response.
     """
-    if not dmft2_step.requested(case):
+    case, WIEN = w2k.case, w2k.WIENROOT
+    req = dmft2_step.request(case)
+    # FOR already supplied native forces on each ordinary charge iteration.
+    # Only a fixed-geometry TOT run can request an extra native measurement.
+    native_force = (req["mode"] == "TOT" and p["force_last"] and not mixer_moves_atoms(case))
+    if not (req["enabled"] or native_force):
         return False
-    print('Final dmft2 -> response -> lcore -> SCF -> mixer pass', file=fh_info, flush=True)
-    dmft2(fday, case, fh_info, dmfe, response_phase='final')
+    if req["enabled"]:
+        print('Final dmft2 -> response -> lcore -> SCF -> mixer pass', file=fh_info, flush=True)
+    else:
+        print('force_last=True: calculating final native forces with a private FOR input', file=fh_info, flush=True)
+    if not req["enabled"] and wopt["m_extn"]:
+        # The ordinary magnetic path can require fresh spectra for a common
+        # mu, then both spin charges and their average before the mixer.
+        lattice_charge_step(fday, w2k, fh_info, dmfe, p, para, wopt, matsubara, final_force=True)
+    else:
+        dmft2(fday, case, fh_info, dmfe, response_phase='final', final_force=native_force)
     lcore(fday, case, WIEN, wopt, fh_info)
     scf(case, wopt)
     scf1(fday, case, WIEN)
@@ -403,13 +446,37 @@ def combineud(case, ROOT, wopt, fh_info):
         shutil.copy(case+'.clmval_aver', case+'.clmvaldn')
         shutil.move(case+'.clmval_aver', case+'.clmvalup')
 
-def SSplit(ROOT, matsubara, iparams, ntail, fh_info, m_extn=''):
-    cmd = ROOT+'/ssplit.py'
-    if matsubara : cmd += ' -n '+str(iparams['nom'][0])+' -t '+str(ntail)
-    if m_extn: cmd += ' -l '+m_extn
-    print('#<ssplit>: ', cmd, file=fh_info)
-    info=subprocess.call(cmd,shell=True,stdout=fh_info,stderr=fh_info)
-    
+def SSplit(ROOT, matsubara, p, fh_info, m_extn=''):
+    cmd = [os.path.join(ROOT,'ssplit.py')]
+    if matsubara:
+        tail = p['ntail']
+        if tail == 'auto':
+            noms = []
+            for key, settings in p.p.items():
+                match = re.fullmatch(r'iparams(\d+)', key)
+                if not match:
+                    continue
+                if 'nom' in settings:
+                    count = int(settings['nom'][0])
+                    if count == 0 and 'beta' in settings:
+                        count = int(2 * settings['beta'][0])
+                    noms.append(count)
+                elif (p['solver'] in ('CTQMC','BCTQMC') and
+                      not os.path.isfile(os.path.join('imp.' + match[1], 'PARAMS'))):
+                    # Before the first solver run, mirror IMP_CTQMC's default.
+                    noms.append(int(3 * settings['beta'][0]) if 'beta' in settings else 100)
+            # ssplit also checks the cutoffs saved with the frozen impurities.
+            if noms:
+                cmd += ['-n',str(max(noms))]
+            cmd += ['--tail-tol',str(p['tail_tol'])]
+        else:
+            cmd += ['-n',str(p['iparams0']['nom'][0])]
+        cmd += ['-t',str(tail)]
+    if m_extn:
+        cmd += ['-l',m_extn]
+    print('#<ssplit>:', ' '.join(cmd), file=fh_info, flush=True)
+    subprocess.check_call(cmd,stdout=fh_info,stderr=fh_info)
+
 def SGather(ROOT, fh_info, p, m_extn=''):
     cmd = ROOT+'/sgather.py' 
     if p['mix_sigma']<1.0 : 
@@ -530,9 +597,9 @@ def FermiF(dmfe, w2k, p, para, wopt, fh_info, fday, matsubara):
     case = w2k.case
     scratch = w2k.SCRATCH
     Prepare_dmft2(dmfe, p, para, wopt, fh_info, 1, 'e')
-    SSplit(dmfe.ROOT, matsubara, p['iparams0'], p['ntail'], fh_info)
+    SSplit(dmfe.ROOT, matsubara, p, fh_info)
     dmft2(fday,case,fh_info,dmfe) #.MPI2)
-    SSplit(dmfe.ROOT, matsubara, p['iparams0'], p['ntail'], fh_info, wopt['m_extn'])
+    SSplit(dmfe.ROOT, matsubara, p, fh_info, wopt['m_extn'])
     dmft2(fday,case,fh_info,dmfe,wopt['m_extn'])
     cmd = dmfe.ROOT+'/fermif '+scratch+'/'+w2k.case+'.bnds '+scratch+'/'+w2k.case+'.bnds'+wopt['m_extn']
     print(('#<fermif>: '), cmd, file=fh_info)
@@ -561,7 +628,8 @@ if __name__ == '__main__':
               'wbroad'        : 0.0,       # broadening of sigma on the imaginary axis
               'kbroad'        : 0.0,       # broadening of sigma on the imaginary axis
               'solver'        : 'CTQMC',   # CTQMC solver
-              'ntail'         : 200,       # on imaginary axis, number of points in the tail of the logarithmic mesh
+              'tail_tol'      : 1.e-6,    # relative proxy tolerance for ntail='auto'
+              'ntail'         : 'auto',    # adaptive tail, or an explicit logarithmic point count
               'mix_delta'     : 1.0,       # whether to mix delta, or not
               'mix_sigma'     : 1.0,       # whether to mix sigma, or not
               'riter'         : 100,        # How often to restart broyden for charge mixing
@@ -578,6 +646,7 @@ if __name__ == '__main__':
               'dftKS'         : True,      # Use internal capabilities to solve the Kohn-Sham problem
               'remove_broyd'  : 1000,      # How many dft steps before broyden files are removed
               'Ferro'         : False,     # For ferromagnetic (or ferrimagnetic) metals it should be set to True, so that the chemical potential is properly computed
+              'force_last': False, # fixed geometry: use FOR once after TOT charge iterations
               'force_Ene_diff': 0.001,     # When checking if force is converged, we require Energy to be converged as well up to this difference
               'force_Rho_diff': 0.01,      # When checking if force is converged, we require Charge to be converged as well up to this difference
               }
@@ -622,10 +691,12 @@ if __name__ == '__main__':
                                 lambda by fractional occupancy of the shell (very little yukawa screening for late TMO and mostly yukawa for early TMOs).
                                 dielectric screening is later increased to compensate for descreased lambda, to give input U. But J is probably smalller 
                                 than required by input.
+        force_last     [bool] False           # TOT: compute native forces once at the final fixed-geometry charge
+                                              # FOR: compute forces on every charge step
         runIMP         [True| False] True     # Run impurity solver or skip this step
         runGF          [True| False] True     # Run dmft1 for G and Delta, or skip this step
-        ntail          [int]         30       # sigma.inp on imaginary axis, number of points in the
-                                                # tail of the logarithmic mesh
+        ntail          ['auto'|int]  'auto'   # adaptive Matsubara tail, or a fixed logarithmic tail count
+        tail_tol       [float]       1.e-6    # relative integrated interpolation error of the automatic probes
         mix_delta      [float]       1.0      # linear mixing parameter for Delta.
         UpdateAtom     [int]         0        # How often to recompute cix-file inside the
                                               # impurity solver
@@ -969,15 +1040,15 @@ if __name__ == '__main__':
                     FermiF(dmfe, w2k, p, para, wopt, fh_info, fday, inl.matsubara)
                 else:
                     Prepare_dmft2(dmfe, p, para, wopt, fh_info, 1, 'm')
-                    SSplit(dmfe.ROOT, inl.matsubara, p['iparams0'], p['ntail'], fh_info)
+                    SSplit(dmfe.ROOT, inl.matsubara, p, fh_info)
                     dEF =  dmft2(fday, w2k.case, fh_info, dmfe); fday.flush()
 
             # Computing Green's function
             if p['runGF']:
-                SSplit(dmfe.ROOT, inl.matsubara, p['iparams0'], p['ntail'], fh_info)
+                SSplit(dmfe.ROOT, inl.matsubara, p, fh_info)
                 dmft1(fday, w2k.case, fh_info, extn, dmfe)
                 if wopt['m_extn']:
-                    SSplit(dmfe.ROOT, inl.matsubara, p['iparams0'], p['ntail'], fh_info, wopt['m_extn'])
+                    SSplit(dmfe.ROOT, inl.matsubara, p, fh_info, wopt['m_extn'])
                     dmft1(fday, w2k.case, fh_info, extn, dmfe, wopt['m_extn'])
                 (nl_imp,nd_imp) = FindLatticeNd(w2k.case, wopt['m_extn'], inl.siginds, imp2latt, fh_info, scf_name='scfdmft1',cmplx=True)
             
@@ -1055,22 +1126,8 @@ if __name__ == '__main__':
         for ita in range(p['max_lda_iterations']):
             if ita%2 == 1 : p.refresh()
 
-            recomputeEF = p['recomputeEF']
-
-            if p['Ferro'] and wopt['m_extn'] and recomputeEF:
-                # In case of ferromagnetic or ferrimagnetic metal, we need to compute common EF for up and dn spins
-                FermiF(dmfe, w2k, p, para, wopt, fh_info, fday, inl.matsubara)
-                recomputeEF = 0
-            
-            Prepare_dmft2(dmfe, p, para, wopt, fh_info, recomputeEF, 'c')
-            SSplit(dmfe.ROOT, inl.matsubara, p['iparams0'], p['ntail'], fh_info)
-            dEF = dmft2(fday,w2k.case,fh_info,dmfe); fday.flush()
-            if wopt['m_extn']:
-                SSplit(dmfe.ROOT, inl.matsubara, p['iparams0'], p['ntail'], fh_info, wopt['m_extn'])
-                dmft2(fday,w2k.case,fh_info,dmfe,wopt['m_extn'])
-                fday.flush()
-                combineud(w2k.case, dmfe.ROOT, wopt, fh_info)
-            
+            dEF, recomputeEF = lattice_charge_step(
+                fday, w2k, fh_info, dmfe, p, para, wopt, inl.matsubara)
 
             if recomputeEF==0: # if we do not recomputeEF we need to make sure that density is correct, otherwise we have a doped compound!
                 with open(w2k.case+'.outputdmf2') as f2:
@@ -1163,7 +1220,8 @@ if __name__ == '__main__':
             break
         
     if istep0 > 0:
-        final_response_pass(fday, w2k.case, fh_info, dmfe, w2k.WIENROOT, wopt)
+        p.refresh()
+        final_response_pass(fday, w2k, fh_info, dmfe, p, para, wopt, inl.matsubara)
 
     toclean = glob.glob('dmft[1|2].error*')+glob.glob('*.broyd*')+glob.glob('dmft')+glob.glob('dmft2')+glob.glob('_processes*')+glob.glob('lapw1')+glob.glob('*.output1_*')+glob.glob('*.vector_*')+glob.glob('*.scf1_*')+glob.glob('lapw1_*.[def|error]')
     for f in toclean: os.remove(f)

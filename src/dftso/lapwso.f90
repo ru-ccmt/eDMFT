@@ -1,5 +1,6 @@
 ! TODO: reading Vns should be done correctly with atpar library. 
 PROGRAM lapwso
+  use soc_displacement, only: init_soc_displacement, export_soc_geometry, init_soc_matching
   USE abcd, ONLY: allocate_abcd
   USE loabc, ONLY: elo, allocate_loabc
   USE loabcr, ONLY: elor, allocate_loabcr
@@ -50,6 +51,7 @@ PROGRAM lapwso
   real*8 :: SS_(3,2), xms(3)
   real*8 :: b2Mb, dt0, dtime0, dtime1, dt4
   real*8 :: phi, theta, weight, restsize
+  character(16) :: geometry_only
   integer :: ii, i, j, ios, ipr, irlotot, isi, ispin, jatom, jspin, ikp, iikp, kpot, l, n_scr, nban2, nn, num, info, lxdos
   integer, allocatable :: kpoints(:)
   REAL*8, allocatable  ::  APA(:)
@@ -224,6 +226,8 @@ PROGRAM lapwso
   
   call read_inso(emm,xms,fl,jspin,kpot,ipr,irlotot) !
 
+  call init_soc_matching(Qprint)
+
   !.....Generate symmop
   call allocate_couplo(ndif,labc)
   CALL generate_lattice(alpha, BR1, BR2, VOL, ORTHO, ALAT(1), ALAT(2), ALAT(3), LATTIC)
@@ -286,8 +290,14 @@ PROGRAM lapwso
   
   allocate(kv(3,nmat,2),ee(nume,2))
   
+  call init_soc_displacement(ndif,nnrlo,jspin,fl)
   call garadme(e,Vru,p,dp,pe,dpe,ri_mat,jspin,kpot,ipr)
   
+  if(myrank==master) call export_soc_geometry(ri_mat,e,jspin,nnrlo,iorbpot)
+  ! Ordinary FOR already owns both physical spinor components. Its private
+  ! replay needs only the central radial data and native angular/spin frame.
+  call get_environment_variable('EDMFT_SOC_GEOMETRY_ONLY',geometry_only)
+  if(trim(geometry_only)=='1') go to 900
   if(iorbpot.ne.0)then
      call garadorb(e,Vru,p,dp,pe,dpe,ri_orb,jspin,kpot,ipr)
   endif
@@ -399,7 +409,7 @@ PROGRAM lapwso
            nv(2)=0
         endif
         call cputim(dtime0)
-        call hmsec(fl,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe)
+        call hmsec(fl,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe,ikp,weight)
         call cputim(dtime1)
         cp(3)=cp(3)+dtime1-dtime0
         deallocate(vec)
@@ -432,6 +442,7 @@ PROGRAM lapwso
      write(6,*) 'write:',cp(4)
      write(6,*) ':TOTTIME on proc 0:',dt4-dt0
   endif
+900 continue
   CALL ERRCLR(ERRFN)
 
   call stop_MPI

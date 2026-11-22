@@ -1,4 +1,4 @@
-SUBROUTINE ABCLM(meigve,SS,NE,NV,KV,P,DP,PE,DPE,isi,JA,indj,lfirst) 
+SUBROUTINE ABCLM(meigve,SS,NE,NV,KV,P,DP,PE,DPE,isi,JA,indj,lfirst,u,coefficient_tangent,central)
   USE param, ONLY: nmat, nume, labc, nato, hblock, lmax, labc2, nloat
   USE lolog, ONLY: nlo, nlov, nlon, lapw
   USE rlolog, ONLY: nnrlo, nrlo
@@ -6,6 +6,10 @@ SUBROUTINE ABCLM(meigve,SS,NE,NV,KV,P,DP,PE,DPE,isi,JA,indj,lfirst)
   USE structure, ONLY: VOL, Rmt, Rotloc, pos, BR1, rotij, tauij
   IMPLICIT NONE
   INTEGER, intent(in) :: NE, NV, isi, ja, indj, lfirst, KV(3,NMAT,2)
+  logical, intent(in) :: coefficient_tangent
+  complex*16, intent(in) :: central(nmat,nume)
+  logical :: moving
+  real*8, intent(in) :: u(3)  ! global Cartesian site velocity (Bohr per unit displacement)
   REAL*8, intent(in)  :: SS(3)
   REAL*8, intent(in)  :: P(Labc+1,NATO,2),DP(Labc+1,NATO,2),PE(Labc+1,NATO,2), DPE(Labc+1,NATO,2)
   !
@@ -31,6 +35,7 @@ SUBROUTINE ABCLM(meigve,SS,NE,NV,KV,P,DP,PE,DPE,isi,JA,indj,lfirst)
   COMPLEX*16, PARAMETER :: IMAG = (0.0D0,1.0D0)
   allocate     ( yl(labc2),h_yl(labc2,hblock), h_alyl(labc2,hblock),h_blyl(labc2,hblock)) 
   allocate(alm(labc2,nume),blm(labc2,nume))
+  moving=any(u/=0.d0)
   PI=ACOS(-1.0D0)                                                   
   TWOPI=2.D0*PI                                                     
   Y=1.0D0                                                           
@@ -83,10 +88,18 @@ SUBROUTINE ABCLM(meigve,SS,NE,NV,KV,P,DP,PE,DPE,isi,JA,indj,lfirst)
         !
         PHSHEL=EXP(IMAG*(ARG1+ARGT))
         do index=1,LABC2
-           h_yl(index,i3)=conjg(yl(index))*phshel
+           ! Apply exp(i*phase) to the conjugate spherical harmonic.
+           ! Explicit real products preserve the imaginary sign in vectorized
+           ! GNU Fortran builds on Apple Silicon. A sign error here rotates
+           ! the plane-wave and local-orbital contributions differently and
+           ! spuriously splits cubic spin-orbit multiplets.
+           h_yl(index,i3)=dcmplx(dble(yl(index))*dble(phshel)+aimag(yl(index))*aimag(phshel), &
+                                dble(yl(index))*aimag(phshel)-aimag(yl(index))*dble(phshel))
         end do
+        if(moving) then
+           h_yl(:,i3)=h_yl(:,i3)*(imag*dot_product(matmul(BR1,BK0),u))
+        endif
      ENDDO
-
 
      index=0
      do L=0,LABC
@@ -132,7 +145,7 @@ SUBROUTINE ABCLM(meigve,SS,NE,NV,KV,P,DP,PE,DPE,isi,JA,indj,lfirst)
      enddo
   enddo
 
-  if (nlo(ja).ne.0) call lomain(meigve,bkx,bky,bkz,fac,ne,lfirst,indj,JA,nv,isi)
+  if (nlo(ja).ne.0) call lomain(meigve,bkx,bky,bkz,fac,ne,lfirst,indj,JA,nv,isi,u,coefficient_tangent,central)
   if (nrlo(ja).ne.0) call rlomain(bkx,bky,bkz,fac,ne,lfirst,indj,JA,nv,isi,kv)
 
   deallocate   (yl,h_yl,h_alyl,h_blyl)

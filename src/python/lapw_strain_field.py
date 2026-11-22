@@ -7,17 +7,19 @@ are zero; symmetry-breaking response/elastic constants need expanded layouts.
 The density-coordinate transport is the independent scalar convention tr(e)/3.
 """
 
+from lapw_xc_response import PBE_PARAMETERS
 from lapw_lattice import NativeLattice
 import numpy as np
 from scipy.special import spherical_jn, factorial2
 from lapw_density_response import checked
 from lapw_geometry_response import harmonic_direction
+from lapw_augmentation_response import harmonics
 from lapw_hartree_periodic import native_local_axes
 from lapw_strain_potential import strain_mask_derivative, masked_potential_strain_source
 from wien_response_operators import hydrostatic_transport_source
 
 
-def harmonic_average_direction(stars, reciprocal, position, local_axes, lm, strain):
+def harmonic_average_direction(stars, reciprocal, position, local_axes, lm, strain, *, displacement=None):
     """Differentiate the native YKAV star sum, retaining phases and star weights."""
     q = stars.members @ reciprocal.T
     local = q @ local_axes.T
@@ -27,7 +29,12 @@ def harmonic_average_direction(stars, reciprocal, position, local_axes, lm, stra
         * np.exp(2j * np.pi * (stars.members @ position))
         / stars.sizes[stars.owners]
     )
-    cache = {l: harmonic_direction(l, local, direction)[1] for l in {l for l, m in lm}}
+    if displacement is None:
+        cache = {l: harmonic_direction(l, local, direction)[1] for l in {l for l, m in lm}}
+    else:
+        # For an internal coordinate only exp(+i G.R) changes in YKAV.
+        phase *= 1j * (q @ displacement)
+        cache = {l: harmonics(l, local) for l in {l for l, m in lm}}
     out = np.empty((len(lm), stars.nstar), complex)
     for i, (l, m) in enumerate(lm):
         values = phase * cache[l][l + m].conj()
@@ -38,7 +45,7 @@ def harmonic_average_direction(stars, reciprocal, position, local_axes, lm, stra
     return out
 
 
-def diagonal_strain_potential(prepared, strain, *, transport_rate=None):
+def diagonal_strain_potential(prepared, strain, *, transport_rate=None, displacements=None):
     """Analytic potential source for symmetric cell strain plus scalar transport.
 
     q'=-e q, Omega'=tr(e)Omega. Let gamma_G=(q.e.q)/q^2. Differentiate the
@@ -56,6 +63,10 @@ def diagonal_strain_potential(prepared, strain, *, transport_rate=None):
         raise NotImplementedError(
             "expand native symmetry/star layout before this strain"
         )
+    if displacements is not None:
+        displacements = checked(displacements, s.pos.shape, "Cartesian site velocities", real=True)
+        if np.any(e) or transport_rate not in (None, 0):
+            raise ValueError("atomic geometry requires fixed cell and stored input charge")
     trace = np.trace(e)
     rate = trace / 3 if transport_rate is None else float(transport_rate)
     if not np.isfinite(rate):
@@ -85,7 +96,8 @@ def diagonal_strain_potential(prepared, strain, *, transport_rate=None):
         lookup = {key: i for i, key in enumerate(lm)}
         args = (b, s.pos[first[atom]], native_local_axes(s.rotloc[atom]), lm)
         y = h.stars.harmonic_average(*args)
-        dy = harmonic_average_direction(h.stars, *args, e)
+        velocity = None if displacements is None else displacements[first[atom]]
+        dy = harmonic_average_direction(h.stars, *args, e, displacement=velocity)
         radius = s.rmt[atom]
         x = norm[1:] * radius
         g = gamma[1:]
@@ -143,14 +155,14 @@ def diagonal_strain_potential(prepared, strain, *, transport_rate=None):
     dp = 2 * gamma * h.diagonal * rho + dA @ multipoles + h.A @ (dD @ rho)
     db = (dB @ p + h.B @ dp).real
     mask = strain_mask_derivative(
-        h.reanalysis, b, s.pos, np.repeat(s.rmt, s.mult), h.volume, e
+        h.reanalysis, b, s.pos, np.repeat(s.rmt, s.mult), h.volume, e, displacements=displacements
     )
     mt = [op.boundary * bound for op, bound in zip(h.radial, db)]
     ir = h.reanalysis.action(dp) + masked_potential_strain_source(h.reanalysis, p, mask)
     coulomb = np.concatenate(mt + [ir.view(float)])
     xc = prepared.xc.ir
     density = np.maximum(xc.expand(rho), 0)
-    if xc.functional == "PBE":
+    if xc.functional in PBE_PARAMETERS and displacements is None:
         fields = xc.fields(density)
         direction = np.zeros_like(fields)
         direction[..., 1:4] = -fields[..., 1:4] @ e
@@ -170,9 +182,11 @@ def diagonal_strain_potential(prepared, strain, *, transport_rate=None):
     )
     vxc = np.zeros(h.size)
     vxc[h.pw_offset :] = pw.view(float)
-    transport = rate * prepared.potential_operator.matvec(
-        hydrostatic_transport_source(prepared.input_density).vector()
-    )
+    transport = np.zeros_like(coulomb)
+    if rate:
+        transport = rate * prepared.potential_operator.matvec(
+            hydrostatic_transport_source(prepared.input_density).vector()
+        )
     return transport + coulomb + vxc, dict(
         transport=transport,
         coulomb_geometry=coulomb,

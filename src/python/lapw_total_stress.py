@@ -12,6 +12,8 @@ The report explicitly identifies projection onto that imposed symmetry when
 the supplied self-energy is not invariant. RMT and local frames remain fixed.
 SOC and spin-dependent KS potentials are outside this implementation.
 """
+from __future__ import annotations
+
 
 from dataclasses import dataclass
 import time
@@ -27,7 +29,7 @@ from lapw_strain_charge import (
 )
 from lapw_geometry_response import native_band_geometry_source
 from lapw_klein_functional import PreparedKleinFunctional
-from lapw_energy_response import SearchedEnergyResponse
+from lapw_energy_response import SearchedEnergyResponse, DFTReferenceEnergyResponse
 from stress_response_adjoint import RY_BOHR3_TO_GPA
 
 
@@ -200,7 +202,10 @@ class PreparedTotalStress:
         self.sigma_symmetry_error = max(errors, default=0.0)
         self.state, self.directory, self.case = state, directory, case
         self.functional = PreparedKleinFunctional(state)
-        self.energy = SearchedEnergyResponse(
+        response_type = (DFTReferenceEnergyResponse
+                         if getattr(state.valence.model, "electronic_model", "dmft") == "dft"
+                         else SearchedEnergyResponse)
+        self.energy = response_type(
             state,
             self.functional,
             directory,
@@ -225,6 +230,8 @@ class PreparedTotalStress:
             )
             induced = readout.contraction(band, geometry, potential, e)
             induced += readout.adjoint @ (self.energy.P @ (self.energy.A @ potential))
+            if isinstance(self.energy, DFTReferenceEnergyResponse):
+                induced += readout.reference_adjoint * self.energy.source_mu(band, potential)
             report.update(
                 source_contracted_by_adjoint=True,
                 radial_energy_policy="differentiated native searches",
@@ -235,7 +242,10 @@ class PreparedTotalStress:
         source, parts, report = hydrostatic_charge_source(
             self.state, self.directory, self.case, strain=e, potential_source=potential
         )
-        source = self.energy.complete_source(source, potential)
+        if isinstance(self.energy, DFTReferenceEnergyResponse):
+            source = self.energy.complete_source(source, potential, parts["band_geometry"])
+        else:
+            source = self.energy.complete_source(source, potential)
         report.update(
             radial_energy_policy="differentiated native searches",
             scalar_transport_rate=float(np.trace(e) / 3),
@@ -292,8 +302,10 @@ class PreparedTotalStress:
         sigma = stress_from_contractions(
             self.strains, values, self.state.potential_core.hartree.volume
         )
+        dft = getattr(self.state.valence.model, 'electronic_model', 'dmft') == 'dft'
         report = dict(
-            observable="complete native frozen-Sigma Klein tangent",
+            observable=("complete native Mermin DFT tangent" if dft
+                        else "complete native frozen-Sigma Klein tangent"),
             stress_Ry_Bohr3=sigma.tolist(),
             stress_GPa=(sigma * RY_BOHR3_TO_GPA).tolist(),
             mean_tensile_stress_GPa=float(np.trace(sigma) * RY_BOHR3_TO_GPA / 3),
@@ -307,6 +319,7 @@ class PreparedTotalStress:
             adjoint=solver,
             central=self.state.metadata,
             search_details=self.energy.details,
+            reference_fermi_response=getattr(self.energy, "reference_report", None),
             contraction_seconds=time.perf_counter() - start,
             stress_applied=False,
             full_tensor_within_symmetry=True,

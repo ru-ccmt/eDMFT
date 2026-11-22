@@ -28,6 +28,18 @@ def checked(a, shape, name, real=False, hermitian=False):
     return a
 
 
+def stored_coefficients(value, shape, name, *, share=False):
+    """Store an immutable native complex matrix; independent callers get a copy."""
+    array = checked(value, shape, name)
+    if share:
+        if array.flags.writeable or array.dtype != np.complex128:
+            raise ValueError("shared coefficients must be read-only complex128: " + name)
+    else:
+        array = np.array(array, dtype=complex, copy=True)
+    array.setflags(write=False)
+    return array
+
+
 class MuffinTinDensity:
     """Prepared one-site MT density; sum equivalent sites with 1/multiplicity.
 
@@ -190,7 +202,7 @@ class MuffinTinDensitySum:
     Only one radial data set is retained for the atom, not one per k point.
     """
 
-    def __init__(self, entries, rho, primitive, harmonics, small_weight, **options):
+    def __init__(self, entries, rho, primitive, harmonics, small_weight, *, share_matching=False, **options):
         rho = np.asarray(rho)
         if rho.ndim != 3 or rho.shape[1] != rho.shape[2] or rho.shape[0] < 1:
             raise ValueError("invalid k-resolved density")
@@ -209,8 +221,8 @@ class MuffinTinDensitySum:
                 or weight <= 0
             ):
                 raise ValueError("invalid site contribution")
-            z = np.array(
-                checked(z, (size, rho.shape[1]), "site matching coefficients"), complex
+            z = stored_coefficients(
+                z, (size, rho.shape[1]), "site matching coefficients", share=share_matching
             )
             zr = z @ rho[k]
             total += weight * zr @ z.conj().T
@@ -338,13 +350,14 @@ class InterstitialDensity:
     """
 
     def __init__(
-        self, coefficients, labels, volume, stars, *, cache_wavefunctions=True
+        self, coefficients, labels, volume, stars, *, cache_wavefunctions=True, share_coefficients=False
     ):
         c = np.asarray(coefficients)
         g = np.asarray(labels)
         if c.ndim != 2 or min(c.shape) < 1:
             raise ValueError("invalid plane-wave coefficients")
-        self.c = checked(c, c.shape, "plane-wave coefficients").copy()
+        self.c = (stored_coefficients(c, c.shape, "plane-wave coefficients", share=True)
+                  if share_coefficients else checked(c, c.shape, "plane-wave coefficients").copy())
         if g.shape != (len(c), 3) or not np.issubdtype(g.dtype, np.integer):
             raise ValueError("invalid plane-wave labels")
         if not np.isfinite(volume) or volume <= 0:

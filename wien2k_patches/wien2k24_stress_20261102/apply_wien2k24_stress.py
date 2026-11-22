@@ -154,6 +154,102 @@ def prepare(root, registry, with_fftw=False):
     return plan
 
 
+def prepare_driver(root, variants):
+    """Patch the active driver, or the script template in an unpacked source tree."""
+    relative = 'run_lapw'
+    active = root / relative
+    template = root / 'SRC/run_lapw'
+    if active.is_symlink():
+        if active.resolve() != template.resolve() or not template.is_file():
+            raise BundleError(f'unsupported run_lapw symlink: {active}')
+        relative = 'SRC/run_lapw'
+    elif not active.exists():
+        relative = 'SRC/run_lapw'
+    before = read_regular(root / relative)
+    if before is None:
+        raise BundleError('--with-run-lapw requires run_lapw or SRC/run_lapw')
+    digest = sha(before)
+    if any(digest == v['target_sha256'] for v in variants):
+        return []
+    for v in variants:
+        if digest == v['sha256']:
+            with tempfile.TemporaryDirectory(prefix='wien-driver-') as temp:
+                path = Path(temp) / 'run_lapw'
+                path.write_bytes(before)
+                apply_diff(path.parent, v['patch'])
+                after = path.read_bytes()
+            if sha(after) != v['target_sha256']:
+                raise BundleError(f'unexpected patched {relative} digest')
+            return [dict(path=relative, before=before, after=after, **{'from': [v['label']]})]
+    raise BundleError(f'unknown {relative} (sha256={digest}); preserve site edits and review the driver patch')
+
+
+def apply_diff(directory, relative):
+    subprocess.run(['patch', '--batch', '--forward', '-F', '0', '-p1', '-d', str(directory),
+                    '-i', str(BUNDLE / safe_relative(relative))], check=True)
+
+
+def prepare_worker_sources(root, recipe, plan):
+    """Check and instrument only temporary copies of the final ordinary sources."""
+    pending = {item['path']: item['after'] for item in plan}
+    exports = {}
+    with tempfile.TemporaryDirectory(prefix='wien-export-check-') as temp:
+        stage = Path(temp)
+        for name, item in recipe['sources'].items():
+            relative = safe_relative(name)
+            before = pending[name] if name in pending else read_regular(root / relative)
+            if sha(before) != item['base_sha256']:
+                raise BundleError(f'unknown response-worker base: {name} (sha256={sha(before)})')
+            path = stage / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(before)
+        apply_diff(stage, recipe['patch'])
+        for name, item in recipe['sources'].items():
+            data = (stage / name).read_bytes()
+            if sha(data) != item['target_sha256']:
+                raise BundleError(f'unexpected response-worker source after patch: {name}')
+            exports[name] = data
+    return exports
+
+
+def install_workers(root, destination, exports):
+    """Compile four serial WIEN workers separately from the ordinary WIEN build."""
+    products = [('SRC_lapw0', 'seq', 'lapw0'), ('SRC_lcore', 'lcore', 'lcore'),
+                ('SRC_lapw1', 'real', 'lapw1'), ('SRC_lapw1', 'complex', 'lapw1c')]
+    ignore = shutil.ignore_patterns('*.o', '*.mod', '*.smod', '*_tmp_.*', '.parallel',
+                                    '.sequential', '.real', '.complex', '*.dSYM',
+                                    'lapw0', 'lcore', 'lapw1', 'lapw1c')
+    with tempfile.TemporaryDirectory(prefix='wien-response-build-') as temp:
+        stage = Path(temp)
+        for component in ('SRC_Globals', 'SRC_lapw0', 'SRC_lcore', 'SRC_lapw1'):
+            shutil.copytree(root / component, stage / component, symlinks=True, ignore=ignore)
+        # WIEN Makefiles may link site-provided libraries through -L../SRC_lib.
+        if (root / 'SRC_lib').is_dir():
+            (stage / 'SRC_lib').symlink_to(root / 'SRC_lib', target_is_directory=True)
+        for name, data in exports.items():
+            path = stage / name
+            if path.is_symlink():
+                raise BundleError(f'unexpected response source symlink: {name}')
+            path.write_bytes(data)
+        plan = []
+        for component, target, executable in products:
+            subprocess.run(['make', '-j1', '-C', str(stage / component),
+                            'DESTDIR=./', target], check=True)
+            product = stage / component / executable
+            if not product.is_file() or not os.access(product, os.X_OK):
+                raise BundleError(f'worker build did not produce {executable}')
+            name = executable + '_response'
+            after = product.read_bytes()
+            before = read_regular(destination / name)
+            if before != after or not os.access(destination / name, os.X_OK):
+                plan.append({'path': name, 'before': before, 'after': after, 'install_mode': 0o755,
+                             'from': ['dedicated WIEN response build']})
+        if plan:
+            destination.mkdir(parents=True, exist_ok=True)
+            install(destination, plan)
+    print(f'Four WIEN response workers verified in {destination}.')
+
+
 def install(root, plan):
     """Back up a preflighted transaction and roll back any failed replacement."""
     stamp = dt.datetime.now().strftime('%Y%m%d_%H%M%S') + '-' + uuid.uuid4().hex[:8]
@@ -167,7 +263,7 @@ def install(root, plan):
     records = []
     for item in plan:
         path = root / item['path']
-        item['mode'] = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644
+        item['mode'] = item.get('install_mode', stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644)
         if item['before'] is not None:
             saved = backup / item['path']
             saved.parent.mkdir(parents=True, exist_ok=True)
@@ -207,11 +303,13 @@ def install(root, plan):
     return backup
 
 
-def build(root, with_fftw):
+def build(root, with_fftw, with_lapw0_mpi=False):
     # Serial make avoids upstream incomplete module dependencies; this is
     # independent of MPI execution of the resulting programs.
     steps = [('SRC_lapw0', []), ('SRC_lapw1', ['real']), ('SRC_lapw1', ['complex']),
              ('SRC_lcore', []), ('SRC_mixer', []), ('SRC_lapw2', ['real']), ('SRC_lapw2', ['complex'])]
+    if with_lapw0_mpi:
+        steps.insert(1, ('SRC_lapw0', ['para']))
     if with_fftw:
         steps += [('SRC_3ddens', []), ('SRC_hf', ['real']), ('SRC_hf', ['complex'])]
     for component, targets in steps:
@@ -224,8 +322,12 @@ def main():
     modes.add_argument('--check', action='store_true', help='preflight only (default)')
     modes.add_argument('--apply', action='store_true', help='apply all recognized source transitions')
     modes.add_argument('--verify', action='store_true', help='require exact current sources and object lists')
+    parser.add_argument('--with-run-lapw', action='store_true', help='include the final screened DFT driver hook')
+    parser.add_argument('--install-response-workers', type=Path, metavar='DBIN',
+                        help='build four isolated response workers into DBIN; --check/--verify only preflight their sources')
     parser.add_argument('--with-debug', action='store_true', help='compatibility option; dormant diagnostics are included')
     parser.add_argument('--with-fftw-compat', action='store_true', help='also patch optional 3ddens/HF FFTW C interfaces')
+    parser.add_argument('--with-lapw0-mpi', action='store_true', help='also build/install lapw0_mpi with the configured MPI compiler')
     parser.add_argument('--build', action='store_true', help='build affected programs with existing site settings')
     parser.add_argument('--install', action='store_true', help='build and install executables into WIENROOT')
     parser.add_argument('--install-helpers', type=Path, metavar='DIR')
@@ -239,35 +341,52 @@ def main():
         for variant in item['variants']:
             if variant['patch'] not in checked:
                 raise BundleError('source transition missing from integrity manifest')
+    for extra in [registry['response_workers'], *registry['run_lapw']]:
+        if extra['patch'] not in checked:
+            raise BundleError('driver or response-worker patch missing from integrity manifest')
     root = options.wienroot.expanduser().resolve()
     if not root.is_dir():
         raise BundleError(f'not a source directory: {root}')
     plan = prepare(root, registry, options.with_fftw_compat)
+    if options.with_run_lapw:
+        plan.extend(prepare_driver(root, registry['run_lapw']))
+    if options.install_response_workers:
+        exports = prepare_worker_sources(root, registry['response_workers'], plan)
     count = sum(options.with_fftw_compat or not x['optional'] for x in registry['sources'].values())
     print(f"{'upgradeable' if plan else 'applied'} {root}: {count} source files; {len(plan)} changes")
     for item in plan:
         print(f"  {'ADD' if item['before'] is None else 'UPDATE'} {item['path']}")
     if options.verify and plan:
         raise BundleError('tree has recognized older sources; apply the upgrade first')
+    if options.verify or options.check:
+        return 0
     if options.apply and plan:
         install(root, plan)
         if prepare(root, registry, options.with_fftw_compat):
             raise BundleError('post-install verification failed')
+        if options.with_run_lapw and prepare_driver(root, registry['run_lapw']):
+            raise BundleError('post-install driver verification failed')
         plan = []
         print('Complete current source hashes and both object lists verified.')
     if options.build or options.install:
         if plan:
             raise BundleError('use --apply before --build on older sources')
-        build(root, options.with_fftw_compat)
+        build(root, options.with_fftw_compat, options.with_lapw0_mpi)
     if options.install:
         binaries = [('SRC_lapw0', 'lapw0'), ('SRC_lapw1', 'lapw1'), ('SRC_lapw1', 'lapw1c'),
                     ('SRC_lcore', 'lcore'), ('SRC_mixer', 'mixer'),
                     ('SRC_lapw2', 'lapw2'), ('SRC_lapw2', 'lapw2c')]
+        if options.with_lapw0_mpi:
+            binaries.append(('SRC_lapw0', 'lapw0_mpi'))
         if options.with_fftw_compat:
             binaries += [('SRC_3ddens', '3ddens'), ('SRC_hf', 'hf'), ('SRC_hf', 'hfc')]
         for directory, filename in binaries:
             shutil.copy2(root / directory / filename, root / filename)
         print('Installed rebuilt executables.')
+    if options.install_response_workers:
+        if plan:
+            raise BundleError('use --apply before building workers on older sources')
+        install_workers(root, options.install_response_workers.expanduser().resolve(), exports)
     if options.install_helpers:
         options.install_helpers.mkdir(parents=True, exist_ok=True)
         for name in ['rmt_stress_correction.py', 'radial_response_fd.py']:

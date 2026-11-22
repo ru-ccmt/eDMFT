@@ -297,7 +297,7 @@
     {
       "path": "SRC_lapw2/lapw2.F",
       "coverage": "packaged-current",
-      "live_sha256": "c88688d59ea7a1b7583c0350088dbf287e343a29d620fe80da19ddd7fae66614"
+      "live_sha256": "726e565f8701192ca6906f0178f4512019f714ee2e3acbe4d422e13220c52e2c"
     },
     {
       "path": "SRC_lapw2/stress_APW_surface.f",
@@ -584,7 +584,6 @@
     "hfpara_lapw",
     "testpara_lapw",
     "x_lapw",
-    "run_lapw",
     "x_nmr_lapw",
     "dstartpara_lapw",
     "irreppara_lapw",
@@ -597,5 +596,23 @@
     "opticpara_lapw",
     "vec2old_lapw",
     "opticcopy_lapw"
-  ]
+  ],
+  "run_lapw": "Separate --with-run-lapw hook for pristine and previous private drivers",
+  "response_workers": {
+    "patch": "patches/build/response-workers.patch",
+    "sources": {
+      "SRC_lapw0/lapw0.F": {
+        "base_sha256": "f7ed79e0ece28bc8c1a4cec1651547f3433e7777687f057185c1db3b6e784b32",
+        "target_sha256": "1811c4665e6125c59ed84da5662d870000e49ffeef63b47e8f3880bb0f4a4275"
+      },
+      "SRC_lapw0/xcpot1.f": {
+        "base_sha256": "e36779b1d1921f5c0f05b4105a66d97f723b14f165aba4a46eda1300f75131bb",
+        "target_sha256": "984293b699fff8a50b0f77ed52c886fa1cf6936a2e9a24631c8d57c008142007"
+      },
+      "SRC_lcore/resld.f": {
+        "base_sha256": "009cb541216bee0d84210e3133171e096313c6c2ca35dee8e17202f8197aade5",
+        "target_sha256": "aadf1a30a924162c6e20a209f8a44ae0edcb2f4b3b5c08c3b194c46c845630aa"
+      }
+    }
+  }
 }

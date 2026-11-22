@@ -3627,17 +3627,20 @@ END SUBROUTINE BuildNormalizationWindowResponseMatrices
 SUBROUTINE cmp_normalization_window_stress(Qbar,cfX,Rspin,iorbital, &
      cix_orb,cixdim,iSx,nindo,nnlo,norbitals,natom,maxdim2,emin,emax, &
      sumw,lmaxp,time_bl,time_bl_w,time_lo,time_lo_w,max_response_modes, &
-     savedWindowRho,savedWindowEnergy,max_nbands,fuse_window_response)
+     savedWindowRho,savedWindowEnergy,max_nbands,fuse_window_response, &
+     fsph,fnsp,fsph2,time_force,time_force_w, &
+     force_norm_window_enabled)
   USE param,ONLY: nume,nmat,lmax2
   USE com,ONLY: nat
   USE dmfts,ONLY: iso,ncix,maxdim,projector,DM_Emin,DM_Emax
   USE xa,ONLY: E,fj,dfj
   USE xa3,ONLY: bk3,bk3lo,aK,k3,k3lo,As,As_lo
-  USE structure,ONLY: rmt,BR1
+  USE structure,ONLY: rmt,BR1,natm
+  USE Forces,ONLY: Qforce
   USE com_mpi,ONLY: myrank,vector_para,vectors,nvector,fvectors,pr_proc,Qprint
   USE p_project,ONLY: phi_jl,dphi_jl,rix,P_rfi,kNri,n_al_ucase, &
        dri,l_al_ucase,j_al_ucase
-  USE dmft_stress,ONLY: stress_val_corr,stress_kin_mt,stress_apw, &
+  USE dmft_stress,ONLY: Qstress,stress_val_corr,stress_kin_mt,stress_apw, &
        stress_kin_int,stress_norm_window,stress_diag_norm, &
        stress_paired_diag_enabled,stress_diag_paired_norm_matching, &
        stress_diag_paired_norm_complete, &
@@ -3646,11 +3649,13 @@ SUBROUTINE cmp_normalization_window_stress(Qbar,cfX,Rspin,iorbital, &
   IMPLICIT NONE
   INTEGER,intent(in) :: nnlo,norbitals,natom,maxdim2,lmaxp,max_nbands
   INTEGER,intent(out) :: max_response_modes
-  LOGICAL,intent(in) :: fuse_window_response
+  LOGICAL,intent(in) :: fuse_window_response,force_norm_window_enabled
   INTEGER,intent(in) :: iorbital(natom,lmaxp+1),cix_orb(norbitals), &
        cixdim(ncix),iSx(maxdim2,norbitals),nindo(norbitals)
   REAL*8,intent(in) :: emin,emax,sumw
-  REAL*8,intent(inout) :: time_bl,time_bl_w,time_lo,time_lo_w
+  REAL*8,intent(inout) :: time_bl,time_bl_w,time_lo,time_lo_w, &
+       time_force,time_force_w
+  REAL*8,intent(inout) :: fsph(3,natm),fnsp(3,natm),fsph2(3,natm)
   COMPLEX*16,intent(in) :: Qbar(maxdim,maxdim,ncix), &
        cfX(maxdim2,maxdim2,norbitals,norbitals),Rspin(2,2,norbitals), &
        savedWindowRho(nume,max_nbands,pr_proc), &
@@ -3790,8 +3795,33 @@ SUBROUTINE cmp_normalization_window_stress(Qbar,cfX,Rspin,iorbital, &
            enddo
         endif
 
-        if (maxval(abs(rhoResponse)).gt.1.d-14 .or. &
-             maxval(abs(eResponse)).gt.1.d-14) then
+        ! Diagnostic force completion: contract only the normalization partner
+        ! of the complementary-band response.  The existing fixed-X partner
+        ! was already contracted in the main k-point pass.  This reuses the
+        ! same three muffin-tin force kernels without altering the charge.
+        if (Qforce .and. force_norm_window_enabled .and. &
+             maxval(abs(rhoResponse)).gt.1.d-14) then
+           allocate(AResponse(nbands_full,nbands_full), &
+                eResponseDiag(nbands_full,nbands_full), &
+                zResponse(nbands_full),weightResponse(nume))
+           AResponse=rhoResponse
+           response_nemaxx=nemax
+           CALL Diagonalize_DMFT_WEIGHTS(zResponse,AResponse,nbands_full, &
+                nemin,response_nemaxx,.true., &
+                'force_normalization_window_response',ikp)
+           eResponseDiag=matmul(conjg(transpose(AResponse)), &
+                matmul(eResponse,AResponse))
+           weightResponse=0.d0
+           weightResponse(nemin:nemax)=zResponse(:)
+           CALL cmp_MT_force_only(AResponse,eResponseDiag, &
+                weightResponse,fsph,fnsp,fsph2,nemin,nemax, &
+                response_nemaxx,nbands_full,n0,nnlo,time_bl,time_bl_w, &
+                time_lo,time_lo_w,time_force,time_force_w)
+           deallocate(AResponse,eResponseDiag,zResponse,weightResponse)
+        endif
+
+        if (Qstress .and. (maxval(abs(rhoResponse)).gt.1.d-14 .or. &
+             maxval(abs(eResponse)).gt.1.d-14)) then
            if (stress_paired_diag_enabled) &
                 call cmp_dmft_paired_matching_matrix(rhoResponse,eResponse, &
                 nemin,nemax,n0,nnlo,stress_diag_paired_norm_matching, &
@@ -4288,7 +4318,93 @@ END SUBROUTINE Serve_Density_requests
 
 module Fermi
   contains
+! Charge and slope of a single k point at fixed Sigma. This is the same
+! Matsubara sum as Density_local with band clipping disabled. Its reference
+! poles are Re eig(H_eff at the LAST measured frequency), including damping.
+! Replacing them by eig(H_KS+Sigma_infinity) changes the finite-cutoff sum.
+subroutine mu_charge_slope(energy,sigma,transform,csize,omega,weights,beta,mu,charge,slope,failed)
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+  implicit none
+  real*8, intent(in) :: energy(:),omega(:),weights(:),beta,mu
+  complex*16, intent(in), contiguous :: sigma(:,:,:),transform(:,:,:,:)
+  integer, intent(in) :: csize(:)
+  real*8, intent(out) :: charge,slope
+  integer, intent(out) :: failed
+  complex*16, allocatable :: g(:,:),work(:),poles(:)
+  complex*16 :: dummy(1),z,g0
+  real*8, allocatable :: ref(:),rwork(:)
+  integer, allocatable :: piv(:)
+  integer :: n,i,j,iw,info,nw,nc,ms
+  real*8 :: f,ferm
+  complex*16 :: tr,sq
+  n=size(energy)
+  nw=size(omega)
+  nc=size(csize)
+  ms=size(sigma,1)
+  failed=0
+  charge=0.d0
+  slope=0.d0
+  allocate(ref(n),g(n,n),work(64*n),poles(n),rwork(2*n))
+  g=0.d0
+  do i=1,n
+     g(i,i)=energy(i)
+  enddo
+  call AddSigma_optimized2(g,sigma(:,:,nw),transform,csize,1,n,nc,ms)
+  call zgeev('N','N',n,g,n,poles,dummy,1,dummy,1,work,size(work),rwork,info)
+  if (info/=0 .or. .not.all(ieee_is_finite(real(poles,kind=8)))) then
+     failed=1
+     return
+  endif
+  ref=real(poles,kind=8)
+  deallocate(g,work,rwork,poles)
+
+  ! dG/dmu=-G^2; the trace of the square requires only pairwise products.
+  ! Each thread holds one inverse, independent of the number of frequencies.
+  !$omp parallel private(g,work,piv,iw,i,j,z,tr,sq,g0,info) reduction(+:charge,slope) reduction(max:failed)
+  allocate(g(n,n),work(64*n),piv(n))
+  !$omp do schedule(static)
+  do iw=1,nw
+     z=cmplx(mu,omega(iw),kind=8)
+     g=0.d0
+     do i=1,n
+        g(i,i)=z-energy(i)
+     enddo
+     call AddSigma_optimized2(g,sigma(:,:,iw),transform,csize,-1,n,nc,ms)
+     call zgetrf(n,n,g,n,piv,info)
+     if (info==0) call zgetri(n,g,n,piv,work,size(work),info)
+     if (info/=0) then
+        failed=1
+        cycle
+     endif
+     tr=0.d0
+     sq=0.d0
+     do i=1,n
+        g0=1.d0/(z-ref(i))
+        tr=tr+(g(i,i)-g0)
+        sq=sq+g0*g0-g(i,i)*g(i,i)
+        do j=1,i-1
+           sq=sq-2.d0*g(j,i)*g(i,j)
+        enddo
+     enddo
+     charge=charge+weights(iw)*real(tr,kind=8)
+     slope=slope+weights(iw)*real(sq,kind=8)
+  enddo
+  !$omp end do
+  deallocate(g,work,piv)
+  !$omp end parallel
+  charge=charge*(2.d0/beta)
+  slope=slope*(2.d0/beta)
+  do i=1,n
+     f=ferm(beta*(ref(i)-mu))
+     charge=charge+f
+     slope=slope+beta*f*(1.d0-f)
+  enddo
+  if (.not.ieee_is_finite(charge) .or. .not.ieee_is_finite(slope)) failed=1
+end subroutine mu_charge_slope
+
 SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnlo, norbitals, natom, maxdim2, nomega, npomega, emin, emax, iorbital, cix_orb, cixdim, iSx, nindo, cfX, Rspin, sumw, wgamma, beta, vnorm1, LowE, lmaxp, SIMPLE, kmax, time_dmf0, time_dmf0w)
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+  use muzero, only: matsum_weight
   USE xa,    ONLY: fj, dfj
   USE xa3,   ONLY: bk3, bk3lo, k3, k3lo, As, As_lo, aK
   USE param, ONLY: lmax2, nume, nmat, nloat, iblock, chunk
@@ -4304,7 +4420,8 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
   COMPLEX*16, allocatable, intent(in) :: Olapm(:,:,:), SOlapm(:,:,:)
   INTEGER, intent(in)    :: recomputeEF, lmaxp
   INTEGER, intent(inout) :: wmax_nbands
-  REAL*8, intent(out)    :: EF, time_dmf0, time_dmf0w
+  real*8, intent(inout) :: EF
+  real*8, intent(out) :: time_dmf0, time_dmf0w
   INTEGER, intent(out)   :: kmax(3)
   REAL*8, intent(in)     :: omega(nomega)
   COMPLEX*16, intent(in) :: sigma(maxsize,ncix,nomega)
@@ -4347,6 +4464,11 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
   COMPLEX*16  :: soo(maxsize,ncix)
   REAL*8, PARAMETER :: small_density_mismatch = 1.0
   REAL*8, allocatable     :: aKR(:), jlr(:), jlp(:)
+
+  logical :: try_newton, newton_done
+  character(len=32) :: mu_solver
+  integer :: attempt, failed_k, failed_any
+  real*8 :: local_n,local_s,total_n,total_s,k_n,k_s,residual,previous,step
 
   if (abs(projector).le.5) then ! Need Olapm, SOlapm
      if (.not.allocated(SOlapm)) then
@@ -4443,11 +4565,10 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
   call walltim(t1w)
   
   ! Ek, zEk, nemm
-  ALLOCATE( wgh(pr_procr), Ek(max_nume,pr_procr), zEk(max_nbands,nomega,pr_procr), nemm(3,pr_procr) )
+  ALLOCATE( wgh(pr_procr), Ek(max_nume,pr_procr), nemm(3,pr_procr) )
   wprint = .TRUE.
   
   Ek(:,:) = 0.0
-  zEk(:,:,:) = 0.0
   wgh(:) = 0
 
   if (recomputeEF.gt.1) then
@@ -4457,219 +4578,59 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
      gtot=0
   endif
 
-  nkp=0
-  iikp=0
-  DO ivector=1,nvector
-     DO is=1,iso    !------ over up/dn ---------------------!
-        itape=8+is
-        if (vector_para) then
-           open(itape,FILE=fvectors(ivector,is),STATUS='old',FORM='unformatted')
-        else
-           rewind(itape) !--- both vector files: 9 and 10 rewind -------------------------!
-        endif
-        DO I=1,NAT
-           READ(itape) EMIST !---- At the beginninge we have linearization energies --!
-           READ(itape) EMIST !---- We just skip them ---------------------------------!
-        ENDDO
-     END DO
-     
-     DO iks=1,vectors(ivector,2) ! kpoint loop begin
-        if (vector_para) then
-           ikp = vectors(ivector,3)+iks  ! successive index in k-point table from case.klist
-           iikp = iikp+1                 ! successive index in k-point table on this processor
-        else
-           ikp = iks                     ! successive index in k-point table from case.klist
-           !--- We need to go over all k-points even though we will compute only some of them on this processor.
-           !--- This is because we need to read vector file sequentially.
-           iikp = ikp-myrank*pr_proc            ! The index of the point to compute. If negative, do not compute! 
-        endif
-        Tcompute=.FALSE.                                                                                                                                                                        
-        if (iikp.gt.0) Tcompute=.TRUE.       ! If Tcompute is true, the point needs to be computed.                                                                                             
-        if (iikp.GT.pr_proc) EXIT            ! Processor finished. The rest of the points will be taken care of by the other processors.                                                        
-        
-        CALL Read_Vec_Spin(E, twgh, As, As_lo, k3, k3lo, bk3, bk3lo, nemin, nemax, DM_nemin, DM_nemax, more_kpoints, n0, emin, emax, DM_Emin, DM_Emax, iso, nmat, nume, nnlo)
-        IF (.NOT.Tcompute) CYCLE
-        IF (.NOT.more_kpoints) EXIT
-
-        wgh(iikp) = twgh
-        
-        isize=n0-nnlo
-        DO I=1,isize                                !----- Over reciprocal vectors -----------------------!
-           Kn(:) = matmul(BR1,BK3(:,I))             !----  Creates K+k in cartesian coordinates ----------!
-           aK(I) = sqrt(Kn(1)**2+Kn(2)**2+Kn(3)**2) !----  calculates |K+k| for use in bessel functions --!
-        ENDDO
-        do jatom=1,nat
-           CALL HARMON(isize,aK(:isize),lmax2,fj(:,:isize,jatom),dfj(:,:isize,jatom),rmt(jatom))
-        enddo
-        
-        ! New
-        if (abs(projector).ge.5) then
-           allocate( phi_jl(nmat, n_al_ucase) )
-           
-           Nri=2**kNri+1    ! Number of radial points in the interstitials
-           phi_jl(:,:)=0
-           allocate( aKR(Nri), jlr(Nri), jlp(Nri) )
-           DO iind=1,n_al_ucase
-              if (abs(dri(iind)).gt.1e-10) then
-                 l     = l_al_ucase(iind)
-                 jatom = j_al_ucase(iind)
-                 DO i=1,isize         ! over all reciprocal vectors K
-                    rx = RMT(jatom)
-                    do ir=1,Nri
-                       aKR(ir)=rx*aK(i)    ! |k+K|*r
-                       rix(ir)=rx          !  r
-                       rx = rx + dri(iind)
-                    enddo
-                    CALL sphbes2(l,Nri,aKR,jlr)  ! spherical bessel : j_l(|k+K|*r)
-                    jlr(:) = jlr(:)*rix(:)       ! r*j_l . We need to do that, because the integral is Int[ (phi(r)/r)*j_l(r)*r^2]=Int[phi(r)*j_l(r)*r]
-                    jlp(:) = jlr(:)*P_rfi(:,iind)
-                    phi_jl(i,iind) = romb(jlp, Nri, dri(iind))  ! Integration over r on rix mesh
-                 ENDDO
-              endif
-           ENDDO
-           deallocate( aKR, jlr, jlp )
-        endif
-        ! New
-        
-        nbands = DM_nemax-DM_nemin+1
-        nip=1
-        allocate( DMFTU(nbands,maxdim2,norbitals,nip) )
-        CALL Build_DMFT_Projector(DMFTU,cfX,Rspin,iorbital,norbitals, &
-             nip,n0,nnlo,nbands,cix_orb,nindo,DM_nemin,DM_nemax, &
-             maxdim2,lmaxp,.False.)
-
-        if (abs(projector).ge.5) deallocate( phi_jl )
-        
-        if (Qrenormalize) then
-           if (abs(projector).le.5) then
-              CALL RenormalizeTrans(DMFTU, Olapm, SOlapm, cix_orb, cixdim, nindo, iSx, nbands, nip, maxdim2, norbitals, maxdim, ncix, SIMPLE)
-           else
-              CALL RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, projector, nbands, nip, maxdim2, norbitals, maxdim, ncix)
+  ! Keep the incoming mu unmodified until a root has been accepted and mixed.
+  ! The eigenvalue route also supplies band exports and the pole-gap modes.
+  ! On failure it restarts from the original mu, with exactly its old data.
+  call get_environment_variable('EDMFT_MU_SOLVER',mu_solver)
+  try_newton=matsubara.and.recomputeEF==1.and.mode/='e'.and..not.Qcheckbands &
+       .and.trim(mu_solver)/='legacy'
+  tEF=EF
+  call Bcast_Density_request(tEF,try_newton)
+  newton_done=.false.
+  previous=huge(1.d0)
+  attempt=0
+  do
+     if (.not.try_newton) then
+        allocate(zEk(max_nbands,nomega,pr_procr))
+        zEk=0.d0
+        call scan_fermi_mesh()
+        exit
+     endif
+     attempt=attempt+1
+     local_n=0.d0
+     local_s=0.d0
+     failed_any=0
+     call scan_fermi_mesh()
+     call Reduce_maxbands(failed_any)
+     call Reduce_Density_sum(local_n,total_n)
+     call Reduce_Density_sum(local_s,total_s)
+     if (myrank==master) then
+        residual=total_n-elecn
+        write(6,'(A,I3,3(1X,ES16.8))') ':MU_NEWTON: trial, mu [Ry], N-target, dN/dmu ', &
+             attempt,tEF,residual,total_s
+        try_newton=failed_any==0.and.ieee_is_finite(residual).and.ieee_is_finite(total_s)
+        if (try_newton) newton_done=abs(residual)<=fatol
+        if (try_newton.and..not.newton_done) then
+           try_newton=total_s>1.d-12.and.abs(residual)<previous
+           if (try_newton) then
+              step=-residual/total_s
+              ! A large extrapolation or nearly incompressible state is a
+              ! better match for the existing bracketed eigenvalue solver.
+              try_newton=ieee_is_finite(step).and.abs(step)<=0.05d0
+              ! After four passes, pay for one last verification only if the
+              ! predicted correction already lies within a few eigen-solver
+              ! root tolerances. Still demand the actual charge residual.
+              if (attempt>=4) try_newton=try_newton.and.attempt==4.and.abs(step)<=10*xatol
+              if (try_newton) tEF=tEF+step
            endif
+           previous=abs(residual)
         endif
-
-
-        ! Keep the chemical-potential pass consistent with the main dmft2
-        ! pass when the opt-in frozen-projector finite-difference diagnostic
-        ! is active.  Freezing U only after cmp_EF would leave an implicit
-        ! projector dependence through the chemical potential and would not
-        ! cleanly isolate the projector derivative.
-        CALL SnapshotDMFTProjector(DMFTU, &
-             E(DM_nemin:DM_nemax),nbands,maxdim2,norbitals,nip, &
-             ikp,iso,'EF')
-
-
-        
-        allocate( STrans(maxsize,ncix,nbands,nbands) )
-        CALL CompressSigmaTransformation1(STrans, DMFTU(:,:,:,1), Sigind, iSx, cix, iorbital, ll, nl, natom, iso, ncix, maxdim, maxdim2, lmaxp, norbitals, nbands, maxsize)
-        
-        allocate( Eij(nbands,nbands) )
-        
-        if (recomputeEF.gt.1) then
-        
-           ! Using pole approximation for the self-energy and the trick described in 
-           ! PRL 96, 036404 (2006)
-           ! to obtain good approximation for the chemical potential. 
-           ! 
-           Eij=0
-           DO iband=1,nbands
-              Eij(iband,iband) = E(iband+DM_nemin-1)  !---   preparing hamiltonian: epsk+sigma
-           ENDDO
-           CALL AddSigma_optimized2(Eij, soo, STrans, csize, 1, nbands, ncix, maxsize)
-           Ha=0
-           Ha(:nbands,:nbands) = Eij(:,:)
-           DO i=1,dNHa
-              ip  = indHa(i,1)
-              ind = indHa(i,2)
-              iorb = indHa(i,3)
-              icix = indHa(i,4)
-              it = Sigind(ip,ip,icix)
-              do iband=1,nbands
-                 Ha(iband,nbands+i) = DMFTU(iband,ind,iorb,1)*sqrt(LowE(2,it,icix))
-                 Ha(nbands+i,iband) = conjg(DMFTU(iband,ind,iorb,1))*sqrt(LowE(2,it,icix))
-              enddo
-           ENDDO
-           DO i=1,dNHa
-              ip  = indHa(i,1)
-              ind = indHa(i,2)
-              iorb = indHa(i,3)
-              icix = indHa(i,4)
-              it = Sigind(ip,ip,icix)
-              Ha(nbands+i,nbands+i) = LowE(3,it,icix)+DM_EF
-           ENDDO
-           
-           CALL ZHEEVD('V','U', nbands+dNHa, Ha, lhda, Ebnd, work, lwork, rwork, lrwork, iwork, liwork, info )
-           if (info .ne. 0) then
-              print *, 'Diagonalization of extended Hamiltonian in computing EF failed. Info-zheevd=', info
-           endif
-        
-           wkp = (twgh/w_sum*2.0)*w_norm1
-           zw0=0
-           do i=1,DM_nemin-1 ! Fully filled bands not treated by DMFT
-              zw0 = zw0+1.
-              weib(i) = weib(i)+ zw0*wkp
-              if (E(i).GT.Ebmax(i)) Ebmax(i) = E(i)
-              if (E(i).LT.Ebmin(i)) Ebmin(i) = E(i)
-              !WRITE(*,'(I3,1x,F12.7,1x,F10.7,1x,F10.7,1x,F10.7)') i, E(i)*Ry2eV, 1., zw0, weib(i)
-           enddo
-           DO i=1,nbands+dNHa ! Bands treated by DMFT
-              dsm=0.0
-              DO iband=1,nbands
-                 dsm = dsm + abs(Ha(iband,i))**2 ! DMFT bands carry a fractional charge
-              ENDDO
-              wg_bnd(i) = dsm  ! The fractional charge of Mott-bands
-              zw0 = zw0 + dsm  ! The total weight up to this band
-              weib(DM_nemin-1+i) = weib(DM_nemin-1+i) + zw0*wkp  ! storing the total weight (summed over k) up to this band
-              if (Ebnd(i).GT.Ebmax(DM_nemin-1+i)) Ebmax(DM_nemin-1+i) = Ebnd(i)  ! Useful to estimate the gap
-              if (Ebnd(i).LT.Ebmin(DM_nemin-1+i)) Ebmin(DM_nemin-1+i) = Ebnd(i)  ! Useful to estimate the gap
-              !WRITE(*,'(I3,1x,F12.7,1x,F10.7,1x,F10.7,1x,F10.7)') i+DM_nemin-1, Ebnd(i)*Ry2eV, dsm, zw0, weib(DM_nemin-1+i)
-           ENDDO
-        endif
-        
-        deallocate( DMFTU )
-        allocate( zw1(nbands) )
-        deallocate( Eij )
-        
-        !! OMP
-        !! private: Eij, tzek, i,
-        !! shared(zEk)
-
-        !$OMP  PARALLEL DO SHARED(zEk) PRIVATE(i,Eij,tzek) SCHEDULE(STATIC,CHUNK)
-        do iom=1,npomega
-           allocate( Eij(nbands,nbands), tzek(nbands) )
-           Eij=0
-           DO i=1,nbands
-              Eij(i,i) = E(i+DM_nemin-1)  !---   preparing hamiltonian: epsk+sigma
-           ENDDO
-           ! Adding self-energy
-           CALL AddSigma_optimized2(Eij, sigma(:,:,iom), STrans, csize, 1, nbands, ncix, maxsize)
-           CALL eigvals(Eij, tzek, nbands)
-           zEk(:nbands,iom,iikp) = tzek(:)
-           deallocate( Eij, tzek )
-        enddo
-        !$OMP END PARALLEL DO
-        
-        DEALLOCATE( zw1 )
-        
-        nemm(1,iikp) = nemin
-        nemm(2,iikp) = DM_nemin
-        nemm(3,iikp) = DM_nemax
-        Ek(:nume,iikp) = E(:nume)
-        
-        DEALLOCATE( STrans )
-        WRITE(*,'(I3,A,1x,I3,1x,I3,1x,A,I4)') myrank, ') Finished k-point number', ikp, iikp, 'with #bands=', nbands
-        nkp=nkp+1
-        if (Qprint) WRITE(6,'(I3,A,1x,I3,1x,I3,1x,A,I4)') myrank, ') Finished k-point number', ikp, iikp, 'with #bands=', nbands
-     ENDDO         ! kpoint loop ends
-     DO is=1,iso    !------ over up/dn ---------------------!
-        itape=8+is
-        if (vector_para) then
-           close(itape)
-        else
-           rewind(itape)
-        endif
-     ENDDO
-  END DO           ! ivector loop ends
+        if (.not.try_newton) write(6,'(A)') ':MU_NEWTON: falling back to the original chemical-potential search'
+     endif
+     call Bcast_Density_request(tEF,newton_done)
+     call Bcast_Density_request(tEF,try_newton)
+     if (newton_done) exit
+  enddo
 
   ! Ebmax <- max(Ebmax)
   ! Ebmin <- min(Ebmin)
@@ -4698,7 +4659,7 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
   wmatsubara = matsubara
   !wprint1=.false.
   if (myrank.EQ.master) then
-     Need_EF_update=.True.
+     Need_EF_update=.not.newton_done
      
      if (recomputeEF.gt.1) then
         ! Print g computed by quasiparticle approximation.
@@ -4816,9 +4777,9 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
      ! Release workers waiting for another Density trial before the EF bcast.
      density_request_EF = 0.d0
      density_request = .FALSE.
-     CALL Bcast_Density_request(density_request_EF, density_request)
+     if (.not.newton_done) CALL Bcast_Density_request(density_request_EF, density_request)
   else
-     CALL Serve_Density_requests()
+     if (.not.newton_done) CALL Serve_Density_requests()
   endif
 
 
@@ -4830,12 +4791,242 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
      DEALLOCATE( indHa )
   endif
   
-  DEALLOCATE( wgh, Ek, zEk, nemm )
+  DEALLOCATE( wgh, Ek, nemm )
+  if (allocated(zEk)) deallocate(zEk)
   call cputim(t2c)
   call walltim(t2w)
   time_dmf0 = t2c-t1c
   time_dmf0w= t2w-t1w
 
+contains
+  ! Stream the local vector files for each trial. Only one k point's
+  ! embedding is resident. A fallback rebuilds the original spectra once.
+  subroutine scan_fermi_mesh()
+  nkp=0
+  iikp=0
+  DO ivector=1,nvector
+     DO is=1,iso    !------ over up/dn ---------------------!
+        itape=8+is
+        if (vector_para) then
+           open(itape,FILE=fvectors(ivector,is),STATUS='old',FORM='unformatted')
+        else
+           rewind(itape) !--- both vector files: 9 and 10 rewind -------------------------!
+        endif
+        DO I=1,NAT
+           READ(itape) EMIST !---- At the beginninge we have linearization energies --!
+           READ(itape) EMIST !---- We just skip them ---------------------------------!
+        ENDDO
+     END DO
+     
+     DO iks=1,vectors(ivector,2) ! kpoint loop begin
+        if (vector_para) then
+           ikp = vectors(ivector,3)+iks  ! successive index in k-point table from case.klist
+           iikp = iikp+1                 ! successive index in k-point table on this processor
+        else
+           ikp = iks                     ! successive index in k-point table from case.klist
+           !--- We need to go over all k-points even though we will compute only some of them on this processor.
+           !--- This is because we need to read vector file sequentially.
+           iikp = ikp-myrank*pr_proc            ! The index of the point to compute. If negative, do not compute! 
+        endif
+        Tcompute=.FALSE.                                                                                                                                                                        
+        if (iikp.gt.0) Tcompute=.TRUE.       ! If Tcompute is true, the point needs to be computed.                                                                                             
+        if (iikp.GT.pr_proc) EXIT            ! Processor finished. The rest of the points will be taken care of by the other processors.                                                        
+        
+        CALL Read_Vec_Spin(E, twgh, As, As_lo, k3, k3lo, bk3, bk3lo, nemin, nemax, DM_nemin, DM_nemax, more_kpoints, n0, emin, emax, DM_Emin, DM_Emax, iso, nmat, nume, nnlo)
+        IF (.NOT.Tcompute) CYCLE
+        IF (.NOT.more_kpoints) EXIT
+
+        wgh(iikp) = twgh
+        
+        isize=n0-nnlo
+        DO I=1,isize                                !----- Over reciprocal vectors -----------------------!
+           Kn(:) = matmul(BR1,BK3(:,I))             !----  Creates K+k in cartesian coordinates ----------!
+           aK(I) = sqrt(Kn(1)**2+Kn(2)**2+Kn(3)**2) !----  calculates |K+k| for use in bessel functions --!
+        ENDDO
+        do jatom=1,nat
+           CALL HARMON(isize,aK(:isize),lmax2,fj(:,:isize,jatom),dfj(:,:isize,jatom),rmt(jatom))
+        enddo
+        
+        ! New
+        if (abs(projector).ge.5) then
+           allocate( phi_jl(nmat, n_al_ucase) )
+           
+           Nri=2**kNri+1    ! Number of radial points in the interstitials
+           phi_jl(:,:)=0
+           allocate( aKR(Nri), jlr(Nri), jlp(Nri) )
+           DO iind=1,n_al_ucase
+              if (abs(dri(iind)).gt.1e-10) then
+                 l     = l_al_ucase(iind)
+                 jatom = j_al_ucase(iind)
+                 DO i=1,isize         ! over all reciprocal vectors K
+                    rx = RMT(jatom)
+                    do ir=1,Nri
+                       aKR(ir)=rx*aK(i)    ! |k+K|*r
+                       rix(ir)=rx          !  r
+                       rx = rx + dri(iind)
+                    enddo
+                    CALL sphbes2(l,Nri,aKR,jlr)  ! spherical bessel : j_l(|k+K|*r)
+                    jlr(:) = jlr(:)*rix(:)       ! r*j_l . We need to do that, because the integral is Int[ (phi(r)/r)*j_l(r)*r^2]=Int[phi(r)*j_l(r)*r]
+                    jlp(:) = jlr(:)*P_rfi(:,iind)
+                    phi_jl(i,iind) = romb(jlp, Nri, dri(iind))  ! Integration over r on rix mesh
+                 ENDDO
+              endif
+           ENDDO
+           deallocate( aKR, jlr, jlp )
+        endif
+        ! New
+        
+        nbands = DM_nemax-DM_nemin+1
+        nip=1
+        allocate( DMFTU(nbands,maxdim2,norbitals,nip) )
+        CALL Build_DMFT_Projector(DMFTU,cfX,Rspin,iorbital,norbitals, &
+             nip,n0,nnlo,nbands,cix_orb,nindo,DM_nemin,DM_nemax, &
+             maxdim2,lmaxp,.False.)
+
+        if (abs(projector).ge.5) deallocate( phi_jl )
+        
+        if (Qrenormalize) then
+           if (abs(projector).le.5) then
+              CALL RenormalizeTrans(DMFTU, Olapm, SOlapm, cix_orb, cixdim, nindo, iSx, nbands, nip, maxdim2, norbitals, maxdim, ncix, SIMPLE)
+           else
+              CALL RenormalizeTransK(DMFTU, cix_orb, cixdim, nindo, iSx, Sigind, projector, nbands, nip, maxdim2, norbitals, maxdim, ncix)
+           endif
+        endif
+
+
+        ! Keep the chemical-potential pass consistent with the main dmft2
+        ! pass when the opt-in frozen-projector finite-difference diagnostic
+        ! is active.  Freezing U only after cmp_EF would leave an implicit
+        ! projector dependence through the chemical potential and would not
+        ! cleanly isolate the projector derivative.
+        CALL SnapshotDMFTProjector(DMFTU, &
+             E(DM_nemin:DM_nemax),nbands,maxdim2,norbitals,nip, &
+             ikp,iso,'EF')
+
+
+        
+        allocate( STrans(maxsize,ncix,nbands,nbands) )
+        CALL CompressSigmaTransformation1(STrans, DMFTU(:,:,:,1), Sigind, iSx, cix, iorbital, ll, nl, natom, iso, ncix, maxdim, maxdim2, lmaxp, norbitals, nbands, maxsize)
+        
+        if (try_newton) then
+           call mu_charge_slope(E(DM_nemin:DM_nemax),sigma,STrans,csize,omega, &
+                matsum_weight,beta,tEF,k_n,k_s,failed_k)
+           wkp=(twgh/w_sum*2.d0)*w_norm1
+           failed_any=max(failed_any,failed_k)
+           local_n=local_n+wkp*(k_n+max(0,DM_nemin-nemin))
+           local_s=local_s+wkp*k_s
+           deallocate(STrans,DMFTU)
+           cycle
+        endif
+        allocate( Eij(nbands,nbands) )
+        
+        if (recomputeEF.gt.1) then
+        
+           ! Using pole approximation for the self-energy and the trick described in 
+           ! PRL 96, 036404 (2006)
+           ! to obtain good approximation for the chemical potential. 
+           ! 
+           Eij=0
+           DO iband=1,nbands
+              Eij(iband,iband) = E(iband+DM_nemin-1)  !---   preparing hamiltonian: epsk+sigma
+           ENDDO
+           CALL AddSigma_optimized2(Eij, soo, STrans, csize, 1, nbands, ncix, maxsize)
+           Ha=0
+           Ha(:nbands,:nbands) = Eij(:,:)
+           DO i=1,dNHa
+              ip  = indHa(i,1)
+              ind = indHa(i,2)
+              iorb = indHa(i,3)
+              icix = indHa(i,4)
+              it = Sigind(ip,ip,icix)
+              do iband=1,nbands
+                 Ha(iband,nbands+i) = DMFTU(iband,ind,iorb,1)*sqrt(LowE(2,it,icix))
+                 Ha(nbands+i,iband) = conjg(DMFTU(iband,ind,iorb,1))*sqrt(LowE(2,it,icix))
+              enddo
+           ENDDO
+           DO i=1,dNHa
+              ip  = indHa(i,1)
+              ind = indHa(i,2)
+              iorb = indHa(i,3)
+              icix = indHa(i,4)
+              it = Sigind(ip,ip,icix)
+              Ha(nbands+i,nbands+i) = LowE(3,it,icix)+DM_EF
+           ENDDO
+           
+           CALL ZHEEVD('V','U', nbands+dNHa, Ha, lhda, Ebnd, work, lwork, rwork, lrwork, iwork, liwork, info )
+           if (info .ne. 0) then
+              print *, 'Diagonalization of extended Hamiltonian in computing EF failed. Info-zheevd=', info
+           endif
+        
+           wkp = (twgh/w_sum*2.0)*w_norm1
+           zw0=0
+           do i=1,DM_nemin-1 ! Fully filled bands not treated by DMFT
+              zw0 = zw0+1.
+              weib(i) = weib(i)+ zw0*wkp
+              if (E(i).GT.Ebmax(i)) Ebmax(i) = E(i)
+              if (E(i).LT.Ebmin(i)) Ebmin(i) = E(i)
+              !WRITE(*,'(I3,1x,F12.7,1x,F10.7,1x,F10.7,1x,F10.7)') i, E(i)*Ry2eV, 1., zw0, weib(i)
+           enddo
+           DO i=1,nbands+dNHa ! Bands treated by DMFT
+              dsm=0.0
+              DO iband=1,nbands
+                 dsm = dsm + abs(Ha(iband,i))**2 ! DMFT bands carry a fractional charge
+              ENDDO
+              wg_bnd(i) = dsm  ! The fractional charge of Mott-bands
+              zw0 = zw0 + dsm  ! The total weight up to this band
+              weib(DM_nemin-1+i) = weib(DM_nemin-1+i) + zw0*wkp  ! storing the total weight (summed over k) up to this band
+              if (Ebnd(i).GT.Ebmax(DM_nemin-1+i)) Ebmax(DM_nemin-1+i) = Ebnd(i)  ! Useful to estimate the gap
+              if (Ebnd(i).LT.Ebmin(DM_nemin-1+i)) Ebmin(DM_nemin-1+i) = Ebnd(i)  ! Useful to estimate the gap
+              !WRITE(*,'(I3,1x,F12.7,1x,F10.7,1x,F10.7,1x,F10.7)') i+DM_nemin-1, Ebnd(i)*Ry2eV, dsm, zw0, weib(DM_nemin-1+i)
+           ENDDO
+        endif
+        
+        deallocate( DMFTU )
+        allocate( zw1(nbands) )
+        deallocate( Eij )
+        
+        !! OMP
+        !! private: Eij, tzek, i,
+        !! shared(zEk)
+
+        !$OMP  PARALLEL DO SHARED(zEk) PRIVATE(i,Eij,tzek) SCHEDULE(STATIC,CHUNK)
+        do iom=1,npomega
+           allocate( Eij(nbands,nbands), tzek(nbands) )
+           Eij=0
+           DO i=1,nbands
+              Eij(i,i) = E(i+DM_nemin-1)  !---   preparing hamiltonian: epsk+sigma
+           ENDDO
+           ! Adding self-energy
+           CALL AddSigma_optimized2(Eij, sigma(:,:,iom), STrans, csize, 1, nbands, ncix, maxsize)
+           CALL eigvals(Eij, tzek, nbands)
+           zEk(:nbands,iom,iikp) = tzek(:)
+           deallocate( Eij, tzek )
+        enddo
+        !$OMP END PARALLEL DO
+        
+        DEALLOCATE( zw1 )
+        
+        nemm(1,iikp) = nemin
+        nemm(2,iikp) = DM_nemin
+        nemm(3,iikp) = DM_nemax
+        Ek(:nume,iikp) = E(:nume)
+        
+        DEALLOCATE( STrans )
+        WRITE(*,'(I3,A,1x,I3,1x,I3,1x,A,I4)') myrank, ') Finished k-point number', ikp, iikp, 'with #bands=', nbands
+        nkp=nkp+1
+        if (Qprint) WRITE(6,'(I3,A,1x,I3,1x,I3,1x,A,I4)') myrank, ') Finished k-point number', ikp, iikp, 'with #bands=', nbands
+     ENDDO         ! kpoint loop ends
+     DO is=1,iso    !------ over up/dn ---------------------!
+        itape=8+is
+        if (vector_para) then
+           close(itape)
+        else
+           rewind(itape)
+        endif
+     ENDDO
+  END DO           ! ivector loop ends
+
+  end subroutine scan_fermi_mesh
 END SUBROUTINE cmp_EF
 
 

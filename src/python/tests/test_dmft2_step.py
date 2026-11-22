@@ -73,6 +73,42 @@ class ExecutionTests(unittest.TestCase):
                 "disabled",
             )
 
+    def test_native_force_modes_follow_live_input(self):
+        # Include both ordinary and screened input modes. Only the native
+        # charge calculation runs on intermediate iterations.
+        for requested, expected in (("FOR", "FOR"), ("FORT", "FOR"),
+                                    ("STRF", "STRF"), ("STRFT", "STRF"),
+                                    ("STRT", "STR"), ("TOT", "TOT")):
+            with self.subTest(requested), case_directory(requested):
+                modes = []
+                def inspect(root, mpi, definition, output):
+                    modes.append(step.input_mode(step.entries(Path(definition).read_text())[5]))
+                with patch.object(step, "run_core", side_effect=inspect):
+                    step.execute("sample", ".", phase="defer")
+                    step.execute("sample", ".", phase="defer", final_force=True)
+                    Path("sample.in2").write_text("FOR\n")
+                    step.execute("sample", ".", phase="defer")
+                self.assertEqual(modes, [expected, expected, "FOR"])
+
+    def test_final_force_uses_private_input_only_for_charge(self):
+        for mode, phase, expected in (("c", "final", "FOR"), ("c", "standalone", "TOT"),
+                                      ("m", "final", "TOT")):
+            with self.subTest(mode=mode, phase=phase), case_directory("TOT", mode):
+                inp, definition = Path("sample.in2c"), Path("dmft2.def")
+                Path("sample.in2").rename(inp)
+                definition.write_text(definition.read_text().replace("sample.in2", inp.name))
+                original = inp.read_bytes(), definition.read_bytes()
+                def inspect(root, mpi, temp_definition, output):
+                    current = step.entries(Path(temp_definition).read_text())[5]
+                    self.assertEqual(step.input_mode(current), expected)
+                    self.assertEqual(Path(current).read_text().splitlines()[1:],
+                                     inp.read_text().splitlines()[1:])
+                    raise RuntimeError("stop")
+                with patch.object(step, "run_core", side_effect=inspect), self.assertRaisesRegex(RuntimeError, "stop"):
+                    step.execute("sample", ".", phase=phase, final_force=True)
+                self.assertEqual((inp.read_bytes(), definition.read_bytes()), original)
+                self.assertFalse(list(Path(".").glob(".dmft2-response-input-*")))
+
     def test_energy_only_never_responds(self):
         with case_directory(charge="m"), patch.object(step, "run_core"), patch.object(
             step, "compute_response"
@@ -80,6 +116,36 @@ class ExecutionTests(unittest.TestCase):
             result = step.execute("sample", "/unused", phase="final")
             self.assertEqual(result["status"], "skipped_noncharge")
             response.assert_not_called()
+
+    def test_final_native_force_for_scalar_and_magnetic_runs(self):
+        import run_dmft as driver
+        from contextlib import ExitStack
+        from types import SimpleNamespace
+        with case_directory("TOT"):
+            Path("sample.inm").write_text("MSR1\n")
+            for ext in ("", "dn"):
+                with self.subTest(ext), ExitStack() as stack:
+                    calls = []
+                    def record(name, **kwargs):
+                        calls.append(name)
+                        if name in ("dmft2", "lattice_charge_step"):
+                            self.assertTrue(kwargs["final_force"])
+                    for name in ("dmft2", "lattice_charge_step", "lcore", "scf", "scf1", "mixer", "scfm"):
+                        stack.enter_context(patch.object(driver, name,
+                            side_effect=lambda *args, n=name, **kwargs: record(n, **kwargs)))
+                    params = {"force_last": False}
+                    args = (io.StringIO(), SimpleNamespace(case="sample", WIENROOT="."),
+                            io.StringIO(), None, params, "", {"m_extn": ext}, True)
+                    self.assertFalse(driver.final_response_pass(*args))
+                    params["force_last"] = True
+                    self.assertTrue(driver.final_response_pass(*args))
+                    self.assertEqual(calls, ["lattice_charge_step" if ext else "dmft2",
+                                             "lcore", "scf", "scf1", "mixer", "scfm"])
+            Path("sample.inm").write_text("MSR1a\n")
+            self.assertFalse(driver.final_response_pass(*args))
+            Path("sample.inm").write_text("MSR1\n")
+            Path("sample.in2").write_text("FOR\n")
+            self.assertFalse(driver.final_response_pass(*args))
 
     def test_mode_aliases_preserve_prepared_files(self):
         for alias, native in [("STRT", "STR"), ("STRFT", "STRF")]:
@@ -259,7 +325,7 @@ class ExecutionTests(unittest.TestCase):
                     raise RuntimeError("response failed")
 
             scope = {
-                "dmft2_step": SimpleNamespace(requested=lambda case: enabled),
+                "dmft2_step": SimpleNamespace(request=lambda case: {"enabled": enabled, "mode":"STRT"}),
                 "dmft2": core,
             }
             for name in ["lcore", "scf", "scf1", "mixer", "scfm"]:
@@ -270,7 +336,8 @@ class ExecutionTests(unittest.TestCase):
                 ),
                 scope,
             )
-            arguments = [io.StringIO(), "sample", io.StringIO(), None, None, None]
+            arguments = [io.StringIO(), SimpleNamespace(case="sample", WIENROOT="."), io.StringIO(),
+                         None, {"force_last": False}, "", {"m_extn": ""}, True]
             if fail:
                 with self.assertRaisesRegex(RuntimeError, "response failed"):
                     scope["final_response_pass"](*arguments)

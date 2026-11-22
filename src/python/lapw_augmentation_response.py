@@ -9,7 +9,8 @@ and its native triangle convention remain separate contributions.
 from functools import lru_cache
 import numpy as np
 from numpy.polynomial.legendre import leggauss
-from scipy.special import sph_harm_y, spherical_jn
+from scipy.special import spherical_jn
+from lapw_scipy_compat import sph_harm_y
 
 
 def real_pair(a, b):
@@ -108,6 +109,20 @@ class PreparedAugmentationChannel:
         )
         self.ell, self.rmt = int(ell), float(rmt)
         self.nlo, self.nband = len(local), c.shape[1]
+
+    def store_matching(self, scratch):
+        # Keep the small LO block in RAM. F and D retain ALL band columns
+        # for every site/l/k and dominate the high-l memory cost.
+        self._stored_matching = {name: scratch.store(self.__dict__.pop(name))
+                                 for name in ("fj", "dfj")}
+
+    def __getattr__(self, name):
+        # Ordinary channels keep these arrays as normal attributes. A copy
+        # used for a geometry derivative overrides both with its own arrays.
+        stored = self.__dict__.get("_stored_matching", {})
+        if name in stored:
+            return stored[name].read()
+        raise AttributeError(name)
 
     def _check(self, boundary, lo):
         if np.shape(boundary) != (4, 2 + self.nlo) or np.shape(lo) != (

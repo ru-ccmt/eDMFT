@@ -1,4 +1,4 @@
-"""Prepared nonmagnetic LDA/PBE native XC response and exact transpose.
+"""Prepared nonmagnetic LDA, PBE and PBEsol native XC response and exact transpose.
 
 The optional energy_per_electron quantity differentiates the actual native
 scalar-energy field. Its discrete derivative need not equal the separately
@@ -16,6 +16,15 @@ import numpy as np
 from scipy.linalg.lapack import dgttrf, dgttrs
 from lapw_density_response import checked
 from stress_response_adjoint import PairedOperator
+
+
+# Native WIEN PBEX/PBEC exchange and correlation gradient coefficients (mu, beta).
+# PBEsol retains the PBE functional form and its common kappa = 0.804.
+# Keep energy, potential, and their derivatives on the same branch.
+PBE_PARAMETERS = {
+    "PBE": (0.2195149727645171, 0.06672455060314922),
+    "PBESOL": (10.0 / 81.0, 0.046),
+}
 
 
 def _gcor(rs):
@@ -45,12 +54,12 @@ def unpolarized_xc(
 
     Branch decisions use real central values. Preserve the built-in native
     low-density fallbacks; replacing them by another library's PBE would
-    differentiate a different implemented map. Only standard XC_LDA/PBE.
+    differentiate a different implemented map. Supports the standard LDA, PBE and PBEsol choices.
     """
     if quantity not in ("potential", "energy_per_electron"):
         raise ValueError("invalid XC quantity")
-    if functional not in ("LDA", "PBE"):
-        raise NotImplementedError("only native LDA/PBE supported")
+    if functional != "LDA" and functional not in PBE_PARAMETERS:
+        raise NotImplementedError("only native LDA, PBE and PBEsol supported")
     n, g, lap, gdgg = np.broadcast_arrays(n, g, lap, gdgg)
     active = n.real > 2e-15
     rho = np.where(active, n, 1.0)
@@ -74,7 +83,7 @@ def unpolarized_xc(
     s = gx / (2 * kf * rho)
     u = ux / (rho**2 * (2 * kf) ** 3)
     v = lap / (rho * (2 * kf) ** 2)
-    mu = 0.2195149727645171
+    mu, beta = PBE_PARAMETERS[functional]
     kappa = 0.804
     ratio = mu / kappa
     p0 = 1 + ratio * s * s
@@ -85,7 +94,6 @@ def unpolarized_xc(
     vx = ex * (4 / 3 * enhance - (u - 4 / 3 * s**3) * fss - v * fs)
     cut = (rho.real < 1e-6) & (abs(vx.real - lda_x.real) > 0.4 * abs(lda_x.real))
     vx = np.where(cut, lda_x, vx)
-    beta = 0.06672455060314922
     gamma = 0.031090690869654895
     delta = beta / gamma
     ks = np.sqrt(4 * kf / np.pi)
@@ -412,9 +420,9 @@ class MuffinTinXCResponse:
         self.project[:, 0] += yw[:, 0]
         self.output_scale = np.ones(self.shape)
         self.output_scale[:, 0] = self.r / np.sqrt(4 * np.pi)
-        if functional == "PBE":
+        if functional in PBE_PARAMETERS:
             if angular_derivatives is None or sine is None or cosine is None:
-                raise ValueError("PBE requires native angular derivatives")
+                raise ValueError("GGA requires native angular derivatives")
             self.angular = [self.Y] + [
                 (np.asarray(a, float)[:, :len(c)] @ c if self.cubic else np.asarray(a, float))
                 for a in angular_derivatives
@@ -582,7 +590,7 @@ class InterstitialXCResponse:
             for k in (-1, 0, 1)
             if lattice_type.strip() != "H" or i*i + j*j - i*j + k*k < 3
         ])
-        if functional == "PBE":
+        if functional in PBE_PARAMETERS:
             xyz = (self.offsets / np.array(self.shape)) @ cell.T
             x, y, z = xyz.T
             design = np.array(
@@ -671,7 +679,7 @@ class InterstitialXCResponse:
         )
         return unpolarized_xc(
             *args,
-            functional="PBE",
+            functional=self.functional,
             charge_cut=1e-9,
             exchange_gradient=exg,
             exchange_gdgg=exu,

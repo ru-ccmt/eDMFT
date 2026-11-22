@@ -31,7 +31,7 @@ module outwin_response
   public :: local_orbital_coefficients
 
   type :: radial_context
-     integer :: n=0
+     integer :: n=0, order=5
      real(dp) :: dx=0, c=0, norm=0
      real(dp), allocatable :: r(:), y(:,:), f(:,:), output(:,:), metric(:,:)
      real(dp), allocatable :: matrix(:,:,:), phi_slope(:), phi_v(:), phi_e(:)
@@ -58,7 +58,7 @@ contains
     n=size(potential)
     policy=0
     if(present(quadrature)) policy=quadrature
-    if(policy<0.or.policy>1) error stop "unknown radial quadrature"
+    if(policy<0.or.policy>2) error stop "unknown radial quadrature"
     if(policy==1.and.n<8) error stop "WIEN24 radial quadrature needs at least eight points"
     if (n<4.or.r0<=0.or.dx<=0) error stop 'invalid radial response grid'
     ctx%n=n; ctx%dx=dx
@@ -66,7 +66,10 @@ contains
     if (.not.rel) ctx%c=1.0e10_dp
     allocate(ctx%r(n), ctx%y(n,2), ctx%f(n,2), ctx%output(n,4), ctx%metric(n,4))
     allocate(ctx%matrix(2,2,n), ctx%phi_slope(n), ctx%phi_v(n), ctx%phi_e(n))
-    call outwin(a,b,ap,bp,nodes,val,slo,rel,potential,r0,dx,n,energy,ell,charge,n)
+    ! LAPWSO integrates every radial step with its fourth-order rule.
+    ! Keep its primal, tangent and transpose on that same discrete trajectory.
+    if (policy==2) ctx%order=4
+    call outwin_ordered(a,b,ap,bp,nodes,val,slo,rel,potential,r0,dx,n,energy,ell,charge,n,ctx%order)
     do k=1,n
        ctx%r(k)=r0*exp(dx*real(k-1,dp))
     enddo
@@ -122,14 +125,14 @@ contains
     ctx%norm=1/sqrt(sum(ctx%metric*ctx%output**2))
   end subroutine
 
-  subroutine history(k, scale, weight, first)
-    integer, intent(in) :: k
+  subroutine history(k, order, scale, weight, first)
+    integer, intent(in) :: k, order
     real(dp), intent(out) :: scale, weight(4)
     integer, intent(out) :: first
-    if (k==4) then
+    if (k==4.or.order==4) then
        scale=8.0_dp/3
        weight=[1.0_dp,-5.0_dp,19.0_dp,0.0_dp]/9
-       first=1
+       first=k-3
     else
        scale=720.0_dp/251
        weight=[-19.0_dp,106.0_dp,-264.0_dp,646.0_dp]/251
@@ -167,7 +170,7 @@ contains
     ! Origin seeds are independent of V and E in the implemented OUTWIN.
     dy=0; df=0
     do k=4,ctx%n
-       call history(k,scale,weight,first)
+       call history(k,ctx%order,scale,weight,first)
        rhs=scale*dy(k-1,:)
        do j=first,k-1
           rhs=rhs+weight(j-first+1)*df(j,:)
@@ -204,7 +207,7 @@ contains
     bf(:,2)=gradient(:,4)/(ctx%dx*ctx%r)*ctx%c/2
     dv_bar=0; de_bar=0
     do k=ctx%n,4,-1
-       call history(k,scale,weight,first)
+       call history(k,ctx%order,scale,weight,first)
        ! f_k=L_k*y_k followed the implicit solve. Reverse it first, then
        ! solve (scale*I-L_k)^T for the implicit-step covector.
        by(k,:)=by(k,:)+matmul(transpose(ctx%matrix(:,:,k)),bf(k,:))

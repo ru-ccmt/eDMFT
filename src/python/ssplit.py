@@ -7,44 +7,11 @@ import numpy as np
 from math import *
 from numpy import zeros,ones,array,shape,loadtxt,savetxt,vstack
 
+from pathlib import Path
+from matsubara_mesh import DEFAULT_TOL, HEADER, cached_auto_mesh, impurity_nom, log_indices
+
 def create_log_mesh(sigdata, nom, ntail_):
-    """Creates logarithmic mesh on Matsubara axis
-       Takes first istart points from mesh om and
-       the rest of om mesh is replaced by ntail poinst
-       redistribued logarithmically.
-       Input:
-           om      -- original long mesh
-           istart  -- first istart points unchanged
-           ntail   -- tail replaced by ntail points only
-       Output:
-           som             -- smaller mesh created from big om mesh
-           sSig[nom,nc]    -- Sig on small mesh
-       Also computed but not returned:
-           ind_om  -- index array which conatins index to
-                      kept Matsubara points
-    """
-    om = sigdata[0]
-    
-    istart = min(nom, len(om))
-    ntail = min(ntail_, len(om)-istart)
-        
-    istart = min(nom,len(om))
-    ntail = min(ntail, len(om)-istart)
-
-    ind_om=[]
-    alpha = log((len(om)-1.)/istart)/(ntail-1.)
-    for i in range(istart):
-        ind_om.append(i)
-    for i in range(ntail):
-        t = int(istart*exp(alpha*i)+0.5)
-        if (t != ind_om[-1]):
-            ind_om.append(t)
-
-    ssigdata = zeros( (shape(sigdata)[0], len(ind_om)), dtype=float )
-    for i in range(len(ind_om)):
-        ssigdata[:,i] = sigdata[:,ind_om[i]]
-
-    return ssigdata
+    return sigdata[:,log_indices(sigdata.shape[1],nom,int(ntail_))]
 
 def union(data):
     " Takes a union of array or list"
@@ -93,8 +60,9 @@ if __name__=='__main__':
     """
 
     parser = optparse.OptionParser(usage)
-    parser.add_option("-n", "--nom",  dest="nom",    type="int", default=100, help="Number of matsubara points in log mesh before the tail")
-    parser.add_option("-t", "--tail", dest="ntail",  type="int", default=30,  help="Number of matsubara points in the tail of the log mesh")
+    parser.add_option("-n", "--nom",  dest="nom",    type="int", default=None, help="Number of matsubara points in log mesh before the tail")
+    parser.add_option("-t", "--tail", dest="ntail",  default="30",  help="Tail points on a logarithmic mesh, or auto for adaptive cubic quadrature")
+    parser.add_option("--tail-tol", type="float", default=DEFAULT_TOL, help="Relative integrated error of the scalar probes in auto mode (default %default)")
     parser.add_option("-i", "--sinp", dest="insig",  default='sig.inp', help="filename of the input file (sig.inp)", metavar="FILE")
     parser.add_option("-o", "--sout", dest="outsig", default='sig.inp', help="filename-part of the output file (sig.inp)")
     parser.add_option("-d", "--outDC", dest="outDC", default='Edc.dat', help="filename of the output DC-file (Edc.dat)")
@@ -132,14 +100,43 @@ if __name__=='__main__':
     print('s_oo=', _s_oo_)
     print('Edc=', _Edc_)
     
-    savetxt(options.outDC, array(_Edc_))
     
 
-    if inl.matsubara:
-        print('..... Creating logarithmic mesh')
-        sigdata = create_log_mesh(sigdata, options.nom, options.ntail)
-    
-    
+    automatic = inl.matsubara and options.ntail == 'auto'
+    nom_input = options.nom if options.nom is not None else 100
+    if automatic:
+        nom_input = impurity_nom(options.nom)
+        full_omega = sigdata[0]
+        components = list(sigdata[1::2] + 1j*sigdata[2::2])
+        # Include open-core curves for both spin blocks so up and down get
+        # identical frequency grids even if their local labels differ.
+        broadening = inl.broadc
+        mappings = [inl]
+        for suffix in ('', 'dn'):
+            if suffix != options.m_extn and Path(case+'.indmfl'+suffix).is_file():
+                other = indmffile.Indmfl(case,'indmfl'+suffix)
+                other.read()
+                broadening = max(broadening,other.broadc)
+                mappings.append(other)
+        cores = {ix for mapping in mappings for ix, labels in mapping.siginds.items()
+                 if not np.any(labels>0) and Path('sfx.'+str(ix)).is_file()}
+        for ix in sorted(cores):
+            core = np.loadtxt('sfx.'+str(ix), ndmin=2).T
+            if not np.array_equal(core[0],full_omega):
+                raise ValueError('open-core and impurity frequency grids differ')
+            components.extend(core[1::2]+1j*core[2::2])
+        rows,fit = cached_auto_mesh(full_omega,components,broadening,nom_input,options.tail_tol,
+                                    Path('.matsubara_mesh.npz'))
+        nlow = min(nom_input,len(full_omega))
+        marker = ' '.join(map(str,[HEADER,nlow,len(fit),*fit]))
+        print(f'Automatic Matsubara mesh: {nlow} consecutive + {len(rows)-nlow} tail of {len(full_omega)-nlow}; '
+              f'probe tolerance {options.tail_tol:g}; {len(fit)} fixed moment-fit samples')
+        sigdata = sigdata[:,rows]
+    elif inl.matsubara:
+        sigdata = create_log_mesh(sigdata,nom_input,int(options.ntail))
+
+    savetxt(options.outDC, array(_Edc_))
+
     # next few lines only find the columns which are not written in sig.inp
     missing_columns={}
     for icix in list(inl.siginds.keys()):    # over all imp.problems, even those that are equivalent
@@ -200,7 +197,7 @@ if __name__=='__main__':
             (c_s_oo,c_Edc) = Find_s_oo_and_Edc(c_filename)
             c_sigdata = loadtxt(c_filename).transpose()            
             if inl.matsubara:
-                c_sigdata = create_log_mesh(c_sigdata, options.nom, options.ntail)
+                c_sigdata = c_sigdata[:,rows] if automatic else create_log_mesh(c_sigdata, nom_input, options.ntail)
 
             if len(c_sigdata[0])!=nom:
                 print('ERROR: The core file '+c_filename+' should have the same mesh as sig.inp. Length of core-file mesh is', len(c_sigdata[0]), 'and the sig mesh is', nom)
@@ -217,4 +214,12 @@ if __name__=='__main__':
         wdata = array(wdata).transpose()        
         wdata = vstack((wdata, sinf))                   # adding s_oo as the last line
         
-        savetxt(options.outsig+str(icix)+options.m_extn, wdata)
+        filename = options.outsig+str(icix)+options.m_extn
+        if automatic:
+            # A trailing comment on the static record travels with each
+            # self-energy. Standard numeric readers see the usual columns.
+            with open(filename,'w') as out:
+                savetxt(out,wdata[:-1])
+                out.write(' '.join(f'{v:.18e}' for v in wdata[-1])+' '+marker+'\n')
+        else:
+            savetxt(filename,wdata)

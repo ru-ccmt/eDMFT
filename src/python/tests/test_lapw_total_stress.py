@@ -34,7 +34,8 @@ class TensorTests(unittest.TestCase):
         from lapw_total_stress import PreparedTotalStress
         meta = NS(sigma_inf=np.zeros((1, 1, 1)), sigma=np.zeros((1, 1, 1, 1)),
                   omega=np.ones(1), sym=lambda x: x)
-        state = NS(valence=NS(branches=(NS(model=NS(diagnostic_only=False, meta=meta)),)),
+        model = NS(diagnostic_only=False, electronic_model="dmft", meta=meta)
+        state = NS(valence=NS(model=model, branches=(NS(model=model),)),
                    metadata={'central_fixed_point_residual_norm': residual},
                    potential_core=NS(structure=structure([np.eye(3)])),
                    parallel=NS(root=root))

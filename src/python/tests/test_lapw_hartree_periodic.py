@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 import numpy as np
-from scipy.special import sph_harm_y
+from lapw_scipy_compat import sph_harm_y
 from lapw_hartree_periodic import (
     native_charge_weights,
     native_local_axes,
@@ -185,7 +185,7 @@ class PeriodicHartreeTests(unittest.TestCase):
             lookup = dict(zip(q.keys, q.slices))
             np.testing.assert_array_equal(spherical, x[lookup[0, 0, 0]])
             np.testing.assert_array_equal(
-                nonspherical[0], np.column_stack([x[lookup[0, *lm]] for lm in ns[0]])
+                nonspherical[0], np.column_stack([x[lookup[(0, *lm)]] for lm in ns[0]])
             )
             expected = x[q.pw_offset :].view(complex)[:3]
             np.testing.assert_array_equal(

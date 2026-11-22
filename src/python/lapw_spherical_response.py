@@ -8,6 +8,7 @@ Npw-by-Npw matrix is built inside a forward or reverse response action.
 
 import numpy as np
 from scipy.special import eval_legendre
+from lapw_response_scratch import StoredMatrix
 from lapw_density_response import checked, herm
 from lapw_response_assembly import NativeBandProjection
 from lapw_compact_blocks import (
@@ -35,7 +36,13 @@ def prepare_wronskian_band(
     if q.ndim != 2 or q.shape[1] != 3 or c.ndim != 2 or len(q) != len(c):
         raise ValueError("invalid PW geometry")
     checked(q, q.shape, "reciprocal vectors", real=True)
-    phase = checked(phase, (len(q),), "site phase")
+    # Site phases enter only as phase_i^* phase_j. For a radial response
+    # the same scalar multiplies every site in an orbit, so the projector
+    # C and the native triangle operation may act after the site sum.
+    phase = np.atleast_2d(np.asarray(phase))
+    if phase.ndim != 2 or not len(phase):
+        raise ValueError("empty or invalid site phases")
+    checked(phase, (len(phase), len(q)), "site phases")
     b = checked(matching, (2, len(q)), "Bessel matching", real=True)
     if (
         int(ell) != ell
@@ -57,7 +64,7 @@ def prepare_wronskian_band(
         * (2 * ell + 1)
         * eval_legendre(ell, np.clip(unit @ unit.T, -1, 1))
     )
-    angular = angular * phase.conj()[:, None] * phase[None, :]
+    angular = angular * (phase.conj().T @ phase)
     radial = b[1, :, None] * b[0, None, :] - b[0, :, None] * b[1, None, :]
     if retained is None:
         return herm(NativeBandProjection(angular, c).project(radial))
@@ -109,6 +116,8 @@ class PreparedSphericalBand:
         difference=None,
         cache_products=True,
         share_radial=False,
+        site_triangle=None,
+        retained=None,
     ):
         self.cache_products = bool(cache_products)
 
@@ -153,31 +162,35 @@ class PreparedSphericalBand:
         )
         # A rectangular kernel requests only RR and QR output. This retains
         # the native triangle correction but never stores its unused QQ part.
-        triangle = checked_columns(
-            wronskian_band, channel.nband, "Wronskian band kernel"
-        )
-        # An APW channel has identically zero Wronskian correction, so its
-        # shape is retained without allocating a useless Nband*Nret array.
-        self.triangle = (
-            np.array(triangle, complex)
-            if self.lapw
-            else np.broadcast_to(np.array(0j), triangle.shape)
-        )
-        self.retained = self.triangle.shape[1]
+        self._site_triangle = site_triangle
+        if wronskian_band is None:
+            # The first site carries the whole orbit matrix. The other
+            # sites reconstruct their own triangle only for a site query.
+            if site_triangle is None or retained is None or not 0 < retained <= channel.nband:
+                raise ValueError("missing Wronskian matrix or orbit metadata")
+            self._orbit_triangle = None
+            self.band_shape = (channel.nband, retained)
+        else:
+            triangle = checked_columns(wronskian_band, channel.nband, "Wronskian band kernel")
+            self.band_shape = triangle.shape
+            self._orbit_triangle = (np.array(triangle, complex) if self.lapw else
+                                    np.broadcast_to(np.array(0j), self.band_shape))
+        self.retained = self.band_shape[1]
         self.s = self._gram(self.phi, self.phi)
         self.s[0, 0] = 1.0
         self.s[0, 1] = self.s[1, 0] = 0.0
         self.k = (self.s @ self.t + self.t.T @ self.s) / 2 + self._gram(
             self.phi, self.phi, self.difference / self.radius
         )
-        self.z = channel.value(self.phi[-1], self.lo, lapw=lapw)
+        # Thousands of (site,l,k) objects can exist. Z, p and d are
+        # inexpensive radial combinations of F,D and the LO matching sums.
+        # In the bounded-cache path form them once per call and release them
+        # afterwards. The immutable radial arrays and matching sums suffice.
+        self._z = channel.value(self.phi[-1], self.lo, lapw=lapw) if cache_products else None
         self._zpw = None
-        if channel.nlo == 0:
-            self._zpw = self.z
-        elif self.cache_products:
-            self._zpw = channel.value(self.phi[-1], np.zeros_like(self.lo), lapw=lapw)
-        self.p = np.einsum("i,min->mn", self.phi[-1, 0] / self.r, self.zpw)
-        self.d = np.einsum("i,min->mn", self.phi[-1, 2] / self.r, self.z)
+        if cache_products:
+            self._zpw = (self._z if channel.nlo == 0 else
+                         channel.value(self.phi[-1], np.zeros_like(self.lo), lapw=lapw))
         self.w = (
             self.phi[-1, 2, 0] * self.phi[-1, 0, 1]
             - self.phi[-1, 0, 0] * self.phi[-1, 2, 1]
@@ -188,6 +201,57 @@ class PreparedSphericalBand:
         self._sz = (
             np.einsum("ij,mjn->min", self.s, self.z) if self.cache_products else None
         )
+
+    def _wronskian_triangle(self, orbit_sum):
+        """Radial directions and their adjoints share one coefficient per orbit.
+
+        For those contractions the first site carries the preprojected sum.
+        A site-resolved value uses the original individual PW phases.
+        Explicit geometry derivatives use each site's own phase derivative.
+        """
+        if self._site_triangle is not None and not orbit_sum:
+            return self._site_triangle()
+        if isinstance(self._orbit_triangle, StoredMatrix):
+            return self._orbit_triangle.read()
+        return self._orbit_triangle
+
+    def store_matching(self, scratch):
+        self.channel.store_matching(scratch)
+        if self.lapw and self._orbit_triangle is not None:
+            self._orbit_triangle = scratch.store(self._orbit_triangle)
+
+    @property
+    def triangle(self):
+        return self._wronskian_triangle(False)
+
+    @property
+    def z(self):
+        return self._z if self._z is not None else self.channel.value(
+            self.phi[-1], self.lo, lapw=self.lapw
+        )
+
+    def _boundary_value(self, zpw):
+        return np.einsum("i,min->mn", self.phi[-1, 0] / self.r, zpw)
+
+    def _boundary_slope(self, z):
+        return np.einsum("i,min->mn", self.phi[-1, 2] / self.r, z)
+
+    @property
+    def p(self):
+        return self._boundary_value(self.zpw)
+
+    @property
+    def d(self):
+        return self._boundary_slope(self.z)
+
+    def _matching(self):
+        z = self.z
+        return z, z if self.channel.nlo == 0 else self.zpw
+
+    def _products(self, z):
+        kz = self._kz if self._kz is not None else np.einsum("ij,mjn->min", self.k, z)
+        sz = self._sz if self._sz is not None else np.einsum("ij,mjn->min", self.s, z)
+        return kz, sz
 
     @property
     def kz(self):
@@ -219,17 +283,21 @@ class PreparedSphericalBand:
         weight = self.metric if potential is None else self.metric * potential[:, None]
         return np.einsum("rci,rc,rcj->ij", a, weight, b, optimize=True)
 
-    def value(self):
+    def value(self, *, orbit_sum=False):
         n = self.retained
-        h = np.einsum("min,mip->np", self.z.conj(), self.kz[..., :n], optimize=True)
-        o = np.einsum("min,mip->np", self.z.conj(), self.sz[..., :n], optimize=True)
+        z, zpw = self._matching()
+        p, d = self._boundary_value(zpw), self._boundary_slope(z)
+        kz, sz = self._products(z)
+        h = np.einsum("min,mip->np", z.conj(), kz[..., :n], optimize=True)
+        o = np.einsum("min,mip->np", z.conj(), sz[..., :n], optimize=True)
         h += (
             self.r**2
             / 2
-            * (self.p.conj().T @ self.d[:, :n] + self.d.conj().T @ self.p[:, :n])
+            * (p.conj().T @ d[:, :n] + d.conj().T @ p[:, :n])
         )
-        if self.lapw:
-            h += 0.5 * self.r**2 * self.w * (self.w - 1) * self.triangle
+        triangle = self._wronskian_triangle(orbit_sum) if self.lapw else None
+        if triangle is not None:
+            h += 0.5 * self.r**2 * self.w * (self.w - 1) * triangle
         return hermitian_columns(h), hermitian_columns(o)
 
     def action(
@@ -239,6 +307,7 @@ class PreparedSphericalBand:
         energy_dot=0.0,
         lo_energies_dot=None,
         difference_dot=None,
+        *, orbit_sum=False,
     ):
         u = checked(primitive_dot, self.phi.shape, "primitive derivative", real=True)
         dm = checked(lo_dot, self.lo.shape, "LO factor derivative", real=True)
@@ -269,7 +338,9 @@ class PreparedSphericalBand:
             + self._gram(self.phi, u, self.difference / self.radius)
             + self._gram(self.phi, self.phi, dv / self.radius)
         )
-        kz, sz, zpw = self.kz, self.sz, self.zpw
+        z, zpw = self._matching()
+        p, d = self._boundary_value(zpw), self._boundary_slope(z)
+        kz, sz = self._products(z)
         dz = self.channel.action(self.phi[-1], u[-1], dm, lapw=self.lapw)
         dzpw = self.channel.action(
             self.phi[-1], u[-1], np.zeros_like(dm), lapw=self.lapw
@@ -282,14 +353,14 @@ class PreparedSphericalBand:
             np.einsum("min,mip->np", dz.conj(), kz[..., :n], optimize=True)
             + np.einsum("min,mip->np", kz.conj(), dz[..., :n], optimize=True)
             + np.einsum(
-                "min,ij,mjp->np", self.z.conj(), dk, self.z[..., :n], optimize=True
+                "min,ij,mjp->np", z.conj(), dk, z[..., :n], optimize=True
             )
         )
         o = (
             np.einsum("min,mip->np", dz.conj(), sz[..., :n], optimize=True)
             + np.einsum("min,mip->np", sz.conj(), dz[..., :n], optimize=True)
             + np.einsum(
-                "min,ij,mjp->np", self.z.conj(), ds, self.z[..., :n], optimize=True
+                "min,ij,mjp->np", z.conj(), ds, z[..., :n], optimize=True
             )
         )
         pd = (
@@ -297,17 +368,17 @@ class PreparedSphericalBand:
             + np.einsum("i,min->mn", self.phi[-1, 0], dzpw)
         ) / self.r
         dd = (
-            np.einsum("i,min->mn", u[-1, 2], self.z)
+            np.einsum("i,min->mn", u[-1, 2], z)
             + np.einsum("i,min->mn", self.phi[-1, 2], dz)
         ) / self.r
         h += (
             self.r**2
             / 2
             * (
-                pd.conj().T @ self.d[:, :n]
-                + self.p.conj().T @ dd[:, :n]
-                + self.d.conj().T @ pd[:, :n]
-                + dd.conj().T @ self.p[:, :n]
+                pd.conj().T @ d[:, :n]
+                + p.conj().T @ dd[:, :n]
+                + d.conj().T @ pd[:, :n]
+                + dd.conj().T @ p[:, :n]
             )
         )
         dw = (
@@ -316,29 +387,51 @@ class PreparedSphericalBand:
             - u[-1, 0, 0] * self.phi[-1, 2, 1]
             - self.phi[-1, 0, 0] * u[-1, 2, 1]
         )
-        if self.lapw:
-            h += 0.5 * self.r**2 * (2 * self.w - 1) * dw * self.triangle
+        triangle = self._wronskian_triangle(orbit_sum) if self.lapw and dw != 0 else None
+        if triangle is not None:
+            h += 0.5 * self.r**2 * (2 * self.w - 1) * dw * triangle
         return hermitian_columns(h), hermitian_columns(o)
 
-    def pullback(self, hbar, obar):
+    def physical_potential_pullback(self, hbar):
+        """Contract the explicit potential leg at fixed basis and radial functions.
+
+        Only Z† delta(K) Z varies on this leg, with
+        delta(K)_ij = integral phi_i phi_j delta(V) dr (native metric).
+        The ordinary radial pullback includes the same quantity as its
+        final output, plus primitive and boundary terms for other directions.
+        """
+        hbar = checked_columns(hbar, self.channel.nband, "physical potential covector")
+        if hbar.shape != self.band_shape:
+            raise ValueError("physical covector column layout mismatch")
+        z = self.z
+        zh = right_multiply_columns(z, hbar)
+        gk = np.einsum("min,mjn->ij", zh, z.conj(), optimize=True).real
+        return self._potential_covector(gk)
+
+    def _potential_covector(self, gk):
+        return np.einsum("rci,ij,rcj,rc->r", self.phi, gk, self.phi,
+                         self.metric, optimize=True) / self.radius
+
+    def pullback(self, hbar, obar, *, orbit_sum=False):
         hbar = checked_columns(hbar, self.channel.nband, "Hamiltonian covector")
         obar = checked_columns(obar, self.channel.nband, "overlap covector")
-        if hbar.shape != self.triangle.shape or obar.shape != self.triangle.shape:
+        if hbar.shape != self.band_shape or obar.shape != self.band_shape:
             raise ValueError("spherical covector column layout mismatch")
         # Hbar and Obar act only in band space; the small radial matrices
         # k and s act in primitive space. Associate their products so each
         # expensive RR/QR band contraction is performed once. The same zh
         # also supplies the boundary-slope contraction below. This changes
         # no derivative and stores no extra per-k cache.
-        zpw = self.zpw
-        zh = right_multiply_columns(self.z, hbar)
-        zo = right_multiply_columns(self.z, obar)
+        z, zpw = self._matching()
+        p = self._boundary_value(zpw)
+        zh = right_multiply_columns(z, hbar)
+        zo = right_multiply_columns(z, obar)
         zbar = 2 * (
             np.einsum("ij,mjn->min", self.k, zh) + np.einsum("ij,mjn->min", self.s, zo)
         )
-        gk = np.einsum("min,mjn->ij", zh, self.z.conj(), optimize=True).real
+        gk = np.einsum("min,mjn->ij", zh, z.conj(), optimize=True).real
         gs = (
-            np.einsum("min,mjn->ij", zo, self.z.conj(), optimize=True).real
+            np.einsum("min,mjn->ij", zo, z.conj(), optimize=True).real
             + (gk @ self.t.T + self.t @ gk) / 2
         )
         gt = self.s @ gk
@@ -349,24 +442,20 @@ class PreparedSphericalBand:
             * (self.metric * (self.difference / self.radius)[:, None])[:, :, None]
             * np.einsum("rcj,ji->rci", self.phi, gk)
         )
-        difference_bar = (
-            np.einsum(
-                "rci,ij,rcj,rc->r", self.phi, gk, self.phi, self.metric, optimize=True
-            )
-            / self.radius
-        )
+        difference_bar = self._potential_covector(gk)
         # d = sum_i phi_slope[i]*z[i]/R, hence d@Hbar is already in zh.
         pb = self.r * np.einsum("i,min->mn", self.phi[-1, 2], zh)
-        db = self.r**2 * right_multiply_columns(self.p, hbar)
+        db = self.r**2 * right_multiply_columns(p, hbar)
         gp[-1, 0] += np.einsum("mn,min->i", pb.conj(), zpw).real / self.r
-        gp[-1, 2] += np.einsum("mn,min->i", db.conj(), self.z).real / self.r
+        gp[-1, 2] += np.einsum("mn,min->i", db.conj(), z).real / self.r
         zbar += self.phi[-1, 2][None, :, None] * db[:, None, :] / self.r
         zpwbar = self.phi[-1, 0][None, :, None] * pb[:, None, :] / self.r
         gb, gm = self.channel.pullback(self.phi[-1], zbar, lapw=self.lapw)
         gbpw, _ = self.channel.pullback(self.phi[-1], zpwbar, lapw=self.lapw)
         gp[-1] += gb + gbpw
-        if self.lapw:
-            wb = 0.5 * self.r**2 * (2 * self.w - 1) * pair_columns(hbar, self.triangle)
+        triangle = self._wronskian_triangle(orbit_sum) if self.lapw else None
+        if triangle is not None:
+            wb = 0.5 * self.r**2 * (2 * self.w - 1) * pair_columns(hbar, triangle)
             gp[-1, 2, 0] += wb * self.phi[-1, 0, 1]
             gp[-1, 0, 1] += wb * self.phi[-1, 2, 0]
             gp[-1, 0, 0] -= wb * self.phi[-1, 2, 1]

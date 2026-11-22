@@ -8,6 +8,7 @@ consistent iterations. Frozen branch/cutoff assumptions match the prepared
 potential/core state. Cell geometry follows WIEN LATGEN, including centered/nonorthogonal cells.
 """
 
+from lapw_xc_response import PBE_PARAMETERS
 from lapw_lattice import NativeLattice
 import numpy as np
 from scipy.special import spherical_jn, factorial2
@@ -140,7 +141,7 @@ def hydrostatic_xc_geometry(prepared, mask_derivative):
     ir = xc.ir
     _, rho = h._split(prepared.input_density.vector())
     density = np.maximum(ir.expand(rho), 0)
-    if ir.functional == "PBE":
+    if ir.functional in PBE_PARAMETERS:
         fields = ir.fields(density)
         direction = fields.copy()
         direction[..., 0] = 0

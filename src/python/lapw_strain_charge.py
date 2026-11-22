@@ -83,14 +83,15 @@ def spatial_matching_source(spatial, matching_dots, volume_trace):
     """
     out = spatial.action(matching_dots=matching_dots)
     nrad = sum(map(len, spatial.template.rad.values()))
-    out[nrad:] -= volume_trace * spatial.value()[nrad:]
+    if volume_trace != 0:
+        out[nrad:] -= volume_trace * spatial.value()[nrad:]
     return out
 
 
-def native_spatial_geometry_source(valence, directory, case, strain):
+def native_spatial_geometry_source(valence, directory, case, strain, *, displacements=None):
     """Explicit valence matching/volume source in the stored harmonic frames."""
     if hasattr(valence, "branches"):
-        return .5 * sum(native_spatial_geometry_source(v, directory, case, strain) for v in valence.branches)
+        return .5 * sum(native_spatial_geometry_source(v, directory, case, strain, displacements=displacements) for v in valence.branches)
     s = valence.structure
     e = checked(strain, (3, 3), "strain", real=True)
     if not np.allclose(e, e.T, atol=1e-14, rtol=0):
@@ -113,6 +114,9 @@ def native_spatial_geometry_source(valence, directory, case, strain):
         geom.append((base.retained, record.nbasis - record.nlo, q, dq, length, dl))
     zd = {}
     for a, entries in direct.matching.items():
+        if displacements is not None and not np.any(displacements[first[a]:first[a]+s.mult[a]]):
+            zd[a] = None
+            continue
         zd[a] = []
         for index, channels in enumerate(entries):
             k = index % nk
@@ -120,6 +124,13 @@ def native_spatial_geometry_source(valence, directory, case, strain):
             c, npw, q, dq, length, dl = geom[k]
             frame = s.rotloc[a] @ axes[site]
             phase = np.exp(2j * np.pi * (valence.records[k].labels.T @ s.pos[site]))
+            phase_rate = None if displacements is None else (
+                NativeLattice.from_structure(s).momenta(valence.records[k].labels.T) @ displacements[site]
+            )
+            if phase_rate is not None and not np.any(displacements[site]):
+                size = sum((2*l+1)*(2+ch.nlo) for l,ch in channels.items())
+                zd[a].append(np.zeros((size, c.shape[1]), complex))
+                continue
             blocks = []
             for l, ch in sorted(channels.items()):
                 ctx = direct.contexts[a][l]
@@ -134,7 +145,7 @@ def native_spatial_geometry_source(valence, directory, case, strain):
                     npw,
                     [npw + lo[a, l, j] for j in range(ch.nlo)],
                     NativeLattice.from_structure(s).volume,
-                    np.trace(e),
+                    np.trace(e), phase_rate=phase_rate,
                 )
                 blocks.append(
                     dot.value(

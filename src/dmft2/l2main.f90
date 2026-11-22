@@ -1,4 +1,7 @@
 SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
+  USE adaptive_matsubara, ONLY: read_mesh_header,prepare_coarse_check,release_mesh, &
+       low_count,fit_rows,tail_moment=>moment,weight_difference,check_sum
+  USE com_mpi, ONLY: Reduce_Density_sum
   USE defs,  ONLY: PI, ZERO
   USE stress_g2_matrices, ONLY: prepare_g2_matrices,release_g2_matrices
   USE param, ONLY: IBLOCK, LMAX2, LOMAX, NCOM, NLOAT, NRAD, NMAT, NUME, NSYM, NKPT, fh_vec, numkpt, filename_V_nsh, filename_V_vns, filename_V_sph, nwave, iff1, iff2, iff3, kmax!, NGAU
@@ -71,6 +74,8 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
        fini_stress_radial_fd,radial_fd_rho_hsph,radial_fd_rho_hnsp, &
        radial_fd_rhoe_overlap,radial_fd_by_pass
   IMPLICIT NONE
+  real*8 :: global_tail_check(3)
+
   CHARACTER*5, intent(in)  :: coord
   REAL*8, intent(in)       :: sumw
   INTEGER, intent(in)      :: NSPIN1
@@ -132,6 +137,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   REAL*8     :: paired_sigma_kinetic_matching(3,3), &
        paired_sigma_kinetic_complete(3,3)
   LOGICAL    :: RENORM_SIMPLE, Qforce_j, QnormWindow, &
+       force_norm_window_enabled, &
        fuse_window_stress
   complex*16 :: wkp
   COMPLEX*16, ALLOCATABLE :: cfX(:,:,:,:), DMFTU(:,:,:,:), &
@@ -167,7 +173,9 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   REAL*8     :: fvdrho(3,nat), fdvrho(3,nat)
   REAL*8     :: forb(3,natm), fextra(3,nat), fsur(3,nat), fkdc(3), fsur2(9), fsur_norm
   CHARACTER(2048) :: response_density_prefix, response_export_prefix
-  LOGICAL :: response_density_mode
+  CHARACTER(16) :: force_norm_window_env
+  CHARACTER(16) :: soc_force_readout_env
+  LOGICAL :: response_density_mode, export_soc_force_readout
   REAL*8, ALLOCATABLE :: response_frequency_weights(:)
   LOGICAL    :: Qforce2
 
@@ -175,6 +183,8 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   response_export_prefix=''
   call get_environment_variable('EDMFT_RESPONSE_DENSITY_PREFIX',response_density_prefix)
   call get_environment_variable('EDMFT_RESPONSE_EXPORT',response_export_prefix)
+  call get_environment_variable('EDMFT_SOC_OPERATOR_READOUT',soc_force_readout_env)
+  export_soc_force_readout=trim(soc_force_readout_env)=='1' .and. len_trim(response_export_prefix)>0
   response_density_mode=len_trim(response_density_prefix).gt.0
   Qforce2=.True.
   
@@ -233,6 +243,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   !----------- Actual reading of the self-energy -------------!
   do icix=1,ncix
      CALL ReadSelfenergy(fh_sig+icix, sigma(:,icix,:), omega, s_oo(:,icix), gammac, csize(icix), nomega, maxsize, Sigind(:,:,icix), maxdim)
+     if (matsubara) call read_mesh_header(fh_sig+icix,csize(icix),nomega,icix==1)
   enddo
   
   !--------------  change from eV to Rydbergs --------------------------!
@@ -250,11 +261,23 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
 
   CALL CountFrequencyArrays2(n0_om, qmax, beta, omega, nomega, matsubara)
   
+  if (allocated(fit_rows)) then
+     ! Fix the boundary of the surrogate-tested tail, including the case
+     ! where local refinement leaves extra consecutive nodes after nom.
+     n0_om=min(low_count+1,nomega)
+     allocate(tail_moment(maxsize,ncix))
+     call DetermineSelfEnergyTailMoment(tail_moment,sigma(:,:,fit_rows),s_oo, &
+          omega(fit_rows),csize,size(fit_rows),maxsize,ncix,myrank==master)
+  endif
   if (matsubara) Temperature = 1/beta
 
   CALL init_muzero(nomega,qmax)
 
   CALL CreateFrequencyArrays2(nomq, jomq, iomq, womq, abom, npomega, n0_om, qmax, beta, omega, nomega, matsubara, Temperature)
+  call prepare_coarse_check(matsum_weight,jomq)
+  if (allocated(fit_rows) .and. myrank==master) write(6,'(A,3I8)') &
+       ':AUTO_TAIL: consecutive, tail, fixed fit samples ',low_count,nomega-low_count,size(fit_rows)
+
 
   ALLOCATE( Rspin(2,2,norbitals) )
   Rspin=0.0
@@ -476,21 +499,15 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
      write(6,'(A)') ':RESPONSE_DENSITY_ONLY: energies and impurity observables are NOT response results'
   endif
   if(len_trim(response_export_prefix).gt.0)then
-     ! Metadata precedes the optional EF search, so require a final charge
-     ! replay at the saved chemical potential.  Exporting a stale mu would
-     ! make the external response differentiate a different lattice state.
-     if(recomputeEF.ne.0.or.mode.ne.'c'.or.iso.ne.1.or.nspin1.ne.1) &
-          error stop 'response export requires nonmagnetic charge mode, recomputeEF=0, no SOC'
+     ! An ordinary SOC FOR exports the occupied density and projector covector
+     ! from its actual band gauge. Its chemical potential may be recomputed.
+     ! Other exports continue to require the final replay at the saved mu.
+     if(mode.ne.'c'.or.nspin1.ne.1.or.(recomputeEF.ne.0.and. &
+          .not.(export_soc_force_readout.and.iso==2.and.Qforce.and.recomputeEF==1))) &
+          error stop 'response export requires an unpolarized charge run at the physical mu'
      if(.not.Qrenormalize.or.abs(projector).ne.5.or..not.matsubara) &
           error stop 'response export requires normalized projector 5 on Matsubara axis'
-     allocate(response_frequency_weights(npomega))
-     response_frequency_weights=1.d0
-     response_frequency_weights(n0_om:npomega)=matsum_weight(n0_om:npomega)
-     call ExportFrozenResponseMetadata(response_export_prefix,omega, &
-          response_frequency_weights,npomega,sigma,s_oo,nomega,maxsize, &
-          DM_EF,Temperature,SOlapm,cfX,cix_orb,cixdim,iSx,iorbital, &
-          nindo,norbitals,maxdim2)
-     deallocate(response_frequency_weights)
+
   endif
 
   ! The ordinary complementary-band correction treats the saved global
@@ -498,12 +515,23 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   ! when X is the k-global inverse square root used by projector types <=5.
   ! The strict DFT debug path has no DMFT projector functional and must remain
   ! identically zero.
-  QnormWindow=Qstress .and. Qrenormalize .and. abs(projector).le.5 &
+  ! The window-induced derivative of the global projector normalization
+  ! is part of the atomic force whenever that normalization is active.
+  ! Keep EDMFT_FORCE_NORM_WINDOW=0 only as a regression diagnostic; the
+  ! physically complete window-normalization term is enabled by default.
+  force_norm_window_env=''
+  call get_environment_variable('EDMFT_FORCE_NORM_WINDOW', &
+       force_norm_window_env)
+  force_norm_window_enabled=trim(force_norm_window_env).ne.'0'
+  QnormWindow=(Qstress .or. (Qforce .and. force_norm_window_enabled)) &
+       .and. Qrenormalize .and. abs(projector).le.5 &
        .and. recomputeEF.ge.0
   ! The compact fused buffer stores only complement--window blocks.  The
   ! moving-band audit additionally carries a within-window connection and
   ! diagonal metric term, so keep its two response passes separate.
-  fuse_window_stress=QnormWindow .and. .not.stress_detailed_diagnostics &
+  fuse_window_stress=QnormWindow .and. Qstress &
+       .and. .not.(Qforce .and. force_norm_window_enabled) &
+       .and. .not.stress_detailed_diagnostics &
        .and. .not.stress_moving_band_enabled
   if (QnormWindow) then
      allocate(normalizationMoment(maxdim,maxdim,ncix), &
@@ -545,6 +573,20 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
           ' Fixed-mu DFT-limit validation: mu=',DM_EF, &
           ' Ry, T=',Temperature
   endif
+
+  if(len_trim(response_export_prefix)>0) then
+     allocate(response_frequency_weights(npomega))
+     response_frequency_weights=1.d0
+     response_frequency_weights(n0_om:npomega)=matsum_weight(n0_om:npomega)
+     call ExportFrozenResponseMetadata(response_export_prefix,omega, &
+          response_frequency_weights,npomega,sigma,s_oo,nomega,maxsize, &
+          DM_EF,Temperature,SOlapm,cfX,cix_orb,cixdim,iSx,iorbital, &
+          nindo,norbitals,maxdim2)
+     if(iso==2) call ExportSpinorResponseFrame(response_export_prefix,Rspin,cfX, &
+          maxdim2,norbitals)
+     deallocate(response_frequency_weights)
+  end if
+
   
   IF (mode.EQ.'e') goto 6170 !!! mode='e' : Computes only eigenvalues and prints them to the disc
   
@@ -924,7 +966,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
         nedim=1
         ! rhoE is needed by both force and stress derivatives.  For ordinary
         ! density runs keep the historical scalar allocation.
-        if (Qforce .or. Qstress) nedim=nbands
+        if (Qforce .or. Qstress .or. export_soc_force_readout) nedim=nbands
         allocate( Aweight(nbands,nbands) )
         allocate( AEweight(nedim,nedim) )
         ! The exact rectangular projector gradient is accumulated whenever
@@ -938,6 +980,14 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
              matsubara,lgTrans,lg_deg,ntcix,nipc,ikp,maxdim2,iorbital, &
              iSx,norbitals,projectorGradientDirect,cix_orb,cixdim, &
              nindo,Sigind)
+
+        ! In a private ordinary-SOC-force replay, reuse the two Matsubara
+        ! contractions we just computed. The real-linear covector of U is
+        ! 2*conjg(C), and Aweight already includes the native 2*w_k. Keep
+        ! both in the same spinor gauge as the accompanying k record.
+        if (export_soc_force_readout) call ExportSOCForceReadout( &
+             response_export_prefix,ikp,nemin,DM_nemin,DM_nemax,nbands, &
+             maxdim2,norbitals,dble(wkp),Aweight,projectorGradientDirect)
 
         if (Qstress .and. stress_paired_diag_enabled) then
            ! Direct correction beyond the on-shell diagonal KS occupations:
@@ -994,7 +1044,9 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
            enddo
         endif
 
-        if (Qstress) CALL WriteOneParticleMomentDump(ikp,n0,nnlo,iso, &
+        ! Force diagnostics can consume the same spinor density before its
+        ! natural-orbital rotation. This writer is off unless explicitly enabled.
+        if (Qstress .or. Qforce) CALL WriteOneParticleMomentDump(ikp,n0,nnlo,iso, &
              nemin,DM_nemin,DM_nemax,nmat,nume,k3,k3lo,bk3,As, &
              Aweight,AEweight,E,nbands,wkp)
 
@@ -1541,7 +1593,9 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
           iorbital,cix_orb,cixdim,iSx,nindo,nnlo,norbitals,natom, &
           maxdim2,emin,emax,sumw,lmaxp,time_bl,time_bl_w,time_lo,time_lo_w, &
           normalization_modes_max,savedWindowRho,savedWindowEnergy, &
-          max_nbands,fuse_window_stress)
+          max_nbands,fuse_window_stress, &
+          fsph,fnsp,fsph2,time_force,time_force_w, &
+          force_norm_window_enabled)
      call walltim(t2w)
      stress_profile_times(4)=stress_profile_times(4)+ &
           t2w-stress_profile_start
@@ -1559,6 +1613,16 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
   call SymmetrizeLocalQuantities(Gdloc0, Edimp0, Gdloc(:,:,1), Edimp, cfX, cix_orb, cixdim, iSx, iorbital, nindo, lg_deg, norbitals, maxdim2, nomega)
   deallocate( Edimp0 )
   
+  if (allocated(weight_difference)) then
+     do i=1,3
+        call Reduce_Density_sum(check_sum(i),global_tail_check(i))
+     enddo
+     if (myrank==master) then
+        write(6,'(A,2ES17.8)') ':TAIL_QUADRATURE: fine minus coarse, charge [e/cell], trace-log [Ry/cell] ',global_tail_check(:2)
+        if (Qforce.or.Qstress) write(6,'(A,ES17.8)') &
+             ':TAIL_QUADRATURE: k-summed Frobenius norm of weighted delta rho_E [Ry] ',global_tail_check(3)
+     endif
+  endif
   CALL Reduce_MPI(xwt, ETOT2, FTOT2, FTOT0, gloc, w_RHOLM, DM, Gdloc, fsph, fnsp, fsph2, Edimp, Nds, w_xwt1, w_xwteh, w_xwtel, w_xwt1h, w_xwt1l, sumfft, tloc, nomega, NRAD, LM_MAX, nat, natm, iff1, iff2, iff3, ift1, ift2, ift3, maxdim, ncix, ntcix, nipc, Qforce)
   if (Qstress) then
      stress_profile_times(7)=stress_rela_setup_wall
@@ -2192,6 +2256,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
 6170 CONTINUE  
 
   DEALLOCATE( sigma, omega, s_oo )
+  call release_mesh()
   CALL fini_muzero
   DEALLOCATE( Rspin )
   deallocate (e_store,elo_store)

@@ -1,38 +1,42 @@
-LOCAL BUNDLE VALIDATION — 9 November 2026
+WIEN2k 24.1 patch bundle verification, 21 November 2026
 
-This release packages the existing audited sources; it introduces no new
-Fortran physics changes. Targets are byte-identical to the installed sources
-under /Users/haule/wien2k_24 at validation time.
+Coverage
+Compared 2,011 existing top-level native source files in WIEN component
+directories on the laptop to the original 24.1 archives. The only difference
+outside the registered sources was a blank line in SRC_mixer/AtomsDiag.f.
+Two new mandatory source files are created by the patches. The final laptop
+tree passes exact verification of 36 mandatory and two optional FFTW sources,
+both Makefile object entries and the active run_lapw. The RUPC build tree passes
+the mandatory source checks. Its installed run_lapw matches the private target.
 
-14 deployment tests PASS (12.012 seconds, initial staged run):
-- Pristine preflight is read-only.
-- Pristine application, original backups and repeat-application idempotence.
-- Upgrades from legacy-required, legacy-full, pre-cache and cached releases.
-- All 55 registered per-file transitions, including mixed historical states.
-- Exact preservation of site compiler/library settings and Makefile comments.
-- Unknown source, ambiguous Makefile and missing-component refusal without
-  partially modifying the destination.
-- Optional 3ddens/HF FFTW patches and default exclusion of those components.
-- Detection of corrupted/stale bundle contents before source changes.
-- Replay and reversal of all five reviewable cumulative source patches.
-- Rollback after an injected failure during source replacement.
-- Repair of missing object-list entries even when source hashes are current.
-- Legacy entry points delegate to the current audited installer.
+Installation from original and historical sources
+18 tests passed on macOS and RUPC Linux. They run in disposable directories
+against the original WIEN2k 24.1 source files. The five cumulative source
+patches were each applied to the advertised starting state and every mandatory
+resulting source hash was checked. The suite also covers the individual source
+transitions, unknown edits, rollback, Makefile preservation, optional FFTW
+changes, pristine driver installation, idempotence, worker source preflight,
+a failed worker build, and the optional MPI LAPW0 build target selection.
+The previous private run_lapw transition was independently replayed and
+matched the installed private script exactly.
 
-Read-only verification against /Users/haule/wien2k_24:
-  36 mandatory sources + 2 optional FFTW sources: exact target hashes.
-  Both required object-list additions present.
-  No source changes required.
+Native builds and material replay
+All four WIEN response workers were compiled from clean objects on macOS
+(gfortran) and RUPC Linux (Intel Fortran) using configured site Makefiles.
+All four RUPC binaries were byte-identical to the corresponding installed
+workers. No licensed source tree, compiled executable or benchmark input is
+stored in the bundle.
 
-The initial/staged tests used original source files extracted from the local
-WIEN2k-24 distribution archives, in disposable /private/tmp trees. No native
-WIEN executable or material calculation was rebuilt or rerun. Source identity
-with the previously tested implementation is verified; fresh compiler/MPI and
-material tests on rupc remain a subsequent deployment step.
+RUPC job 234784 ran the SrVO3 DFT PBEsol screened-stress benchmark with the
+rebuilt workers on eight ranks. All nine components in the converged report
+matched the previous run (234782) exactly. The diagonal entries in GPa were
+2.6154531730818693, 2.6154531730818693 and 2.5918662338694416. This replay
+compares two builds on the same density snapshot.
 
-To repeat against a complete pristine source tree:
-  python3 tests/test_bundle.py --pristine-root /path/to/pristine/WIEN2k24 -v
+To repeat the deployment tests, supply a pristine 24.1 tree containing the
+seven covered source directories, their Makefiles, and run_lapw or SRC/run_lapw:
+  python3 tests/test_bundle.py --pristine-root /path/to/original/WIEN2k24 -v
 
-The portable tests require Python 3, patch, and the original seven covered
-source directories including optional 3ddens/HF. They do not modify the input
-tree or require a Fortran compiler. The test log is validation/deployment_tests.log.
+The regression suite uses Python 3.8+ and patch. The actual worker compilation
+additionally requires a full configured build tree and working Fortran and
+library settings. See README.md for the installation commands.

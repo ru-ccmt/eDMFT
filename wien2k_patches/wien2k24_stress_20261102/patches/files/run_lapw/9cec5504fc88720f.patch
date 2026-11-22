@@ -1,0 +1,98 @@
+--- a/run_lapw
++++ b/run_lapw
+@@ -1003,7 +1003,7 @@
+ else
+    #total_exec	$mixuse $minusf
+    #echo 'Before mixer -d '
+-   x_lapw mixer -d   # It gets frozen here. Idk why....
++   x_lapw mixer -d $minusf   # Generate the definition for the selected -f case.
+    #echo 'Before output mixer'
+    output mixer ; (time $WIENROOT/$mixuse mixer.def) >> $dayfile
+    teststatus
+@@ -1052,7 +1052,7 @@
+ 
+ #---> test of energy convergence
+ #if ($ecut == "0") goto chargetest
+-set etest = (`$bin/testconv -p :ENE -c $ecut`)	
++set etest = (`$bin/testconv -p :ENE -c $ecut -f $file`)	
+ teststatus
+ echo ":ENERGY convergence:  $etest[1-3]"		>> $dayfile
+ if (! $?ec_test) goto chargetest
+@@ -1070,7 +1070,7 @@
+ 
+ chargetest:
+ #if ($ccut == "0.0000") goto nextiter
+-set ctest = (`$bin/testconv -p :DIS -c $ccut`)	
++set ctest = (`$bin/testconv -p :DIS -c $ccut -f $file`)	
+ teststatus
+ echo ":CHARGE convergence:  $ctest[1-3]"		>> $dayfile
+ if (! $?cc_test) goto stresstest
+@@ -1087,7 +1087,7 @@
+ endif
+ 
+ stresstest:
+-set strtest = (`$bin/testconv -p :STR -c $strcut`)	
++set strtest = (`$bin/testconv -p :STR -c $strcut -f $file`)	
+ teststatus
+ echo ":STRESS convergence:  $strtest[1-4]"		>> $dayfile
+ if (! $?str_test) goto testmsr
+@@ -1109,10 +1109,10 @@
+   if ($#msrtest >= 13 ) then
+     echo msrcount $msrcount msrtest $msrtest[13]
+ #   Trap silly early convergene with "minimum-requests"
+-    set etest2 = (`$bin/testconv -p :ENE -c 0.001`)
++    set etest2 = (`$bin/testconv -p :ENE -c 0.001 -f $file`)
+     if ( $etest2[1] == '0')set msrtest[13]='F'
+     set ccut1=0.01;if($ccut != 0.0000 ) set ccut1=$ccut
+-    set ctest2 = (`$bin/testconv -p :DIS -c $ccut1`)
++    set ctest2 = (`$bin/testconv -p :DIS -c $ccut1 -f $file`)
+     if ( $ctest2[1] == '0')set msrtest[13]='F'
+ #
+     if ($msrtest[13] == 'T') then
+@@ -1225,7 +1225,10 @@
+ if($?str_test && $?str_conv) then
+    if($?ec_conv && $?cc_conv && $?fc_conv && ($testmsr == '') ) then
+       set allstr=`head -1 $file.in2$complex2|cut -c 1-3`
+-      if ("$allstr" == "STR" && $?str_conv) goto stop   
++      if ("$allstr" == "STR" && $?str_conv) then
++         set dft_response_converged = 1
++         goto stop
++      endif   
+       if($?fc_test) then
+          foreach i ($file.in2$complex2)
+             FORtoSTRF $i    # switch STR label
+@@ -1240,7 +1243,10 @@
+ #       set str_conv1
+     endif
+ else
+-    if($?ec_conv && $?cc_conv && $?fc_conv && $?str_conv && ($testmsr == '') ) goto stop
++    if($?ec_conv && $?cc_conv && $?fc_conv && $?str_conv && ($testmsr == '') ) then
++       set dft_response_converged = 1
++       goto stop
++    endif
+ endif
+ 
+ if ($iter) goto cycle			#end of sc-cycle
+@@ -1265,6 +1271,22 @@
+ endif
+ 
+ stop:					#normal exit
++# STRT/STRFT use the native STR/STRF path in LAPW2.  Once the ordinary
++# charge loop has converged, compute the screened response from the last
++# pre-MIXER density (case.clmsum_old).  This keeps response work out of every
++# SCF cycle and leaves the live LAPW0/LAPW1/LAPW2 files untouched.
++set dft_response_mode = `head -1 $file.in2$complex2 | awk '{print $1}'`
++if ( $?dft_response_converged && ( "$dft_response_mode" == "STRT" || "$dft_response_mode" == "STRFT" ) ) then
++   if ( ! $?WIEN_DMFT_ROOT ) then
++      echo "STRT/STRFT requires WIEN_DMFT_ROOT for dft_stress_step.py" | tee -a $dayfile
++      exit 9
++   endif
++   $WIEN_DMFT_ROOT/dft_stress_step.py --case $file --wien-root $WIENROOT >>& $dayfile
++   if ( $status != 0 ) then
++      echo "Final screened DFT stress failed; see $dayfile" 
++      exit 9
++   endif
++endif
+ printf "\n>   stop\n"			>> $dayfile
+ printf "\n>   stop\n"	
+ exit 0 

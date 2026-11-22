@@ -82,7 +82,7 @@ class FixedBasisPhysicalPotential:
         columns = [np.concatenate((rr, qr)) for rr, qr in zip(h, hq)]
         spherical = np.zeros(bands.spherical.input_size)
         for a, l, k, op in bands.spherical.spherical:
-            *_, physical = op.pullback(columns[k], np.zeros_like(columns[k]))
+            physical = op.physical_potential_pullback(columns[k])
             spherical[bands.spherical.slices[a]] += physical
         nonspherical = {
             a: op.potential_pullback([h[k] for k in ks], [hq[k] for k in ks])

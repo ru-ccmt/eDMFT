@@ -8,9 +8,10 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
      matsubara, lgTrans, lg_deg, ntcix, nipc, ikp, maxdim2, iorbital, &
      iSx, norbitals, projectorGradientDirect, cix_orb, cixdim, nindo, &
      Sigind)
+  USE adaptive_matsubara, ONLY: tail_moment=>moment,weight_difference,check_sum
   USE defs,  ONLY: pi, IMAG
   USE xa,    ONLY: E
-  USE muzero,ONLY: nomq, iomq, jomq, womq, abom, n0_om, matsum_weight
+  USE muzero,ONLY: jomq, abom, n0_om, matsum_weight
   USE param, ONLY: CHUNK
   use defs,  only: Ry2eV
   USE dmfts, only: maxdim, lmaxp, natom
@@ -70,7 +71,7 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
   end interface
   ! locals
   COMPLEX*16 :: sigma_winf(maxsize,ncix)
-  COMPLEX*16, allocatable :: Wsum(:,:), WEsum(:,:), w0inf(:), Identity(:,:)
+  COMPLEX*16, allocatable :: Wsum(:,:), WEsum(:,:), w0inf(:)
   COMPLEX*16, allocatable :: WSigPair(:,:), SigDirect(:,:), SigScratch(:,:), &
        SigmaTail1(:,:)
   COMPLEX*16, allocatable :: CPair(:,:,:), CStatic(:,:,:), &
@@ -79,15 +80,20 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
        CdiagUdagGminus(:,:), CdiagProduct(:,:), CdiagProductMinus(:,:)
   COMPLEX*16, allocatable :: Eij(:,:), zek(:), zar(:,:), zal(:,:), tmp(:,:), Sigmaij(:,:), Sigma_inf(:,:), Gij(:,:), tmp2(:,:)
   REAL*8,     allocatable :: zek_inf(:)
-  COMPLEX*16, allocatable :: zw1(:), w1(:,:), zar_inf(:,:), zal_inf(:,:), w2(:,:), w3(:,:), Dni(:)
+  COMPLEX*16, allocatable :: zw1(:), w1(:,:), zar_inf(:,:), zal_inf(:,:), w2(:,:), w3(:,:)
   COMPLEX*16, ALLOCATABLE :: Winf(:,:), Wferm(:,:), Bii(:)
-  REAL*8     :: logGD, logG0
-  COMPLEX*16 :: cc, gtc, cek, omn, w0, wo, bg, sginf, sginf_!, cc0, cc1, cc2
+  COMPLEX*16, allocatable :: luWork(:)
+  INTEGER, allocatable :: pivots(:)
+  complex*16, allocatable :: check_energy(:,:),check_static(:)
+  real*8 :: dw,delta_moment_weight
+  INTEGER :: luInfo
+  REAL*8     :: logGD, logG0, logRatio, dynamicLog
+  COMPLEX*16 :: cc, gtc, omn, z, sginf, staticMomentTrace
   REAL*8  :: fer, tlogGD, tlogG, tlogG0, tdens, ek_inf, beta, csm, wkpt, &
-       C0, sginf2, second_order_correction, fermi, matsuWeight, tailMoment2!, diff
-  INTEGER :: i, iom, num, num0, it, nomq_max, icix, j, ip, iq, iorb, &
+       C0, sginf2, second_order_correction, fermi, weight, tailMoment2
+  INTEGER :: i, iom, num, num0, it, icix, j, ip, iorb, &
        ind, nloc, start_nipc
-  LOGICAL :: Qforce, stressMomentDiagnostic, computeDirectC
+  LOGICAL :: Qforce, stressMomentDiagnostic, computeDirectC, inTail
   CHARACTER(len=64) :: diagnosticEnvironment
   INTEGER :: diagnosticStatus
   REAL*8 :: directNorm, directResidual, directScale
@@ -140,8 +146,12 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
      ! noisy tails use a short plateau average; clearly bad/increasing tails
      ! retain the historical endpoint estimate -w_N Im Sigma(iw_N).  The
      ! classification is printed only once (at the first k point).
-     CALL DetermineSelfEnergyTailMoment(sigma_winf,sigma,s_oo,omega,csize, &
-          nomega,maxsize,ncix,ikp.eq.1)
+     if (allocated(tail_moment)) then
+        sigma_winf=tail_moment
+     else
+        CALL DetermineSelfEnergyTailMoment(sigma_winf,sigma,s_oo,omega,csize, &
+             nomega,maxsize,ncix,ikp.eq.1)
+     endif
      allocate(SigmaTail1(nbands,nbands))
      SigmaTail1=0.d0
      CALL AddSigma_optimized2(SigmaTail1,sigma_winf,STrans,csize,1, &
@@ -242,274 +252,149 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
      WEsum=0.d0
      Aweight(:,:)=0.d0
      AEweight(:,:)=0.d0
-     logG0=0.d0
-     logGD=0.d0
 
-     allocate( Identity(nbands,nbands) )
-     Identity(:,:) = 0.d0                         ! Initialize the array.
-     forall(j=1:nbands) Identity(j,j) = 1.d0     ! Set the diagonal.
-     
-     sginf=0 ! This will be used for the second-order correction to Tr(Sigma*G) ~ sum_{iw} Bii(i)/(iw-C0) * 1/(iw-zek_inf(i)) = Bii(i)*(f(C0)-f(zek_inf(i)))/(C0-zek_inf(i))   
-
-     ! !$OMP  PARALLEL DO SHARED(gloc,Sigma_inf,Gdloc,ntcix,wkpt,Gdloc0)&
-     ! !$OMP& PRIVATE(Eij,Sigmaij,zek,tlogG0,tlogGD,tdens,gtc,num,num0,ek_inf,cek,omn,Gij,it,ip,bg,cc)&
-     ! !$OMP& SCHEDULE(STATIC,CHUNK) REDUCTION(+:w0inf,Wsum,WEsum,dens,logG0,logGD,sginf)
-     do iom=1,n0_om-1
-        ! Necessary allocation due to openMP
-        allocate( Eij(nbands,nbands), zek(nbands) )  
-        allocate( Sigmaij(nbands,nbands), Gij(nbands,nbands) )
-        ! Total hamiltonian (H+Sigma) in Kohn-Sham basis
-        Eij=0
-        DO i=1,nbands
-           Eij(i,i) = E(i+DM_nemin-1)  !---   preparing hamiltonian: epsk+sigma
-        ENDDO
-        ! Adding self-energy
-        Sigmaij=0
-        CALL AddSigma_optimized2(Sigmaij, sigma(:,:,iom), STrans, csize, 1, nbands, ncix, maxsize)
-        Eij = Eij + Sigmaij
-
-        omn = omega(iom)*IMAG
-        ! Computing the lattice Green's function                                                                                                                                                                                              
-        Gij(:,:)=-Eij(:,:) ! off diagonal components are just G^{-1} = -(E+Sigma)
-        do i=1,nbands
-           Gij(i,i)=omn+DM_EF+Gij(i,i) ! diagonal components corrected
-        enddo
-        CALL zinv(Gij, nbands)
-        ! Density from the Green's function                                                                                                                                                                                                   
-        Wsum = Wsum + Gij
-        
-        if (Qforce) then
-           WEsum = WEsum + Gij(:,:)*(omn+DM_EF) - Identity(:,:) ! This is summing A^R  eps_{k,w}/(iom+mu-eps_{k,w}) A^L = (iom+mu)*G - I          
-        endif
-        if (stressMomentDiagnostic) then
-           ! Accumulate both positive- and negative-frequency orientations.
-           ! The negative partner of Sigma*G is Sigma^+*G^+, not
-           ! (Sigma*G)^+=G^+*Sigma^+.  Retaining this order is essential for
-           ! comparing the generally non-Hermitian matrix rhoE-epsilon*rho.
-           SigDirect=matmul(Sigmaij,Gij)
-           SigScratch=matmul(conjg(transpose(Sigmaij)), &
-                conjg(transpose(Gij)))
-           WSigPair=WSigPair+SigDirect+SigScratch
-        endif
-        if (computeDirectC) then
-           CALL BuildLocalSigmaMatrix(SigmaLocal,sigma(:,:,iom), &
-                Sigind,cixdim,maxdim,maxsize,ncix)
-           CALL AccumulateDirectProjectorPair(CPair,Gij,Uactive, &
-                SigmaLocal,cixdim,nbands,maxdim,ncix,CdiagUdagG, &
-                CdiagUdagGminus,CdiagProduct,CdiagProductMinus)
-        endif
-        
-        CALL eigvals(Eij, zek, nbands) ! eigenvalues only
-
-        tlogGD=0.0
-        tlogG0=0.0
-        tdens=0.0
-        gtc=0
-        bg=0
-        !$OMP  PARALLEL DO SHARED(zek_inf,zek)&
-        !$OMP& PRIVATE(num,num0,ek_inf,cek,cc)&
-        !$OMP& SCHEDULE(STATIC,CHUNK) REDUCTION(+:w0inf,bg,tlogG0,tlogGD,tdens,gtc)   
-        DO num=DM_nemin,DM_nemax
-           ! These frequencies are not yet in logarithmic mesh (Where all consecutive matsubara frequencies are present)
-           num0 = num-DM_nemin+1
-           ek_inf = zek_inf(num0)
-           cek = zek(num0)-DM_EF           ! eps_k-mu
-           cc = 1.d0/(omn-ek_inf)
-           w0inf(num0) = w0inf(num0) + cc  ! w0inf = sum( 1/(i*om+mu-ek_inf) , om)
-           bg = bg + Bii(num0)*cc
-           tlogGD = tlogGD - dble(log(-omn+cek))
-           tlogG0 = tlogG0 - dble(log(-omn+ek_inf))
-           tdens  = tdens  + dble( 1/(omn-cek)-1/(omn-ek_inf) )
-           gtc = gtc + 1/(omn-cek)
-        ENDDO
-        !$OMP END PARALLEL DO
-        tlogGD = 2/beta*tlogGD
-        tlogG0 = 2/beta*tlogG0
-        tdens  = 2/beta*tdens
-        
-        sginf =  sginf + bg/(omn-C0)
-
-        gloc(iom) = gloc(iom) + gtc * (0.5*wkp)
-
-        dens  = dens  + tdens * wkpt
-        logG0 = logG0 + tlogG0* wkpt
-        logGD = logGD + tlogGD* wkpt
-
-        DO it=1,ntcix  ! sum_{ij} Gij(i,j) * STrans(j,i)
-           if (lg_deg(it).eq.0) cycle
-           do ip=start_nipc,nipc
-              Gdloc(it,iom,ip) = Gdloc(it,iom,ip) + ProductTrace2(Gij, lgTrans(:,:,it,ip), nbands)*(wkp*0.5)  ! 0.5 because wkp=2*wk/sumw
-           enddo
-        ENDDO
-        Call ProjectToLocal(Gdloc0(:,:,:,iom), Gij, DMFTU(:,:,:,1), 0.5*dble(wkp), iorbital, iSx, nbands, maxdim2, norbitals)
-        deallocate( Sigmaij, Gij )
-        deallocate( Eij, zek )
-     enddo   ! iom loop
-     ! !$OMP END PARALLEL DO
-
-     deallocate( Identity )
-     
-     nomq_max=1
-     do iom=n0_om,npomega
-        nomq_max = max(nomq_max,nomq(iom))
-     enddo
-
-     allocate( Eij(nbands,nbands), zek(nbands), zar(nbands,nbands), zal(nbands,nbands) )
-     allocate( tmp2(nbands,nbands) )
-     allocate( Sigmaij(nbands,nbands), Gij(nbands,nbands) )
-     allocate( Dni(nbands) )
-     
-     do iom=n0_om,npomega
-        
-        if ( abs((2*jomq(iom)-1)*pi/beta - omega(iom)).gt.1e-6 ) then
-           print *, 'ERROR: ', iom, (2*jomq(iom)-1)*pi/beta, omega(iom)
-        endif
-        
-        ! Total hamiltonian (H+Sigma) in Kohn-Sham basis
-        Eij=0
-        DO i=1,nbands
-           Eij(i,i) = E(i+DM_nemin-1)  !---   preparing hamiltonian: epsk+sigma
-        ENDDO
-        ! Adding self-energy
-        Sigmaij=0
-        CALL AddSigma_optimized2(Sigmaij, sigma(:,:,iom), STrans, csize, 1, nbands, ncix, maxsize)
-        Eij = Eij + Sigmaij
-        CALL eigsys(Eij, zek, zal, zar, nbands) ! eigenvalues and eigenvectors                                                                                                                                                                
-
-        tlogGD=0.d0
-        tlogG0=0.d0
-        tdens=0.d0
-        gtc=0.d0
-        sginf_=0.d0
-        !$OMP PARALLEL DO SHARED(w0inf,tmp,iom,Dni,C0)&
-        !$OMP PRIVATE(num0,ek_inf,cek,omn,w0,i,wo,cc,bg)&
-        !$OMP& SCHEDULE(STATIC,CHUNK) REDUCTION(+:tlogGD,tlogG0,tdens,sginf_)
-        DO num=DM_nemin,DM_nemax
-           num0 = num-DM_nemin+1
-           ek_inf = zek_inf(num0)           
-           cek = zEk(num0)-DM_EF
-           w0=0.d0
-           bg=0.d0
-           wo=0.d0
-           ! Cubic-spline quadrature of the final integrand.  matsum_weight
-           ! is the sum of the cardinal cubic spline over every omitted
-           ! Matsubara point.  In contrast to the historical scheme, no pole
-           ! or eigenvalue is interpolated before the nonlinear resolvent is
-           ! formed.
-           omn = IMAG*omega(iom)
-           matsuWeight=matsum_weight(iom)
-           w0 = matsuWeight/(omn-cek)
-           cc = matsuWeight/(omn-ek_inf)
-           wo = cc
-           bg = cc/(omn-C0)
-           tlogGD = tlogGD-matsuWeight*dble(log(-omn+cek))
-           tlogG0 = tlogG0-matsuWeight*dble(log(-omn+ek_inf))
-           tdens  = tdens+matsuWeight*dble(1/(omn-cek)-1/(omn-ek_inf))
-           w0inf(num0) = w0inf(num0) + wo
-           tmp(:,num0) =  zar(:,num0)*w0
-           sginf_ = sginf_ + bg*Bii(num0)
-
-           Dni(num0) = 1./(IMAG*omega(iom)-cek)
-        ENDDO
-        !$OMP END PARALLEL DO
-
-        ! omn is PRIVATE in the OpenMP band loop above.  Set the shared scalar
-        ! explicitly before using it in the matrix-valued tail subtraction;
-        ! otherwise it retains a stale frequency from the preceding dense
-        ! loop and turns the intended 1/omega^2 correction into a nearly
-        ! constant, strongly mesh-dependent shift.
+     ! At fixed k and positive Matsubara frequency, A = zI - H_KS - Sigma
+     ! and G = A^{-1}, with z = mu + iw.  The same pivoted LU factorization
+     ! supplies both G and the real trace-log (sum of log absolute pivots).
+     ! Taking the real part pairs +iw with -iw; a row interchange has unit
+     ! modulus.  We never need eigenvectors of the dynamic Hamiltonian here.
+     ! The static eigensystem above still supplies the analytic Fermi tail.
+     allocate(Gij(nbands,nbands), Sigmaij(nbands,nbands))
+     allocate(pivots(nbands),luWork(64*nbands))
+     sginf=czero
+     dynamicLog=0.d0
+     if (allocated(weight_difference).and.Qforce) then
+        allocate(check_energy(nbands,nbands),check_static(nbands))
+        check_energy=czero
+        check_static=czero
+        delta_moment_weight=0.d0
+     endif
+     do iom=1,npomega
         omn=IMAG*omega(iom)
+        z=DM_EF+omn
+        weight=matsum_weight(iom)  ! one on the contiguous low-frequency mesh
+        inTail=iom.ge.n0_om
+        if (inTail.and.abs((2*jomq(iom)-1)*pi/beta-omega(iom)).gt.1.d-6) &
+             print *, 'ERROR: ', iom, (2*jomq(iom)-1)*pi/beta, omega(iom)
 
-        gtc = sum(Dni)
-        sginf = sginf + sginf_
-        ! Wsum = Ar * 1/(i*om+mu-ek) * Al
-        CALL zgemm('N','N',nbands,nbands,nbands,cone,tmp,nbands,zal,nbands,czero,Gij,nbands)
-        Wsum = Wsum + Gij
-
-        if (Qforce) then
-           ! WEsum = Ar * 1/(i*om+mu-ek) * ek * Al
-           do num0=1,nbands
-              tmp(:,num0) = tmp(:,num0)*zek(num0)
-           enddo
-           CALL zgemm('N','N',nbands,nbands,nbands,cone,tmp,nbands,zal,nbands,cone,WEsum,nbands)
-           ! Remove the leading dynamic high-frequency term from the spline
-           ! sum.  Since (iw)^2=-w^2 this subtraction numerically adds a
-           ! positive Sigma_1/w^2 matrix here.  The exact discrete sum of the
-           ! removed term, from this same n0_om boundary to infinity, is
-           ! restored below.  Subtracting and restoring over identical limits
-           ! prevents double counting and also makes the splined residual
-           ! decay two powers faster.
-           WEsum=WEsum-matsum_weight(iom)*SigmaTail1/(omn*omn)
+        Sigmaij=czero
+        CALL AddSigma_optimized2(Sigmaij,sigma(:,:,iom),STrans,csize,1, &
+             nbands,ncix,maxsize)
+        Gij=-Sigmaij
+        do i=1,nbands
+           Gij(i,i)=Gij(i,i)+(z-E(i+DM_nemin-1))
+        enddo
+        CALL zgetrf(nbands,nbands,Gij,nbands,pivots,luInfo)
+        if (luInfo.ne.0) then
+           write(6,*) 'Matsubara ZGETRF failed at k, frequency, info:',ikp,iom,luInfo
+           error stop 'singular or invalid Matsubara inverse Green function'
         endif
+
+        ! -Re log det A plus the static reference. Subtract their logarithms
+        ! at this frequency before summation to retain the small difference.
+        logRatio=0.d0
+        do i=1,nbands
+           logRatio=logRatio+(log(abs(omn-zek_inf(i)))-log(abs(Gij(i,i))))
+        enddo
+        dynamicLog=dynamicLog+weight*logRatio
+        CALL zgetri(nbands,Gij,nbands,pivots,luWork,size(luWork),luInfo)
+        if (luInfo.ne.0) then
+           write(6,*) 'Matsubara ZGETRI failed at k, frequency, info:',ikp,iom,luInfo
+           error stop 'Matsubara Green function inversion failed'
+        endif
+
+        gtc=czero
+        tdens=0.d0
+        staticMomentTrace=czero
+        do i=1,nbands
+           cc=1.d0/(omn-zek_inf(i))
+           w0inf(i)=w0inf(i)+weight*cc
+           gtc=gtc+Gij(i,i)
+           tdens=tdens+dble(Gij(i,i)-cc)
+           staticMomentTrace=staticMomentTrace+Bii(i)*cc
+        enddo
+        sginf=sginf+weight*staticMomentTrace/(omn-C0)
+        ! Constant and analytically completed pieces cancel between the
+        ! fine sum and the coarser sum at the same mu, Sigma and Sigma_1.
+        if (allocated(weight_difference)) then
+           dw=weight_difference(iom)
+           check_sum(1)=check_sum(1)+(2.d0/beta)*wkpt*dw*tdens
+           check_sum(2)=check_sum(2)+(2.d0/beta)*wkpt*dw*(logRatio-dble(staticMomentTrace/(omn-C0)))
+        endif
+        gloc(iom)=gloc(iom)+(0.5d0*wkp)*gtc
+        dens=dens+(2.d0/beta)*wkpt*weight*tdens
+
+        ! Gij is the unweighted resolvent returned at this frequency to the
+        ! impurity. Only frequency sums use tmp = weight * G. This remains
+        ! valid even if a spline weight is zero or negative.
+        tmp=weight*Gij
+        Wsum=Wsum+tmp
         if (stressMomentDiagnostic) then
-           ! Gij here is the quadrature-interpolated positive-frequency
-           ! Green function for this logarithmic-mesh node.  Sigmaij is held
-           ! at the same node, exactly as in the WEsum construction above.
-           SigDirect=matmul(Sigmaij,Gij)- &
-                matsum_weight(iom)*SigmaTail1/(omn*omn)
-           SigScratch=matmul(conjg(transpose(Sigmaij)), &
-                conjg(transpose(Gij)))- &
-                matsum_weight(iom)*SigmaTail1/(omn*omn)
+           ! At -iw the product is Sigma^dagger G^dagger, in this order.
+           SigDirect=matmul(Sigmaij,tmp)
+           SigScratch=matmul(conjg(transpose(Sigmaij)),conjg(transpose(tmp)))
            WSigPair=WSigPair+SigDirect+SigScratch
+           if (inTail) WSigPair=WSigPair-2.d0*weight*SigmaTail1/(omn*omn)
         endif
         if (computeDirectC) then
            CALL BuildLocalSigmaMatrix(SigmaLocal,sigma(:,:,iom), &
                 Sigind,cixdim,maxdim,maxsize,ncix)
-           CALL AccumulateDirectProjectorPair(CPair,Gij,Uactive, &
+           CALL AccumulateDirectProjectorPair(CPair,tmp,Uactive, &
                 SigmaLocal,cixdim,nbands,maxdim,ncix,CdiagUdagG, &
                 CdiagUdagGminus,CdiagProduct,CdiagProductMinus)
-
-           ! Gij already contains matsum_weight at a sparse node.  Remove
-           ! the paired Sigma_1 U^+/(iw)^2 asymptote from that same weighted
-           ! integrand; its exact discrete tail is restored below.
-           do icix=1,ncix
-              nloc=cixdim(icix)
-              CALL zgemm('N','C',nloc,nbands,nloc,cone, &
-                   SigmaTail1Local(1,1,icix),maxdim, &
-                   Uactive(1,1,icix),nbands,czero,CdiagProduct,maxdim)
-              CPair(1:nloc,:,icix)=CPair(1:nloc,:,icix)- &
-                   2.d0*matsum_weight(iom)* &
-                   CdiagProduct(1:nloc,:)/(omn*omn)
-           enddo
+           if (inTail) then
+              do icix=1,ncix
+                 nloc=cixdim(icix)
+                 if (nloc.le.0) cycle
+                 CALL zgemm('N','C',nloc,nbands,nloc,cone, &
+                      SigmaTail1Local(1,1,icix),maxdim, &
+                      Uactive(1,1,icix),nbands,czero,CdiagProduct,maxdim)
+                 CPair(1:nloc,:,icix)=CPair(1:nloc,:,icix)- &
+                      2.d0*weight*CdiagProduct(1:nloc,:)/(omn*omn)
+              enddo
+           endif
         endif
-        
-        ! Evaluating G_local
-        do j=1,nbands
-           tmp2(:,j) = zar(:,j)*Dni(j)
-        enddo
-        CALL zgemm('N','N',nbands,nbands,nbands,cone,tmp2,nbands,zal,nbands,czero,Gij,nbands)
-        DO it=1,ntcix
+
+        do it=1,ntcix
            if (lg_deg(it).eq.0) cycle
-           !CALL zgemm('N','T',nbands,nbands,nbands,cone,zal,nbands,lgTrans(:,:,it),nbands,czero,tmp,nbands)
-           !
-           ! Here we want to compute   Gdloc = \sum_{ij} (A^R * g * A^L)_{ij} * lgTrans_{ij} = Tr( A^R * g * A^L * lgTrans^T )
-           !   We first compute   tmp = lgTrans * {A^L}^T
-           !          and next    tmp2_{ij} = A^R_{ij}*g_j
-           !          finally     G_loc = \sum_{ij} tmp2_{ji} tmp_{ji} = A^R_{ji} g_i A^L_{il} * lgTrans^T_{lj} 
            do ip=start_nipc,nipc
-              !CALL zgemm('N','T',nbands,nbands,nbands,cone,lgTrans(:,:,it,ip),nbands,zal,nbands,czero,tmp,nbands)
-              !Gdloc(it,iom,ip) = Gdloc(it,iom,ip) +  ProductTrace2(tmp2,tmp,nbands)* 0.5*wkp
-              !
-              Gdloc(it,iom,ip) = Gdloc(it,iom,ip) + ProductTrace2(Gij, lgTrans(:,:,it,ip), nbands)*(wkp*0.5)  ! 0.5 because wkp=2*wk/sumw
+              Gdloc(it,iom,ip)=Gdloc(it,iom,ip)+(0.5d0*wkp)* &
+                   ProductTrace2(Gij,lgTrans(:,:,it,ip),nbands)
            enddo
-        ENDDO
-        Call ProjectToLocal(Gdloc0(:,:,:,iom), Gij, DMFTU(:,:,:,1), 0.5*dble(wkp), iorbital, iSx, nbands, maxdim2, norbitals)
-        tlogGD = 2/beta*tlogGD
-        tlogG0 = 2/beta*tlogG0
-        tdens  = 2/beta*tdens
-        
-        gloc(iom) = gloc(iom) + gtc * (0.5*wkp)
-        dens  = dens  + tdens * wkpt
-        logG0 = logG0 + tlogG0* wkpt
-        logGD = logGD + tlogGD* wkpt
-        
-     enddo   ! iom loop
-     
-     deallocate( Sigmaij )
-     deallocate( Eij, zek, zar, zal )
-     deallocate( Gij )
-     deallocate( Dni )
-     
+        enddo
+        CALL ProjectToLocal(Gdloc0(:,:,:,iom),Gij,DMFTU(:,:,:,1), &
+             0.5d0*dble(wkp),iorbital,iSx,nbands,maxdim2,norbitals)
+        if (Qforce) then
+           ! All projections above have consumed G. Reuse its storage for
+           ! H_eff G = zG-I, subtracting I before adding to the running sum.
+           Gij=z*Gij
+           do i=1,nbands
+              Gij(i,i)=Gij(i,i)-cone
+           enddo
+           WEsum=WEsum+weight*Gij
+           if (allocated(check_energy).and.inTail) then
+              check_energy=check_energy+dw*Gij
+              check_static=check_static+dw/(omn-zek_inf)
+              delta_moment_weight=delta_moment_weight+dble(dw/(omn*omn))
+           endif
+           ! Only sparse nodes have their Sigma_1/(iw)^2 asymptote removed.
+           ! Its exact discrete sum is restored below from the same boundary.
+           if (inTail) WEsum=WEsum-weight*SigmaTail1/(omn*omn)
+        endif
+     enddo
+     deallocate(Sigmaij,Gij,pivots,luWork)
+     if (allocated(check_energy)) then
+        ! rho_E contains (zG-I) less the static resolvent contribution and
+        ! Sigma_1/(iw)^2. Its Hermitian part pairs positive/negative omega.
+        do i=1,nbands
+           tmp(:,i)=zar_inf(:,i)*((zek_inf(i)+DM_EF)*check_static(i))
+        enddo
+        check_energy=check_energy-matmul(tmp,zal_inf)-delta_moment_weight*SigmaTail1
+        check_energy=(0.5d0*wkp)*(2.d0/beta)*(check_energy+conjg(transpose(check_energy)))
+        check_sum(3)=check_sum(3)+norm2(abs(check_energy))
+        deallocate(check_energy,check_static)
+     endif
+
      ALLOCATE( Winf(nbands,nbands), Wferm(nbands,nbands) )
      do num0=1,nbands
         tmp(:,num0) =   zar_inf(:,num0)*w0inf(num0)
@@ -584,6 +469,7 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
      Aweight(:,:) = (0.5*wkp)*(tmp(:,:) + transpose(conjg(tmp(:,:))))
 
      if (Qforce) then
+        allocate(tmp2(nbands,nbands))
         !$OMP PARALLEL DO SHARED(tmp,tmp2) SCHEDULE(STATIC)
         do num0=1,nbands
            tmp (:,num0) = zar_inf(:,num0)*(     w0inf(num0)          * (zek_inf(num0)+DM_EF) )
@@ -634,7 +520,7 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
      
      !print *, 'sginf=', dble(sginf), 'sginf2=', dble(sginf2)                                                                                                                                                                                 
      
-     logG = logGD - logG0 + tlogG + second_order_correction*wkpt
+     logG = tlogG + wkpt*((2.d0/beta)*dynamicLog + second_order_correction)
      
      !WRITE(*,'(A,F12.6,1x,A,F12.6,1x,A,F12.6,1x,A,F12.6)') 'logGD-logG0=', logGD-logG0, 'tlogG=', tlogG, 'logG=', logG
      !WRITE(*, '(A,F12.6,1x,A,F12.6,1x)') 'csm=', csm 
@@ -661,7 +547,7 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
      DEALLOCATE( zek_inf )
      DEALLOCATE( zal_inf, zar_inf )
      deallocate( tmp )
-     deallocate( tmp2 )
+     if (Qforce) deallocate(tmp2)
      deallocate( Sigma_inf )
      deallocate( SigmaTail1 )
      if (computeDirectC) deallocate(CPair,CStatic,Uactive,SigmaLocal, &
@@ -937,7 +823,7 @@ SUBROUTINE DetermineSelfEnergyTailMoment(moment1,sigma,sigmaInfinity, &
         ! A second, nested fit is a cheap sensitivity test.  A formally small
         ! residual is not sufficient when a slowly drifting, non-asymptotic
         ! tail can be fitted over one particular interval.
-        nshort=max(6,(nfit+1)/2)
+        nshort=min(nfit,max(6,(nfit+1)/2))
         firstShort=nomega-nshort+1
         CALL FitTwoSelfEnergyMoments(shortMoment,shortSecondMoment, &
              shortResidual,sigma(it,icix,:),sigmaInfinity(it,icix), &

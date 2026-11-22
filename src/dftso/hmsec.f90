@@ -1,5 +1,6 @@
-SUBROUTINE HMSEC(FL,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe)
-  USE param,  ONLY: nume, labc, nato, nmat, hblock, num2, nume2
+SUBROUTINE HMSEC(FL,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe,ikp,weight)
+  use soc_displacement, only: velocity, scalar_window, read_scalar_tangent, accumulate_soc_translation, write_soc_translation
+  USE param,  ONLY: nume, labc, nato, nmat, hblock, num2, nume2, nloat
   USE lolog,  ONLY: mrf, lso
   USE rlolog, ONLY: nnrlo, loorext
   USE orb,    ONLY: natorb
@@ -46,7 +47,7 @@ SUBROUTINE HMSEC(FL,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe)
   COMPLEX*16,allocatable :: dwork(:)
   COMPLEX*16,allocatable :: ovrful(:,:)
   COMPLEX*16,allocatable :: s_vec(:,:)
-  REAL*8 :: ri_mat(4,4,0:labc,nato,2,2)
+  REAL*8 :: ri_mat(nloat,nloat,0:labc,nato,2,2)
   REAL*8 :: ri_orb(4,4,0:labc,nato,2,2)
   CHARACTER*1:: job2
   COMPLEX*16 :: ovrlc,hsoc,vnstot
@@ -56,6 +57,10 @@ SUBROUTINE HMSEC(FL,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe)
   REAL*8     :: cp(7)
   REAL*8     :: pi, abstol, tol, dtime1, dtime2, dtime3, dtime4, dtime5, dtime6, dtime7
   REAL*8     :: htim1,htim2
+  integer, intent(in) :: ikp
+  real*8, intent(in) :: weight
+  complex*16, allocatable :: hdot(:,:),central_matching(:,:,:),scalar_tangent(:,:)
+  real*8, parameter :: stationary(3)=0.d0
   LOGICAL    :: hs_check
   COMPLEX*16, parameter :: imag = (0.0d0,1.0d0)
   DTIME4=0.0d0
@@ -102,6 +107,8 @@ SUBROUTINE HMSEC(FL,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe)
   nmatr=nban2*(nban2+1)/2
   
   allocate(h_(nume2,nume2))
+  if(scalar_window) call read_scalar_tangent(ikp,ss,ee(:,1),meigve(:,:,1),nv(1),ne(1),scalar_tangent)
+  if(allocated(velocity)) allocate(hdot(nban2,nban2),source=(0.d0,0.d0))
 
   if (nnrlo.eq.0) then
      allocate      (s_(1,1))
@@ -121,7 +128,7 @@ SUBROUTINE HMSEC(FL,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe)
         indj=lfirst+ina
         call cputim(htim1)            
         do isi=1,jspin
-           call abclm(meigve(:,:,isi),ss,ne(isi),nv(isi),kv,p,dp,pe,dpe,isi,ity,indj,lfirst)
+           call abclm(meigve(:,:,isi),ss,ne(isi),nv(isi),kv,p,dp,pe,dpe,isi,ity,indj,lfirst,stationary,.false.,meigve(:,:,isi))
         enddo
         call cputim(htim2) 
         DTIME4=DTIME4+htim2-htim1           
@@ -245,6 +252,21 @@ SUBROUTINE HMSEC(FL,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe)
         call cputim(htim1)
         if (lso(ity)) then
            call hsocalc(h_,ri_mat,ne,nnrlo,jspin,indj,ity)
+           if(allocated(velocity)) then
+              if(scalar_window .or. any(velocity(:,indj)/=0.d0)) then
+                 central_matching=abcdlm(:,:,1:ne(1),1)
+                 if (scalar_window) then
+                    call abclm(scalar_tangent,ss,ne(1),nv(1),kv,p,dp,pe,dpe,1,ity,indj,lfirst, &
+                         stationary,.true.,meigve(:,:,1))
+                 else
+                    call abclm(meigve(:,:,1),ss,ne(1),nv(1),kv,p,dp,pe,dpe,1,ity,indj,lfirst, &
+                         velocity(:,indj),.false.,meigve(:,:,1))
+                 endif
+                 call accumulate_soc_translation(hdot,central_matching,abcdlm(:,:,:,1),ri_mat,ne(1),indj,ity)
+                 abcdlm(:,:,1:ne(1),1)=central_matching
+                 deallocate(central_matching)
+              endif
+           endif
         endif
         call cputim(htim2)
         DTIME5=DTIME5+htim2-htim1
@@ -424,6 +446,7 @@ SUBROUTINE HMSEC(FL,emm,ne,nv,ee,ri_mat,ri_orb,jspin,ipr,ss,kv,p,dp,pe,dpe)
         enddo
      enddo
   enddo
+  if(allocated(hdot)) call write_soc_translation(ikp,ss,weight,en,vec,hdot,neig,nban2,vect,nv(1))
   deallocate(meigve)
 
 !-> Getting lapwso back
