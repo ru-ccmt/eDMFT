@@ -59,7 +59,7 @@ def prepare(config):
         if electronic_model != "dmft":
             raise ValueError("analytic SOC force requires an eDMFT snapshot")
         required |= {"lapwso_worker", "lapwso_definition"}
-    allowed = {"native_mpi", "lapw1_mpi", "physical_policy", "dmft2dn_definition", "fermif", "electronic_model", "preserve_soc_normalization", "captured_soc"}
+    allowed = {"native_mpi", "lapw1_mpi", "physical_policy", "stress_ensemble", "dmft2dn_definition", "fermif", "electronic_model", "preserve_soc_normalization", "captured_soc"}
     if "captured_soc" in config:
         if not soc:
             raise ValueError("captured SOC moments require a spinor preparation")
@@ -86,6 +86,15 @@ def prepare(config):
         reference, case, override=config.get("physical_policy"),
         electronic_model=electronic_model, native_soc=soc,
     )
+    # run_channels below must see the original search policy; in particular
+    # it must reuse the user's in-gap EF when recomputeEF=0. Only the tangent
+    # about that state uses the independently selected number constraint.
+    response_policy = policy.record()
+    if "stress_ensemble" in config:
+        ensemble = config["stress_ensemble"]
+        if ensemble not in ("fixed-n", "fixed-mu") or (electronic_model == "dft" and ensemble != "fixed-n"):
+            raise ValueError("invalid stress ensemble for " + electronic_model)
+        response_policy["fixed_number"] = ensemble == "fixed-n"
     if policy.magnetic and "dmft2dn_definition" not in config:
         raise ValueError("two-spin preparation requires dmft2dn_definition")
     work.mkdir(parents=True, exist_ok=False)
@@ -263,7 +272,7 @@ def prepare(config):
             run_channels(definitions, policy, export, common_fermi, export=True)
     if captured is None:
         run("lcore", config["lcore_worker"], ["lcore.def"])
-        prepare_native_potential_core(work, case, work / "potential_core.npz")
+        prepare_native_potential_core(work, case, work / "potential_core.npz", prepare=False)
     if before != fingerprint_files(files):
         raise RuntimeError("parent inputs changed during preparation")
     missing_export = (
@@ -277,6 +286,7 @@ def prepare(config):
         case=case,
         electronic_model=electronic_model,
         physical_policy=policy.record(),
+        response_policy=response_policy,
         parent_fingerprints=before,
         config=config,
         timings=times,
@@ -286,6 +296,10 @@ def prepare(config):
     )
     if soc:
         report["soc_lo_matching"] = "LEGACY_COMPONENT_CUTOFF" if legacy_matching else "LINEAR"
+    if (os.environ.get("EDMFT_RELAX_BLOCK") and electronic_model == "dmft"
+            and not config.get("preserve_soc_normalization", False)):
+        from structure_relaxation import save_measured_normalization
+        save_measured_normalization(os.environ["EDMFT_RELAX_BLOCK"], work, policy.channels)
     if soc and (reference / "SOlapm.dat").is_file():
         from frozen_sigma_response import Metadata
         from lapw_soc_electronic import saved_normalization_error

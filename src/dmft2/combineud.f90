@@ -162,7 +162,7 @@ subroutine ReadCLMVAL(fclmval1, fclmval2, fclmvala, pfc)
         READ(fhv2,'(/)')
         
         WRITE(fhv3,'(3X,A12,I3,3X,A2,I2/)') 'CLM(R) FOR L', Li, 'M=', Mi
-        WRITE(fhv3,'(3X,4E19.12)') ( 0.5*pfc*(RHOLM1(I)+RHOLM2(I)), I=1,IMAX )
+        WRITE(fhv3,'(3X,4ES19.12)') ( 0.5*pfc*(RHOLM1(I)+RHOLM2(I)), I=1,IMAX )
         WRITE(fhv3,'(/)')
      end DO
      READ(fhv1,'(///)')
@@ -184,7 +184,7 @@ subroutine ReadCLMVAL(fclmval1, fclmval2, fclmvala, pfc)
   DO J=1,NWAVE
      READ(fhv1,'(3X,3I5,2E19.12)')  (KZZ(JX),JX=1,3),RHOK1
      READ(fhv2,'(3X,3I5,2E19.12)')  (KZZ(JX),JX=1,3),RHOK2
-     WRITE(fhv3, '(3X,3I5,2E19.12)')   (KZZ(JX),JX=1,3),0.5*pfc*(RHOK1+RHOK2)
+     WRITE(fhv3, '(3X,3I5,2ES19.12)')   (KZZ(JX),JX=1,3),0.5*pfc*(RHOK1+RHOK2)
   ENDDO
     
   close(fhv1)

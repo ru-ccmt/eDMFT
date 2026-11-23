@@ -226,11 +226,17 @@ class ScreenedResponse:
         direction = "Adjoint" if adjoint else "Forward"
         action_seconds = 0.0
 
+        # GMRES may modify both its input and the returned work vector. Keep
+        # private copies so we can reuse the final *actual* operator product
+        # when SciPy has already evaluated A at exactly the returned solution.
+        last_x = last_ax = None
+
         def apply(x):
-            nonlocal count, action_seconds
+            nonlocal count, action_seconds, last_x, last_ax
             count += 1
             before = time.perf_counter()
             result = x - action(x)
+            last_x, last_ax = x.copy(), result.copy()
             action_seconds = time.perf_counter() - before
             return result
 
@@ -269,10 +275,12 @@ class ScreenedResponse:
                 f"{direction} GMRES finished {len(norms)} inner iterations "
                 f"using {count} operator actions. Checking the true residual."
             )
-        residual = source - apply(answer)
+        reused = last_x is not None and np.array_equal(answer, last_x)
+        residual = source - (last_ax if reused else apply(answer))
         norm = float(np.linalg.norm(residual))
         if self.progress is not None:
-            log_residual("recomputed true", norm / scale)
+            label = "true (final operator product reused)" if reused else "recomputed true"
+            log_residual(label, norm / scale)
         report = dict(
             converged=bool(info == 0 and norm <= threshold),
             gmres_info=int(info),
@@ -280,6 +288,7 @@ class ScreenedResponse:
             residual_norm=norm,
             threshold=threshold,
             actions=count,
+            final_product_reused=reused,
             inner_residual_history=norms,
             seconds=time.monotonic() - started,
         )

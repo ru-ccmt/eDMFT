@@ -24,7 +24,32 @@ def _read(f, dtype, count):
     return values
 
 
-def prepare_native_potential_core(directory, case, output):
+def _pseudocharge_ncon(lines):
+    """Read the pseudocharge parameter using the record selected by LAPW0 inputpars."""
+    if len(lines) < 2:
+        raise ValueError("case.in0 is missing the second (R2V/NR2V) record")
+    # LAPW0 reads an 80-column record. It scans for IFFT until a comment
+    # or the numeric unit (LUSE2) ends its option scan. Without IFFT this
+    # second record is also the one on which LAPW0 looks for NCON.
+    record = lines[1][:80]
+    option = re.search(r" IFFT|[(!#]|[ -][0-9]", record)
+    if option and option.start() < 75 and option.group() == " IFFT":
+        if len(lines) < 3:
+            raise ValueError("case.in0 specifies IFFT but has no FFT parameter record")
+        record = lines[2][:80]
+
+    # NCON starts at 9. inputpars reads the integer after the keyword
+    # and clamps explicit values to [3, 19]. A '#' ends the NCON scan.
+    record = record.partition("#")[0]
+    i = record.find("NCON")
+    if 0 <= i < 75:
+        value = re.match(r"\s*([+-]?\d+)(?=[\s,/]|$)", record[i + 4:i + 14])
+        if value:
+            return min(19, max(3, int(value[1])))
+    return 9
+
+
+def prepare_native_potential_core(directory, case, output, *, prepare=True):
     """Validate complete native records before writing the numeric/JSON archive."""
     folder = Path(directory)
     s = Struct()
@@ -36,8 +61,7 @@ def prepare_native_potential_core(directory, case, output):
     functional = {"XC_LDA": "LDA", "XC_PBE": "PBE", "XC_PBESOL": "PBESOL"}.get(token)
     if functional is None:
         raise NotImplementedError("explicit XC_LDA, XC_PBE or XC_PBESOL required")
-    ncon = re.search(r"\bNCON\s+(\d+)", in0[2].upper())
-    ncon = int(ncon[1]) if ncon else 9
+    ncon = _pseudocharge_ncon(in0)
     with (folder / "xc_native.bin").open("rb") as f:
         nat, nstar, *shape = _read(f, "i4", 5)
         volume = _read(f, "f8", 1)[0]
@@ -162,5 +186,6 @@ def prepare_native_potential_core(directory, case, output):
         angular_data=angular,
         core_data=cores,
         source_files=files,
+        prepare=prepare,
         ncon=ncon,
     )

@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 from scipy.sparse import csr_matrix
 
-from lapw_augmentation_response import PreparedAugmentationChannel, harmonics
+from lapw_augmentation_response import PreparedAugmentationChannel, harmonics, hydrostatic_matching_tangent
 from lapw_radial_native import NativeRadialContext
 
 
@@ -266,12 +266,22 @@ class SOCMatching:
             )
             ch.local[j] = angular[:, rows] @ self.component_projection(z, masks)
             self.locals.append((rows, angular[:, rows], phase[rows], masks))
+        from lapw_geometry_response import SpinorMatchingGeometry
+        frame = np.linalg.solve(geometry.br1.T, site.local_momenta.T)
+        self.strain_geometry = SpinorMatchingGeometry(self.q, local, frame, phase,
+            geometry.volume, npw, [rows for rows, _, _, _ in self.locals])
+        self.filtered_lo = None
+        if geometry.legacy_lo_filter:
+            # The native filter acts after the Bloch phase has been applied.
+            # Strip that fixed phase since the matching derivative includes it.
+            self.filtered_lo = [ph.conj()[:, None] * self.component_projection(
+                ph[:, None] * coefficients[rows], masks) for rows, _, ph, masks in self.locals]
         self.channel = ch
         self.z = ch.value(
             self.ctx.primitive[-1], self.ctx.lo_coefficients, lapw=self.ctx.lapw
         )[:, self.slots, :]
 
-    def action(self, dc, velocity, boundary_dot, abc_dot):
+    def action(self, dc, velocity, boundary_dot, abc_dot, *, hydrostatic=False, strain=None):
         from copy import copy
 
         ctx, ch = self.ctx, self.channel
@@ -289,6 +299,13 @@ class SOCMatching:
                 v = phase[:, None] * x[rows]
                 dch.local[j] = angular @ self.component_projection(v, masks)
             dz += dch.value(ctx.primitive[-1], ctx.lo_coefficients, lapw=ctx.lapw)
+        if hydrostatic:
+            q2 = np.einsum("ij,ij->i", self.q[:self.npw], self.q[:self.npw])
+            dot = hydrostatic_matching_tangent(ch, (self.f * q2) @ self.c[:self.npw])
+            dz += dot.value(ctx.primitive[-1], ctx.lo_coefficients, lapw=ctx.lapw)
+        if strain is not None:
+            dot = self.strain_geometry.tangent(ch, strain, self.c, self.filtered_lo)
+            dz += dot.value(ctx.primitive[-1], ctx.lo_coefficients, lapw=ctx.lapw)
         return dz[:, self.slots, :]
 
     def pullback(self, zbar):
@@ -342,7 +359,7 @@ class SOCBandHamiltonian:
         rz = (radial @ z).reshape(len(z), -1)
         return (angular @ rz).reshape(z.shape)
 
-    def action(self, radial_dots=None, dc=None, velocities=None, *, central=False):
+    def action(self, radial_dots=None, dc=None, velocities=None, *, central=False, hydrostatic=False, strain=None):
         """SOC matrix derivative, or the central SOC matrix when central=True."""
         n = self.c.shape[1]
         h = np.zeros((2 * n, 2 * n), complex)
@@ -357,7 +374,7 @@ class SOCBandHamiltonian:
                 else:
                     dr, db, da = radial_dots[key]
                 dz = match.action(
-                    dc, None if velocities is None else velocities[site], db, da
+                    dc, None if velocities is None else velocities[site], db, da, hydrostatic=hydrostatic, strain=strain
                 )
             for i, j in ((0, 0), (0, 1), (1, 1)):
                 a = angular[:, :, i, j]

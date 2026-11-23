@@ -146,10 +146,14 @@ def AStep(fday, case, name, inp_name, WIEN, para, fh_info, opts=''):
     fh_info.flush()
     
     info=subprocess.call(cmd,shell=True,stdout=fday)
+    if info and os.environ.get("EDMFT_RELAX_BLOCK"):
+        raise RuntimeError(f"relaxation command failed ({info}): {cmd}")
     
     for fe in glob.glob(name+'.error*'):
         if getsize(fe) !=0:
             print('ERROR in '+fe+' from file:', open(fe,'r').readlines())
+            if os.environ.get('EDMFT_RELAX_BLOCK'):
+                raise RuntimeError(f'{name} reported an error in {fe}')
 
 def lapw0(fday, case, WIEN, para, fh_info):
     para=''
@@ -171,6 +175,8 @@ def lapw1(fday, case, WIEN, para, dftKS, dmfe, wopt, fh_info):
             print(('#<'+sname+'>: '), cmd, file=fh_info)
             fh_info.flush()
             info=subprocess.call(cmd,shell=True,stdout=fh_info)
+            if info and os.environ.get("EDMFT_RELAX_BLOCK"):
+                raise RuntimeError(f"relaxation command failed ({info}): {cmd}")
         else:                  # V_{KS} is polarized, need to lapw1 steps
             print('>%-10s' % (sname+' --up'), '( '+time.strftime("%I:%M:%S %p")+' )', file=fday)
             with open(':log', 'a') as fl:
@@ -179,6 +185,8 @@ def lapw1(fday, case, WIEN, para, dftKS, dmfe, wopt, fh_info):
             print(('#<'+sname+'>: '), cmd, file=fh_info)
             fh_info.flush()
             info=subprocess.call(cmd,shell=True,stdout=fh_info)
+            if info and os.environ.get("EDMFT_RELAX_BLOCK"):
+                raise RuntimeError(f"relaxation command failed ({info}): {cmd}")
             
             print('>%-10s' % (sname+' --dn'), '( '+time.strftime("%I:%M:%S %p")+' )', file=fday)
             with open(':log', 'a') as fl:
@@ -187,6 +195,8 @@ def lapw1(fday, case, WIEN, para, dftKS, dmfe, wopt, fh_info):
             print(('#<'+sname+'>: '), cmd, file=fh_info)
             fh_info.flush()
             info=subprocess.call(cmd,shell=True,stdout=fh_info)
+            if info and os.environ.get("EDMFT_RELAX_BLOCK"):
+                raise RuntimeError(f"relaxation command failed ({info}): {cmd}")
     else:
         if not wopt['updn']: # just one type of core file, so V_{KS} is not polarized
             AStep(fday, case, 'lapw1', 'in1', WIEN, para, fh_info, pcmplx)
@@ -204,6 +214,8 @@ def lapwso(fday, case, WIEN, para, dftKS, dmfe, fh_info):
         print(('#<'+name+'>: '), cmd, file=fh_info)
         fh_info.flush()
         info=subprocess.call(cmd,shell=True,stdout=fh_info)
+        if info and os.environ.get("EDMFT_RELAX_BLOCK"):
+            raise RuntimeError(f"relaxation command failed ({info}): {cmd}")
     else:
         AStep(fday, case, 'lapwso', 'inso', WIEN, para, fh_info)
 
@@ -264,6 +276,17 @@ def lattice_charge_step(fday, w2k, fh_info, dmfe, p, para, wopt, matsubara, fina
 
     Prepare_dmft2(dmfe, p, para, wopt, fh_info, recomputeEF, 'c')
     SSplit(dmfe.ROOT, matsubara, p, fh_info)
+    if os.environ.get('EDMFT_RELAX_BLOCK') and not getattr(p, '_relax_checked', False):
+        # Check full STRFT support before the first MSR1a position update.
+        # The magnetic backend currently publishes a tensor without atomic forces.
+        req = dict(dmft2_step.request(w2k.case), mode='STRFT', enabled=True)
+        settings = dmft2_step.preflight(w2k.case, req, dmfe.ROOT, dmfe.MPI2)
+        if settings['physical_policy']['magnetic']:
+            raise NotImplementedError("cell and internal relaxation needs screened atomic forces on both spin branches")
+        p._relax_checked = True
+    if os.environ.get('EDMFT_RELAX_BLOCK'):
+        from structure_relaxation import refresh_projector
+        refresh_projector(os.environ['EDMFT_RELAX_BLOCK'])
     phase = 'final' if final_force else 'defer'
     dEF = dmft2(fday, w2k.case, fh_info, dmfe, response_phase=phase, final_force=final_force)
     fday.flush()
@@ -315,6 +338,23 @@ def final_response_pass(fday, w2k, fh_info, dmfe, p, para, wopt, matsubara):
     scf1(fday, case, WIEN)
     mixer(fday, case, WIEN, fh_info)
     scfm(fday, case, WIEN)
+    # The response and final mixer must succeed before regenerable exports
+    # are removed. Reports and prepared inputs remain available for analysis.
+    try:
+        from response_cleanup import cleanup_response, cleanup_parent_vectors
+        response_cleanup = cleanup_response(case)
+        vector_cleanup = cleanup_parent_vectors(case)
+        cleanup = {key: response_cleanup.get(key, 0) + vector_cleanup.get(key, 0)
+                   for key in ('removed_files', 'removed_bytes')}
+        if cleanup.get('removed_files'):
+            print('Response cleanup: removed %d temporary files (%d bytes)' %
+                  (cleanup['removed_files'], cleanup['removed_bytes']),
+                  file=fh_info, flush=True)
+    except Exception as error:
+        # A storage/cleanup error must not invalidate successfully published
+        # forces. Retain the remaining files and make the failure visible.
+        print('WARNING: response temporary-file cleanup failed: '+str(error),
+              file=fh_info, flush=True)
     fday.flush()
     return True
 
@@ -646,6 +686,7 @@ if __name__ == '__main__':
               'dftKS'         : True,      # Use internal capabilities to solve the Kohn-Sham problem
               'remove_broyd'  : 1000,      # How many dft steps before broyden files are removed
               'Ferro'         : False,     # For ferromagnetic (or ferrimagnetic) metals it should be set to True, so that the chemical potential is properly computed
+              'relax'         : False,     # opt-in internal-coordinate and cell optimization
               'force_last': False, # fixed geometry: use FOR once after TOT charge iterations
               'force_Ene_diff': 0.001,     # When checking if force is converged, we require Energy to be converged as well up to this difference
               'force_Rho_diff': 0.01,      # When checking if force is converged, we require Charge to be converged as well up to this difference
@@ -691,6 +732,15 @@ if __name__ == '__main__':
                                 lambda by fractional occupancy of the shell (very little yukawa screening for late TMO and mostly yukawa for early TMOs).
                                 dielectric screening is later increased to compensate for descreased lambda, to give input U. But J is probably smalller 
                                 than required by input.
+        relax          [bool] False           # MSR1a/FOR internal moves and screened STRFT cell updates
+        relax_pressure [GPa] 0.0              # positive external pressure is compression
+        relax_force_tol [mRy/Bohr] 0.5        # maximum screened force per atom
+        relax_stress_tol [GPa] 0.02           # maximum principal stress residual
+        relax_max_strain 0.01                 # maximum principal log strain per step
+        relax_bulk_modulus [GPa] 120          # initial bulk stiffness for the cell step
+        relax_shear_modulus [GPa] 60          # initial shear stiffness for the cell step
+        relax_refresh_bohr [Bohr] 0.08        # remeasure after this internal displacement
+        relax_max_steps 20                    # maximum screened evaluations in this invocation
         force_last     [bool] False           # TOT: compute native forces once at the final fixed-geometry charge
                                               # FOR: compute forces on every charge step
         runIMP         [True| False] True     # Run impurity solver or skip this step
@@ -713,10 +763,11 @@ if __name__ == '__main__':
         print(help)
         sys.exit(0)
     
-    fh_info = open('dmft_info.out','w')
-    fh_pinfo = open('info.iterate', 'a')
-    
-    p = Params('params.dat', params, f_sparams=None, fh_info=fh_info)
+    # Decide whether to enter the outer relaxation loop before truncating
+    # an active electronic worker's logs. Execute params.dat only once here.
+    from io import StringIO
+    startup_log = StringIO()
+    p = Params('params.dat', params, f_sparams=None, fh_info=startup_log)
 
     # list of options for wien2k
     wopt={'cmplx':'', 'so':'', 'm_extn':'', 'updn':''}  
@@ -728,9 +779,32 @@ if __name__ == '__main__':
     dmfe = utils.DmftEnvironment()  # DMFT paths
     w2k = utils.W2kEnvironment()    # W2k filenames and paths
     
+    p.refresh()
+    block = None
+    if p['relax'] or 'EDMFT_RELAX_BLOCK' in os.environ:
+        from pathlib import Path
+        import structure_relaxation as relaxation
+        control = {**relaxation.DEFAULTS, **p.p}
+        if 'EDMFT_RELAX_BLOCK' not in os.environ:
+            relaxation.run(w2k.case, control, __file__)
+            sys.exit(0)
+        block = relaxation.ElectronicBlock(w2k.case, Path(os.environ['EDMFT_RELAX_BLOCK']),
+                                           relaxation.options(control))
+        if not p['relax'] or p['finish'] < 1:
+            raise ValueError("relaxation worker requires relax=True and finish >= 1")
+
+    fh_info = open('dmft_info.out','w')
+    fh_info.write(startup_log.getvalue())
+    p.log = fh_info
+    fh_pinfo = open('info.iterate', 'a')
+
     # we want to clean certain files that might interfere with this run
     to_clean = ['*.scf','Edc.dat','dmft[1|2].error*','*.[dlt|gc1|cdos].*','*.outputdmf[1|2].*','dmft[1|2]_info.out', '*.broyd*']
     toclean = []
+    if block is not None:
+        to_clean.remove('*.broyd*')
+        relaxation.reset_mixer_history(w2k.case, block.directory.parent,
+                                      f'{block.directory.name} new geometry or screened force correction')
     for pat in to_clean:
         toclean.extend( glob.glob(pat) )
     for f in toclean: os.remove(f)
@@ -792,8 +866,7 @@ if __name__ == '__main__':
             inldn.emin,inldn.emax = inl.emin, inl.emax
             inldn.write(w2k.case+'.indmfl'+wopt['m_extn'])
     
-    # Reading parameters from params.dat
-    p.refresh()
+
     
     para = ''
     if p['dftKS'] and dmfe.MPI2:
@@ -970,13 +1043,14 @@ if __name__ == '__main__':
 
     if p['finish']>=1: # Charge self-consistent
         
-        if os.path.isfile(w2k.case+'.clmsum_old'): shutil.copy2(w2k.case+'.clmsum_old', w2k.case+'.clmsum')
+        if os.path.isfile(w2k.case+'.clmsum_old') and (block is None or not os.path.isfile(w2k.case+'.clmsum')):
+            shutil.copy2(w2k.case+'.clmsum_old', w2k.case+'.clmsum')
         if not os.path.isfile(w2k.case+'.clmsum'):
             print('no '+w2k.case+'.clmsum(_old) file found, which is necessary for lapw0 !')
             print('no '+w2k.case+'.clmsum(_old) file found, which is necessary for lapw0 !', file=fday)
             sys.exit(1)
         
-        if os.path.isfile(w2k.case+'.broyd1'):
+        if block is None and os.path.isfile(w2k.case+'.broyd1'):
             print(w2k.case+'.broyd* files present! I will remove previous broyd files.') 
             # print 'You have '+str(p['sleeptime'])+' seconds to kill this job ( ^C   or   kill '+str(os.getpid())+' )'
             # print 'or the script will rm *.broyd* and continue (use -NI to avoid automatic rm)'
@@ -1104,7 +1178,8 @@ if __name__ == '__main__':
 
             itt += 1   # END DMFT INNER LOOP
             
-        n_imp *= 1./itt
+        if itt:
+            n_imp *= 1./itt
         
         if int(len(sigmas)*p['saver'])>1 :
             sigmas.reverse()
@@ -1148,12 +1223,21 @@ if __name__ == '__main__':
             nc = ConvertFromLatticeToImp(nd, imp2latt)
 
             lcore(fday,w2k.case,w2k.WIENROOT,wopt,fh_info);       fday.flush()
+            if block is not None:
+                offset = os.path.getsize(w2k.case+'.scf') if os.path.exists(w2k.case+'.scf') else 0
             scf  (w2k.case, wopt)
             scf1 (fday,w2k.case,w2k.WIENROOT);
-            mixer(fday,w2k.case,w2k.WIENROOT,fh_info);       fday.flush()
+            if block is None:
+                mixer(fday,w2k.case,w2k.WIENROOT,fh_info)
+            else:
+                block.mix(offset, lambda: mixer(fday,w2k.case,w2k.WIENROOT,fh_info))
+            fday.flush()
             scfm (fday,w2k.case,w2k.WIENROOT);               fday.flush()
             drho, dene = Diff(fday, w2k.case, dEF, diff_nimp, ddiff_nimp);fday.flush()
             
+            if block is not None:
+                block.check_ordinary(drho, dene, p)
+
             # Writting to info.iterate file
             if os.path.isfile('EF.dat'): EF = float(open('EF.dat').read())
             (ETOT,SUM,XSUM,YSUM,ZSUM,EORB,XEORB,ZEORB) = FindEtot(w2k.case,wopt)
@@ -1181,7 +1265,7 @@ if __name__ == '__main__':
                 if fstc.AreForcesConverged(w2k.case, how_many_times=3, min_Ene_diff=p['force_Ene_diff'], min_Rho_diff=p['force_Rho_diff'], info=fh_info):
                     fstc.StopStructureOptimization(w2k.case,info=fh_info)
             else:
-                succi = (drho<p['cc'] and dene<p['ec'])
+                succi = (drho<p['cc'] and dene<p['ec'] and (block is None or block.frozen))
                 
             if succi or ita==(p['max_lda_iterations']-1):
                 istep1 += 1
@@ -1197,9 +1281,12 @@ if __name__ == '__main__':
             fday.flush()
             
             if succi : break
-            if ita>0 and ita%p['remove_broyd']==0 : 
-                for f in glob.glob('*.broyd*'): 
-                    os.remove(f)
+            if ita>0 and ita%p['remove_broyd']==0 :
+                if block is not None:
+                    relaxation.reset_mixer_history(w2k.case, block.directory.parent, 'remove_broyd interval')
+                else:
+                    for f in glob.glob('*.broyd*'):
+                        os.remove(f)
 
         ddiff_nimp = abs(pdiff_nimp-diff_nimp)
         pdiff_nimp = diff_nimp
@@ -1211,22 +1298,54 @@ if __name__ == '__main__':
             fstc.RelaxAgain(w2k.case, mix_method)
             shutil.copy2(w2k.case+'.struct',w2k.case+'.struct.'+str(icycle-1))
         
-        if (p['max_lda_iterations']>=10): 
+        if block is not None and p['runIMP'] and icycle < charge_cycles:
+            relaxation.reset_mixer_history(w2k.case, block.directory.parent, 'next impurity cycle')
+        elif block is None and p['max_lda_iterations']>=10:
             toclean = glob.glob('*.broyd*')
             for f in toclean: os.remove(f)
         
-        if not RelaxingStructure and ddiff_nimp<p['nc'] and drho<2*p['cc'] and dene<2*p['ec']:
+        if (block is None or (block.frozen and drho<=p['cc'] and dene<=p['ec'])) and not RelaxingStructure and ddiff_nimp<p['nc'] and drho<2*p['cc'] and dene<2*p['ec']:
             # impurity occupation is not changing much anymore, and charge and energy is converged, hence we can safely stop if structure is not relaxing.
             break
         
     if istep0 > 0:
         p.refresh()
+        if block is not None:
+            def ordinary_measurement(filename):
+                # Same density, self-energy, structure, LAPW states and full
+                # FOR publication as STRFT below. No mixer between measurements.
+                lattice_charge_step(fday, w2k, fh_info, dmfe, p, para, wopt, inl.matsubara)
+                lcore(fday, w2k.case, w2k.WIENROOT, wopt, fh_info)
+                suffix = os.path.relpath(filename)[len(w2k.case):]
+                scf(w2k.case, wopt, outfile=suffix)
+            block.before_screen(drho, dene, ddiff_nimp, p, ordinary_measurement)
         final_response_pass(fday, w2k, fh_info, dmfe, p, para, wopt, inl.matsubara)
+        if block is not None:
+            block.after_screen(p)
 
-    toclean = glob.glob('dmft[1|2].error*')+glob.glob('*.broyd*')+glob.glob('dmft')+glob.glob('dmft2')+glob.glob('_processes*')+glob.glob('lapw1')+glob.glob('*.output1_*')+glob.glob('*.vector_*')+glob.glob('*.scf1_*')+glob.glob('lapw1_*.[def|error]')
-    for f in toclean: os.remove(f)
-
-    allFiles=glob.glob("*")
-    for filename in allFiles:
-        if os.stat(filename).st_size==0:
-            os.remove(filename)
+    if block is not None:
+        relaxation.reset_mixer_history(w2k.case, block.directory.parent, 'screened measurement complete')
+    # Final cleanup must obey response retention and preserve linked vector targets.
+    cleanup_allowed = True
+    try:
+        keep_temporary = dmft2_step.request(w2k.case)['config'].get('keep_temporary_files', False)
+        cleanup_allowed = not keep_temporary
+        if cleanup_allowed and istep0 > 0:
+            # Ordinary FOR may not need an extra final_response_pass, but its
+            # successfully published response still needs the same cleanup.
+            from response_cleanup import cleanup_response, cleanup_parent_vectors
+            cleanup_response(w2k.case)
+            cleanup_parent_vectors(w2k.case)
+    except Exception as error:
+        cleanup_allowed = False
+        print('WARNING: final cleanup deferred: '+str(error), file=fh_info, flush=True)
+    if cleanup_allowed:
+        # Vector removal belongs to the guarded callbacks above. This legacy
+        # list must not override keep_temporary_files or delete alias targets.
+        toclean = glob.glob('dmft[1|2].error*')+(glob.glob('*.broyd*') if block is None else [])+glob.glob('dmft')+glob.glob('dmft2')+glob.glob('_processes*')+glob.glob('lapw1')+glob.glob('*.output1_*')+glob.glob('*.scf1_*')+glob.glob('lapw1_*.[def|error]')
+        for f in toclean: os.remove(f)
+        for filename in glob.glob('*'):
+            if os.path.islink(filename) or '.vector' in filename:
+                continue
+            if os.path.isfile(filename) and os.stat(filename).st_size == 0:
+                os.remove(filename)

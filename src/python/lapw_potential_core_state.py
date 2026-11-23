@@ -314,6 +314,7 @@ def save_potential_core_state(
     source_files=None,
     ncon=9,
     rho_min=(2e-8, 1e-9),
+    prepare=True,
 ):
     """Validate, prepare, and atomically save caller-provided native central data.
 
@@ -322,7 +323,10 @@ def save_potential_core_state(
     contains vsp (r*V Ry), shift_Ry and states with energy_Ha, kappa,
     occupation and zero-based match/end indices. An empty state list is an
     explicit no-core atom. Sources must already represent one common central
-    calculation; a generic native exporter remains a separate integration task.
+    calculation. By default the writer validates the physical data and returns
+    the prepared operator. For a private snapshot consumed in another process,
+    prepare=False writes the same archive and returns None. The first load
+    performs the full physical validation before the response solve.
     """
     s = structure
     if len(angular_data) != s.nat or len(core_data) != s.nat:
@@ -368,7 +372,11 @@ def save_potential_core_state(
     # JSON also rejects accidental ndarray/nonserializable metadata before a
     # file is published. No NaN/Inf scalar is allowed in the state header.
     encoded = json.dumps(metadata, sort_keys=True, allow_nan=False)
-    prepared = _prepare(json.loads(encoded), arrays)
+    # A standalone caller receives a fully validated, prepared operator. During
+    # a screened run this private archive crosses a process boundary; only its
+    # consumer can use the constructed maps. It runs the same _prepare checks
+    # before any solve or publication. The file format is identical.
+    prepared = _prepare(json.loads(encoded), arrays) if prepare else None
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)

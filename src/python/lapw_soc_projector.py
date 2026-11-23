@@ -10,7 +10,7 @@ import numpy as np
 
 from indmffile import Indmfl
 from lapw_lattice import NativeLattice, native_site_frames
-from lapw_augmentation_response import PreparedAugmentationChannel
+from lapw_augmentation_response import PreparedAugmentationChannel, hydrostatic_matching_tangent
 from lapw_radial_native import NativeRadialContext
 from lapw_projector_response import PreparedProjector5
 
@@ -127,6 +127,10 @@ class SpinorProjectors:
                 np.eye(2 * l + 1),
                 lapw=ctx.lapw,
             )
+            from lapw_geometry_response import SpinorMatchingGeometry
+            op.strain_geometry = SpinorMatchingGeometry(q, q @ frame.T, frame.T,
+                np.exp(2j * np.pi * (frac @ self.locations[site])), self.lattice.volume, npw,
+                [npw + self.mat.lo_indices[a, l, j] for j in range(ctx.nlo)])
             ops.append((site, key, ic, op, t))
         return SpinorProjectorAtK(ops, q, self.meta, len(self.locations))
 
@@ -137,9 +141,9 @@ class SpinorProjectorAtK:
         self.nsites = nsites
         self.phi = {(site, ic): op.value() for site, key, ic, op, t in ops}
 
-    def evaluate(self, psi, *, dpsi=None, radial=None, velocity=None):
+    def evaluate(self, psi, *, dpsi=None, radial=None, velocity=None, hydrostatic=False, strain=None):
         """Return raw U or its full tangent, in [band, index, impurity] order."""
-        tangent = any(v is not None for v in (dpsi, radial, velocity))
+        tangent = strain is not None or hydrostatic or any(v is not None for v in (dpsi, radial, velocity))
         m, nc = self.meta.normalization.shape[0], len(self.meta.dimensions)
         out = np.zeros((psi.shape[-1], m, nc), complex)
         for site, key, ic, op, t in self.ops:
@@ -154,6 +158,18 @@ class SpinorProjectorAtK:
                 dp = np.zeros_like(phi)
                 if radial is not None:
                     dp += op.action(*radial[key])
+                if hydrostatic:
+                    # Channels here act on the unit matrix of LAPW rows.
+                    # Plane-wave columns can be weighted directly; LO columns
+                    # of fj vanish, and their matching normalization is separate.
+                    q2 = np.einsum("ij,ij->i", self.q, self.q)
+                    dot = hydrostatic_matching_tangent(op.channel, op.channel.fj * q2)
+                    dz = dot.value(op.phi[-1], op.lo, lapw=op.lapw)
+                    dp += np.einsum("min,i,ma->na", dz.conj(), op.q, op.transform)
+                if strain is not None:
+                    dot = op.strain_geometry.tangent(op.channel, strain)
+                    dz = dot.value(op.phi[-1], op.lo, lapw=op.lapw)
+                    dp += np.einsum("min,i,ma->na", dz.conj(), op.q, op.transform)
                 if velocity is not None:
                     dp -= (1j * (self.q @ velocity[site]))[:, None] * phi
                 value = pair(psi, dp)

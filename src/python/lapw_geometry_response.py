@@ -15,7 +15,7 @@ from pathlib import Path
 import hashlib
 from lapw_lattice import NativeLattice, native_site_frames
 import numpy as np
-from scipy.special import eval_legendre, spherical_jn
+from scipy.special import eval_jacobi, eval_legendre, spherical_jn
 from lapw_augmentation_response import harmonics
 from lapw_compact_blocks import hermitian_columns
 from lapw_density_response import checked
@@ -74,6 +74,64 @@ def matching_direction(ell, rmt, length, length_dot):
     return np.array([j, q * jp]), np.array([rmt * dq * jp, dq * (jp + x * jpp)])
 
 
+def _matching_factors(channel, q_local, dq_local, length, length_dot, phase,
+                      npw, volume, trace, phase_rate=None):
+    phase = np.asarray(phase)
+    if phase_rate is None:
+        y, dy = harmonic_direction(channel.ell, q_local, dq_local)
+    else:
+        # A translation changes only the Bloch phase at fixed cell and axes.
+        # The matching arrays include LO rows, which carry their native G labels.
+        y = harmonics(channel.ell, q_local)
+        dy = np.zeros_like(y)
+    pref = 4 * np.pi * (1j**channel.ell) / np.sqrt(volume) * phase
+    g = pref * y.conj()
+    dg = (1j * phase_rate * g if phase_rate is not None
+          else pref * (dy.conj() - 0.5 * trace * y.conj()))
+    match, dmatch = matching_direction(
+        channel.ell, channel.rmt, length[:npw], length_dot[:npw]
+    )
+    return g, dg, match, dmatch
+
+
+class SpinorMatchingGeometry:
+    """Central fixed-fractional-coordinate data for SOC and projector-5 matching.
+
+    Row-vector convention: q = (k+G) B^T, dq = -q e. Local harmonics see
+    dq in the same fixed Cartesian orbital frame as the central harmonic.
+    At fixed fractional positions the Bloch phase has no strain derivative.
+    """
+    def __init__(self, q, local, frame, phase, volume, npw, groups):
+        self.q, self.local, self.frame = q, local, frame
+        self.phase, self.volume, self.npw, self.groups = phase, volume, npw, groups
+
+    def tangent(self, channel, strain, coefficients=None, local_coefficients=None):
+        dq = -self.q @ strain
+        length = np.linalg.norm(self.q, axis=1)
+        dl = np.divide(np.einsum("ij,ij->i", self.q, dq), length,
+                       out=np.zeros_like(length), where=length != 0)
+        g, dg, b, db = _matching_factors(channel, self.local, dq @ self.frame, length, dl,
+                                         self.phase, self.npw, self.volume, np.trace(strain))
+        df = dg[:, :self.npw] * b[0] + g[:, :self.npw] * db[0]
+        ddf = dg[:, :self.npw] * b[1] + g[:, :self.npw] * db[1]
+        out = copy(channel)
+        if coefficients is None:
+            # Projector matching is in LAPW rows (identity coefficients).
+            out.fj, out.dfj, out.local = (np.zeros_like(x) for x in
+                                           (channel.fj, channel.dfj, channel.local))
+            out.fj[:, :self.npw], out.dfj[:, :self.npw] = df, ddf
+            for j, rows in enumerate(self.groups):
+                out.local[j][:, rows] = dg[:, rows]
+        else:
+            out.fj = df @ coefficients[:self.npw]
+            out.dfj = ddf @ coefficients[:self.npw]
+            out.local = np.empty_like(channel.local)
+            for j, rows in enumerate(self.groups):
+                c = coefficients[rows] if local_coefficients is None else local_coefficients[j]
+                out.local[j] = dg[:, rows] @ c
+        return out
+
+
 def augmentation_geometry_direction(
     channel,
     q_local,
@@ -94,22 +152,9 @@ def augmentation_geometry_direction(
     dg uses dY and -tr(strain)/2. LO factors carry the same normalization.
     Radial primitives and ABC coefficients are held fixed here.
     """
+    g, dg, match, dmatch = _matching_factors(
+        channel, q_local, dq_local, length, length_dot, phase, npw, volume, trace, phase_rate)
     c = np.asarray(coefficients)
-    phase = np.asarray(phase)
-    if phase_rate is None:
-        y, dy = harmonic_direction(channel.ell, q_local, dq_local)
-    else:
-        # A translation changes only the Bloch phase at fixed cell and axes.
-        # The matching arrays include LO rows, which carry their native G labels.
-        y = harmonics(channel.ell, q_local)
-        dy = np.zeros_like(y)
-    pref = 4 * np.pi * (1j**channel.ell) / np.sqrt(volume) * phase
-    g = pref * y.conj()
-    dg = (1j * phase_rate * g if phase_rate is not None
-          else pref * (dy.conj() - 0.5 * trace * y.conj()))
-    match, dmatch = matching_direction(
-        channel.ell, channel.rmt, length[:npw], length_dot[:npw]
-    )
     out = copy(channel)
     out.fj = (dg[:, :npw] * match[0] + g[:, :npw] * dmatch[0]) @ c[:npw]
     out.dfj = (dg[:, :npw] * match[1] + g[:, :npw] * dmatch[1]) @ c[:npw]
@@ -190,6 +235,62 @@ def atomic_wronskian_columns(q, labels, c, structure, velocities, volume, weight
             tangent += radial * dr_phase
         tangent *= np.sign(indices[None, :] - indices[block, None])
         result += c[block].conj().T @ (tangent @ c[:, :retained])
+    return hermitian_columns(result)
+
+
+def strain_wronskian_columns(q, labels, c, structure, strain, volume, weights, retained):
+    """Differentiate the ordered LAPW surface term, summed before band projection.
+
+    The addition theorem replaces the sum over m by (2l+1) P_l(u_i.u_j).
+    The fractional site phase is fixed under homogeneous strain. Its orbit
+    sum can therefore be taken once for all l of a site type. Only a bounded
+    block of the plane-wave matrix is held at once.
+    """
+    n = len(q)
+    result = np.zeros((c.shape[1], retained), complex)
+    ell_set = sorted({ell for orbit in weights for ell, weight in orbit.items() if weight})
+    if not ell_set:
+        return result
+    trace = np.trace(strain)
+    r = np.linalg.norm(q, axis=1)
+    u = np.divide(q, r[:, None], where=r[:, None] != 0, out=np.zeros_like(q))
+    u[r == 0, 2] = 1.0  # native Y_lm(theta=phi=0) at the origin
+    dq = -q @ strain
+    dr = np.einsum("ij,ij->i", u, dq)
+    du = np.divide(dq - dr[:, None] * u, r[:, None], where=r[:, None] != 0, out=np.zeros_like(q))
+    phases = np.exp(2j * np.pi * (structure.pos @ labels.T))
+    orbit_starts = np.r_[0, np.cumsum(structure.mult)]
+    orbit_data = []
+    for atom, channels in enumerate(weights):
+        factors = []
+        for ell, w in channels.items():
+            if w:
+                m, dm = matching_direction(ell, structure.rmt[atom], r, dr)
+                factors.append((ell, 4 * np.pi * (2 * ell + 1) * w / volume, m, dm))
+        if factors:
+            orbit_data.append((phases[orbit_starts[atom] : orbit_starts[atom + 1]], factors))
+    indices = np.arange(n)
+    rows = max(1, min(n, (8 * 1024**2) // ((160 + 16 * len(ell_set)) * n)))
+    for start in range(0, n, rows):
+        sl = slice(start, min(n, start + rows))
+        cosine = np.clip(u[sl] @ u.T, -1, 1)
+        dcos = du[sl] @ u.T + u[sl] @ du.T
+        polys = {}
+        for ell in ell_set:
+            leg = eval_legendre(ell, cosine)
+            dleg = 0 if ell == 0 else 0.5 * (ell + 1) * eval_jacobi(ell - 1, 1, 1, cosine) * dcos
+            polys[ell] = (leg, dleg - trace * leg)
+        block = np.zeros(cosine.shape, complex)
+        for phase, factors in orbit_data:
+            radial = np.zeros_like(cosine)
+            for ell, fac, (j, b), (dj, db) in factors:
+                leg, angular = polys[ell]
+                w = b[sl, None] * j - j[sl, None] * b
+                dw = db[sl, None] * j + b[sl, None] * dj - dj[sl, None] * b - j[sl, None] * db
+                radial += fac * (angular * w + leg * dw)
+            block += radial * (phase[:, sl].conj().T @ phase)
+        block *= np.sign(indices[None, :] - indices[sl, None])
+        result += c[sl].conj().T @ (block @ c[:, :retained])
     return hermitian_columns(result)
 
 
@@ -480,12 +581,10 @@ def native_band_geometry_source(state, directory, case, strain, *, displacements
         if displacements is not None:
             if not np.any(displacements[site]):
                 continue
-            if op.lapw and l not in wronskian_weights[a]:
-                wronskian_weights[a][l] = 0.5 * op.r**2 * op.w * (op.w - 1)
-        dot, data = channel_dot(op.channel, a, l, k, site, np.eye(3))
-        c, npw, *_ = geometry(k)
-        tri = wronskian_geometry_direction(data, c[:npw], nr) if op.lapw and displacements is None else 0
-        dh, do = spherical_geometry_direction(op, dot, tri)
+        if op.lapw and l not in wronskian_weights[a]:
+            wronskian_weights[a][l] = 0.5 * op.r**2 * op.w * (op.w - 1)
+        dot, _ = channel_dot(op.channel, a, l, k, site, np.eye(3))
+        dh, do = spherical_geometry_direction(op, dot, 0)
         h[k] += dh
         o[k] += do
         if check_central:
@@ -548,6 +647,11 @@ def native_band_geometry_source(state, directory, case, strain, *, displacements
             dh += atomic_wronskian_columns(
                 q[:npw], state.records[k].labels[:, :npw].T, c[:npw], s,
                 displacements, volume, wronskian_weights, nr,
+            )
+        else:
+            dh += strain_wronskian_columns(
+                q[:npw], state.records[k].labels[:, :npw].T, c[:npw], s,
+                e, volume, wronskian_weights, nr,
             )
         h[k] += dh
         o[k] += do

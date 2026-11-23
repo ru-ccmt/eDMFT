@@ -1,10 +1,11 @@
 """Physical ensemble, magnetic channels and MIXER policy for native response.
 
 The flags describe different choices. INM controls charge normalization;
-recomputeEF controls the electronic number constraint; Ferro controls HOW a
-common chemical potential is found for inequivalent spin spectra. In a Ferro
-run the two charge calls use recomputeEF=0 after fermif, although the physical
-response is fixed N. Never infer its ensemble from that temporary zero alone.
+recomputeEF selects the reference Fermi search. Ferro controls how the two
+spin channels obtain their common chemical potential. After fermif each
+Ferro charge call uses recomputeEF=0 even when the common mu was searched.
+Screened stress records the derivative constraint separately in response_policy;
+its default conserves the central particle number even for a supplied EF.dat.
 """
 from dataclasses import asdict, dataclass
 from pathlib import Path

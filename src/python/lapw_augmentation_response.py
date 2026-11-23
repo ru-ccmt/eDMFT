@@ -10,7 +10,6 @@ from functools import lru_cache
 import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.special import spherical_jn
-from lapw_scipy_compat import sph_harm_y
 
 
 def real_pair(a, b):
@@ -18,14 +17,57 @@ def real_pair(a, b):
 
 
 def harmonics(ell, q_local):
-    """Condon--Shortley Y_lm, ordered m=-l,...,l, for local Cartesian q."""
+    """Condon--Shortley Y_lm in native Cartesian recurrence, m=-l,...,l."""
     q = np.asarray(q_local, float)
     if q.ndim != 2 or q.shape[1] != 3 or not np.all(np.isfinite(q)):
         raise ValueError("invalid local reciprocal vectors")
-    length = np.linalg.norm(q, axis=1)
-    cosine = np.divide(q[:, 2], length, out=np.ones_like(length), where=length > 0)
-    theta, phi = np.arccos(np.clip(cosine, -1, 1)), np.arctan2(q[:, 1], q[:, 0])
-    return np.array([sph_harm_y(ell, m, theta, phi) for m in range(-ell, ell + 1)])
+    # Preserve tiny transverse components at the poles. Both arccos and
+    # legacy SciPy sph_harm can lose them; native YLM uses this recurrence.
+    scale = np.max(np.abs(q), axis=1)
+    scaled = np.divide(q, scale[:, None], out=np.zeros_like(q),
+                       where=scale[:, None] > 0)
+    length = np.linalg.norm(scaled, axis=1)
+    cosine = np.divide(scaled[:, 2], length, out=np.ones_like(length),
+                       where=length > 0)
+    transverse = np.divide(scaled[:, 0] + 1j*scaled[:, 1], length,
+                           out=np.zeros(len(q), complex), where=length > 0)
+    previous = np.full((1, len(q)), 1/np.sqrt(4*np.pi), complex)
+    older = None
+    for degree in range(1, ell + 1):
+        current = np.empty((degree + 1, len(q)), complex)
+        current[degree] = -np.sqrt((2*degree+1)/(2*degree))*transverse*previous[-1]
+        current[degree-1] = np.sqrt(2*degree+1)*cosine*previous[-1]
+        for m in range(degree - 1):
+            denominator = degree*degree - m*m
+            a = np.sqrt((4*degree*degree-1)/denominator)
+            b = np.sqrt((2*degree+1)*((degree-1)**2-m*m)/((2*degree-3)*denominator))
+            current[m] = a*cosine*previous[m] - b*older[m]
+        older, previous = previous, current
+    result = np.empty((2*ell + 1, len(q)), complex)
+    result[ell:] = previous
+    for m in range(1, ell + 1):
+        result[ell-m] = (-1)**m*previous[m].conj()
+    return result
+
+
+def hydrostatic_matching_tangent(channel, q_squared_fj):
+    """Fixed-RMT matching derivative for a lattice dilated by exp(eta).
+
+    Fractional Bloch phases and all momentum directions are fixed, even for
+    a skew cell. The normalization of every row, including an LO, supplies
+    -3/2. The Bessel equation gives d_eta j_l = -R q j'_l and
+    d_eta(q j'_l) = q j'_l + [(Rq)^2-l(l+1)] j_l/R. q_squared_fj
+    weights each individual plane wave by q^2 BEFORE projection to bands.
+    Both relations are regular at q=0 and at zeros of j_l.
+    """
+    from copy import copy
+    dot = copy(channel)
+    radius, ell = channel.rmt, channel.ell
+    dot.fj = -1.5 * channel.fj - radius * channel.dfj
+    dot.dfj = (radius * q_squared_fj - ell * (ell + 1) / radius * channel.fj
+               - 0.5 * channel.dfj)
+    dot.local = -1.5 * channel.local
+    return dot
 
 
 class PreparedAugmentationChannel:

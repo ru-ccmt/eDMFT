@@ -95,8 +95,12 @@ def diagonal_strain_potential(prepared, strain, *, transport_rate=None, displace
         )
         lookup = {key: i for i, key in enumerate(lm)}
         args = (b, s.pos[first[atom]], native_local_axes(s.rotloc[atom]), lm)
-        y = h.stars.harmonic_average(*args)
         velocity = None if displacements is None else displacements[first[atom]]
+        if velocity is not None and not np.any(velocity):
+            dA.append(np.zeros((h.stars.nstar, len(lm)), complex))
+            dD.append(np.zeros((len(lm), h.stars.nstar), complex))
+            continue
+        y = h.stars.harmonic_average(*args)
         dy = harmonic_average_direction(h.stars, *args, e, displacement=velocity)
         radius = s.rmt[atom]
         x = norm[1:] * radius
@@ -160,10 +164,23 @@ def diagonal_strain_potential(prepared, strain, *, transport_rate=None, displace
     mt = [op.boundary * bound for op, bound in zip(h.radial, db)]
     ir = h.reanalysis.action(dp) + masked_potential_strain_source(h.reanalysis, p, mask)
     coulomb = np.concatenate(mt + [ir.view(float)])
-    xc = prepared.xc.ir
-    density = np.maximum(xc.expand(rho), 0)
-    if xc.functional in PBE_PARAMETERS and displacements is None:
-        fields = xc.fields(density)
+    vxc = xc_geometry_field(h, prepared.xc.ir, rho, e, mask, displacements is None)
+    transport = np.zeros_like(coulomb)
+    if rate:
+        transport = rate * prepared.potential_operator.matvec(
+            hydrostatic_transport_source(prepared.input_density).vector()
+        )
+    return transport + coulomb + vxc, dict(
+        transport=transport,
+        coulomb_geometry=coulomb,
+        xc_geometry=vxc,
+        mask_derivative=mask,
+    )
+
+def xc_geometry_field(h, xc, rho, e, mask, moving_cell):
+    """Differentiate an XC energy or potential field on the same moving FFT mask."""
+    if xc.functional in PBE_PARAMETERS and moving_cell:
+        fields = xc.fields(np.maximum(xc.expand(rho), 0))
         direction = np.zeros_like(fields)
         direction[..., 1:4] = -fields[..., 1:4] @ e
         pairs = [(0,0),(1,1),(2,2),(1,2),(0,2),(0,1)]
@@ -182,17 +199,8 @@ def diagonal_strain_potential(prepared, strain, *, transport_rate=None, displace
     )
     vxc = np.zeros(h.size)
     vxc[h.pw_offset :] = pw.view(float)
-    transport = np.zeros_like(coulomb)
-    if rate:
-        transport = rate * prepared.potential_operator.matvec(
-            hydrostatic_transport_source(prepared.input_density).vector()
-        )
-    return transport + coulomb + vxc, dict(
-        transport=transport,
-        coulomb_geometry=coulomb,
-        xc_geometry=vxc,
-        mask_derivative=mask,
-    )
+    return vxc
+
 
 # Historical function name retained for existing importers.
 symmetric_strain_potential = diagonal_strain_potential

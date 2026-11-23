@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 import numpy as np
+from scipy.special import spherical_jn
 from lapw_scipy_compat import sph_harm_y
 from lapw_hartree_periodic import (
     native_charge_weights,
@@ -238,6 +239,72 @@ class PeriodicHartreeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             PeriodicHartreeResponse(d, s, (12, 14, 16), inversion=False)
 
+
+
+class NativeOddGridTests(unittest.TestCase):
+    def test_reanalysis_against_direct_native_indexed_DFT(self):
+        # REAN0's one-based wrapping differs from fftfreq on odd axes.
+        # Evaluate the full discrete Fourier sums independently of NumPy FFT.
+        from itertools import product
+        _, s, rep = fixture()
+        b = np.array([[1.1, .2, .1], [0, .9, .15], [0, 0, 1.2]])
+        pos = np.array([[.17, .31, .41], [.83, .69, .59]])
+        radii = np.array([.8, .8])
+        volume = abs(np.linalg.det(2*np.pi*np.linalg.inv(b)))
+        rng = np.random.default_rng(724)
+        for shape in ((5, 7, 9), (5, 6, 7), (6, 8, 10)):
+            labels = np.array(list(product(*[
+                [i-n if i+1 > n//2 else i for i in range(n)]
+                for n in shape])))
+            samples = np.array(list(product(*[np.arange(n)/n for n in shape])))
+            transform = np.exp(-2j*np.pi*(samples @ labels.T))
+            norm = np.linalg.norm(labels @ b.T, axis=1)
+            for inversion in (False, True):
+                stars = NativeStarTable(rep, s.timat, s.tau, inversion=inversion)
+                q = NativeHartreeReanalysis(stars, shape, b, pos, radii, volume)
+                mask = np.zeros(len(labels), complex)
+                for site, r in zip(pos, radii):
+                    x = norm*r
+                    radial = np.divide(spherical_jn(1, x), x,
+                                       out=np.full_like(x, 1/3), where=x != 0)
+                    phase = np.exp(2j*np.pi*(labels @ site))
+                    if inversion:
+                        phase = phase.real
+                    mask -= 4*np.pi*r**3/volume*radial*phase
+                mask[0] += 1
+                z = rng.normal(size=len(rep)) + 1j*rng.normal(size=len(rep))
+                grid = np.zeros(shape, complex)
+                indices = tuple((stars.members % np.array(shape)).T)
+                weights = stars.phases/stars.sizes[stars.owners]
+                grid[indices] = z[stars.owners]*weights
+                field = (transform @ grid.ravel()).real
+                mask_real = (transform @ mask.conj()).real
+                coefficients = transform.conj().T @ (field*mask_real)/len(labels)
+                members = coefficients.reshape(shape)[indices]*weights.conj()
+                expected = np.bincount(stars.owners, members.real,
+                                       minlength=stars.nstar).astype(complex)
+                expected += 1j*np.bincount(stars.owners, members.imag,
+                                          minlength=stars.nstar)
+                np.testing.assert_allclose(q.action(z), expected, rtol=0, atol=5e-14)
+                self.assertLess(q.operator.check_transpose(samples=3), 5e-14)
+
+    def test_harmonic_average_preserves_near_pole_components(self):
+        stars = NativeStarTable(np.array([[0, 0, 0], [0, 0, 1]]),
+                                np.eye(3, dtype=int)[None], np.zeros((1, 3)),
+                                inversion=False)
+        b = np.eye(3)
+        b[0, 2] = 1e-8
+        actual = stars.harmonic_average(b, np.zeros(3), np.eye(3), [(1, 1)])
+        expected = -np.sqrt(3/(8*np.pi))*1e-8/np.sqrt(1+1e-16)
+        self.assertLess(abs(actual[0, 1]-expected), 1e-22)
+
+    def test_odd_grid_preserves_native_GETFFT_boundary_guard(self):
+        _, s, _ = fixture()
+        stars = NativeStarTable(np.array([[0, 0, 0], [2, 0, 0]]),
+                                s.timat, s.tau, inversion=False)
+        with self.assertRaises(ValueError):
+            NativeHartreeReanalysis(stars, (5, 7, 9), np.eye(3),
+                                   s.pos, s.rmt, s.a*s.b*s.c)
 
 CHARGE = os.environ.get("EDMFT_HARTREE_CHARGE_LIBRARY", "")
 

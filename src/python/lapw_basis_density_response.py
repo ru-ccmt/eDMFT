@@ -115,7 +115,9 @@ class BasisDensityResponse:
                 dz[a].append(np.concatenate(block))
         return self.spatial.action(matching_dots=dz, primitive_dots=dp)
 
-    def pullback(self, covector):
+    def pullback(self, covector, *, with_energies=False):
+        """Reuse the spatial and matching covectors for radial energy derivatives."""
+        energies = {}
         # Density-matrix and interstitial covectors are unnecessary for D.
         _, zbar, pbar = self.spatial.pullback(covector, include_density=False)
         result = np.zeros(self.input_size)
@@ -142,5 +144,8 @@ class BasisDensityResponse:
             # Sum all matching and spatial radial covectors BEFORE the native
             # reverse pass. Discard energy covectors only under fixed E policy.
             for l, ctx in self.contexts[a].items():
-                result[sl] += ctx.pullback(gp[l], gm[l])[0]
-        return result
+                dv, de, dlo = ctx.pullback(gp[l], gm[l])
+                result[sl] += dv
+                if with_energies:
+                    energies[a, l] = np.r_[de, dlo]
+        return (result, energies) if with_energies else result

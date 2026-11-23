@@ -136,12 +136,75 @@ class IntegrationTests(unittest.TestCase):
                             self.assertEqual(result["force_source"], source or "analytic")
                             self.assertEqual(result["backend"], "analytic")
 
+    def test_stress_ensemble_is_independent_of_central_fermi_search(self):
+        with fixture() as (_, bin, _, req):
+            structure = SimpleNamespace(
+                a=4., b=5., c=6., lattyp="P", alpha=90., beta=90., gamma=90.,
+                nat=1, ReadStruct=lambda _: None,
+            )
+            Path("sample.inm").write_text("MSR1 0.0 NO\n")
+            settings = req["config"]["solver"]
+            with patch("wstruct.Struct", return_value=structure), patch(
+                "lapw_total_stress.invariant_strains"
+            ), patch("force_response_modes.internal_modes", return_value=[]), patch(
+                "force_response_modes.check_force_frame"
+            ):
+                for search, ensemble, legacy, expected in (
+                    (0, None, None, "fixed-n"), (1, None, None, "fixed-n"),
+                    (0, "fixed-mu", None, "fixed-mu"), (1, "fixed-mu", None, "fixed-mu"),
+                    (0, None, False, "fixed-mu"), (0, "fixed-n", False, "fixed-n"),
+                ):
+                    with self.subTest(search=search, ensemble=ensemble, legacy=legacy):
+                        Path("sample.indmf2").write_text(f"c 1.25 {search} 1.0 .T. 0.02\n")
+                        if ensemble:
+                            settings["stress_ensemble"] = ensemble
+                        else:
+                            settings.pop("stress_ensemble", None)
+                        if legacy is not None:
+                            settings["physical_policy"] = {"fixed_number": legacy}
+                        else:
+                            settings.pop("physical_policy", None)
+                        for mode in ("STRT", "STRFT"):
+                            req["mode"] = mode
+                            result = step.preflight("sample", req, bin, "")
+                            self.assertEqual(result["physical_policy"]["fixed_number"], bool(search))
+                            self.assertFalse(result["physical_policy"]["normalization_enabled"])
+                            self.assertEqual(result["stress_ensemble"], expected)
+                        self.assertEqual(Path("EF.dat").read_text(), "1.25")
+                req["mode"] = "FORT"
+                settings.pop("stress_ensemble")
+                settings.pop("physical_policy")
+                self.assertNotIn("stress_ensemble", step.preflight("sample", req, bin, ""))
+                req["mode"] = "STRT"
+                settings["stress_ensemble"] = "fixed-ne"
+                with self.assertRaisesRegex(ValueError, "stress_ensemble"):
+                    step.preflight("sample", req, bin, "")
+
+    def test_soc_stress_uses_saved_derivative_constraint_and_replays_older_snapshots(self):
+        import lapw_soc_screened as soc
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            argv = ["lapw_soc_screened.py", "--case", "sample", "--snapshot", directory,
+                    "--pressure", "--output", str(root / "out")]
+            for central, derivative in ((False, True), (True, False), (False, None)):
+                with self.subTest(central=central, derivative=derivative):
+                    snapshot = dict(case="sample", spinor=True, physical_policy={"fixed_number": central})
+                    if derivative is not None:
+                        snapshot["response_policy"] = {"fixed_number": derivative}
+                    (root / "preparation.json").write_text(json.dumps(snapshot))
+                    with patch("sys.argv", argv), patch.object(soc, "SOCScreenedForce") as model:
+                        model.return_value.run.return_value = {}
+                        soc.main()
+                    expected = central if derivative is None else derivative
+                    self.assertEqual(model.call_args.kwargs["fixed_number"], expected)
+
     def test_preparation_and_driver_are_isolated_then_ready_not_applied(self):
         with fixture() as (root, bin, wi, req):
             before = {p: p.read_bytes() for p in root.iterdir() if p.is_file()}
             solver = dict(
-                backend="analytic",
-                physical_policy=dict(magnetic=False,ferro=False,fixed_number=True,normalization_enabled=True),
+                backend="analytic", stress_ensemble="fixed-n",
+                physical_policy=dict(magnetic=False,ferro=False,fixed_number=False,normalization_enabled=True),
                 wien_root=str(wi),
                 dmft2=str(bin / "dmft2"),
                 library=str(bin / "liblapw_response.so"),
@@ -156,6 +219,8 @@ class IntegrationTests(unittest.TestCase):
                 script = Path(command[1]).name
                 if script == "lapw_response_prepare.py":
                     cfg = json.loads(Path(command[2]).read_text())
+                    self.assertFalse(cfg["physical_policy"]["fixed_number"])
+                    self.assertEqual(cfg["stress_ensemble"], "fixed-n")
                     self.assertEqual(cfg["dmft2"], str(bin / "dmft2"))
                     self.assertEqual(Path(cfg["reference"]).name, "reference")
                     self.assertEqual(Path(cfg["workspace"]).name, "central")
@@ -199,7 +264,7 @@ class IntegrationTests(unittest.TestCase):
     def test_failed_native_preparation_does_not_start_driver(self):
         with fixture() as (root, bin, wi, req):
             solver = dict(
-                backend="analytic",
+                backend="analytic", stress_ensemble="fixed-n",
                 physical_policy=dict(magnetic=False,ferro=False,fixed_number=True,normalization_enabled=True),
                 wien_root=str(wi),
                 dmft2=str(bin / "dmft2"),
@@ -223,7 +288,7 @@ class MPIIntegrationTests(unittest.TestCase):
     def test_separate_python_native_launches_and_cache_budgets(self):
         with fixture() as (root, bin, wi, req):
             solver = dict(
-                backend="analytic",
+                backend="analytic", stress_ensemble="fixed-n",
                 physical_policy=dict(magnetic=False,ferro=False,fixed_number=True,normalization_enabled=True),
                 wien_root=str(wi),
                 dmft2=str(bin / "dmft2"),

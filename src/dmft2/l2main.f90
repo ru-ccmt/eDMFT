@@ -1224,15 +1224,21 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
            nbands=nemax-nemin+1
            DM_nemin=nemin
            DM_nemax=nemax
-           DM_nemaxx=nemax
            allocate(Aweight(nbands,nbands))
            call ReadFrozenResponseDensity(response_density_prefix,ikp, &
                 n0,iso,nmat,nume,nemin,nemax,E,As,Aweight)
         endif
 
+        ! Retain all natural occupations in the physical density. Aweight
+        ! already contains the k-point weight, so an absolute eigenvalue
+        ! cutoff discards more charge on denser meshes. Using the entire
+        ! input block here gives both MT and interstitial CLMVAL the same
+        ! density matrix as the Green-function response. In response replay
+        ! the block covers all stored bands, as selected above.
+        DM_nemaxx = DM_nemax
         allocate( zw2(nbands) )
         CALL Diagonalize_DMFT_WEIGHTS(zw2,Aweight,nbands,DM_nemin, &
-             DM_nemaxx,.not.response_density_mode,'physical_density',ikp)
+             DM_nemaxx,.false.,'physical_density',ikp)
 
         ! Weights for all bands, which are needed below
         weight=0
@@ -2456,7 +2462,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
 1990 FORMAT(3X,'ATOMNUMBER   ',I3,5X,10A4)                             
 2001 FORMAT(3X,'NUMBER OF LM',I3//)                                   
 2011 FORMAT(3X,'CLM(R) FOR L',I3,3X,'M=',I2/)                         
-2022 FORMAT(3X,4E19.12)                                                 
+2022 FORMAT(3X,4ES19.12)
 2030 FORMAT(///)                                                       
 2031 FORMAT(/)                                                         
 !2032 FORMAT(49X,I3,//)  
@@ -2471,7 +2477,7 @@ SUBROUTINE L2MAIN(coord,NSPIN1,sumw,tclm,tclm_w,tfour,tfour_w)
 
 204 FORMAT(I10,' FOURIER COEFFICIENTS CALCULATED',/' LARGEST COMPONENTS:',3I6)
 2061 FORMAT(1X,'        ',I10,1X,'NUMBER OF PW')
-2071 FORMAT(3X,3I5,2E19.12)
+2071 FORMAT(3X,3I5,2ES19.12)
 1060 FORMAT(//,':NOE  :',1X,'NUMBER OF ELECTRONS',10X,'=',F8.3,//   ,':FER  :',1X,'F E R M I - ENERGY',11X,'= ',F9.5)            
 
 END SUBROUTINE L2MAIN

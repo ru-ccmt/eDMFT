@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 import numpy as np
 from frozen_sigma_tangent import real_inner
 from stress_response_adjoint import (
@@ -60,6 +61,25 @@ class AdjointTests(unittest.TestCase):
             lam, np.linalg.solve(np.eye(17) - j.T, gradient), atol=1e-11
         )
         self.assertTrue(report["converged"])
+
+    def test_true_residual_with_reused_and_different_final_vectors(self):
+        jacobian = matrix_operator(np.diag([0.25, 0.5]))
+        answer = np.array([2.0, -3.0])
+        source = answer - jacobian.rmatvec(answer)
+        for same in (False, True):
+            def solver(operator, rhs, **kwargs):
+                trial = answer.copy() if same else -answer
+                product = operator.matvec(trial)
+                # An iterative solver owns its workspaces and may reuse these.
+                trial.fill(0)
+                product.fill(0)
+                return answer.copy(), 0
+
+            with self.subTest(same=same), patch("stress_response_adjoint.gmres", solver):
+                _, report = ScreenedResponse(jacobian).solve(source, adjoint=True)
+                self.assertEqual(report["final_product_reused"], same)
+                self.assertEqual(report["actions"], 1 if same else 2)
+                self.assertEqual(report["residual_norm"], 0)
 
     def test_physical_chain_electrons_and_common_gradient(self):
         model = complex_model()

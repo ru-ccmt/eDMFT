@@ -18,6 +18,7 @@ import numpy as np
 from scipy.interpolate import CubicSpline
 from scipy.special import spherical_jn
 from lapw_density_response import checked
+from lapw_hartree_periodic import rean0_reciprocal_labels
 
 
 FLOAT = re.compile(r"[-+]?\d+\.\d+[ED][-+]?\d+", re.I)
@@ -230,8 +231,7 @@ def strain_mask_derivative(reanalysis, reciprocal, positions, radii, volume, str
         or volume <= 0
     ):
         raise ValueError("symmetric strain and positive fixed-RMT geometry required")
-    axes = [np.fft.fftfreq(n) * n for n in reanalysis.shape]
-    labels = np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1)
+    labels = rean0_reciprocal_labels(reanalysis.shape)
     g = labels @ b.T
     norm = np.linalg.norm(g, axis=-1)
     direction = np.divide(

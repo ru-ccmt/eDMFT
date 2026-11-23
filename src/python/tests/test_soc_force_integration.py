@@ -23,6 +23,8 @@ class SOCForceIntegrationTests(unittest.TestCase):
             ("TOT", "final", True, None, True),
             ("FORT", "defer", False, None, False),
             ("FORT", "final", False, None, True),
+            ("PRES", "defer", False, None, False),
+            ("PRES", "final", False, None, True),
         ]:
             with self.subTest(
                 mode=mode, phase=phase, final=final, option=option
@@ -63,11 +65,11 @@ class SOCForceIntegrationTests(unittest.TestCase):
                 )
                 self.assertEqual(calc.called, expected)
                 self.assertEqual(
-                    "extra_env" in core.call_args.kwargs, expected and mode != "FORT"
+                    "extra_env" in core.call_args.kwargs, expected and mode not in {"FORT", "PRES"}
                 )
                 if expected:
                     self.assertEqual(
-                        "captured_soc" in calc.call_args.kwargs, mode != "FORT"
+                        "captured_soc" in calc.call_args.kwargs, mode not in {"FORT", "PRES"}
                     )
                 self.assertEqual(Path("test.in2").read_text().strip(), mode)
 

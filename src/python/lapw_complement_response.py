@@ -23,6 +23,7 @@ import time
 import numpy as np
 from scipy.linalg import cholesky, eigh_tridiagonal, hessenberg, qr, solve_triangular
 from scipy.special import expit
+from scipy.linalg.lapack import zpttrs
 
 from lapw_density_response import checked, herm
 from stress_response_adjoint import HermitianCoordinates, PairedOperator
@@ -129,8 +130,8 @@ class ShiftedComplement:
         if self.charge_bound > charge_tolerance or self.slope_bound > slope_tolerance:
             raise ValueError("complement is not thermally empty; retain more bands")
         safe_energies = np.where(self.active_columns, e, np.min(e[self.active_columns]))
-        self.diagonal = d[:, None] - safe_energies[None, :]
-        self.lower = np.empty((self.nq - 1, self.nr), complex)
+        self.diagonal = np.asfortranarray(d[:, None] - safe_energies[None, :])
+        self.lower = np.empty((self.nq - 1, self.nr), complex, order="F")
         for i in range(self.nq - 1):
             if np.any(self.diagonal[i] <= 0):
                 raise ValueError("nonpositive shifted complement pivot")
@@ -163,11 +164,20 @@ class ShiftedComplement:
         x = -(rhs * self.active_columns).astype(complex, copy=False)
         if self.rotation is not None:
             x = self.rotation.conj().T @ x
-        for i in range(1, self.nq):
-            x[i] -= self.lower[i - 1] * x[i - 1]
-        x /= self.diagonal
-        for i in range(self.nq - 2, -1, -1):
-            x[i] -= self.lower[i].conj() * x[i + 1]
+        # Each band has its own energy shift and hence its own LDL† factors.
+        # LAPACK applies the two triangular substitutions in compiled code.
+        # The active-column mask was checked against the thermal density and
+        # the projector window during preparation. Other columns are zero.
+        if self.nq == 1:
+            x /= self.diagonal
+        else:
+            x = np.asfortranarray(x)
+            for j in np.flatnonzero(self.active_columns):
+                column, info = zpttrs(self.diagonal[:, j], self.lower[:, j],
+                                      x[:, j:j+1], lower=1, overwrite_b=1)
+                if info:
+                    raise RuntimeError(f"complement tridiagonal solve failed at column {j}: {info}")
+                x[:, j] = column[:, 0]
         return x if self.rotation is None else self.rotation @ x
 
     def residual(self, tangent, rhs):
@@ -474,6 +484,31 @@ class ComplementPerturbationCoordinates:
                 raw.imag.ravel(),
             ]
         )
+
+    def point_covectors(self, vector):
+        """Yield H/O columns and raw-projector weights for one local k at a time.
+
+        The real packed vector stores all RR blocks before the variable-sized
+        QR blocks. Preserve the isometric sqrt(2) conventions of unpack()
+        without allocating a second copy of all complex matrices on a rank.
+        """
+        v = checked(vector, (self.size,), "joint complement coordinates", real=True)
+        n = self.matrix.retained.n
+        rr = HermitianCoordinates((n, n))
+        cross = self.matrix.retained.size
+        width = self.matrix.size
+        raw_real = v[2 * width : 2 * width + self.raw_size].reshape(self.raw_shape)
+        raw_imag = v[2 * width + self.raw_size :].reshape(self.raw_shape)
+        for k, shape in enumerate(self.matrix.shapes):
+            count = int(np.prod(shape))
+            columns = []
+            for start in (0, width):
+                top = rr.unpack(v[start + k * n * n : start + (k + 1) * n * n])
+                pos = start + cross
+                qr = v[pos : pos + count] + 1j * v[pos + count : pos + 2 * count]
+                columns.append(np.vstack((top, qr.reshape(shape) / np.sqrt(2))))
+            cross += 2 * count
+            yield columns[0], columns[1], raw_real[k] + 1j * raw_imag[k]
 
     def unpack(self, vector):
         v = checked(vector, (self.size,), "joint complement coordinates", real=True)

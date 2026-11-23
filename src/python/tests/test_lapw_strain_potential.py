@@ -138,6 +138,36 @@ class ExplicitStrainPotentialTests(unittest.TestCase):
             self.h.volume * np.linalg.det(f),
         )
 
+    def test_odd_grid_mask_derivatives_follow_the_native_geometry(self):
+        sites, radii, volume = self.s.pos, self.s.rmt, self.h.volume
+        shape = (11, 14, 15)
+        shear = np.array([[0, 0, 0.5], [0, 0, 0], [0.5, 0, 0]])
+        velocity = np.array([[0.7, -0.2, 0.3]])
+
+        def geometry(t, strain, displacement):
+            deformation = np.eye(3) + t * strain
+            return NativeHartreeReanalysis(
+                self.h.stars, shape, np.linalg.solve(deformation.T, self.b),
+                sites + t * (displacement @ self.b) / (2 * np.pi),
+                radii, volume * np.linalg.det(deformation),
+            )
+
+        zero_strain = np.zeros((3, 3))
+        zero_velocity = np.zeros_like(velocity)
+        center = geometry(0, zero_strain, zero_velocity)
+        for strain, displacement in [(shear, None), (zero_strain, velocity)]:
+            with self.subTest(strain=strain, displacement=displacement):
+                exact = strain_mask_derivative(
+                    center, self.b, sites, radii, volume, strain,
+                    displacements=displacement,
+                )
+                motion = zero_velocity if displacement is None else displacement
+                step = 2e-6
+                plus = geometry(step, strain, motion).mask_fourier
+                minus = geometry(-step, strain, motion).mask_fourier
+                np.testing.assert_allclose(exact, (plus - minus) / (2 * step),
+                                           rtol=3e-8, atol=3e-10)
+
     def test_mask_hydrostatic_and_shear_against_full_geometry(self):
         for e in [
             np.eye(3),

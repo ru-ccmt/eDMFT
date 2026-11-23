@@ -154,7 +154,13 @@ class CompactSphericalPotentialBands(SphericalPotentialBands):
             raw[k, :, cols, ic] += op.action(*pt[a][l])[:nr]
         return c.pack(h, o, raw, hq, oq)
 
-    def pullback(self, vector):
+    def pullback(self, vector, *, with_energies=False):
+        """Reverse the matrix, matching and projector maps in one pass.
+
+        When requested, also retain the derivatives with respect to the
+        searched linearization energies. Potential and energy covectors
+        share the LAPW matrix contractions and the native radial solves.
+        """
         hb, ob, rb, hq, oq = self.coordinates.unpack(vector)
         nr = rb.shape[1]
         # Cache only the needed columns per k. No QQ reconstruction occurs.
@@ -168,8 +174,15 @@ class CompactSphericalPotentialBands(SphericalPotentialBands):
             a: {l: np.zeros_like(c.lo_coefficients) for l, c in cs.items()}
             for a, cs in self.contexts.items()
         }
+        if with_energies:
+            energies = {
+                (a, l): np.zeros(1 + ctx.nlo)
+                for a, cs in self.contexts.items() for l, ctx in cs.items()
+            }
         for a, l, k, op in self.spherical:
-            p, m, *_ = op.pullback(hc[k], oc[k], orbit_sum=True)
+            p, m, de, dlo, _ = op.pullback(hc[k], oc[k], orbit_sum=True)
+            if with_energies:
+                energies[a, l] += np.r_[de, dlo]
             gp[a][l] += p
             gm[a][l] += m
         for a, op, ks in self.nonspherical:
@@ -196,13 +209,17 @@ class CompactSphericalPotentialBands(SphericalPotentialBands):
         if self.projector_contexts is not self.contexts:
             for a in pg:
                 for l in pg[a]:
-                    answer[self.slices[a]] += self.projector_contexts[a][l].pullback(
-                        pg[a][l], mg[a][l]
-                    )[0]
+                    dv, de, dlo = self.projector_contexts[a][l].pullback(pg[a][l], mg[a][l])
+                    answer[self.slices[a]] += dv
+                    if with_energies:
+                        energies[a, l] += np.r_[de, dlo]
         for a, cs in self.contexts.items():
             for l, c in cs.items():
-                answer[self.slices[a]] += c.pullback(gp[a][l], gm[a][l])[0]
-        return answer
+                dv, de, dlo = c.pullback(gp[a][l], gm[a][l])
+                answer[self.slices[a]] += dv
+                if with_energies:
+                    energies[a, l] += np.r_[de, dlo]
+        return (answer, energies) if with_energies else answer
 
 
 class CompactSpatialValenceDensity:
@@ -304,9 +321,7 @@ class CompactSpatialValenceDensity:
                 qr[k] += w * (q.conj().T @ bz)
         yi = np.array(list(y.pw.values()))
         for k, (op, cq) in enumerate(zip(self.retained.interstitial, self.ir)):
-            potential = np.fft.ifftn(op.stars.pullback(yi)).real / op.volume
-            psi = op.psi if op.psi is not None else op._waves(op.c)
-            vc = op._wave_pullback(potential[..., None] * psi)
+            vc = op.potential_times_coefficients(yi)
             rr[k] += herm(op.c.conj().T @ vc)
             qr[k] += cq.conj().T @ vc
         return self.coordinates.pack(rr, qr)

@@ -5,6 +5,18 @@ The callers own input preparation and sigma splitting. This module never
 regenerates those inputs. run_dmft defers response until a single final pass;
 a standalone x_dmft execution may respond immediately. The present response
 analytic backend saves a complete tensor for publication during SCF assembly.
+For supported second-variational SOC inputs, STRT publishes the symmetry-allowed
+tensor and STRFT also evaluates the allowed atomic forces with the same adjoint.
+PRES in the active IN2 requests the scalar
+hydrostatic pressure. The native charge pass uses TOT. At the final charge,
+the response writes the compression-positive result to case.outputdmf2_response
+and the archived report. Pressure alone cannot supply a tensor to the mixer.
+Analytic stress conserves the particle number to first order, including when
+recomputeEF=0 holds EF.dat fixed for the central charge calculation. To hold
+the chemical potential fixed during differentiation as well, set
+{"solver": {"stress_ensemble": "fixed-mu"}} in case.stress_response.json.
+An explicit legacy physical_policy.fixed_number flag retains its meaning for
+both stages unless stress_ensemble specifies the derivative separately.
 The optional legacy native backend exports density/potential tangents only.
 """
 from __future__ import annotations
@@ -15,6 +27,7 @@ import fcntl
 import hashlib
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -26,10 +39,11 @@ import tempfile
 import time
 import uuid
 
-ALIASES = {"STRT": "STR", "STRFT": "STRF", "FORT": "FOR"}
+ALIASES = {"STRT": "STR", "STRFT": "STRF", "FORT": "FOR", "PRES": "TOT"}
 SOLVER_KEYS = {
     "backend",
     "physical_policy",
+    "stress_ensemble",
     "lapw0_worker",
     "lapw1_worker",
     "lcore_worker",
@@ -43,6 +57,9 @@ SOLVER_KEYS = {
     "native_mpi",
     "cache_mb",
     "basis_cache_mb",
+    "kpoint_cache_mb",
+    "soc_frequency_rtol",
+    "frequency_rtol",
     "disk_matching",
     "dmft2",
     "wien_root",
@@ -143,9 +160,11 @@ def request(case, definition="dmft2.def", config_path=None, disabled=False):
     config = json.loads(path.read_text()) if path.is_file() else {}
     if not isinstance(config, dict):
         raise ValueError("response configuration must be a JSON object")
-    unknown = set(config) - {"enabled", "solver", "workspace_root"}
+    unknown = set(config) - {"enabled", "solver", "workspace_root", "keep_temporary_files"}
     if unknown:
         raise ValueError(f"unknown response settings: {sorted(unknown)}")
+    if type(config.get("keep_temporary_files", False)) is not bool:
+        raise ValueError("response keep_temporary_files must be true or false")
     enabled = config.get("enabled", mode in ALIASES)
     if not isinstance(enabled, bool):
         raise ValueError("response enabled must be true or false")
@@ -332,6 +351,10 @@ def preflight(case, req, root, mpi):
             "unsupported solver settings; see dmft2_response_integration.txt"
         )
     backend = solver.get("backend", "analytic")
+    if "stress_ensemble" in solver and (
+        backend != "analytic" or solver["stress_ensemble"] not in ("fixed-n", "fixed-mu")
+    ):
+        raise ValueError("solver.stress_ensemble requires the analytic backend and 'fixed-n' or 'fixed-mu'")
     soc_forward = backend == "native_soc_forward"
     if soc_forward:
         if req["mode"] != "FORT" or not Path(case + ".inso").is_file() or not Path("lapwso.def").is_file():
@@ -346,12 +369,15 @@ def preflight(case, req, root, mpi):
         raise ValueError("charge_integration must be native or legacy_spline")
     defs = req["files"]
     so_input = Path(case + ".inso")
-    soc_analytic = (backend == "analytic" and req["mode"] in {"FOR", "FORT"}
+    soc_analytic = (backend == "analytic" and req["mode"] in {"FOR", "FORT", "PRES", "STRT", "STRFT"}
                     and so_input.is_file() and so_input.stat().st_size > 0)
+    pressure = req["mode"] == "PRES"
+    if pressure and not soc_analytic:
+        raise ValueError("PRES requires an analytic second-variational SOC calculation")
     spinor = soc_forward or soc_analytic
     if spinor and not Path("lapwso.def").is_file():
-        raise ValueError("spinor FORT needs the LAPWSO definition used for the central spinors")
-    if soc_analytic and solver.get("force_source", "analytic") != "analytic":
+        raise ValueError("spinor response needs the LAPWSO definition used for the central spinors")
+    if soc_analytic and not pressure and solver.get("force_source", "analytic") != "analytic":
         raise ValueError("select native_soc_forward explicitly for displaced spinor diagnostics")
     for suffix in ([] if spinor else [".inso"]) + [".clmup", ".clmdn", ".incup", ".incdn"]:
         p = Path(case + suffix)
@@ -370,9 +396,9 @@ def preflight(case, req, root, mpi):
         )
     if req["mode"] == "FOR" and not soc_analytic:
         raise ValueError("a direct SOC force requires the analytic spinor backend")
-    if req["mode"] not in {"FOR", "STR", "STRF", "STRT", "STRFT", "FORT"}:
+    if req["mode"] not in {"FOR", "STR", "STRF", "STRT", "STRFT", "FORT", "PRES"}:
         raise ValueError(
-            "response requires STR, STRF, STRT, STRFT or FORT in the actual IN2 input"
+            "response requires STR, STRF, STRT, STRFT, FORT or PRES in the actual IN2 input"
         )
     force_requested = req["mode"] in {"FOR", "FORT", "STRFT"}
     if force_requested and backend != "analytic" and not soc_forward:
@@ -405,6 +431,14 @@ def preflight(case, req, root, mpi):
     from lapw_response_policy import detect_policy
     NativeLattice.from_structure(s)
     policy = detect_policy(".", case, control=defs[2], override=solver.get("physical_policy"), native_soc=spinor)
+    if backend == "analytic" and req["mode"] in {"STR", "STRF", "STRT", "STRFT", "PRES"}:
+        # Holding EF.dat in a Mott gap selects the unstrained reference. A
+        # neutral strained crystal conserves N, even when its reference needed
+        # no Fermi search. Apply this choice only to the linearized response.
+        # Preserve a user's explicitly supplied legacy two-purpose override.
+        legacy = solver.get("physical_policy") or {}
+        default_ensemble = "fixed-mu" if legacy.get("fixed_number") is False else "fixed-n"
+        solver = dict(solver, stress_ensemble=solver.get("stress_ensemble", default_ensemble))
     if req["mode"] in {"FOR", "FORT"} and policy.magnetic:
         raise NotImplementedError("FORT magnetic atomic sources have not been validated")
     all_forces_fixed = False
@@ -413,10 +447,21 @@ def preflight(case, req, root, mpi):
         modes = internal_modes(s, force_atoms)
         all_forces_fixed = not modes
         check_force_frame(s, force_atoms or range(1, s.nat + 1))
-    if soc_analytic and req["mode"] == "FORT" and not all_forces_fixed:
+        if (req["mode"] == "STRFT" and not all_forces_fixed and force_source == "displaced"
+                and (solver["stress_ensemble"] == "fixed-n") != policy.fixed_number):
+            # The diagnostic finite-displacement endpoints replay the central
+            # Fermi search. Their source would belong to a different ensemble
+            # from the shared adjoint. Analytic atomic sources use that adjoint's
+            # number constraint throughout, including an off-neutral reference.
+            raise ValueError("displaced STRFT force sources require matching central and derivative "
+                             "ensembles; use analytic force sources for separate ensembles")
+    screened_spinor = req["mode"] in {"PRES", "STRT", "STRFT"} or (req["mode"] == "FORT" and not all_forces_fixed)
+    if soc_analytic and screened_spinor:
+        if req["mode"] == "STRFT" and not all_forces_fixed and force_source == "displaced":
+            raise ValueError("combined SOC stress and forces require solver.force_source=analytic")
         reason = soc_operator_scope(case, defs)
         if reason:
-            raise ValueError("unsupported analytic spinor FORT input: " + reason)
+            raise ValueError(f"unsupported spinor {req['mode']} input: {reason}")
     if soc_forward:
         if len(force_steps) != 2 or not 0 < solver.get("tolerance", 1e-3) < 1:
             raise ValueError("SOC forward response requires two steps and a relative tolerance between zero and one")
@@ -482,6 +527,15 @@ def preflight(case, req, root, mpi):
             or cache_mb < 0
         ):
             raise ValueError("solver.cache_mb must be a nonnegative per-rank budget")
+        for key in ("frequency_rtol", "soc_frequency_rtol"):
+            mode_tol = solver.get(key)
+            if mode_tol is not None and (type(mode_tol) not in (float, int)
+                                         or not 0 <= mode_tol < 1):
+                raise ValueError(f"solver.{key} must be in [0,1)")
+        point_mb = solver.get("kpoint_cache_mb")
+        if point_mb is not None and (type(point_mb) not in (float, int)
+                                     or not np.isfinite(point_mb) or point_mb < 0):
+            raise ValueError("solver.kpoint_cache_mb must be a nonnegative per-rank budget")
         if type(solver.get("disk_matching", False)) is not bool:
             raise ValueError("solver.disk_matching must be true or false")
         basis_cache_mb = solver.get("basis_cache_mb", 128.0)
@@ -500,7 +554,7 @@ def preflight(case, req, root, mpi):
                 + ", ".join(sorted(legacy))
                 + "; remove them or select backend=native"
             )
-        if req["mode"] not in {"FOR", "FORT"} and (
+        if req["mode"] not in {"FOR", "FORT", "PRES"} and (
             not Path(case + ".in0").is_file() or input_mode(case + ".in0") != "STR"
         ):
             raise ValueError("analytic stress publication requires STR in case.in0")
@@ -508,7 +562,8 @@ def preflight(case, req, root, mpi):
             raise ValueError("analytic backend requires native charge integration")
         from lapw_total_stress import invariant_strains
 
-        invariant_strains(s)
+        if not pressure:
+            invariant_strains(s)
         names = {
             "lapw0_worker": "lapw0_response",
             "lcore_worker": "lcore_response",
@@ -610,7 +665,7 @@ def compute_response(case, req, root, mpi, run_id, output, *, captured_soc=None)
     ] + ([("lapwso.def", Path("lapwso.def"))] if spinor else []) + ([("dmft2dn.def", Path("dmft2dn.def"))] if solver["physical_policy"]["magnetic"] else []):
         (snapshot / name).write_text(local_definition(source.read_text()))
         fingerprints[name] = sha256(snapshot / name)
-    if spinor and not solver["all_forces_fixed"]:
+    if spinor and (req["mode"] in {"STRT", "STRFT"} or not solver["all_forces_fixed"]):
         from lapw_soc_rank import parent_ranks
         from wstruct import Struct
         struct = Struct()
@@ -656,6 +711,7 @@ def compute_response(case, req, root, mpi, run_id, output, *, captured_soc=None)
         "lapw_valence_state",
         "lapw_screened_state",
         "lapw_geometry_response",
+        "lapw_atomic_geometry",
         "lapw_strain_charge",
         "lapw_strain_functional",
         "lapw_response_kpool",
@@ -694,7 +750,7 @@ def compute_response(case, req, root, mpi, run_id, output, *, captured_soc=None)
         "force_screened_diagnostic",
         "lapw_soc_force_reference",
         "lapw_soc_subspace", "lapw_soc_projector", "lapw_soc_response",
-        "lapw_soc_valence", "lapw_soc_electronic", "lapw_soc_screened", "lapw_soc_rank",
+        "lapw_frequency_modes", "lapw_soc_valence", "lapw_soc_electronic", "lapw_soc_screened", "lapw_soc_rank",
     ]:
         spec = importlib.util.find_spec(module)
         if spec is not None and spec.origin:
@@ -748,6 +804,11 @@ def compute_response(case, req, root, mpi, run_id, output, *, captured_soc=None)
         }
         if solver["physical_policy"]["magnetic"]:
             cfg["dmft2dn_definition"] = str(snapshot/"dmft2dn.def")
+        if req["mode"] in {"STR", "STRF", "STRT", "STRFT", "PRES"}:
+            cfg["stress_ensemble"] = solver["stress_ensemble"]
+            central_mu = "number search" if solver["physical_policy"]["fixed_number"] else "supplied EF.dat"
+            progress(journal, f"Central chemical potential: {central_mu}; screened derivative: "
+                              + cfg["stress_ensemble"])
         if spinor:
             if captured_soc is not None:
                 cfg["captured_soc"] = str(Path(captured_soc).resolve())
@@ -796,10 +857,23 @@ def compute_response(case, req, root, mpi, run_id, output, *, captured_soc=None)
                            "--library", solver["library"], "--output", str(work / "total_stress"),
                            "--progress-file", str(journal),
                            "--cache-mb", str(solver.get("cache_mb", 256.0))]
-            if solver.get("force_atoms"):
+            if solver.get("kpoint_cache_mb") is not None:
+                commands[1] += ["--kpoint-cache-mb", str(solver["kpoint_cache_mb"])]
+            if req["mode"] == "PRES":
+                commands[1].append("--pressure")
+            elif req["mode"] in {"STRT", "STRFT"}:
+                commands[1].append("--stress")
+                if analytic_forces:
+                    commands[1].append("--atomic-forces")
+            if req["mode"] != "PRES" and solver.get("force_atoms"):
                 commands[1] += ["--force-atoms", *map(str, solver["force_atoms"])]
             if direct_soc:
                 commands[1].append("--soc-operator-only")
+        mode_tol = solver.get("frequency_rtol")
+        if spinor and solver.get("soc_frequency_rtol") is not None:
+            mode_tol = solver["soc_frequency_rtol"]
+        if mode_tol is not None:
+            commands[1] += ["--frequency-rtol", str(mode_tol)]
         if solver.get("mpi"):
             if spinor:
                 # Abort peers when one rank discovers an incompatible local
@@ -858,7 +932,11 @@ def compute_response(case, req, root, mpi, run_id, output, *, captured_soc=None)
         if (
             report.get("converged") is not True
             or (commands and not direct_soc and report.get("adjoint", {}).get("converged") is not True)
-            or (req["mode"] not in {"FOR", "FORT"} and report.get("full_tensor_within_symmetry") is not True)
+            or (req["mode"] not in {"FOR", "FORT", "PRES"} and report.get("full_tensor_within_symmetry") is not True)
+            or (req["mode"] == "PRES" and (
+                report.get("observable") != "screened hydrostatic SOC pressure"
+                or not isinstance(report.get("compression_pressure_GPa"), (float, int))
+                or not math.isfinite(report["compression_pressure_GPa"])))
             or report.get("diagnostic_only", False)
         ):
             raise RuntimeError(
@@ -878,7 +956,7 @@ def compute_response(case, req, root, mpi, run_id, output, *, captured_soc=None)
                 if direct_soc:
                     result["application"] = "add_soc_operator"
             elif analytic_forces:
-                result = report if spinor else report["atomic_forces"]
+                result = report if spinor and req["mode"] != "STRFT" else report["atomic_forces"]
             else:
                 from force_response_modes import run_force_modes
                 progress(journal, "Preparing symmetry-preserving atomic force sources with the shared adjoint")
@@ -908,12 +986,14 @@ def compute_response(case, req, root, mpi, run_id, output, *, captured_soc=None)
             "report_sha256": sha256(path),
             "parent_fingerprints": parent,
             "converged": True,
-            "stress_ready": req["mode"] not in {"FOR", "FORT"},
+            "stress_ready": req["mode"] not in {"FOR", "FORT", "PRES"},
+            "pressure_ready": req["mode"] == "PRES",
             "force_ready": force_ready,
             "force_report": None if force_path is None else str(force_path),
             "force_report_sha256": None if force_path is None else sha256(force_path),
             "stress_applied": False,
-            "scope": "requested symmetry-preserving frozen-Sigma response; pending SCF assembly",
+            "scope": ("hydrostatic SOC pressure in the response report" if req["mode"] == "PRES"
+                      else "requested symmetry-preserving frozen-Sigma response; pending SCF assembly"),
         }
     cfg = solver | {
         "case": case,
@@ -1014,6 +1094,7 @@ def execute(
         "phase": phase,
         "requested_mode": req["mode"],
         "config": req["config_path"],
+        "keep_temporary_files": req["config"].get("keep_temporary_files", False),
         "stress_applied": False,
         "status": "running_dmft2",
     }

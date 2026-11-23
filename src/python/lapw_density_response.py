@@ -309,33 +309,61 @@ class FourierStars:
         if len(rot) == 0:
             raise ValueError("empty symmetry group")
         self.representatives = rep.copy()
-        self.members = []
-        for g in rep:
-            star = {}
-            for r, t in zip(rot, tau):
-                q = tuple(r @ g)
-                angle = 2 * np.pi * (g @ t)
-                phase = np.exp(1j * angle) if complex_phases else complex(np.cos(angle))
-                star.setdefault(q, []).append(phase)
-            indices = []
-            factors = []
-            for q, phases in star.items():
-                if any(abs(v) > n // 2 for v, n in zip(q, self.shape)):
-                    raise ValueError("Fourier star outside the FFT grid")
-                indices.append(tuple(v % n for v, n in zip(q, self.shape)))
-                factors.append(np.mean(phases).conjugate())
-            self.members.append((np.array(indices, int), np.array(factors)))
+        owners, q, phase = star_members(rep, rot, tau, complex_phases)
+        if np.any(abs(q) > np.array(self.shape) // 2):
+            raise ValueError("Fourier star outside the FFT grid")
+        self._grid_indices = np.ravel_multi_index(q.T, self.shape, mode="wrap")
+        self._owners = owners
+        self._phase = phase
+        self._offsets = np.r_[0, np.cumsum(np.bincount(owners, minlength=len(rep)))]
+
+    @property
+    def members(self):
+        # Preserve the native ordering for callers inspecting each star.
+        grid = np.column_stack(np.unravel_index(self._grid_indices, self.shape))
+        return [(grid[a:b], self._phase[a:b]) for a, b in zip(self._offsets, self._offsets[1:])]
 
     def action(self, fourier):
         f = checked(fourier, self.shape, "Fourier density")
-        return np.array([np.sum(f[tuple(i.T)] * phase) for i, phase in self.members])
+        values = f.ravel()[self._grid_indices] * self._phase
+        return np.add.reduceat(values, self._offsets[:-1]) if len(values) else values
 
     def pullback(self, covector):
-        y = checked(covector, (len(self.members),), "star covector")
+        y = checked(covector, (len(self.representatives),), "star covector")
         out = np.zeros(self.shape, complex)
-        for value, (indices, phase) in zip(y, self.members):
-            np.add.at(out, tuple(indices.T), value * phase.conj())
+        np.add.at(out.ravel(), self._grid_indices, y[self._owners] * self._phase.conj())
         return out
+
+
+def star_members(rep, rot, tau, complex_phases):
+    """Average duplicate space-group images inside each star, in native order."""
+    owners, vectors, phases = [], [], []
+    step = max(1, 32768 // len(rot))
+    for start in range(0, len(rep), step):
+        g = rep[start : start + step]
+        r = np.einsum("sij,gj->gsi", rot, g)
+        phase = np.exp(2j * np.pi * (g @ tau.T))
+        if not complex_phases:
+            phase = phase.real
+        # Keep +/- Nyquist distinct here. Wrapping occurs only at FFT assembly.
+        lo = r.min(axis=(0, 1))
+        dims = tuple((r.max(axis=(0, 1)) - lo + 1).tolist())
+        key = np.ravel_multi_index((r - lo).reshape(-1, 3).T, dims).reshape(len(g), -1)
+        key += np.arange(len(g))[:, None] * int(np.prod(dims))
+        _, first, inv, count = np.unique(
+            key.ravel(), return_index=True, return_inverse=True, return_counts=True
+        )
+        inv = inv.ravel()
+        order = np.argsort(first)
+        p = phase.ravel()
+        avg = (np.bincount(inv, weights=p.real) + 1j * np.bincount(inv, weights=p.imag)) / count
+        ids = first[order]
+        owners.append(start + ids // len(rot))
+        vectors.append(r.reshape(-1, 3)[ids])
+        phases.append(avg[order].conj())
+    if not owners:
+        return np.empty(0, int), np.empty((0, 3), int), np.empty(0, complex)
+    return np.concatenate(owners), np.concatenate(vectors), np.concatenate(phases)
 
 
 class InterstitialDensity:
@@ -371,6 +399,16 @@ class InterstitialDensity:
         self.index = tuple((g % self.shape).T)
         if len(set(map(tuple, g))) != len(g):
             raise ValueError("duplicate plane-wave labels")
+        # For an alias-free grid, FFT(v * psi) evaluated on the LAPW
+        # rows is exactly sum_G' vhat[G-G'] C[G']. For moderate PW counts
+        # the matrix product is considerably cheaper than two band FFTs.
+        # Retain only O(Npw) labels at each k. Build the G-G' grid lookup in
+        # bounded row tiles when applying the adjoint; a dense table at every
+        # cached k point would compete with the memory used by the spinors.
+        self.direct_labels = None
+        if len(g) ** 2 <= min(2**22, 8 * self.ng * np.log2(max(2, self.ng))):
+            self.direct_labels = g.copy()
+            self.direct_labels.setflags(write=False)
         self.psi = self._waves(self.c) if cache_wavefunctions else None
 
     def _waves(self, c):
@@ -410,12 +448,28 @@ class InterstitialDensity:
             result += self.stars.action(np.fft.fftn(n) / (self.ng * self.volume))
         return result
 
+    def potential_times_coefficients(self, covector):
+        star_grid = self.stars.pullback(covector)
+        if self.direct_labels is None:
+            v = np.fft.ifftn(star_grid).real / self.volume
+            psi = self.psi if self.psi is not None else self._waves(self.c)
+            return self._wave_pullback(v[..., None] * psi)
+        # The original physical potential is the real part of IFFT(star_grid).
+        # Reproduce this projection before expanding G-G', including G=0.
+        neg = tuple((-np.arange(n)) % n for n in self.shape)
+        fourier = ((star_grid + star_grid[np.ix_(*neg)].conj()) / (2 * self.volume)).ravel()
+        g = self.direct_labels
+        result = np.empty_like(self.c, dtype=complex)
+        rows = max(1, min(len(g), (8 * 1024**2) // (48 * len(g))))
+        for first in range(0, len(g), rows):
+            block = slice(first, first + rows)
+            differences = tuple(g[block, i, None] - g[None, :, i] for i in range(3))
+            indices = np.ravel_multi_index(differences, self.shape, mode="wrap")
+            result[block] = fourier[indices] @ self.c
+        return result
+
     def pullback(self, covector, rho=None):
-        # FFT/N has adjoint IFFT. The real projection is essential: the
-        # independent coordinates of the physical grid density are real.
-        v = np.fft.ifftn(self.stars.pullback(covector)).real / self.volume
-        psi = self.psi if self.psi is not None else self._waves(self.c)
-        vc = self._wave_pullback(v[..., None] * psi)
+        vc = self.potential_times_coefficients(covector)
         rhobar = herm(self.c.conj().T @ vc)
         if rho is None:
             return rhobar

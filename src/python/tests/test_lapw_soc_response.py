@@ -1,5 +1,7 @@
 """Retained-space and radial SOC derivatives independent of the Ce files."""
 
+from contextlib import ExitStack
+from types import SimpleNamespace
 import os
 from pathlib import Path
 import unittest
@@ -10,6 +12,37 @@ from scipy.linalg import eigh
 from lapw_radial_native import NativeRadialContext
 from lapw_soc_response import SOCRadialChannel, SOCMatching
 from lapw_soc_subspace import RetainedEigenspace, hermitian
+
+
+class SOCPointCacheTests(unittest.TestCase):
+    def test_retained_prefix_and_streamed_resource_lifetimes(self):
+        from lapw_soc_screened import SOCScreenedForce
+
+        with ExitStack() as lifetime:
+            model = SOCScreenedForce.__new__(SOCScreenedForce)
+            model.stack = lifetime
+            model.records = range(3)
+            model.cached_points = {}
+            model.cache_bytes = model.cache_scratch = 0
+            model.cache_limit = 4 * 1024**2
+            model.scratch_limit = 1024
+            model.admit_points = True
+            opened, closed = [], []
+
+            def prepare(index, record, resources):
+                opened.append(index)
+                resources.callback(closed.append, index)
+                return SimpleNamespace(array=np.ones(2 * 1024**2, dtype=np.uint8),
+                                       val=SimpleNamespace(matching_scratch_bytes=512))
+
+            model._prepare_point = prepare
+            for _ in range(2):
+                self.assertEqual([i for i, _ in model.points()], [0, 1, 2])
+            self.assertEqual(opened, [0, 1, 2, 1, 2])
+            self.assertEqual(closed, [1, 2, 1, 2])
+            self.assertLessEqual(model.cache_bytes, model.cache_limit)
+            self.assertEqual(model.cache_scratch, 512)
+        self.assertEqual(closed[-1], 0)
 
 
 class SOCSubspaceTests(unittest.TestCase):
@@ -45,6 +78,36 @@ class SOCSubspaceTests(unittest.TestCase):
             self.assertAlmostEqual(
                 lhs, np.vdot(bh, dh).real + np.vdot(bo, do).real, places=11
             )
+
+    def test_uniform_dilation_in_triclinic_and_centered_cells(self):
+        from types import SimpleNamespace
+        from lapw_lattice import NativeLattice
+        from lapw_soc_response import SOCSite
+
+        rng = np.random.default_rng(731)
+        labels = rng.integers(-3, 4, (19, 3)).astype(float)
+        labels[0] = 0.0
+        c = rng.normal(size=(19, 7)) + 1j * rng.normal(size=(19, 7))
+        ctx = SimpleNamespace(rmt=2.35, lapw=True, primitive=rng.normal(size=(1, 4, 3)),
+                              lo_coefficients=rng.normal(size=(3, 1)))
+        for kind, angles in [("P", (76, 99, 104)), ("CXZ", (90, 90, 96)),
+                             ("F", (90, 90, 90))]:
+            def build(eta):
+                a, b, caxis = np.exp(eta) * np.array([7., 8., 9.])
+                s = SimpleNamespace(lattyp=kind, a=a, b=b, c=caxis,
+                                    alpha=angles[0], beta=angles[1], gamma=angles[2])
+                lattice = NativeLattice.from_structure(s)
+                geometry = SimpleNamespace(br1=lattice.reciprocal, nlo=5, volume=lattice.volume,
+                    channels={(0, 2): SimpleNamespace(ctx=ctx, slots=[0, 1, 2])},
+                    lo_indices={(0, 2): [np.arange(5)]}, legacy_lo_filter=False)
+                site = SOCSite(0, lattice.reciprocal, np.array([.13, -.27, .44]), {})
+                return SOCMatching(geometry, site, labels, c, 2)
+            with self.subTest(kind=kind):
+                step = 1e-5
+                dz = build(0).action(None, None, np.zeros_like(ctx.primitive[-1]),
+                                     np.zeros_like(ctx.lo_coefficients), hydrostatic=True)
+                fd = (build(step).z - build(-step).z) / (2 * step)
+                np.testing.assert_allclose(dz, fd, atol=1e-8, rtol=1e-7)
 
     def test_lo_phase_and_differential_at_zero(self):
         # Small components and exact zeros occur even for normalized bands.

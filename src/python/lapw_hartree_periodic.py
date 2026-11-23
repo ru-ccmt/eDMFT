@@ -16,7 +16,7 @@ LDMTest SIMP/NCEM are not supported. XC, core and screening are separate.
 from lapw_lattice import NativeLattice
 import numpy as np
 from scipy.special import spherical_jn, factorial2
-from lapw_scipy_compat import sph_harm_y
+from lapw_augmentation_response import harmonics
 from lapw_hartree_radial import NativeCoulombIntegral, RadialHartreeDirichlet
 from lapw_density_response import checked
 from stress_response_adjoint import PairedOperator
@@ -128,13 +128,7 @@ class NativeStarTable:
     def harmonic_average(self, reciprocal, position, local_axes, lm):
         """YKAV = mean_star[tau_G exp(iG.Ra) Y_lm*(local G)]."""
         q = self.members @ reciprocal.T @ local_axes.T
-        norm = np.linalg.norm(q, axis=1)
-        theta = np.arccos(
-            np.clip(
-                np.divide(q[:, 2], norm, out=np.ones_like(norm), where=norm > 0), -1, 1
-            )
-        )
-        phi = np.arctan2(q[:, 1], q[:, 0])
+        values = {l: harmonics(l, q) for l in {int(l) for l, m in lm}}
         phase = (
             self.phases
             * np.exp(2j * np.pi * (self.members @ position))
@@ -142,12 +136,28 @@ class NativeStarTable:
         )
         result = np.empty((len(lm), self.nstar), complex)
         for i, (l, m) in enumerate(lm):
-            row = phase * sph_harm_y(l, m, theta, phi).conj()
+            row = phase * values[int(l)][int(l) + int(m)].conj()
             result[i] = np.bincount(
                 self.owners, row.real, minlength=self.nstar
             ) + 1j * np.bincount(self.owners, row.imag, minlength=self.nstar)
             result[i, 0] = 1 / np.sqrt(4 * np.pi) if l == 0 else 0
         return result
+
+
+def rean0_reciprocal_labels(shape):
+    """Integer G labels at the FFT slots used by LAPW0's REAN0 sphere mask.
+
+    Fortran subtracts n when its one-based index exceeds n//2. On a
+    length-27 axis, slot 13 (zero based) therefore represents -14. This
+    choice affects the sphere form factor and atomic phase on odd grids.
+    Use the same grid for the mask and for changes of geometry.
+    """
+    axes = []
+    for n in shape:
+        axis = np.arange(n)
+        axis[n // 2:] -= n
+        axes.append(axis)
+    return np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1)
 
 
 class NativeHartreeReanalysis:
@@ -162,8 +172,8 @@ class NativeHartreeReanalysis:
 
     def __init__(self, stars, shape, reciprocal, positions, radii, volume, *, lattice=None):
         self.stars = stars
-        if len(shape) != 3 or any(int(n) != n or n < 4 or n % 2 for n in shape):
-            raise ValueError("native reanalysis requires an explicit even FFT grid")
+        if len(shape) != 3 or any(int(n) != n or n < 4 for n in shape):
+            raise ValueError("native reanalysis requires an explicit FFT grid")
         self.shape = tuple(map(int, shape))
         b = checked(reciprocal, (3, 3), "reciprocal matrix", real=True)
         pos = np.asarray(positions)
@@ -175,8 +185,7 @@ class NativeHartreeReanalysis:
             raise ValueError("star touches FFT Nyquist plane or is outside grid")
         self.indices = tuple((stars.members % np.array(shape)).T)
         # Native REAN0 stores +iG.R phases. REAN4 conjugates them before FFT.
-        axes = [np.fft.fftfreq(n) * n for n in shape]
-        labels = np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1)
+        labels = rean0_reciprocal_labels(self.shape)
         norm = np.linalg.norm(labels @ b.T, axis=-1)
         mask = np.zeros(self.shape, complex)
         for p, r in zip(pos, radii):

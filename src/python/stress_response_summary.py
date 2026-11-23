@@ -156,6 +156,11 @@ def _report_text(report):
         if parts:
             rows.append(("Radial-energy-search completion*",
                          explicit - sum(np.asarray(v) for v in parts.values())))
+        spinor_parts = report.get("strain_explicit_contributions")
+        if spinor_parts:
+            for key, label in [("electrostatic_Ry", "Electrostatic geometry"), ("xc_Ry", "XC geometry"),
+                               ("core_Ry", "Occupied core"), ("bands_Ry", "Spinor bands and projector")]:
+                rows.append((label, [part[key] for part in spinor_parts]))
         rows += [("Explicit subtotal a_nu", explicit),
                  ("Screened induced lambda.s_nu", report["induced_Ry"]),
                  ("TOTAL D_nu", report["derivatives_Ry"])]
@@ -206,6 +211,13 @@ def _report_text(report):
               f"GMRES info={adjoint.get('gmres_info', 'not recorded')}\n",
               "Adjoint true residual / threshold: " + _number(adjoint.get("residual_norm")) +
               " / " + _number(adjoint.get("threshold")) + "\n"]
+    if "central_relative_charge_residual" in report:
+        lines.append("Relative SOC charge-map residual: " + _number(report["central_relative_charge_residual"]) + "\n")
+    freq = report.get("frequency_compression", {})
+    if freq:
+        count = freq.get("compressed_branch_kpoints", freq.get("compressed_kpoints", 0))
+        total = freq.get("branch_kpoints", freq.get("total_kpoints", 0))
+        lines.append(f"Signed Matsubara modes used on {count}/{total} branch k points.\n")
     for key, label in [
         ("prepare_potential_core_seconds", "Potential/core setup"),
         ("prepare_valence_seconds", "Electronic response setup"),
@@ -241,6 +253,13 @@ def finish(case, status, *, directory="."):
         report = json.loads(Path(status["report"]).read_text())
         if "stress_Ry_Bohr3" in report:
             _append(path, _report_text(report))
+        elif status.get("pressure_ready"):
+            _append(path, "\nScreened SOC pressure from uniform dilation of the primitive cell\n"
+                    f"Primitive volume (Bohr^3)            {report['primitive_volume_Bohr3']:16.8f}\n"
+                    f"Fixed-charge dF/dlog(a) (Ry)         {report['fixed_charge_derivative_Ry']:16.8f}\n"
+                    f"Charge-response dF/dlog(a) (Ry)      {report['charge_response_derivative_Ry']:16.8f}\n"
+                    f"Total dF/dlog(a) (Ry)                {report['dF_dlog_linear_scale_Ry']:16.8f}\n"
+                    f"Pressure (GPa, compression positive) {report['compression_pressure_GPa']:16.8f}\n")
         elif report.get("symmetry_fixed"):
             _append(path, "All selected atomic forces vanish by site symmetry.\n")
         elif report.get("application") == "add_soc_operator":
@@ -291,7 +310,9 @@ def finish(case, status, *, directory="."):
                 elif prep.is_file():
                     _append(path, f"Native preparation record: {prep}\n")
         _append(path, f"Status/SCF publication record: {Path(directory).resolve()/(case+'.stress_response.status.json')}\n")
-        if not status.get("stress_applied") and not status.get("force_applied"):
+        if status.get("pressure_ready"):
+            progress(path, "The scalar SOC pressure is recorded in this summary and the archived report.")
+        elif not status.get("stress_applied") and not status.get("force_applied"):
             progress(path, "NEXT: lcore and SCF assembly will publish the requested response.")
         else:
             progress(path, "Status JSON records successful SCF publication; see comparison below.")

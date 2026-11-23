@@ -128,6 +128,7 @@ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
         self.frequency_chunk = int(frequency_chunk)
         self._greens = {}
         self._kernels = {}
+        self.generalized_adjoint_modes = None
         self._kernel_bytes = 0
         self.precontract = bool(precontract)
         self._cache_bytes = 0
@@ -290,7 +291,7 @@ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
         density = []
         projector_gradient = np.zeros_like(self.uc)
         for k in range(len(self.eps)):
-            dm = self._fermi(k, -np.eye(self.eps.shape[1]))
+            dm = self._static_action(k, -np.eye(self.eps.shape[1]))
             _, e, v, _, _, _ = self._static[k]
             u = self.uc[k]
             rho_inf = (v * expit(-e / self.meta.temperature)) @ v.conj().T
@@ -315,6 +316,18 @@ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
             projector_gradient[k] = 2 * self.kw[k] * projector_local
             if self.precontract:
                 self._prepare_contraction(k)
+            if k not in self._kernels:
+                # Fold the static Matsubara subtraction into the Fermi divided
+                # difference. In the static eigenbasis Herm(G_inf D G_inf)
+                # has entries Re(g_i g_j) D_ij for any Hermitian direction D.
+                # This real symmetric map is also its own adjoint. The fully
+                # precontracted kernel already includes this subtraction.
+                divided = self._static[k][-1]
+                for start in range(0, len(self.meta.omega), self.frequency_chunk):
+                    sl = slice(start, start + self.frequency_chunk)
+                    g = 1 / (1j * self.meta.omega[sl, None] - e)
+                    weights = 2 * self.meta.temperature * self.meta.weights[sl]
+                    divided -= (g.T @ (weights[:, None] * g)).real
         self.mu_response = np.asarray(mu)
         self.mu_response.flags.writeable = False
         self.compressibility = float(
@@ -330,11 +343,12 @@ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
         self._ready = True
         self._prepare_seconds = time.monotonic() - started
 
-    def _fermi(self, k, d):
+    def _static_action(self, k, d):
+        """Apply the static divided differences prepared for this k's response path."""
         _, _, v, _, _, divided = self._static[k]
         return v @ ((v.conj().T @ d @ v) * divided) @ v.conj().T
 
-    def _chunks(self, k):
+    def _chunks(self, k, *, need_static=True):
         hi, e, v, ew, vw, divided = self._static[k]
         u = self.uc[k, self.W]
         for a in range(0, len(self.meta.omega), self.frequency_chunk):
@@ -357,7 +371,9 @@ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
                     self._greens[key] = gw
                     self._cache_bytes += gw.nbytes
             gq = 1 / (z[:, None] - (self.eps[k, self.Q] - self.meta.mu))
-            giw = (vw[None] * (1 / (z[:, None] - ew))[:, None, :]) @ vw.conj().T
+            giw = None
+            if need_static:
+                giw = (vw[None] * (1 / (z[:, None] - ew))[:, None, :]) @ vw.conj().T
             yield a, stop, gw, gq, giw
 
     def cache_info(self):
@@ -537,15 +553,15 @@ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
         for k, u in enumerate(self.uc):
             v = du[k]
             di = dh[k] + v @ self.sinf @ u.conj().T + u @ self.sinf @ v.conj().T
-            dr = self._fermi(k, di)
+            dr = self._static_action(k, di)
             if k in self._kernels:
                 dr += self._contract_forward(k, dh[k], v)
                 result.append(2 * self.kw[k] * herm(dr))
                 continue
-            for a, stop, gw, gq, giw in self._chunks(k):
+            for a, stop, gw, gq, _ in self._chunks(k, need_static=False):
                 sigma = self.sigma[a:stop]
                 d = dh[k][None] + (v @ sigma) @ u.conj().T + (u @ sigma) @ v.conj().T
-                dg = self.sandwich(gw, gq, d) - self.sandwich(giw, gq, di)
+                dg = self.sandwich(gw, gq, d)
                 dr += np.einsum(
                     "w,wij->ij",
                     2 * self.meta.temperature * self.meta.weights[a:stop],
@@ -570,7 +586,7 @@ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
             cache=self.cache_info(),
         )
 
-    def adjoint(self, y, fixed_number=True, embedding=True, return_raw=False):
+    def adjoint(self, y, fixed_number=True, embedding=True, return_raw=False, *, frequency_modes=None):
         """VJP of response, including the nonlocal projector-normalization chain.
 
         With return_raw=True, return (H_bar,phi_bar); otherwise retain the
@@ -592,20 +608,23 @@ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
         du_bar = np.zeros_like(self.uc)
         for k, u in enumerate(self.uc):
             yy = 2 * self.kw[k] * y[k]
-            di_bar = self._fermi(k, yy)
+            di_bar = self._static_action(k, yy)
             if k in self._kernels:
                 hbar, ubar = self._contract_adjoint(k, yy)
                 answer[k] = di_bar + hbar
                 du_bar[k] = 2 * di_bar @ u @ self.sinf + ubar
                 continue
-            for a, stop, gw, gq, giw in self._chunks(k):
+            if frequency_modes and k in frequency_modes:
+                hbar, ubar = frequency_modes[k].adjoint(self, yy)
+                answer[k] = di_bar + hbar
+                du_bar[k] = 2 * di_bar @ u @ self.sinf + ubar
+                continue
+            for a, stop, gw, gq, _ in self._chunks(k, need_static=False):
                 weights = 2 * self.meta.temperature * self.meta.weights[a:stop]
                 # Positive-frequency Hermitian projection is self-adjoint.
                 # The resolvent sandwich itself is not: use both daggers.
                 dg_bar = self.sandwich(gw.swapaxes(-1, -2).conj(), gq.conj(), yy)
-                dgi_bar = self.sandwich(giw.swapaxes(-1, -2).conj(), gq.conj(), yy)
                 dg_bar *= weights[:, None, None]
-                di_bar -= np.einsum("w,wij->ij", weights, dgi_bar)
                 answer[k] += dg_bar.sum(axis=0)
                 sigma = self.sigma[a:stop]
                 du_bar[k] += (
@@ -706,7 +725,8 @@ class CachedFrozenSigmaResponse(FrozenSigmaResponse):
         y, before the fixed-N projection; projecting it again breaks covariance.
         """
         y = self._matrix(y, "density covector")
-        hbar, rawbar = self.adjoint(y, fixed_number=fixed_number, return_raw=True)
+        hbar, rawbar = self.adjoint(y, fixed_number=fixed_number, return_raw=True,
+                                    frequency_modes=self.generalized_adjoint_modes)
         obar = -0.5 * (hbar * self.eps[:, None, :] + self.eps[:, :, None] * hbar)
         obar -= 0.5 * herm(np.einsum("knic,kmic->knm", rawbar, self.raw.conj()))
         obar -= 0.5 * (y @ self._central_density + self._central_density @ y)

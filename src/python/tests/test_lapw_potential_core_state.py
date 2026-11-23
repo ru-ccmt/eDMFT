@@ -5,12 +5,33 @@ from pathlib import Path
 from types import SimpleNamespace
 import json, tempfile, unittest
 import numpy as np
+from lapw_native_potential_export import _pseudocharge_ncon
 from lapw_potential_core_state import (
     save_potential_core_state,
     load_potential_core_state,
     fingerprint_files,
 )
 from wien_response_density import Density
+
+
+class NativeNconTests(unittest.TestCase):
+    def test_native_default_and_selected_input_record(self):
+        cases = [
+            (["NR2V"], 9),
+            (["NR2V", "NCON 15"], 9),
+            (["NR2V # IFFT NCON 7"], 9),
+            (["R2V 13 IFFT", "0 0 0 1 NCON 7"], 9),
+            (["R2V NCON 7"], 7),
+            (["NR2V IFFT", "40 48 48 1.0 1 NCON 13"], 13),
+            (["NR2V IFFT", "40 48 48 1.0 1 # NCON 13"], 9),
+            (["NR2V IFFT", "40 48 48 1.0 1 NCON -2"], 3),
+            (["NR2V IFFT", "40 48 48 1.0 1 NCON 22"], 19),
+        ]
+        for records, expected in cases:
+            with self.subTest(records=records):
+                self.assertEqual(_pseudocharge_ncon(["TOT XC_PBE", *records]), expected)
+        with self.assertRaisesRegex(ValueError, "FFT parameter record"):
+            _pseudocharge_ncon(["TOT XC_PBE", "NR2V IFFT"])
 
 
 def inputs():

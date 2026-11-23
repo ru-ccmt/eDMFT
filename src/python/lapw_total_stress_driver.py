@@ -32,6 +32,79 @@ from lapw_strain_charge import PreparedChargeSourceContraction
 from wien_response_density import Density
 
 
+def solve_charge_adjoint(screened, gradient, branches, parallel, budget_mb, tolerance, progress, initial=None):
+    """Use signed frequency modes only while iterating the common charge adjoint.
+
+    The fixed-N projection, both spin branches, static complement, radial
+    response, and geometry sources retain their usual definitions. Certify the
+    final solution with the original discrete Jacobian on all ranks.
+    """
+    from lapw_frequency_modes import prepare_frequency_modes
+    from stress_response_adjoint import ResponseConvergenceError
+
+    controls = dict(adjoint=True, rtol=2e-12, atol=1e-11, restart=30, max_cycles=8)
+    count = int(parallel.sum(sum(len(b.records) for b in branches)))
+    stats = dict(factor_rtol=tolerance, branch_kpoints=count, compressed_branch_kpoints=0)
+    candidate = None
+    reduced_report = None
+    with ExitStack() as files, ExitStack() as modes:
+        remaining = int(budget_mb * 1024**2)
+        local = []
+        for branch in branches:
+            model = branch.model
+            if tolerance == 0 or getattr(model, "electronic_model", "dmft") == "dft":
+                continue
+            # Cap additional rank-private mode storage across all spin channels.
+            # A failed fit, an exact precontracted point, or a full scratch
+            # volume leaves the ordinary Matsubara action in use at that point.
+            tables = prepare_frequency_modes(model, tolerance, remaining, files)
+            if tables:
+                modes.callback(setattr, model, "generalized_adjoint_modes", model.generalized_adjoint_modes)
+                model.generalized_adjoint_modes = tables
+                for k, table in tables.items():
+                    remaining -= len(table.signs) * table.width * 16
+                    local.append((len(table.signs), table.error))
+        used = [entry for rank in parallel.gather(local) for entry in rank]
+        if used:
+            ranks = [r for r, err in used]
+            stats.update(compressed_branch_kpoints=len(used), min_modes=min(ranks),
+                         max_modes=max(ranks), max_relative_factor_error=max(err for r, err in used))
+            progress(f"Using {min(ranks)} to {max(ranks)} signed modes on {len(used)}/{count} branch k points")
+            try:
+                candidate, reduced_report = screened.solve(gradient, initial=initial, **controls)
+            except ResponseConvergenceError as exc:
+                reduced_report = exc.report
+    # The scope of 'modes' has ended. Every subsequent product, including
+    # the contraction with the geometry and force sources, is full frequency.
+    if candidate is not None:
+        residual = gradient - (candidate - screened.jacobian.rmatvec(candidate))
+        norm = float(parallel.reduce(float(np.linalg.norm(residual)), "max"))
+        target = reduced_report["threshold"]
+        progress(f"Full-frequency adjoint residual {norm:.4e} (absolute target {target:.4e})")
+        if np.isfinite(norm) and norm <= target:
+            result = dict(reduced_report, residual_norm=norm, full_frequency_check=True,
+                          full_frequency_fallback=False, actions=reduced_report["actions"] + 1)
+            return (candidate, result), stats
+    if reduced_report is not None:
+        progress("Refining the shared adjoint with the full Matsubara operator")
+    guess = candidate if candidate is not None else initial
+    try:
+        x, report = screened.solve(gradient, initial=guess, **controls)
+    except ResponseConvergenceError:
+        if initial is None:
+            raise
+        progress("Restarting the full-frequency adjoint with a zero initial iterate")
+        x, report = screened.solve(gradient, **controls)
+    # Outside the mode context, solve() checks the true residual with the
+    # full operator and raises on failure. Record that check even when no
+    # k point used compressed modes, so cleanup can verify this report.
+    report.update(full_frequency_check=True, full_frequency_fallback=reduced_report is not None)
+    if reduced_report is not None:
+        report.update(mode_attempt=reduced_report,
+                      actions=report["actions"] + reduced_report["actions"] + int(candidate is not None))
+    return (x, report), stats
+
+
 def run_prepared(
     snapshot,
     case,
@@ -52,8 +125,13 @@ def run_prepared(
     save_geometry=False,
     ensemble="auto",
     diagnostic_gap_cutoff=None,
+    frequency_rtol=None,
 ):
     """Prepare once, solve one adjoint, optionally form invariant stress sources."""
+    if frequency_rtol is None:
+        frequency_rtol = 1e-7
+    if not np.isfinite(frequency_rtol) or not 0 <= frequency_rtol < 1:
+        raise ValueError("frequency factor tolerance must be in [0,1)")
     if atomic_forces and full_sources:
         raise ValueError("atomic forces require a shared adjoint readout")
     if adjoint_only and full_sources:
@@ -73,7 +151,9 @@ def run_prepared(
     from lapw_magnetic_response import combine_valence
     provenance = snapshot / "preparation.json"
     preparation = json.loads(provenance.read_text()) if provenance.is_file() else {}
-    override = preparation.get("physical_policy", {})
+    # Older snapshots recorded one policy for both the reference and its
+    # response. Retain that interpretation for reproducible diagnostic replay.
+    override = dict(preparation.get("response_policy", preparation.get("physical_policy", {})))
     electronic_model = preparation.get("electronic_model", "dmft")
     if ensemble not in ("auto", "fixed-n", "fixed-mu"):
         raise ValueError("invalid electronic ensemble")
@@ -88,7 +168,7 @@ def run_prepared(
     if potential_core is None:
         potential_core = output / "potential_core.npz"
         parallel.root_call(
-            lambda: prepare_native_potential_core(snapshot, case, potential_core)
+            lambda: prepare_native_potential_core(snapshot, case, potential_core, prepare=False)
         )
     pc = load_potential_core_state(potential_core, expected_fingerprints=expected)
     import re
@@ -178,19 +258,24 @@ def run_prepared(
             timed_jacobian, progress=progress if parallel.root else None
         )
         solved = None
+        frequency_stats = None
         readout = None
         if not full_sources:
             t = time.perf_counter()
             progress("Solving one shared screened adjoint" if adjoint_only
                      else "Solving one screened adjoint for all strain directions")
-            solved = total.energy.screened.solve(
-                total.energy.charge_gradient,
-                adjoint=True,
-                rtol=2e-12,
-                atol=1e-11,
-                restart=30,
-                max_cycles=8,
-            )
+            seed = initial = None
+            if os.environ.get("EDMFT_RELAX_BLOCK") and electronic_model == "dmft":
+                from structure_relaxation import AdjointSeed
+                seed = AdjointSeed(pc, "scalar-" + str(policy.channels))
+                initial = parallel.root_call(lambda: seed.load(os.environ.get("EDMFT_RELAX_INITIAL")))
+                if initial is not None:
+                    progress("Starting GMRES from the preceding geometry adjoint")
+            solved, frequency_stats = solve_charge_adjoint(
+                total.energy.screened, total.energy.charge_gradient, branches,
+                parallel, cache_mb, frequency_rtol, progress, initial=initial)
+            if seed is not None:
+                parallel.root_call(lambda: seed.save(os.environ["EDMFT_RELAX_BLOCK"], solved[0]))
             timings["adjoint_solve_seconds"] = time.perf_counter() - t
             progress("Adjoint converged; preparing shared source readout")
             t = time.perf_counter()
@@ -268,6 +353,8 @@ def run_prepared(
             raise RuntimeError("central snapshot changed during response")
         if parallel.fingerprints(v.fingerprint_paths) != v.fingerprints:
             raise RuntimeError("native valence snapshot changed during response")
+        if frequency_stats is not None:
+            report["frequency_compression"] = frequency_stats
         if atomic_report is not None:
             report["atomic_forces"] = atomic_report
         report.update(
@@ -349,6 +436,7 @@ def main():
         "--adjoint-only", action="store_true",
         help="force mode: solve shared adjoint without preparing stress directions",
     )
+    p.add_argument("--frequency-rtol", type=float, help="Matsubara factor tolerance (0 uses full sums)")
     p.add_argument("--disk-matching", action="store_true",
                    help="store inactive matching arrays in rank-local temporary files")
     p.add_argument("--atomic-forces", action="store_true",
@@ -389,7 +477,7 @@ def main():
         force_atoms=a.force_atoms,
         save_geometry=a.save_geometry,
         ensemble=a.ensemble,
-        diagnostic_gap_cutoff=a.diagnostic_gap_cutoff,
+        diagnostic_gap_cutoff=a.diagnostic_gap_cutoff, frequency_rtol=a.frequency_rtol,
     )
 
 

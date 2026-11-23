@@ -12,7 +12,7 @@ KS eigenvectors and normalized window through the electronic response.
 """
 
 import numpy as np
-from lapw_density_response import checked, herm, stored_coefficients
+from lapw_density_response import checked, herm, stored_coefficients, star_members
 from lapw_complement_response import (
     ComplementMatrixCoordinates,
     ComplementPerturbationCoordinates,
@@ -83,25 +83,28 @@ class NativeInterstitialPotential:
         self.nstar = len(rep)
         self.complex_values = bool(complex_values)
         self.representatives = rep.copy()
-        members = {}
-        for j, k in enumerate(rep):
-            star = {}
-            for r, t in zip(rot, tau):
-                phase = (
-                    np.exp(2j * np.pi * (k @ t))
-                    if complex_values
-                    else complex(np.cos(2 * np.pi * (k @ t)))
-                )
-                star.setdefault(tuple(r @ k), []).append(phase)
-            for key, phases in star.items():
-                if key in members:
-                    raise ValueError("overlapping potential stars")
-                members[key] = (j, np.mean(phases).conjugate())
+        owners, points, phases = star_members(rep, rot, tau, complex_values)
         self.rows, self.cols = np.triu_indices(len(g))
-        differences = g[self.rows] - g[self.cols]
-        mapped = [members.get(tuple(d), (-1, 0j)) for d in differences]
-        self.indices = np.array([j for j, p in mapped], int)
-        self.phases = np.array([p for j, p in mapped], complex)
+        # Index each reciprocal difference by an integer key; absent native
+        # VNS entries remain zero. Sorting also detects overlapping stars.
+        lo = np.minimum(points.min(axis=0), -np.ptp(g, axis=0))
+        hi = np.maximum(points.max(axis=0), np.ptp(g, axis=0))
+        dims = tuple(hi - lo + 1)
+        key = np.ravel_multi_index((points - lo).T, dims)
+        order = np.argsort(key)
+        key = key[order]
+        if np.any(np.diff(key) == 0):
+            raise ValueError("overlapping potential stars")
+        self.indices = np.full(len(self.rows), -1, int)
+        self.phases = np.zeros(len(self.rows), complex)
+        for first in range(0, len(self.rows), 65536):
+            sl = slice(first, first + 65536)
+            diff = g[self.rows[sl]] - g[self.cols[sl]] - lo
+            find = np.ravel_multi_index(diff.T, dims)
+            idx = np.searchsorted(key, find).clip(max=len(key) - 1)
+            present = key[idx] == find
+            self.indices[sl][present] = owners[order[idx[present]]]
+            self.phases[sl][present] = phases[order[idx[present]]]
         self.present = self.indices >= 0
         self.off = self.rows != self.cols
         for array in (
@@ -375,10 +378,14 @@ class NativePotentialBands:
                 hqr[k] += q
         return self.output.pack(hrr, orr, raw, hqr, oqr)
 
-    def pullback(self, vector):
+    def pullback(self, vector, *, with_energies=False):
         hrr, orr, raw, hqr, oqr = self.output.unpack(vector)
         nr = self.nr
-        if self.compact:
+        if with_energies:
+            if not self.compact:
+                raise ValueError("joint radial energy readout requires compact band coordinates")
+            sb, energies = self.spherical.pullback(vector, with_energies=True)
+        elif self.compact:
             sb = self.spherical.pullback(vector)
         else:
             h = np.zeros((self.nk, self.nb, self.nb), complex)
@@ -397,4 +404,5 @@ class NativePotentialBands:
             for a, (op, ks) in self.ns.items()
         }
         pw = sum((op.pullback(hrr[k], hqr[k]) for k, op in enumerate(self.ir)))
-        return self.input.pack(sb, ns, pw)
+        potential = self.input.pack(sb, ns, pw)
+        return (potential, energies) if with_energies else potential

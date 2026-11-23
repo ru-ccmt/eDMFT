@@ -5,7 +5,6 @@ input policy. All electrostatic constants and the native potential gauge are
 retained. This is a functional component, not a separately additive stress.
 """
 
-from types import SimpleNamespace
 import numpy as np
 from lapw_density_response import checked
 from lapw_functional_cancellation import SpatialPotentialPairing, PreparedXCEnergy
@@ -14,7 +13,7 @@ from lapw_hydrostatic_potential import (
     hydrostatic_xc_geometry,
 )
 from wien_response_operators import hydrostatic_transport_source
-from lapw_strain_field import diagonal_strain_potential
+from lapw_strain_field import diagonal_strain_potential, xc_geometry_field
 
 
 class PreparedDensityFunctional:
@@ -86,7 +85,7 @@ class PreparedDensityFunctional:
         )
         return float(self.density_gradient @ d)
 
-    def geometry(self, strain):
+    def geometry(self, strain, *, potential_parts=None):
         """Partial derivative at fixed native density coefficients; RMT fixed.
 
         W' is zero in MT and 3W in IR. The Coulomb and XC field sources include
@@ -96,19 +95,13 @@ class PreparedDensityFunctional:
         pc = self.state
         h = pc.hartree
         n = self.density
-        _, parts = diagonal_strain_potential(pc, strain, transport_rate=0)
+        parts = potential_parts
+        if parts is None:
+            _, parts = diagonal_strain_potential(pc, strain, transport_rate=0)
         dc, dv = parts["coulomb_geometry"], parts["xc_geometry"]
-        energy_state = SimpleNamespace(
-            hartree=h,
-            xc=self.xc.field_response,
-            input_density=pc.input_density,
-            structure=pc.structure,
-            potential_operator=pc.potential_operator,
-        )
-        _, energy_parts = diagonal_strain_potential(
-            energy_state, strain, transport_rate=0
-        )
-        de = energy_parts["xc_geometry"]
+        _, rho = h._split(pc.input_density.vector())
+        de = xc_geometry_field(h, self.xc.field_response.ir, rho, strain,
+                               parts["mask_derivative"], True)
         trace = np.trace(strain)
         ir = slice(h.pw_offset, None)
         es = -0.5 * self.pairing.value(n, dc) + self.boundary_gradient @ dc

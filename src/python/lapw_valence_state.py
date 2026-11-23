@@ -67,7 +67,7 @@ class PreparedValenceState:
     """Prepared maps; contexts is the H/O bank, projector_contexts is ATPARN.
 
     Both banks share potential coordinates, not radial normalization rules.
-    Their native contexts are owned by this state and closed together.
+    The state owns its native contexts unless the caller supplies a shared bank.
     """
 
     model: object
@@ -442,74 +442,14 @@ def _prepare_snapshot(
         disk_matching=disk_matching, spin_channel=spin_channel, dft=dft)
 
 
-def _prepare_representation(case, central, mat, records, k_coordinates, bases,
-                            model, nret, stack, *, complex_vectors, library,
-                            cache_wavefunctions, matrix_quadrature, fft_grid,
-                            parallel, basis_cache_mb, disk_matching, spin_channel,
-                            dft, scalar_spin_frame=False, geometry_only=False):
-    """Scalar LAPW H/O and spatial charge in the given retained/complement frame.
+def prepare_radial_contexts(mat, ltop, matrix_quadrature, stack, library):
+    """Prepare atom/l radial maps, common to every k point in this snapshot.
 
-    For SOC, the central scalar occupation is the partial spin trace of the
-    spinor DMFT density matrix. The spinor projector and resolvent are prepared
-    separately; the scalar LAPW terms use the same native kernels as DMFT2.
+    The owning stack must outlive all band representations that borrow the maps.
+    LAPWSO and the DMFT density use different radial quadratures.
     """
     s = mat.s
-    has_projector = not (dft or scalar_spin_frame)
-    if not np.isfinite(basis_cache_mb) or basis_cache_mb < 0:
-        raise ValueError("basis cache budget must be nonnegative")
-    basis_cache_limit = int(basis_cache_mb * 1024**2)
-    basis_cache_bytes = 0
-    nk = len(records)
-    for pattern in ["native.k????????.bin", "native.ham.k????????.bin"]:
-        if not scalar_spin_frame and len(list(central.glob(pattern))) != parallel.sum(nk):
-            raise ValueError("extra/missing native matrix k records")
-    rho = model.central_density()
-    reference = (None if geometry_only else
-                 Density(central / (case + ".clmval" + spin_channel), central / (case + ".struct")))
-    if has_projector:
-        inl = Indmfl(str(central / case), extn="indmfl" + spin_channel)
-        inl.read()
-    ctx = {}
-    matrix_ctx = {}
-    from lapw_response_scratch import MatchingScratch
-    scratch = MatchingScratch(stack) if disk_matching else None
-    sphere = []
-    nonsphere = []
-    project = []
-    ltop, lns = map(
-        int,
-        (central / (case + (".in1c" if mat.complex else ".in1")))
-        .read_text()
-        .splitlines()[1]
-        .split()[1:3],
-    )
-    if ltop < 8 or not 0 <= lns <= ltop:
-        raise NotImplementedError(
-            "native density adapter needs LMAX>=8 and LNSMAX<=LMAX"
-        )
-    # LAPW1 can retain angular channels above l=8 (FeSe uses l=10), but the
-    # native dmft2 density still uses the compile-time LMAX2=8 in modules.f90.
-    # Reconstructing its output from all LAPW1 channels adds high-l products
-    # which dmft2 never wrote to clmval. The discrepancy is most visible in
-    # the outer radial samples of high-l nonspherical density harmonics and
-    # invalidates the strict native charge-map closure needed by the adjoint.
-    # DFT's native LAPW2 path has its own angular cutoff and retains ltop.
-    density_limit = ltop if dft else 8
-    first = np.r_[0, np.cumsum(s.mult)[:-1]]
-    site_atom = np.repeat(np.arange(s.nat), s.mult)
-    axes, locations = native_site_frames(s)
-    geometry = []
-    for k, (ev, c, labels) in enumerate(mat.cv):
-        kf = k_coordinates[k]
-        frac = labels.T + kf
-        q = NativeLattice.from_structure(s).momenta(frac)
-        qn = np.linalg.norm(q, axis=1)
-        geometry.append((c, labels, frac, q, qn, len(c) - mat.nlo_total))
-    density_atoms = {}
-    density_matching = {}
-    density_complement = {}
-    density_ctx = matrix_ctx if dft else ctx
-    volume = NativeLattice.from_structure(s).volume
+    ctx, matrix_ctx = {}, {}
     for a in range(s.nat):
         n = s.jrj[a]
         ctx[a] = {}
@@ -553,6 +493,79 @@ def _prepare_representation(case, central, mat, records, k_coordinates, bases,
                         quadrature=matrix_quadrature,
                     )
                 )
+    return ctx, matrix_ctx
+
+
+def _prepare_representation(case, central, mat, records, k_coordinates, bases,
+                            model, nret, stack, *, complex_vectors, library,
+                            cache_wavefunctions, matrix_quadrature, fft_grid,
+                            parallel, basis_cache_mb, disk_matching, spin_channel,
+                            dft, scalar_spin_frame=False, geometry_only=False, radial_contexts=None):
+    """Scalar LAPW H/O and spatial charge in the given retained/complement frame.
+
+    For SOC, the central scalar occupation is the partial spin trace of the
+    spinor DMFT density matrix. The spinor projector and resolvent are prepared
+    separately; the scalar LAPW terms use the same native kernels as DMFT2.
+    """
+    s = mat.s
+    has_projector = not (dft or scalar_spin_frame)
+    if not np.isfinite(basis_cache_mb) or basis_cache_mb < 0:
+        raise ValueError("basis cache budget must be nonnegative")
+    basis_cache_limit = int(basis_cache_mb * 1024**2)
+    basis_cache_bytes = 0
+    nk = len(records)
+    for pattern in ["native.k????????.bin", "native.ham.k????????.bin"]:
+        if not scalar_spin_frame and len(list(central.glob(pattern))) != parallel.sum(nk):
+            raise ValueError("extra/missing native matrix k records")
+    rho = model.central_density()
+    reference = (None if geometry_only else
+                 Density(central / (case + ".clmval" + spin_channel), central / (case + ".struct")))
+    if has_projector:
+        inl = Indmfl(str(central / case), extn="indmfl" + spin_channel)
+        inl.read()
+    from lapw_response_scratch import MatchingScratch
+    scratch = MatchingScratch(stack) if disk_matching else None
+    sphere = []
+    nonsphere = []
+    project = []
+    ltop, lns = map(
+        int,
+        (central / (case + (".in1c" if mat.complex else ".in1")))
+        .read_text()
+        .splitlines()[1]
+        .split()[1:3],
+    )
+    if ltop < 8 or not 0 <= lns <= ltop:
+        raise NotImplementedError(
+            "native density adapter needs LMAX>=8 and LNSMAX<=LMAX"
+        )
+    # LAPW1 can retain angular channels above l=8 (FeSe uses l=10), but the
+    # native dmft2 density still uses the compile-time LMAX2=8 in modules.f90.
+    # Reconstructing its output from all LAPW1 channels adds high-l products
+    # which dmft2 never wrote to clmval. The discrepancy is most visible in
+    # the outer radial samples of high-l nonspherical density harmonics and
+    # invalidates the strict native charge-map closure needed by the adjoint.
+    # DFT's native LAPW2 path has its own angular cutoff and retains ltop.
+    density_limit = ltop if dft else 8
+    first = np.r_[0, np.cumsum(s.mult)[:-1]]
+    site_atom = np.repeat(np.arange(s.nat), s.mult)
+    axes, locations = native_site_frames(s)
+    geometry = []
+    for k, (ev, c, labels) in enumerate(mat.cv):
+        kf = k_coordinates[k]
+        frac = labels.T + kf
+        q = NativeLattice.from_structure(s).momenta(frac)
+        qn = np.linalg.norm(q, axis=1)
+        geometry.append((c, labels, frac, q, qn, len(c) - mat.nlo_total))
+    density_atoms = {}
+    density_matching = {}
+    density_complement = {}
+    if radial_contexts is None:
+        radial_contexts = prepare_radial_contexts(mat, ltop, matrix_quadrature, stack, library)
+    ctx, matrix_ctx = radial_contexts
+    density_ctx = matrix_ctx if dft else ctx
+    volume = NativeLattice.from_structure(s).volume
+    for a in range(s.nat):
         dens = []
         density_matching[a] = []
         ns = []

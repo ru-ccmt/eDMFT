@@ -1,0 +1,134 @@
+Structural relaxation with run_dmft.py
+=====================================
+
+In an initialized, charge-self-consistent eDMFT case, add the following to
+params.dat and run run_dmft.py in the case directory.
+
+    relax = True
+
+The combined force/stress response currently supports nonmagnetic eDMFT,
+including supported SOC inputs. Spin-dependent DMFT branches require an
+extension of the screened atomic-force backend.
+
+The run updates case.struct and case.clmsum. The charge and impurity controls
+in params.dat retain their usual meanings. For example, runIMP=False keeps the
+impurity self-energy fixed. Use a charge tolerance appropriate to the desired
+force and stress resolution. The following optional controls show the defaults.
+
+    relax_pressure = 0.0          # imposed hydrostatic pressure in GPa
+    relax_force_tol = 0.5         # maximum screened per-atom norm, mRy/Bohr
+    relax_stress_tol = 0.02       # maximum principal stress residual, GPa
+    relax_max_strain = 0.01       # maximum principal log strain of one cell step
+    relax_bulk_modulus = 120.0    # initial bulk stiffness in GPa
+    relax_shear_modulus = 60.0    # initial shear stiffness in GPa
+    relax_refresh_bohr = 0.08     # maximum internal motion before a new measurement
+    relax_max_steps = 20          # maximum screened evaluations per invocation
+
+Chemical potential and pressure
+-------------------------------
+
+For a Mott insulator, recomputeEF=0 keeps the supplied EF.dat during charge
+convergence and preparation of the screened stress. The analytic pressure
+and stress conserve the particle number of that central solution to first
+order in strain. The chemical-potential derivative is solved internally.
+It does not update EF.dat or correct a pre-existing error in the integrated
+charge. The normalization choice in case.inm is independent.
+
+For a fixed-chemical-potential derivative, use the following in case.stress_response.json.
+
+    {"solver": {"stress_ensemble": "fixed-mu"}}
+
+The corresponding explicit fixed-number setting is "fixed-n". A legacy
+solver.physical_policy.fixed_number override still applies to both stages
+unless stress_ensemble specifies the derivative. The response log records
+the central chemical-potential choice and the derivative constraint.
+
+Following a run
+---------------
+
+    tail -f case.relax/history
+    tail -f case.outputdmf2_response
+
+Replace "case" with the WIEN case name. The first log spans the entire
+relaxation. A typical inner iteration looks like this.
+
+    [2026-11-22T16:40:00] 0018.020 MSR1a (int.-relax) FOR+scrn   0.03860 mRy/Bohr, rho 1.28e-5   (<=2e-5,yes)
+    [2026-11-22T16:40:03] 0018.021 MSR1  (posi.-held) FOR+scrn   0.01240 mRy/Bohr, rho 1.48e-5   (<=2e-5,yes)
+
+MSR1a (int.-relax) allows internal motion. MSR1 (posi.-held) holds the atoms
+fixed. The force is the largest per-atom norm used by the mixer. FOR+scrn
+includes the most recent screened-minus-ordinary correction. The rho field
+gives the mixer charge distance (:DIS) in scientific notation with three
+significant digits, its target (cc), and whether the unrounded value meets
+that target. Energy convergence (ec) is still checked.
+A small force while :DIS is large calls for more electronic iterations.
+During STRFT, the second log shows preparation and
+the individual GMRES residuals. It is rewritten for each dmft2 call.
+During FOR, case.scfm can list a very large pressure marked partial.
+The ordinary pass lacks the full valence stress. Only the completed STRFT
+tensor in case.relax/history is used to update the lattice. The log reports
+tensile-positive stress. The next line, labeled "pressure (GPa)", gives minus
+one third of its trace. Positive pressure means compression.
+
+case.broyd* records the native mixer history. Successive MSR1a atomic moves
+share it. The history is cleared on a change of cell, on a change of mixer
+mode, and when starting a block with a new screened force correction. The log
+gives the reason and the number of files removed. The input charge is retained.
+
+At each screened measurement the history gives the representative fractional
+positions, Cartesian forces, screened-minus-ordinary corrections, the tensile
+stress tensor, and the decision on the cell. case.relax/status.json records
+the current step and convergence status. Numbered subdirectories hold the
+initial and measured structures and measurement.json. Follow the report
+path in that file for the complete response calculation. When the cell
+moves, next.struct and next.clmsum record the structure and charge seed.
+
+How one geometry block works
+---------------------------
+
+The internal-coordinate update is native WIEN2k MSR1a. Its standard
+run_lapw -min workflow also finishes with fixed-position charge iterations
+after checking the mixer force flag, charge and energy. Here the inner
+stopping rule uses the force norm explicitly because the next, screened
+measurement has its own force tolerance. The screened force correction
+and the variable-cell optimizer are eDMFT extensions.
+
+1. At fixed cell the driver requests FOR. WIEN's MSR1a mixer updates the
+   charge and symmetry-allowed internal coordinates. The driver archives an
+   incoming SOlapm.dat in the numbered directory. FOR and STRFT both
+   normalize the projector on their current LAPW states. A successful
+   measurement supplies a fresh SOlapm.dat when all branches share it.
+   When consecutive ordinary force estimates are small and the latest charge
+   distance meets cc, the driver switches to MSR1 so charge can settle at
+   fixed positions. It resumes internal moves if the equilibrated force
+   estimate requires them.
+2. After electronic convergence the driver measures ordinary FOR and screened
+   STRFT with the same final LAPW states and geometry. A single adjoint
+   supplies all symmetry-allowed stress and force components. The geometry
+   stays fixed during publication and the final charge-mixing step.
+3. The next block adds the most recent screened-minus-ordinary force to
+   newly computed ordinary forces. This is a local approximation. A large
+   change in internal positions triggers an early remeasurement. The previous
+   adjoint can also initialize GMRES on a compatible density basis. The new
+   solve must satisfy the ordinary residual check.
+4. Once charge and screened forces meet their targets, residual stress can
+   drive a cell move. The response uses tensile-positive sigma, so positive
+   external pressure P requires sigma + P I = 0. The driver keeps only the
+   symmetry-allowed tensor, makes a bounded elastic step, and uses measured
+   stress changes to update an inverse-BFGS compliance when the curvature
+   is reliable. Fractional positions are fixed during the cell move. The
+   driver keeps the muffin-tin radii, shortens a trial step if spheres
+   overlap and adjusts the interstitial constant of the charge seed to
+   conserve its native electron count.
+5. Success requires a fresh screened measurement at the final cell and
+   positions with charge, force and stress all within tolerance.
+
+The interface temporarily manages case.in0, active case.in2 inputs and
+case.inm and restores their original first lines when the run exits. Leave
+these managed fields to the driver during a run. Keep params.dat unchanged
+during a screened measurement because it belongs to the response snapshot.
+The body of each electronic block uses the ordinary finish, cc, ec and
+iteration limits. An exhausted limit or failed response is reported. Restart
+run_dmft.py in the same directory to continue from the saved geometry and
+charge. A cell-step journal supports recovery after an interrupted update.
+Keep each case.relax directory with its own calculation.

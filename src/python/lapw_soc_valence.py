@@ -12,7 +12,6 @@ import numpy as np
 from response_parallel import SERIAL
 from lapw_complement_response import LAPWComplementBasis
 from lapw_energy_response import energy_direction
-from lapw_energy_readout import band_energy_gradient, density_energy_gradient
 from lapw_geometry_response import native_band_geometry_source
 from lapw_strain_charge import native_spatial_geometry_source
 from lapw_soc_subspace import SecondVariationalResponse, hermitian
@@ -44,6 +43,7 @@ class SOCValenceAtK:
         fingerprints,
         stack,
         library,
+        radial_contexts=None,
     ):
         self.directory, self.case, self.ik = Path(directory), case, ik
         self.problem = SecondVariationalResponse(
@@ -98,6 +98,7 @@ class SOCValenceAtK:
             spin_channel="",
             dft=False,
             scalar_spin_frame=True,
+            radial_contexts=radial_contexts,
             geometry_only=pc is None,
         )
         self.val.fingerprints = fingerprints
@@ -133,7 +134,7 @@ class SOCValenceAtK:
         projector = {key: apply(key, ch) for key, ch in self.projector_contexts.items()}
         return energies, radial, projector
 
-    def action(self, v, velocity=None, *, include_charge=True):
+    def action(self, v, velocity=None, *, include_charge=True, hydrostatic=False, strain=None):
         """Return dHspin, raw dPhi and charge contribution at fixed band occupations."""
         val, p = self.val, self.problem
         energies, radial, projector = self._radial_directions(v)
@@ -149,8 +150,8 @@ class SOCValenceAtK:
             band += part
             if include_charge:
                 spatial += charge
-        if velocity is not None:
-            e = np.zeros((3, 3))
+        if velocity is not None or hydrostatic or strain is not None:
+            e = strain if strain is not None else (np.eye(3) if hydrostatic else np.zeros((3, 3)))
             geo, _ = native_band_geometry_source(
                 val, self.directory, self.case, e, displacements=velocity
             )
@@ -166,7 +167,7 @@ class SOCValenceAtK:
             scal.outside @ ((hq[0] - oq[0] * scal.energy) * scal.reciprocal_gaps)
             - 0.5 * scal.a @ oo[0]
         )
-        hso = p.soc.action(radial, da, velocity)
+        hso = p.soc.action(radial, da, velocity, hydrostatic=hydrostatic, strain=strain)
         n = len(dh)
         hso[:n, :n] += dh
         hso[n:, n:] += dh
@@ -175,7 +176,7 @@ class SOCValenceAtK:
             [da @ c + scal.a @ dd for c, dd in zip(p.spin_blocks, np.split(dc, 2))]
         )
         du = self.project.evaluate(
-            p.waves, dpsi=dpsi, radial=projector, velocity=velocity
+            p.waves, dpsi=dpsi, radial=projector, velocity=velocity, hydrostatic=hydrostatic, strain=strain
         )
         if not include_charge:
             return hk, du, None
@@ -251,15 +252,20 @@ class SOCValenceAtK:
         )
         return hermitian(g), waves
 
-    def pullback(self, hbar, raw_bar, waves_bar, y):
-        """Return the central potential covector; position sources use action."""
+    def pullback(self, hbar, raw_bar, waves_bar, y, *, with_geometry=False, with_strain=False):
+        """Return the potential covector and optionally the band and site covectors.
+
+        Packed H/O coefficients include both scalar metric legs. The two
+        direct position terms arise from SOC matching and projector translation.
+        All three act on the same displacements as the forward source.
+        """
         p, val = self.problem, self.val
-        dw, radial_proj, _ = self.project.pullback(p.waves, raw_bar)
+        dw, radial_proj, projector_position = self.project.pullback(p.waves, raw_bar)
         dw += waves_bar
         da = sum(x @ c.conj().T for x, c in zip(dw, p.spin_blocks))
         dc = np.concatenate([p.scalar.a.conj().T @ x for x in dw])
         hso = p.spin.pullback(hbar, dc, metric=False)
-        radial, db, _ = p.soc.pullback(hso)
+        radial, db, soc_position = p.soc.pullback(hso)
         da += db
         a, b, e = p.scalar.a, p.scalar.outside, p.scalar.energy
         n = len(e)
@@ -271,17 +277,19 @@ class SOCValenceAtK:
         packed = val.bands.output.pack(
             hrr[None], orr[None], np.zeros_like(val.model.raw), [hqr], [obr]
         )
-        gv = val.bands.pullback(packed)
-        has_density = bool(np.any(y))
-        if has_density:
-            gv += val.bands.spherical_selector.rmatvec(val.direct.operator.rmatvec(y))
-        result = self.select.rmatvec(gv)
-        ge = {}
         if self.search:
-            ge = band_energy_gradient(val.bands.spherical, packed)
-            if has_density:
-                for key, add in density_energy_gradient(val.direct, y).items():
+            gv, ge = val.bands.pullback(packed, with_energies=True)
+        else:
+            gv = val.bands.pullback(packed)
+        if np.any(y):
+            if self.search:
+                density_v, density_e = val.direct.pullback(y, with_energies=True)
+                for key, add in density_e.items():
                     ge[key] += add
+            else:
+                density_v = val.direct.operator.rmatvec(y)
+            gv += val.bands.spherical_selector.rmatvec(density_v)
+        result = self.select.rmatvec(gv)
         for bank, bars in (
             (p.soc.geometry.channels, radial),
             (self.projector_contexts, radial_proj),
@@ -293,4 +301,10 @@ class SOCValenceAtK:
                     ge[key] += np.r_[de, dlo]
         for key, matrix in self.search.items():
             result[self.slices[key[0]]] += matrix.T @ ge[key]
+        if with_strain:
+            # The fixed-charge and screened covectors multiply the same explicit
+            # SOC matrix and raw projector tangents for every independent strain.
+            return result, packed, projector_position + soc_position, hso, raw_bar
+        if with_geometry:
+            return result, packed, projector_position + soc_position
         return result

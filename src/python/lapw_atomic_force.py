@@ -12,9 +12,8 @@ from scipy.special import spherical_jn
 
 from force_response_modes import internal_modes
 from lapw_charge_response import native_mixer_inversion
-from lapw_geometry_response import native_band_geometry_source
+from lapw_atomic_geometry import atomic_geometry_readouts
 from lapw_lattice import NativeLattice
-from lapw_strain_charge import native_spatial_geometry_source
 from lapw_strain_field import diagonal_strain_potential
 from lapw_strain_potential import masked_potential_strain_source
 
@@ -62,13 +61,13 @@ def atomic_force_report(total, readout, atoms, progress):
     norm = state.normalization
     results = []
     force = np.zeros((s.nat, 3))
-    for atom, direction, pattern in modes:
+    local = atomic_geometry_readouts(state.valence, total.directory, total.case, modes,
+                                      functional.lattice.joint_gradient, readout.band_covector,
+                                      readout.raw_covector)
+    fixed_geometry, induced_geometry = readout.parallel.sum(local)
+    for i, (atom, direction, pattern) in enumerate(modes):
         progress(f"Analytic atomic source on atom {atom} along {direction}")
         potential, parts = diagonal_strain_potential(pc, fixed_cell, displacements=pattern)
-        band, _ = native_band_geometry_source(state.valence, total.directory, total.case,
-                                               fixed_cell, displacements=pattern)
-        spatial = native_spatial_geometry_source(state.valence, total.directory, total.case,
-                                                 fixed_cell, displacements=pattern)
         # RMT, cell volume and radial quadrature remain fixed. In MT coordinates
         # all position dependence of C_es is in the regular electrostatic field.
         # Both IR XC energy per electron and IR XC potential acquire the same
@@ -79,13 +78,13 @@ def atomic_force_report(total, readout, atoms, progress):
         dcoul = float(electrostatic_weight @ parts["coulomb_geometry"])
         dxc = pc.hartree.volume * float(density.density[ir] @ (dxc_energy.view(float) - parts["xc_geometry"][ir]))
         d_search = total.energy.A @ potential
-        explicit = (dcoul + dxc + readout.parallel.sum(functional.lattice.joint_gradient @ band)
+        explicit = (dcoul + dxc + fixed_geometry[i]
                     + functional.potential_gradient @ potential + total.energy.g @ d_search)
         # The normalization rule integrates *raw output* charge with a moving
         # interstitial mask, even though the stored input array is unchanged.
         d_ir = atomic_charge_integral_derivative(pc.input_density, s, pattern)
         d_norm = norm.explicit_source(ir_geometry=float(d_ir @ norm.base[ir]))
-        induced = (readout.parallel.sum(readout.band_covector @ band + readout.raw_covector @ spatial)
+        induced = (induced_geometry[i]
                    + readout.potential_covector @ potential
                    + readout.adjoint @ (d_norm + total.energy.P @ d_search))
         factor = -1000.0 / s.mult[atom-1]  # Ry -> mRy; per equivalent atom
