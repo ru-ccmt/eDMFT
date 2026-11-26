@@ -330,7 +330,8 @@ def final_lapw0_input(case, force_last, info):
     Keep the stress input visible for the entire measurement.
     """
     mode = dmft2_step.final_force_mode(force_last)
-    if mode not in ('STRF', 'STRFT') or mixer_moves_atoms(case):
+    native_mode = dmft2_step.ALIASES.get(mode, mode)
+    if native_mode not in ('STR', 'STRF') or mixer_moves_atoms(case):
         yield
         return
     req = dmft2_step.request(case)
@@ -896,10 +897,10 @@ if __name__ == '__main__':
         relax_shear_modulus [GPa] 60          # initial shear stiffness for the cell step
         relax_refresh_bohr [Bohr] 0.08        # remeasure after this internal displacement
         relax_max_steps 20                    # maximum screened evaluations in this invocation
-        force_last     [bool/str] False       # fixed geometry with TOT: False=off, True='FOR' (ordinary forces)
-                                             # 'FORT'=screened forces, 'STRF'=ordinary stress and forces,
-                                             # 'STRFT'=screened stress and forces. Both stress modes temporarily set TOT to STR in case.in0.
-                                              # FOR: compute forces on every charge step
+        force_last     [bool/str] False       # final measurement for fixed geometry with TOT. False=off, True='FOR'
+                                              # ordinary: 'FOR' forces, 'STR' stress, 'STRF' both
+                                              # screened: 'FORT' forces, 'STRT' stress, 'STRFT' both
+                                              # final stress modes temporarily set TOT to STR in case.in0
         runIMP         [True| False] True     # Run impurity solver or skip this step
         runGF          [True| False] True     # Run dmft1 for G and Delta, or skip this step
         ntail          ['auto'|int]  'auto'   # adaptive Matsubara tail, or a fixed logarithmic tail count

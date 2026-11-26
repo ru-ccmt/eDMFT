@@ -156,9 +156,9 @@ def final_force_mode(value):
         return "FOR" if value else None
     if isinstance(value, str):
         mode = value.strip().upper()
-        if mode in {"FOR", "FORT", "STRF", "STRFT"}:
+        if mode in {"FOR", "FORT", "STR", "STRT", "STRF", "STRFT"}:
             return mode
-    raise ValueError("force_last must be False, True (= FOR), 'FOR', 'FORT', 'STRF', or 'STRFT'")
+    raise ValueError("force_last must be False, True (= FOR), 'FOR', 'FORT', 'STR', 'STRT', 'STRF', or 'STRFT'")
 
 
 def request(case, definition="dmft2.def", config_path=None, disabled=False, *, final_force=False):

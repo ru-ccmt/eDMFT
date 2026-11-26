@@ -112,6 +112,7 @@ class ExecutionTests(unittest.TestCase):
     def test_named_final_measurements_from_tot(self):
         for value, native_mode, screened in [
             (True, "FOR", False), ("FOR", "FOR", False), ("FORT", "FOR", True),
+            ("STR", "STR", False), ("STRT", "STR", True),
             ("STRF", "STRF", False), ("STRFT", "STRF", True),
         ]:
             with self.subTest(value=value), case_directory("TOT"):
@@ -172,12 +173,13 @@ class ExecutionTests(unittest.TestCase):
                     args = (io.StringIO(), SimpleNamespace(case="sample", WIENROOT="."),
                             io.StringIO(), None, params, "", {"m_extn": ext}, True)
                     self.assertFalse(driver.final_response_pass(*args))
-                    for value, expected_mode in ((True, "FOR"), ("FORT", "FORT"), ("STRFT", "STRFT")):
+                    for value in (True, "FOR", "FORT", "STR", "STRT", "STRF", "STRFT"):
+                        expected_mode = "FOR" if value is True else value
                         calls.clear()
                         params["force_last"] = value
                         self.assertTrue(driver.final_response_pass(*args))
                         # A screened magnetic measurement owns both channels.
-                        first = "lattice_charge_step" if ext and value is True else "dmft2"
+                        first = "lattice_charge_step" if ext and expected_mode in ("FOR", "STR", "STRF") else "dmft2"
                         self.assertEqual(calls, [first, "lcore", "scf", "scf1", "mixer", "scfm"])
             Path("sample.inm").write_text("MSR1a\n")
             self.assertFalse(driver.final_response_pass(*args))
@@ -188,7 +190,7 @@ class ExecutionTests(unittest.TestCase):
     def test_scheduled_lapw0_stress_tracks_active_in2_and_restores_input(self):
         import run_dmft as driver
         for suffix in ('in2', 'in2c'):
-            for mode in ('FOR', 'FORT', 'STRF', 'STRFT', True, False):
+            for mode in ('FOR', 'FORT', 'STR', 'STRT', 'STRF', 'STRFT', True, False):
                 with self.subTest(suffix=suffix, mode=mode), case_directory('TOT'):
                     if suffix == 'in2c':
                         Path('sample.in2').rename('sample.in2c')
@@ -200,7 +202,7 @@ class ExecutionTests(unittest.TestCase):
                     original = b'TOT  XC_PBESOL\r\n  NR2V\tIFFT\r\n'
                     path.write_bytes(original)
                     with driver.final_lapw0_input('sample', mode, io.StringIO()):
-                        expected = b'STR' if mode in ('STRF', 'STRFT') else b'TOT'
+                        expected = b'STR' if mode in ('STR', 'STRT', 'STRF', 'STRFT') else b'TOT'
                         self.assertEqual(path.read_bytes(), expected + original[3:])
                         self.assertEqual(step.input_mode('sample.' + suffix), 'TOT')
                     self.assertEqual(path.read_bytes(), original)
