@@ -1066,12 +1066,15 @@ public:
             std::vector<SparseFunction> next(state_count);
             for (int state=0;state<state_count;++state) {
               if (states[state].empty()) continue;
+              // All outgoing branches consume this input at this vertex. Free
+              // its matrices before processing the next state or convolution.
+              const SparseFunction input=std::move(states[state]);
               std::array<int,2> live{{
                 (state%base_state_count)/state_extent-1,state%state_extent-1}};
               const int broken=state/base_state_count;
               if (vertex==root_vertex) {
                 AddFunction(next[state],ContractRoot(
-                  states[state],roots,workspace,vertex_factor[vertex]));
+                  input,roots,workspace,vertex_factor[vertex]));
                 continue;
               }
 
@@ -1098,7 +1101,7 @@ public:
                   const int ds=2*bath+line.direction;
                   AddFunction(next[encode_state(target_live[0],
                                                 target_live[1],broken || first_moved)],
-                    MultiplyRight(states[state],operator_cache[Opposite(ds)],
+                    MultiplyRight(input,operator_cache[Opposite(ds)],
                                   vertex_factor[vertex],first_moved?2.0:1.0));
                 }
               } else {
@@ -1111,7 +1114,7 @@ public:
                 const int ds=2*bath+line.direction;
                 AddFunction(next[encode_state(target_live[0],
                                               target_live[1],broken)],
-                  MultiplyRight(states[state],operator_cache[ds],
+                  MultiplyRight(input,operator_cache[ds],
                                 vertex_factor[vertex],
                                 line_weight[split][bath]));
               }
@@ -1122,8 +1125,7 @@ public:
               for(int state=0;state<base_state_count;++state)
                 AddFunction(next[state],std::move(next[state+base_state_count]));
             if (vertex<5)
-              ConvolveRightPseudoPreparedBatch(
-                next,cix,workspace,prepared[prepared_index[vertex]]);
+              ConvolveSelfStates(next,cix,workspace,prepared[prepared_index[vertex]]);
             states.swap(next);
           }
           const double common_prefactor=
@@ -1810,6 +1812,34 @@ public:
     buffers.left_hilbert_batch.clear();
   }
 
+  // Bath states are independent through this convolution. Replace their
+  // matrices in groups so a vertex with two live bath indices never needs a
+  // second complete set of subblock outputs alongside its inputs.
+  static void ConvolveSelfStates(std::vector<SparseFunction>& states,const Cix& cix,
+                                 const imag_dlr::Workspace& workspace,
+                                 const PreparedPseudoCoefficients& prepared)
+  {
+    constexpr std::size_t states_per_batch=16;
+    if (!workspace.atomic_subblocks() || states.size()<=states_per_batch) {
+      ConvolveRightPseudoPreparedBatch(states,cix,workspace,prepared);
+      return;
+    }
+    std::array<std::size_t,states_per_batch> slots;
+    std::vector<SparseFunction> batch;
+    batch.reserve(states_per_batch);
+    for (std::size_t next=0;next<states.size();) {
+      for (;next<states.size() && batch.size()<states_per_batch;++next) {
+        if (states[next].empty()) continue;
+        slots[batch.size()]=next;
+        batch.push_back(std::move(states[next]));
+      }
+      if (batch.empty()) break;
+      ConvolveRightPseudoPreparedBatch(batch,cix,workspace,prepared);
+      for (std::size_t i=0;i<batch.size();++i) states[slots[i]]=std::move(batch[i]);
+      batch.clear();
+    }
+  }
+
   static void AccumulateCut(
       const SparseFunction& values,const Cix& cix,double prefactor,
       const std::vector<double>& pseudo_degeneracy,MatrixXd& output,
@@ -2201,6 +2231,28 @@ public:
           prepared_index[edge]=found;
         }
 
+        // A one-vertex arc depends only on its own operator at fixed poles.
+        // Keep the last such arc in its normal output slot. Irregular MPI bath
+        // lists and zero-weight pairs can therefore use the same traversal.
+        const bool short_first=cut.external_vertex==2;
+        const bool short_second=cut.external_vertex==4;
+        int previous_short_op=-2; // -1 is the missing-operator sentinel
+        SparseFunction short_arc;
+        const auto build_arc=[&](int begin,int end,const BathPlan& plan,
+                                 SparseFunction& arc) {
+          arc.clear();
+          arc=Engine::PseudoValues(pseudo_blocks,edge_factor[begin]);
+          for (int vertex=begin+1;vertex<end && !arc.empty();++vertex) {
+            const int op=plan.vertex_operator[vertex];
+            if (op<0)
+              throw std::logic_error("missing TCA physical split operator");
+            arc=Engine::MultiplyRight(arc,operator_cache[op],ones);
+            arc=Engine::ConvolveRightPseudoPrepared(
+              arc,cix,workspace,prepared[prepared_index[vertex]],vertex==5);
+          }
+          // A zero-vertex second arc has no final convolution to reflect it.
+          if (begin==5 && !arc.empty()) Reflect(arc,workspace.basis());
+        };
         for (std::size_t pair_index=0;pair_index<plans.size();++pair_index) {
           BathPlan& plan=plans[pair_index];
           double prefactor=plan.fixed_prefactor;
@@ -2209,37 +2261,20 @@ public:
               plan.channel[split],pole[split]);
           if (prefactor==0.0) continue;
 
-          SparseFunction first=Engine::PseudoValues(
-            pseudo_blocks,edge_factor[0]);
-          for (int vertex=1;vertex<cut.external_vertex && !first.empty();
-               ++vertex) {
-            const int op=plan.vertex_operator[vertex];
-            if (op<0)
-              throw std::logic_error("missing TCA physical split operator");
-            first=Engine::MultiplyRight(first,operator_cache[op],ones);
-            first=Engine::ConvolveRightPseudoPrepared(
-              first,cix,workspace,prepared[prepared_index[vertex]]);
+          SparseFunction other_first,other_second;
+          SparseFunction& first=short_first ? short_arc : other_first;
+          SparseFunction& second=short_second ? short_arc : other_second;
+          if (!short_first || plan.vertex_operator[1]!=previous_short_op) {
+            build_arc(0,cut.external_vertex,plan,first);
+            if (short_first) previous_short_op=plan.vertex_operator[1];
           }
-
-          SparseFunction second=Engine::PseudoValues(
-            pseudo_blocks,edge_factor[cut.external_vertex]);
-          bool second_reflected=false;
-          for (int vertex=cut.external_vertex+1;
-               vertex<6 && !second.empty();++vertex) {
-            const int op=plan.vertex_operator[vertex];
-            if (op<0)
-              throw std::logic_error("missing TCA physical split operator");
-            second=Engine::MultiplyRight(second,operator_cache[op],ones);
-            second=Engine::ConvolveRightPseudoPrepared(
-              second,cix,workspace,prepared[prepared_index[vertex]],
-              vertex==5);
-            if (vertex==5) second_reflected=true;
+          if (first.empty()) continue;
+          if (!short_second || plan.vertex_operator[5]!=previous_short_op) {
+            build_arc(cut.external_vertex,6,plan,second);
+            if (short_second) previous_short_op=plan.vertex_operator[5];
           }
-          // The last convolution (vertex five) directly returns values at
-          // beta-tau, so no separate DLR reflection pass is needed here.
-          if (!second.empty() && !second_reflected)
-            Reflect(second,workspace.basis());
-          if (!first.empty() && !second.empty()) plan.nonempty=true;
+          if (second.empty()) continue;
+          plan.nonempty=true;
 
           for (const auto& pair:external)
             AccumulateBoundaryEstimators(

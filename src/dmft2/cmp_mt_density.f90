@@ -70,6 +70,8 @@ SUBROUTINE cmp_MT_density(w_RHOLM, Aweight, wEpsw, weight, fsph, fnsp, fsph2, ne
   INTEGER    :: j, ik
   INTEGER    :: lmax2lmax2_,nbands_dft_,dim_,lomaxlomax_,nloat_
   
+  complex*16,allocatable :: local_c(:,:),weighted(:,:),local_density(:,:)
+  integer :: base(0:lmax2,2+nloat),ncoeff,channel,nchannels,iband
   lmax2lmax2 = (LMAX2+1)*(LMAX2+1)
   lomaxlomax = (lomax+1)*(lomax+1)
   LMX=LMAX2                                                    
@@ -163,6 +165,39 @@ SUBROUTINE cmp_MT_density(w_RHOLM, Aweight, wEpsw, weight, fsph, fnsp, fsph2, ne
         CALL cputim(time1)
         CALL walltim(time1_w)
 
+        ! D(i,j) = sum_{band,spin} weight(band) C(i) conjg(C(j)) / iso.
+        ! Each nonspherical harmonic contracts the same D with different Gaunt
+        ! coefficients. Spherical csplit still needs the individual band terms.
+        if (any(lm(1,1:lmmax)/=0)) then
+           ncoeff=0
+           do l=0,lmx
+              do j=1,2+ilo(l)
+                 base(l,j)=ncoeff+l+1
+                 ncoeff=ncoeff+2*l+1
+              enddo
+           enddo
+           nchannels=iso*max(0,DM_nemaxx-nemin+1)
+           allocate(local_c(ncoeff,nchannels),weighted(ncoeff,nchannels),local_density(ncoeff,ncoeff))
+           channel=0
+           do iband=nemin,DM_nemaxx
+              do is=1,iso
+                 channel=channel+1
+                 do l=0,lmx
+                    do m=-l,l
+                       ly=l*(l+1)+m+1
+                       local_c(base(l,1)+m,channel)=dh_alm(is,ly,iband)
+                       local_c(base(l,2)+m,channel)=dh_blm(is,ly,iband)
+                       do j=1,ilo(l)
+                          local_c(base(l,2+j)+m,channel)=dh_clm(j,is,ly,iband)
+                       enddo
+                    enddo
+                 enddo
+                 weighted(:,channel)=local_c(:,channel)*(weight(iband)/iso)
+              enddo
+           enddo
+           call zgemm('N','C',ncoeff,ncoeff,nchannels,(1.d0,0.d0),weighted,ncoeff,local_c,ncoeff, &
+                (0.d0,0.d0),local_density,ncoeff)
+        endif
         DO ILM=1,LMMAX
            Li=IABS(LM(1,ILM))
            Mi=LM(2,ILM)
@@ -237,8 +272,29 @@ SUBROUTINE cmp_MT_density(w_RHOLM, Aweight, wEpsw, weight, fsph, fnsp, fsph2, ne
                  CALL cputim(time3)
                  CALL walltim(time3_w)
 
-!!! This loop takes really a lot of time, but the multithreading is dissabled, because the code can corredump.
-!!! You should debug this very carefully.
+                 if (Li/=0) then
+                    ! The Gaunt selection rule fixes mp=m-mi.
+                    do m=max(-l,mi-lp),min(l,mi+lp)
+                       mp=m-mi
+                       gint=imag1*gnt(m,mp)
+                       sa=sa+gint*local_density(base(l,1)+m,base(lp,1)+mp)
+                       sb=sb+gint*local_density(base(l,2)+m,base(lp,2)+mp)
+                       sab=sab+gint*local_density(base(l,1)+m,base(lp,2)+mp)
+                       sba=sba+gint*local_density(base(l,2)+m,base(lp,1)+mp)
+                       do jlo=1,ilo(l)
+                          s21(jlo)=s21(jlo)+gint*local_density(base(l,2+jlo)+m,base(lp,1)+mp)
+                          se21(jlo)=se21(jlo)+gint*local_density(base(l,2+jlo)+m,base(lp,2)+mp)
+                          do jlop=1,ilo(lp)
+                             s22(jlop,jlo)=s22(jlop,jlo)+gint*local_density(base(l,2+jlo)+m,base(lp,2+jlop)+mp)
+                          enddo
+                       enddo
+                       do jlop=1,ilo(lp)
+                          s12(jlop)=s12(jlop)+gint*local_density(base(l,1)+m,base(lp,2+jlop)+mp)
+                          se12(jlop)=se12(jlop)+gint*local_density(base(l,2)+m,base(lp,2+jlop)+mp)
+                       enddo
+                    enddo
+                 else
+                    ! Retain per-band diagnostics for the spherical coefficient.
                  !$OMP PARALLEL DO SHARED(suma,sumb,sumab,sumba,sum21,sume21,sum12,sume12,sum22,GNT)&
                  !$OMP& PRIVATE(num,M,MP,MS,MPS,MTEST,LY,LPY,is,gint,tsuma,tsumb,tsumab,tsumba,tsum21,tsume21,tsum12,tsume12,tsum22,tsa,tsb,tsab,tsba,ts21,tse21,ts12,tse12,ts22,wkp)&
                  !$OMP& SCHEDULE(STATIC,CHUNK) &
@@ -333,6 +389,7 @@ SUBROUTINE cmp_MT_density(w_RHOLM, Aweight, wEpsw, weight, fsph, fnsp, fsph2, ne
                  ENDDO
                  !$OMP END PARALLEL DO
 
+                 endif
                  deallocate( GNT )
 
                  CALL cputim(time4)
@@ -378,6 +435,7 @@ SUBROUTINE cmp_MT_density(w_RHOLM, Aweight, wEpsw, weight, fsph, fnsp, fsph2, ne
               ENDDO lp_sum
            ENDDO l_sum
         ENDDO
+        if (allocated(local_density)) deallocate(local_c,weighted,local_density)
 
         CALL cputim(time2)
         CALL walltim(time2_w)

@@ -1236,7 +1236,7 @@ public:
   void InitializeStorage(int Npseudo_unique, const Array<double,1>& xn){};
   auto DeterminePseudos(Array<double,2>& Gm, Array<double,2>& gm,
 			const Array<double,2>& Sm, const Array<double,1>& _tau_, const Cix& cix, double lambda0_fixed, int followPeak_fixed,
-			int itt, const json& pars, MPIcls& mpi)
+			int itt, const json& pars, MPIcls& mpi, bool write_measurements)
   {
     if (lambda0_fixed!=0 or followPeak_fixed>0){
       if (lambda0_fixed!=0) (*mpi.out)<<"lambda0_fixed="<<lambda0_fixed<<" ";
@@ -1244,10 +1244,10 @@ public:
       (*mpi.out)<<endl;
     }
     
-    auto [lambda0,followPeak] = DeterminePseudoPropagators(Gm,/**/tau,tau_dh,Sm,cix,beta,lambda0_fixed,followPeak_fixed,itt,mpi,pars,pars["peak_pos"]);
+    auto [lambda0,followPeak] = DeterminePseudoPropagators(Gm,/**/tau,tau_dh,Sm,cix,beta,lambda0_fixed,followPeak_fixed,itt,mpi,pars,pars["peak_pos"],write_measurements);
     
     FindLargestEigenvalues(gm,
-			   Gm,tau,cix,itt,mpi);
+			   Gm,tau,cix,itt,mpi,pars["fastFilesystem"].get<bool>());
     double mu = pars["mu"];
     auto r = DeterminProbabilitiesI(tau,Gm,cix,beta,mu,lambda0,followPeak,itt,mpi);
     return r;
@@ -2067,7 +2067,8 @@ public:
              Cix& cix,
              json& pars,
              MPIcls& mpi,
-             bool mc_reference=false)
+             bool mc_reference=false,
+             Array<double,2>* final_audit_shift=nullptr)
   {
     if (pars["TCA_solver"].get<std::string>()!="dlr")
       throw std::logic_error("analytic TCA called while TCA_solver is not dlr");
@@ -2207,6 +2208,7 @@ public:
     bool using_frozen_tail=false;
     bool exact_audit=false;
     bool had_frozen_tail=false;
+    Eigen::MatrixXd audit_shift_nodes;
 
     if (use_active) {
       // Select the active pseudo set once from the OCA-converged propagators.
@@ -2304,6 +2306,10 @@ public:
                      << std::endl;
         compact=evaluate_workspace(*diagram_dlr_workspace,cmpPhysG);
         const Eigen::MatrixXd new_tail=compact.sigma-active_compact.sigma;
+        if (final_audit_shift) {
+          audit_shift_nodes=new_tail;
+          if (freeze_tail && had_frozen_tail) audit_shift_nodes-=tca_frozen_sigma_tail;
+        }
         if (tca_frozen_tail_ready && mpi.rank==mpi.master && mpi.out) {
           const double full_scale=std::max(
             compact.sigma.norm(),std::numeric_limits<double>::min());
@@ -2350,6 +2356,13 @@ public:
         dense.col(it)=basis.evaluate(output_tau(it),coefficients).transpose();
       return dense;
     };
+    if (final_audit_shift && audit_shift_nodes.size()) {
+      const Eigen::MatrixXd shift=to_dense(audit_shift_nodes);
+      final_audit_shift->resize(cix.Npseudo_unique,output_tau.extent(0));
+      for (int p=0;p<cix.Npseudo_unique;++p)
+        for (int it=0;it<output_tau.extent(0);++it)
+          (*final_audit_shift)(p,it)=shift(p,it);
+    }
     const Eigen::MatrixXd sigma=to_dense(compact.sigma);
     dSm.resize(cix.Npseudo_unique,output_tau.extent(0));
     for (int p=0;p<cix.Npseudo_unique;++p)
@@ -2652,7 +2665,7 @@ public:
           (*mpi.out)<<std::endl;
         }
       }
-      if (mpi.rank==mpi.master) {
+      if (mpi.rank==mpi.master && (cmpPhysG || pars["fastFilesystem"].get<bool>())) {
         // Write to a temporary file, check flush/close, and only then replace
         // the visible result. The log marker below means the complete file is
         // closed and available, not merely that evaluation has reached 100%.
@@ -2736,7 +2749,7 @@ public:
         throw std::invalid_argument("fca_self_prefix_mb must be finite and nonnegative, within size_t range");
       options.self_prefix_bytes=static_cast<std::size_t>(prefix_mb*(1024.*1024.));
       options.profile=pars["fca_profile"].get<bool>();
-      options.live_profile=pars["fca_live_profile"].get<bool>();
+      options.live_profile=pars.value("fca_live_profile",pars["fastFilesystem"].get<bool>());
       options.bath_sector_profile=pars["fca_bath_sector_profile"].get<bool>();
       options.tt_probe_task=pars["fca_tt_probe_task"].get<int>();
       options.tt_probe_bath=pars["fca_tt_probe_bath"].get<int>();
@@ -3365,13 +3378,16 @@ public:
   Array<double,2>& imagt(Array<double,2>& Gt){return Gt;}
   //
   void Print_Pseudo(const string& filename, const Array<double,2>& Smt_new, json& pars){
-    ofstream dout(filename); dout.precision(12);
+    ofstream dout(filename);
+    dout.exceptions(std::ios::badbit | std::ios::failbit);
+    dout.precision(12);
     dout<<"# beta="<<beta<<" U="<<pars["U"]<<" Norder="<<pars["Norder"]<<endl;
     for (int i=0; i<tau.size(); ++i){
       dout<<tau(i)<<" ";
       for (int ip=0; ip<Smt_new.extent(0); ++ip) Prints(dout,Smt_new(ip,i));
       dout<<endl;
     }
+    dout.close();
   }
   void Print_Physical(const string& filename, const Array<double,2>& G00, const Array<double,2>& F00, const Array<double,2>& F01)
   {

@@ -925,14 +925,10 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     throw std::invalid_argument("kugler requires unpruned OCA_solver=dlr, oca_dlr_backend=matrix without legacy diagnostics");
   edmft::self_energy::validate(pars,ImagAxis,kugler);
   cix.kugler_estimators=kugler;
+  const bool lagged_tca=pars["tca_lagged"].get<bool>();
   const bool lagged_fca=pars["fca_lagged"].get<bool>();
-  if (lagged_fca && (!ImagAxis || N_min_order!=4 || N_max_order!=4))
-    throw std::invalid_argument(
-      "fca_lagged currently requires imaginary-axis N_min_order=Norder=4; "
-      "FCA must remain current when it normalizes higher-order MC");
-  if (lagged_fca && (!std::isfinite(pars["diff_stop"].get<double>()) ||
-                     pars["diff_stop"].get<double>()<=0.0))
-    throw std::invalid_argument("fca_lagged requires a positive finite diff_stop");
+  const bool lagged=lagged_tca || lagged_fca;
+  const char* outer_name=lagged_tca ? "TCA" : "FCA";
   {
     int two_2_i = 1;
     for (int i=0; i<Skeletons::Freq.extent(0); ++i){
@@ -1006,13 +1002,11 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
   if (pars["lambda0_fixed"].get<double>()!=0) lambda0_fixed = pars["lambda0_fixed"];
   int include_oca=0; bool cOCA_needed=false;
   Array<double,1> Phi_tot(N_max_order); Phi_tot=0;
-  // FCA is the expensive outer correction.  Store its dense-time self-energy
-  // on every MPI rank; only the cheap NCA/OCA/TCA terms change during the
-  // inner Dyson iterations.  A fresh FCA calculation is mandatory at each
-  // outer checkpoint and for the final physical measurement.
-  Array<double,2> frozen_fca;
-  double frozen_fca_phi=0.0;
-  bool have_frozen_fca=false, refresh_fca=false;
+  // Lag only the highest analytic order. TCA starts with the current G;
+  // FCA can preconverge the lower orders before its first evaluation.
+  Array<double,2> frozen_sigma;
+  double frozen_phi=0.0;
+  bool have_anchor=false, refresh_outer=lagged_tca;
   // An empty marker is intentionally a user-settable assertion that the
   // matching PPSigma.0 came from a completed FCA-containing solver call.  It
   // never stores an FCA correction: the first step recomputes FCA for the
@@ -1024,7 +1018,7 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
       warm_start=static_cast<bool>(marker);
     }
     mpi.bcast_one_boolean(warm_start);
-    refresh_fca=warm_start;
+    refresh_outer=warm_start;
     if (mpi.rank==mpi.master && warm_start)
       (*mpi.out)<<"FCA lagged warm start: .fca_warm_start and valid "
                 <<Sfilename<<" found; evaluating FCA on the first step"
@@ -1047,28 +1041,34 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     if (pars["N_min_order"].get<int>()!=N_min_order ||
         pars["Norder"].get<int>()!=N_max_order)
       throw std::invalid_argument("changing N_min_order/Norder requires restarting the solver");
-    if (pars["fca_lagged"].get<bool>()!=lagged_fca)
-      throw std::invalid_argument("changing fca_lagged requires restarting the solver");
-    if (lagged_fca && (!std::isfinite(pars["diff_stop"].get<double>()) ||
+    if (pars["fca_lagged"].get<bool>()!=lagged_fca ||
+        pars["tca_lagged"].get<bool>()!=lagged_tca)
+      throw std::invalid_argument("changing the lagged order requires restarting the solver");
+    if (lagged && (!std::isfinite(pars["diff_stop"].get<double>()) ||
                        pars["diff_stop"].get<double>()<=0.0))
-      throw std::invalid_argument("fca_lagged requires a positive finite diff_stop");
+      throw std::invalid_argument("lagged self-consistency requires a positive finite diff_stop");
     const auto order_plan=edmft::orders::make_plan(
       ImagAxis,N_min_order,N_max_order,
       ImagAxis ? pars["TCA_solver"].get<std::string>() : "",
       ImagAxis ? pars["FCA_solver"].get<std::string>() : "");
-    const bool analytic_tca=order_plan.tca;
     const bool analytic_fca=order_plan.fca;
     // Recompute every analytic anchor from this iteration's propagators;
     // never accidentally normalize against a previous iteration's Phi.
     Phi_tot=0.0;
     // An outer-check failure may reject a provisional final iteration.  In
     // that case physical evaluation must switch off again on the next step.
-    if (lagged_fca) cmpPhysG=next_break;
+    if (lagged) cmpPhysG=next_break;
     else if (next_break) cmpPhysG=true;
+
+    const bool full_output=pars["fastFilesystem"].get<bool>();
+    const bool write_measurements=full_output || cmpPhysG;
+    const int checkpoint_every=pars["pp_checkpoint_every"].get<int>();
+    if (checkpoint_every<0)
+      throw std::invalid_argument("pp_checkpoint_every must be nonnegative");
     
     auto [nd,Q,lambda0,Fimp,Epot,TrSigmaG,followPeak,density_matrix0,Prob]=ra.DeterminePseudos(Gm,gm,Sm,xn,
-											  cix,lambda0_fixed,followPeak_fixed,itt,pars,mpi);
-    if (mpi.rank==mpi.master){
+											  cix,lambda0_fixed,followPeak_fixed,itt,pars,mpi,write_measurements);
+    if (mpi.rank==mpi.master && full_output){
       int ist = next_break ? 0 : itt+1;
       ra.Print_Pseudo(pars["PPG"].get<string>()+to_string(ist), Gm, pars);
     }
@@ -1081,7 +1081,7 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     t_nca = std::chrono::duration<double>(_tst1_-_tst_).count();
     //if (mpi.rank==mpi.master) ra.Print_Pseudo("Smt_NCA."+to_string(itt+1), Smt, pars);
 
-    if (mpi.rank==mpi.master){
+    if (mpi.rank==mpi.master && write_measurements){
       ra.Print_Pseudo("aStval.1", Smt, pars);
       ra.Print_Physical("ag00.1", G00, F00, F01);
     }
@@ -1127,7 +1127,7 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
 			  cmpPhysG, Q, xn, Gm, cix, pars, mpi);
       auto _tst1_ = std::chrono::steady_clock::now();
       t_oca = std::chrono::duration<double>(_tst1_-_tst_).count();
-      if (mpi.rank==mpi.master){
+      if (mpi.rank==mpi.master && write_measurements){
 	ra.Print_Pseudo("aStval.2", Smt, pars);
 	if (cmpPhysG) ra.Print_Physical("ag00.2", dG00, dF00, dF01);
       }
@@ -1143,86 +1143,65 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     // Analytic terms through N_min_order are added exactly once. If higher
     // orders are requested, MC also visits the anchor order to normalize,
     // but InterpolateOnRightMesh excludes that sector from its correction.
-    bool fresh_fca=false, compared_fca=false;
-    double fca_outer_delta=std::numeric_limits<double>::infinity();
+    bool fresh_outer=false, compared_outer=false;
+    double outer_delta=std::numeric_limits<double>::infinity();
+    Array<double,2> audit_shift; // full TCA minus its ordinary inner-map value on a final audit
     if constexpr (ImagAxis) {
-      if (analytic_tca) {
-        auto _tst_=std::chrono::steady_clock::now();
-        Phi_tot(2)=ra.TCA(Smt,dG00,dF00,dF01,
-                          cmpPhysG,Q,xn,Gm,cix,pars,mpi,
-                          order_plan.sample_higher_orders);
-        auto _tst1_=std::chrono::steady_clock::now();
-        t_tca=std::chrono::duration<double>(_tst1_-_tst_).count();
-        if (mpi.rank==mpi.master) {
-          ra.Print_Pseudo("aStval.3",Smt,pars);
-          if (cmpPhysG) ra.Print_Physical("ag00.3",dG00,dF00,dF01);
-        }
-        ra.Update_Sm(Sm_new,Smt,xn,cix,mpi);
-        if (cmpPhysG) {
-          G00+=dG00;
-          F00+=dF00;
-          F01+=dF01;
-        }
-        include_oca=2;
-      }
-      // FCA is either the final analytic term or the reference for MC at
-      // fifth and higher orders. Its presence must not suppress MC below.
-      if (analytic_fca) {
+      for (int order=3; order<=N_min_order; ++order) {
+        const bool tca=(order==3);
+        const bool lag_this_order=tca ? lagged_tca : lagged_fca;
+        const bool reuse=lag_this_order && have_anchor && !refresh_outer && !cmpPhysG;
+        const bool warmup=lag_this_order && !have_anchor && !refresh_outer && !cmpPhysG;
         const auto start=std::chrono::steady_clock::now();
-        const bool preparing_tca=lagged_fca && !have_frozen_fca &&
-                                 !refresh_fca && !cmpPhysG;
-        const bool use_frozen=lagged_fca && have_frozen_fca &&
-                              !refresh_fca && !cmpPhysG;
-        if (preparing_tca) {
-          // The initial inner solve is NCA+OCA+TCA only.  In particular, a
-          // 4,4 run need not be restarted manually from a converged TCA file.
-          Smt.resize(cix.Npseudo_unique,xn.size()); Smt=0.0;
-          Phi_tot(3)=0.0; // omitted, not a computed fourth-order Phi
+        double& phi=Phi_tot(order-1);
+        if (warmup) {
+          Smt=0.0;
+          phi=0.0;
           if (mpi.rank==mpi.master)
-            (*mpi.out)<<"FCA lagged: preconverging NCA+OCA+TCA; "
-                      "FCA not yet evaluated"<<std::endl;
-        } else if (use_frozen) {
-          // The stored contribution is already on the dense Dyson tau mesh.
-          // It is a self-energy correction, not a frozen pseudo propagator:
-          // lower orders and the Dyson equation remain fully self-consistent.
-          Smt.resize(frozen_fca.extent(0),frozen_fca.extent(1));
-          Smt=frozen_fca;
-          Phi_tot(3)=frozen_fca_phi; // diagnostic value at the anchor G only
+            (*mpi.out)<<"FCA lagged: preconverging NCA+OCA+TCA; FCA not yet evaluated"<<std::endl;
+        } else if (reuse) {
+          phi=frozen_phi;
           if (mpi.rank==mpi.master)
-            (*mpi.out)<<"FCA lagged: reusing self-energy from outer anchor; "
-                      "printed Phi[4] is the anchor value, not Phi[G_current]"
-                      <<std::endl;
+            (*mpi.out)<<outer_name<<" lagged: reusing self-energy from outer anchor; "
+                      <<"printed Phi["<<order<<"] is the anchor value, not Phi[G_current]"<<std::endl;
         } else {
-          const bool had_anchor=have_frozen_fca;
-          Phi_tot(3)=ra.FCA(Smt,dG00,dF00,dF01,cmpPhysG,Q,xn,Gm,cix,pars,mpi,
-                            order_plan.sample_higher_orders);
-          fresh_fca=true;
-          if (lagged_fca) {
-            if (had_anchor) {
-              fca_outer_delta=ra.Difference(Smt,frozen_fca,Prob);
-              compared_fca=true;
+          if (tca)
+            phi=ra.TCA(Smt,dG00,dF00,dF01,cmpPhysG,Q,xn,Gm,cix,pars,mpi,
+                       order_plan.sample_higher_orders,lagged_tca && have_anchor && cmpPhysG ? &audit_shift : nullptr);
+          else
+            phi=ra.FCA(Smt,dG00,dF00,dF01,cmpPhysG,Q,xn,Gm,cix,pars,mpi,
+                       order_plan.sample_higher_orders);
+          if (lag_this_order) {
+            fresh_outer=true;
+            if (have_anchor) {
+              // For a full-pole final audit compare like with like.
+              if (audit_shift.size()) Smt-=audit_shift;
+              outer_delta=ra.Difference(Smt,frozen_sigma,Prob);
+              if (audit_shift.size()) Smt+=audit_shift;
+              compared_outer=true;
               if (mpi.rank==mpi.master)
-                (*mpi.out)<<"FCA lagged outer check: weighted_delta="
-                          <<fca_outer_delta<<" threshold="
-                          <<pars["diff_stop"]<<std::endl;
+                (*mpi.out)<<outer_name<<" lagged outer check: weighted_delta="<<outer_delta
+                          <<" threshold="<<pars["diff_stop"]<<std::endl;
             }
-            frozen_fca.resize(Smt.extent(0),Smt.extent(1));
-            frozen_fca=Smt;
-            frozen_fca_phi=Phi_tot(3);
-            have_frozen_fca=true;
-            refresh_fca=false;
+            // No cache is needed for a one-shot or iteration-limited final step.
+            if (itt+1<pars["Nitt"].get<int>()) {
+              frozen_sigma.resize(Smt.shape());
+              frozen_sigma=Smt;
+              frozen_phi=phi;
+              have_anchor=true;
+            }
+            refresh_outer=false;
           }
         }
-        t_fca=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
-        if (mpi.rank==mpi.master) {
-          // FCA already saved aStval.4 before starting its physical phase.
-          // Do not rewrite it here: the early checkpoint is the final self
-          // result and is also usable if physical evaluation is interrupted.
-          if (cmpPhysG) ra.Print_Physical("ag00.4",dG00,dF00,dF01);
+        (tca ? t_tca : t_fca)=std::chrono::duration<double>(
+          std::chrono::steady_clock::now()-start).count();
+        if (mpi.rank==mpi.master && write_measurements) {
+          if (tca && !reuse) ra.Print_Pseudo("aStval.3",Smt,pars);
+          if (cmpPhysG) ra.Print_Physical(tca ? "ag00.3" : "ag00.4",dG00,dF00,dF01);
         }
-        ra.Update_Sm(Sm_new,Smt,xn,cix,mpi);
+        ra.Update_Sm(Sm_new,reuse ? frozen_sigma : Smt,xn,cix,mpi);
         if (cmpPhysG) { G00+=dG00; F00+=dF00; F01+=dF01; }
-        include_oca=3;
+        include_oca=order-1;
       }
     }
     
@@ -1267,13 +1246,16 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
       }
     }
 
+    // The full-pole audit measures the final observables. Test convergence
+    // of the same reduced-pole map that generated the preceding iterates.
+    if (audit_shift.size()) Sm_new-=audit_shift;
     double diff = ra.Difference(Sm_new,Sm,Prob);   // sum(abs(Sm_new-Sm))/Sm_new.size();
     bool accept_final=next_break;
-    if (lagged_fca) {
+    if (lagged) {
       const double tolerance=pars["diff_stop"].get<double>();
       const bool inner_close=std::isfinite(diff) && diff<tolerance;
-      const bool outer_close=compared_fca &&
-        std::isfinite(fca_outer_delta) && fca_outer_delta<tolerance;
+      const bool outer_close=compared_outer &&
+        std::isfinite(outer_delta) && outer_delta<tolerance;
       const bool out_of_iterations=itt+1>=pars["Nitt"].get<int>();
       if (next_break && !(inner_close && outer_close)) {
         if (out_of_iterations) {
@@ -1281,41 +1263,44 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
           // Nitt=1 is an intentional one-shot evaluation, not a failed
           // attempt at the nested self-consistency loop.
           if (mpi.rank==mpi.master && pars["Nitt"].get<int>()>1)
-            (*mpi.out)<<"WARNING: FCA lagged reached Nitt before both "
+            (*mpi.out)<<"WARNING: "<<outer_name<<" lagged reached Nitt before both "
                       "inner and outer checks converged; final result is "
                       "iteration-limited"<<std::endl;
         } else {
           // A prospective final measurement is not a convergence override.
-          // If the fresh FCA correction moved, resume the inner loop with
+          // If the fresh outer correction moved, resume the inner loop with
           // that new anchor.  No final Sig.out/Gf.out is published below.
           accept_final=false;
           next_break=false;
-          refresh_fca=inner_close;
+          // The full-pole audit can also update the weak tail. Rebuild the
+          // ordinary anchor before any reuse after a rejected audit.
+          refresh_outer=inner_close || audit_shift.size()!=0;
           if (mpi.rank==mpi.master)
-            (*mpi.out)<<"FCA lagged: rejected provisional final step; "
+            (*mpi.out)<<outer_name<<" lagged: rejected provisional final step; "
                       "inner_delta="<<diff<<" outer_delta="
-                      <<fca_outer_delta<<std::endl;
+                      <<outer_delta<<std::endl;
         }
       } else if (!next_break && inner_close) {
-        if (fresh_fca && !compared_fca) {
-          // The first FCA anchor has just been added.  Give the inner Dyson
+        if (fresh_outer && !compared_outer) {
+          // The first outer anchor has just been added.  Give the inner Dyson
           // loop at least one iteration with it held fixed before checking.
           if (mpi.rank==mpi.master)
-            (*mpi.out)<<"FCA lagged: first FCA anchor ready; relaxing "
+            (*mpi.out)<<outer_name<<" lagged: first outer anchor ready; relaxing "
                       "lower orders with it held fixed"<<std::endl;
         } else if (outer_close) {
           next_break=true; // one final, current-G physical measurement
           if (mpi.rank==mpi.master)
-            (*mpi.out)<<"FCA lagged: inner and outer checks passed; "
+            (*mpi.out)<<outer_name<<" lagged: inner and outer checks passed; "
                       "next iteration computes physical observables"<<std::endl;
         } else {
-          refresh_fca=true; // check FCA at the newly relaxed propagator
+          refresh_outer=true; // check the outer order at the relaxed propagator
           if (mpi.rank==mpi.master)
-            (*mpi.out)<<"FCA lagged: inner loop converged; refreshing FCA "
+            (*mpi.out)<<outer_name<<" lagged: inner loop converged; refreshing "<<outer_name<<" "
                       "on the next iteration"<<std::endl;
         }
       }
     }
+    if (audit_shift.size() && accept_final) Sm_new+=audit_shift;
     if (cmpPhysG && accept_final)
       ra.PhysicalSelfEnergy(Sigm, Gc, density_matrix, Ekin, nf,
 					   G00, F00, F01, cix, bb, pars, itt+1, mpi, "Sdyson.");
@@ -1330,7 +1315,19 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     
     if (mpi.rank==mpi.master){
       int ist = next_break ? 0 : itt+1;
-      ra.Print_Pseudo(pars["PPSig"].get<string>()+to_string(ist), Sm, pars);
+      const string prefix=pars["PPSig"].get<string>();
+      const bool final_measurement=cmpPhysG && accept_final;
+      if (full_output) {
+        ra.Print_Pseudo(prefix+to_string(ist), Sm, pars);
+      } else if (final_measurement || (checkpoint_every>0 && (itt+1)%checkpoint_every==0)) {
+        const string target=prefix+(final_measurement ? "0" : "checkpoint");
+        const string temporary=target+".tmp";
+        ra.Print_Pseudo(temporary, Sm, pars);
+        if (std::rename(temporary.c_str(),target.c_str())!=0)
+          throw std::runtime_error("cannot publish pseudo-self-energy file "+target);
+      }
+      if (!full_output && final_measurement)
+        ra.Print_Pseudo(pars["PPG"].get<string>()+"0", Gm, pars);
       if (cmpPhysG && accept_final){
 	string ending = (not next_break) ? string(".")+to_string(ist) : "";
 	ra.Print_Physical2(pars["fSig"].get<string>()+ending, Sigm, density_matrix0, nd, mu, Fimp, Epot, TrSigmaG, Ekin, nf, density_matrix, cix.deg_bath);
@@ -1349,10 +1346,10 @@ void ComputeNew(json& pars, RNG& drand, Cix& cix, MPIcls& mpi){
     }
     
     if (next_break && accept_final) break;
-    if (lagged_fca) {
+    if (lagged) {
       if (itt+2==pars["Nitt"].get<int>() && !next_break) {
         (*mpi.out)<<itt<<") Next is the last iteration allowed by Nitt; "
-                  "FCA will be recomputed even if the outer loop is unfinished"<<endl;
+                  <<outer_name<<" will be recomputed even if the outer loop is unfinished"<<endl;
         next_break=true;
       }
     } else if (diff<pars["diff_stop"].get<double>() or itt+2==pars["Nitt"].get<int>()){
@@ -1428,6 +1425,7 @@ int main(int argc, char *argv[])
   pars["pp_approx_N"] = json::array(); // Reference partition only in these valences.
   pars["cix"]             = "bctqmc.cix";
   pars["Nitt"]            = 100;  // max number of self-consistent steps for bold calculation
+  pars["tca_lagged"]      = false; // effective default is resolved after PARAMS: analytic 3,3 only
   pars["fca_lagged"]      = false; // effective default is resolved after PARAMS: analytic 4,4 only
   pars["recalc_weight"]   = 0;    // we recalculate weight for equal distribution per order after recalc_weight*Ms MC steps have passed.
   pars["Nt"]              = 150;  // number of MC steps changing time (instead of changing diagram)
@@ -1454,6 +1452,7 @@ int main(int argc, char *argv[])
   pars["fGf"]      = "Gf.out";    // output file for green's function G(iom)
   pars["PPG"]      = "PPG.";
   pars["fastFilesystem"]=false;
+  pars["pp_checkpoint_every"]=10;  // quiet mode: save one rolling restart every N iterations (0 disables)
   pars["converge_OCA"]=false;
   pars["subExprElim"]=true;
   pars["min_weight"]=1e-2;         // when weight for any order becomes smaller than that, dont reduce it further
@@ -1587,7 +1586,6 @@ int main(int argc, char *argv[])
   pars_i["fca_self_prefix_mb"] = 64.0;               // extra retained prefix cap, not total memory; overflow uses reference
   pars_i["fca_physical_cache_mb"] = 64.0;            // per-rank/per-task prefix cache budget; 0 disables caching, not early sums
   pars_i["fca_profile"] = true;                      // per-topology worker timings and physical operation counters
-  pars_i["fca_live_profile"] = true;                 // per-task timing/norm CSV flushed during each long FCA phase
   pars_i["fca_bath_sector_profile"] = false;         // opt-in streamed-bath self diagnostic; no FCA contribution is dropped
   pars_i["fca_tt_probe_task"] = -1;                   // >=0: write open-bath singular spectra for one shared-self task
   pars_i["fca_tt_probe_bath"] = -1;                   // -1: first nonzero streamed bath in that task
@@ -1715,33 +1713,25 @@ int main(int argc, char *argv[])
        pars["OCA_cut2"].get<double>()>=1.0);
     pars["kugler"]=analytic_imag && compatible_oca;
   }
-  // A frozen FCA is safe only when fourth order is the last analytic order;
-  // higher-order Monte Carlo needs a current FCA normalization anchor.
-  if (!patch.contains("fca_lagged"))
-    pars["fca_lagged"]=!RealAxisQ && default_min_order==4 && default_max_order==4;
-
-  // Reject an unsupported lagged mode before MPI enters any expensive
-  // initialization.  In particular the analytic fourth-order Phi must NOT
-  // be frozen while it is the normalization anchor for fifth/sixth-order MC.
-  const auto& lagged_value=pars["fca_lagged"];
-  const auto& lagged_stop=pars["diff_stop"];
-  const bool lagged_bad_type=!lagged_value.is_boolean();
-  const bool lagged_requested=!lagged_bad_type && lagged_value.get<bool>();
-  if (lagged_bad_type || (lagged_requested &&
-      (RealAxisQ || pars["N_min_order"]!=4 || pars["Norder"]!=4 ||
-       !lagged_stop.is_number() ||
-       !std::isfinite(lagged_stop.get<double>()) ||
-       lagged_stop.get<double>()<=0.0))) {
-    if (mpi->rank==mpi->master) {
-      const std::string message=
-        "ERROR in PARAMS: fca_lagged must be boolean; true requires "
-        "imaginary-axis N_min_order=Norder=4 and positive finite diff_stop. "
-        "Higher-order MC keeps the ordinary current-FCA normalization.";
-      std::cerr<<message<<std::endl;
-      (*mpi->out)<<message<<std::endl;
+  // Only the highest pure analytic order may be frozen. Higher-order MC
+  // requires a fresh normalization on every step.
+  for (int order : {3,4}) {
+    const std::string key=(order==3 ? "tca_lagged" : "fca_lagged");
+    const bool eligible=!RealAxisQ && default_min_order==order && default_max_order==order;
+    if (!patch.contains(key)) pars[key]=eligible;
+    const auto& enabled=pars[key];
+    const auto& stop=pars["diff_stop"];
+    if (!enabled.is_boolean() || (enabled.get<bool>() &&
+        (!eligible || !stop.is_number() || !std::isfinite(stop.get<double>()) || stop.get<double>()<=0.0))) {
+      if (mpi->rank==mpi->master) {
+        const auto message=fmt::format("ERROR in PARAMS: {} must be boolean; true requires "
+          "imaginary-axis N_min_order=Norder={} and positive finite diff_stop.",key,order);
+        std::cerr<<message<<std::endl;
+        (*mpi->out)<<message<<std::endl;
+      }
+      delete mpi;
+      return EXIT_FAILURE;
     }
-    delete mpi;
-    return EXIT_FAILURE;
   }
 
   // Resolve the user-facing TCA accuracy preset before constructing Axis0:

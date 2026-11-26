@@ -16,13 +16,13 @@ LIBS = $(PLIBS)
 all : bctqmc
 
 bctqmc : boldc.cc readinput.h interpolate.h measureW.h skeletons.h wfile.h basics.h generatediags.h readinput.h tanmesh.h util.h wdiags.h wevaluate.h whybrid.h wsign.h Gexp.h dynamic_mesh.h any_axis.h real_axis.h imag_axis.h nca_oca_imag_axis.h nca_oca_real_axis.h imag_axis_spectra.h real_axis_spectra.h frequency_loops_real_axis.h wbroad.h read_cix.h wmpi.h
-	$(PC++) $(CFLAGS) boldc.cc -o $@ $(LIBS)
+	$(PC++) $(CFLAGS) -DEDMFT_DLR_USE_BLAS boldc.cc -o $@ $(LIBS)
 
 clean:
 	rm -f bctqmc boldc.o
 
 # Symmetry-preserving pole fitting and its boundary regression.
-bctqmc : aaa_symmetry.h
+bctqmc : aaa_symmetry.h dlr.h tca_dlr.h bblas.h
 
 test_aaa_symmetry : test_aaa_symmetry.cc aaa.h aaa_symmetry.h
 	$(PC++) $(CFLAGS) -I. test_aaa_symmetry.cc -o $@ $(LIBS)

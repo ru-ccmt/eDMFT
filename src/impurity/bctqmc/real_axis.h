@@ -90,7 +90,7 @@ public:
     feo.resize(om.size());
     for (int i=0; i<om.size(); ++i) feo(i)=fermi(beta*om(i));
 
-    if (true){
+    if (mpi.rank==mpi.master && pars["fastFilesystem"].get<bool>()){
       ofstream out("debug_Delta.dat");
       for (int iw=0; iw<om.size(); ++iw){
 	out<<om(iw)<<" ";
@@ -120,7 +120,7 @@ public:
   }
 
   auto DeterminePseudos(Array<complex<double>,2>& Gm, Array<complex<double>,2>& gm, Array<complex<double>,2>& Sm, Array<double,1>& xn, 
-			const Cix& cix, double lambda0_fixed, int followPeak_fixed, int itt, json& pars, MPIcls& mpi)
+			const Cix& cix, double lambda0_fixed, int followPeak_fixed, int itt, json& pars, MPIcls& mpi, bool write_measurements)
   {
     if (lambda0_fixed!=0 or followPeak_fixed>0){
       if (lambda0_fixed!=0) (*mpi.out)<<"lambda0_fixed="<<lambda0_fixed<<" ";
@@ -147,7 +147,7 @@ public:
     PhiR.resize(cix.Npseudo_unique,xn.size());
     PhiR = DeterminPhiR(Gm,xn,few,dh,logo,beta);
 
-    if (followPeak>0){
+    if (mpi.rank==mpi.master && write_measurements && followPeak>0){
       ofstream out("GroundState."+to_string(itt+1));
       int ib=followPeak-1;
       int N = cix.Block[ib].size(); // block size
@@ -284,7 +284,7 @@ public:
 			  Array<complex<double>,2>& G00, const Array<complex<double>,2>& F00, const Array<complex<double>,2>& F01,
 			  const Cix& cix, const BathBlocks& bb, const json& pars, int ist, MPIcls& mpi, string dysonFname)
   {
-    bool debug = true;
+    const bool debug=mpi.rank==mpi.master && pars["fastFilesystem"].get<bool>();
     const double small=1e-10;
     Array<int,1> sigind0(cix.Nbath_unique), deg_sigind(cix.Nbath_unique_unique); sigind0=0; deg_sigind=0;
     for (int ib=0; ib<cix.Nbath; ++ib) sigind0(cix.bath_sigind(ib)) = cix.bath_sigind0(ib);
@@ -631,13 +631,16 @@ public:
   //
   template<class T>
   void Print_Pseudo(const string& filename, const Array<T,2>& Smt_new, json& pars){
-    ofstream dout(filename); dout.precision(12);
+    ofstream dout(filename);
+    dout.exceptions(std::ios::badbit | std::ios::failbit);
+    dout.precision(12);
     dout<<"# beta="<<beta<<" U="<<pars["U"]<<" Norder="<<pars["Norder"]<<endl;
     for (int i=0; i<xn_.size(); ++i){
       dout<<xn_(i)<<" ";
       for (int ip=0; ip<Smt_new.extent(0); ++ip) Prints(dout,Smt_new(ip,i));
       dout<<endl;
     }
+    dout.close();
   }
   void Print_Physical(const string& filename, const Array<complex<double>,2>& G00, const Array<complex<double>,2>& F00, const Array<complex<double>,2>& F01)
   {

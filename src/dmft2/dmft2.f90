@@ -25,6 +25,13 @@ PROGRAM DMFT2
   CHARACTER*180 :: FNAME,FNAME1,fnamehelp
   CHARACTER*200 :: vec_up, vec_dn, ene_up, ene_dn
   LOGICAL       :: helpfiles!, Qident
+  integer       :: use_shared_map, expected_points, raw_unit, raw_job, raw_count
+  integer :: mapped_total, row_total
+  character(16) :: count_tag
+  logical       :: map_exists
+  character(1024) :: raw_line
+  character(180) :: raw_host
+  character(1) :: sep1,sep2
   INTEGER       :: i, loro, latom
   REAL*8        :: sw(3), sumw, BR1inv(3,3)
   INTEGER       :: INDEX, INDEX1, MI, JR, JC, fh_dos, lngth, ios, ivector, inkp, ik_start
@@ -202,34 +209,86 @@ PROGRAM DMFT2
 !!!! These are in general different than what is needed in lapw1 for the hamiltonian.
   CALL RECFIL(FNAME1,GMAX,RCFILE,KXMAX,KYMAX,KZMAX,NWAVE)
   
+  nvector=0
+  vectors=0
+  expected_points=-1
+  mapped_total=-1
   if (vector_para) then
-     FNAME = '_processes_'
-     !WRITE(6,*) 'Trying to open ', FNAME
-     open(999,FILE=FNAME,STATUS='OLD',ERR=77,IOSTAT=ios) ! opens _processes_, hence this parallel dmft_lapw1 run, and not parallel w2k_lapw1 run
-     call Scatter_Vector_data()
-     goto 88
-77   CONTINUE     
-     
-     CALL FilenameMPI2(FNAME)
-     !WRITE(6,*) 'Trying to open ', FNAME
-     open(999,FILE=FNAME,STATUS='OLD',ERR=88,IOSTAT=ios) ! opens _processes_x  
-     nvector=0
-     vectors=0
-     DO 
-        READ (999,*,END=88,ERR=970) ivector,inkp,ik_start,vec_up,vec_dn,ene_up,ene_dn  ! can jump to 20
-        nvector = nvector+1
-        vectors(nvector,1) = ivector       ! the successive number of vector file          
-        vectors(nvector,2) = inkp          ! number of k-points                            
-        vectors(nvector,3) = ik_start      ! what is the first k-point in this vector file 
-        fvectors(nvector,1) = vec_up       ! filenames....                                 
-        fvectors(nvector,2) = vec_dn
-        fvectors(nvector,3) = ene_up
-        fvectors(nvector,4) = ene_dn
-        if (Qprint) WRITE(6,*) 'FNAMES=', fvectors(nvector, :)
-     ENDDO
-88   CONTINUE
-     if (Qprint) print *, 'Vector files are read in parallel mode'
-     close(999)
+     ! The DEF requests split vectors. The common dftKS map is read on
+     ! rank zero. Converted WIEN2k layouts may assign several shards, or
+     ! none, to a rank. All ranks must take the same collective branch.
+     use_shared_map=0
+     if (myrank==master) then
+        inquire(file='_processes_',exist=map_exists)
+        if (map_exists) use_shared_map=1
+     endif
+     call Bcast_Size(use_shared_map)
+     if (use_shared_map==1) then
+        if (myrank==master) then
+           open(999,file='_processes_',status='old',action='read',iostat=ios)
+           if (ios/=0) call abort_dmft2('Cannot read native split-vector map _processes_.')
+        endif
+        call Scatter_Vector_data()
+        if (myrank==master) close(999)
+     else
+        FNAME='_processes_'
+        call FilenameMPI2(FNAME)
+        inquire(file=FNAME,exist=map_exists)
+        if (map_exists) then
+           open(999,file=FNAME,status='old',action='read',iostat=ios)
+           if (ios/=0) call abort_dmft2('Cannot read '//trim(FNAME))
+           do
+              read(999,'(a)',iostat=ios) raw_line
+              if (ios<0) exit
+              if (ios/=0) call abort_dmft2('Unreadable row in '//trim(FNAME))
+              if (len_trim(raw_line)==0) cycle
+              read(raw_line,*,iostat=ios) ivector,inkp,ik_start,vec_up,vec_dn,ene_up,ene_dn
+              if (ios/=0) call abort_dmft2('Incomplete row in '//trim(FNAME))
+              if (inkp<0.or.ik_start<0) call abort_dmft2('Invalid row in '//trim(FNAME))
+              ! New WIEN2k maps carry a backward-compatible mesh count;
+              ! legacy seven-field rows still work.
+              count_tag=''
+              read(raw_line,*,iostat=ios) ivector,inkp,ik_start,vec_up,vec_dn,ene_up,ene_dn,count_tag
+              if (ios==0.and.count_tag=='nk_total') then
+                 read(raw_line,*,iostat=ios) ivector,inkp,ik_start,vec_up,vec_dn,ene_up,ene_dn,count_tag,row_total
+                 if (ios/=0) call abort_dmft2('Invalid mesh count in '//trim(FNAME))
+                 if (row_total<=0.or.(mapped_total>=0.and.mapped_total/=row_total)) &
+                      call abort_dmft2('Inconsistent mesh count in '//trim(FNAME))
+                 mapped_total=row_total
+              endif
+              if (nvector==size(vectors,1)) call abort_dmft2('Too many vector shards on one rank in '//trim(FNAME))
+              nvector=nvector+1
+              vectors(nvector,:)=[ivector,inkp,ik_start]
+              fvectors(nvector,:)=[vec_up,vec_dn,ene_up,ene_dn]
+           enddo
+           close(999)
+        endif
+        ! When WIEN2k's original job list is present, it also detects an
+        ! omitted final shard: the remaining intervals alone look complete.
+        if (myrank==master) then
+           inquire(file='.processes',exist=map_exists)
+           if (map_exists) then
+              open(newunit=raw_unit,file='.processes',status='old',action='read',iostat=ios)
+              if (ios/=0) call abort_dmft2('Cannot read WIEN2k .processes')
+              do
+                 read(raw_unit,'(a)',iostat=ios) raw_line
+                 if (ios<0) exit
+                 if (ios/=0) call abort_dmft2('Cannot read WIEN2k .processes')
+                 read(raw_line,*,iostat=ios) raw_job
+                 if (ios/=0) cycle  ! init:, residue:, and blank lines
+                 read(raw_line,*,iostat=ios) raw_job,sep1,raw_host,sep2,raw_count
+                 if (ios/=0) call abort_dmft2('Incomplete WIEN2k job row in .processes')
+                 if (sep1/=':'.or.sep2/=':') &
+                      call abort_dmft2('Invalid WIEN2k job row in .processes')
+                 if (raw_count<0) call abort_dmft2('Negative k-point count in .processes')
+                 expected_points=max(0,expected_points)+raw_count
+              enddo
+              close(raw_unit)
+           endif
+        endif
+        call Bcast_Size(expected_points)
+     endif
+     if (Qprint) write(6,*) 'Vector files are read in parallel mode'
   else
      nvector=1
   endif
@@ -283,6 +342,12 @@ PROGRAM DMFT2
 
   CALL INIT_ENERGY_FILE(sumw, nkpt, numkpt, nmat, nume)  ! This computes weights and also reads all k-points
   
+  if (mapped_total>=0.and.numkpt/=mapped_total) &
+       call abort_dmft2('Incomplete WIEN2k split-vector layout: actual k-point count differs from the complete process map.')
+  if (expected_points>=0.and.numkpt/=expected_points) &
+       call mesh_failure('The split-vector k-point count disagrees with WIEN2k .processes. Regenerate the matching maps.')
+  if (vector_para) call check_vector_coverage(numkpt)
+
   if (Qprint) write(6, 877) DM_Emin,DM_Emax  ! Energy window
   if (Qprint) write(6, 887) natom      ! Projected density of states calculation for xxx atoms
 

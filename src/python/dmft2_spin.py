@@ -21,9 +21,9 @@ def chemical_potential(directory='.'):
 
 
 @contextmanager
-def measurement_definition(definition, *, mode, recompute, mu):
+def measurement_definition(definition, *, mode, recompute, mu, final_force=False):
     """Change only the three measurement fields in a disposable control copy."""
-    with execution_definition(definition) as native:
+    with execution_definition(definition, final_force=final_force) as native:
         text = Path(native).read_text()
         source = Path(entries(text)[2])
         lines, i, words = control_fields(source)
@@ -38,7 +38,7 @@ def measurement_definition(definition, *, mode, recompute, mu):
             yield str(df)
 
 
-def run_channels(definitions, policy, run, fermi, *, export=False, search_only=False):
+def run_channels(definitions, policy, run, fermi, *, export=False, search_only=False, final_force=False):
     """Invoke run(label, DEF) in the proper common-mu order.
 
     Ordinary compensated magnets adjust mu in the first charge call. Ferro
@@ -59,7 +59,7 @@ def run_channels(definitions, policy, run, fermi, *, export=False, search_only=F
     for index, (channel, definition) in enumerate(zip(policy.channels, definitions)):
         search = int(not export and index == 0 and policy.fixed_number and not policy.ferro)
         with measurement_definition(definition, mode='c', recompute=search,
-                                    mu=chemical_potential()) as df:
+                                    mu=chemical_potential(), final_force=final_force) as df:
             run('dmft2'+channel, df)
         if search_only:
             return

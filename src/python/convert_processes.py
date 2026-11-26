@@ -17,6 +17,8 @@ def convert(so, fh_info):
     nkstart=0
     for line in lines:
         dat = line.split()
+        if not dat:
+            continue
         if dat[0]=='init:':
             machines.append(dat[1])
         if re.match('\s*\d+',dat[0]):
@@ -68,13 +70,34 @@ def convert(so, fh_info):
     #print '------------'
 
                    
-    for prc in sorted(work.keys()):
-        fo = open('_processes_'+str(prc-1),'w')
-        for (i,nkp,nkstart,VECN) in work[prc]:
-            print(i, nkp, nkstart, '"'+VECN[0]+'"', '"'+VECN[1]+'"', '"'+VECN[2]+'"', '"'+VECN[3]+'"', file=fo)
-            #print  i, nkp, nkstart, '"'+VECN[0]+'"', '"'+VECN[1]+'"', '"'+VECN[2]+'"', '"'+VECN[3]+'"'
-        
-        
+    if not work:
+        return
+
+    # Install complete rank files before retiring any previous layout.
+    # dftKS uses the common _processes_ file, which otherwise takes
+    # precedence over these newly converted WIEN2k rank files in dmft2.
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    written = set()
+    with TemporaryDirectory(prefix='.dmft-vector-maps-', dir='.') as staging:
+        for prc, rows in sorted(work.items()):
+            if prc<1:
+                raise ValueError('Invalid processor index in WIEN2k .processes')
+            dest = Path('_processes_'+str(prc-1))
+            with (Path(staging)/dest).open('w') as output:
+                for i, nkp, start, names in rows:
+                    if nkp<0 or not all(names):
+                        raise ValueError('Incomplete vector assignment in WIEN2k job '+str(i))
+                    # Older readers consume only the first seven fields.
+                    print(i, nkp, start, *('"'+name+'"' for name in names),
+                          'nk_total', nkstart, file=output)
+            written.add(dest)
+        for dest in sorted(written):
+            os.replace(Path(staging)/dest, dest)
+    for old in Path('.').glob('_processes_*'):
+        if re.fullmatch(r'_processes_[0-9]+',old.name) and old not in written:
+            old.unlink()
+    Path('_processes_').unlink(missing_ok=True)
 
 if __name__ == '__main__':
     

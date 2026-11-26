@@ -20,6 +20,11 @@
 #include <utility>
 #include <vector>
 
+#ifdef EDMFT_DLR_USE_BLAS
+#include <iostream>
+#include "bblas.h"
+#endif
+
 namespace edmft::dlr {
 
 using Eigen::MatrixXcd;
@@ -618,57 +623,60 @@ public:
       output_offset[item+1]=output_offset[item]+nr[item]*nc[item];
     }
 
-    MatrixXd f_value_flat(rank(),input_offset.back());
+    // Use one slab for input nodes, then H*f, then output nodes. All three
+    // have the same number of DLR rows and their lifetimes do not overlap.
+    MatrixXd work(rank(),input_offset.back());
     for (int item=0;item<count;++item)
-      for (int l=0;l<rank();++l)
-        for (int i=0;i<nr[item];++i)
-          for (int j=0;j<nk[item];++j)
-            f_value_flat(l,input_offset[item]+i*nk[item]+j)=
-              (*f_values[item])[l](i,j);
-    const MatrixXd f_flat=values_to_coefficients(f_value_flat);
-    MatrixXd hf_flat(rank(),input_offset.back());
-    hf_flat.noalias()=thilb_*f_flat;
-
+      for (int i=0;i<nr[item];++i)
+        for (int j=0;j<nk[item];++j) {
+          const Eigen::Index column=input_offset[item]+i*nk[item]+j;
+          for (int l=0;l<rank();++l)
+            work(l,column)=(*f_values[item])[l](i,j);
+        }
     MatrixXd diagonal_flat(rank(),output_offset.back());
     MatrixXd off_diagonal_flat(rank(),output_offset.back());
-    for (int item=0;item<count;++item) {
-      MatrixXd f_l(nr[item],nk[item]),hf_l(nr[item],nk[item]);
-      for (int l=0;l<rank();++l) {
-        for (int i=0;i<nr[item];++i)
-          for (int j=0;j<nk[item];++j) {
-            const Eigen::Index column=input_offset[item]+i*nk[item]+j;
-            f_l(i,j)=f_flat(l,column);
-            hf_l(i,j)=hf_flat(l,column);
-          }
-        const MatrixXd diagonal=f_l*(*g[item])[l];
-        const MatrixXd off_diagonal=
-          hf_l*(*g[item])[l]+f_l*(*hg[item])[l];
-        for (int i=0;i<nr[item];++i)
-          for (int j=0;j<nc[item];++j) {
-            const Eigen::Index column=output_offset[item]+i*nc[item]+j;
-            diagonal_flat(l,column)=diagonal(i,j);
-            off_diagonal_flat(l,column)=off_diagonal(i,j);
-          }
+    {
+      const MatrixXd f_flat=values_to_coefficients(work);
+      convolution_product(work,thilb_,f_flat,false);
+      for (int item=0;item<count;++item) {
+        MatrixXd f_l(nr[item],nk[item]),hf_l(nr[item],nk[item]);
+        MatrixXd diagonal(nr[item],nc[item]),off_diagonal(nr[item],nc[item]);
+        for (int l=0;l<rank();++l) {
+          for (int i=0;i<nr[item];++i)
+            for (int j=0;j<nk[item];++j) {
+              const Eigen::Index column=input_offset[item]+i*nk[item]+j;
+              f_l(i,j)=f_flat(l,column);
+              hf_l(i,j)=work(l,column);
+            }
+          diagonal.noalias()=f_l*(*g[item])[l];
+          off_diagonal.noalias()=hf_l*(*g[item])[l];
+          off_diagonal.noalias()+=f_l*(*hg[item])[l];
+          for (int i=0;i<nr[item];++i)
+            for (int j=0;j<nc[item];++j) {
+              const Eigen::Index column=output_offset[item]+i*nc[item]+j;
+              diagonal_flat(l,column)=diagonal(i,j);
+              off_diagonal_flat(l,column)=off_diagonal(i,j);
+            }
+        }
       }
     }
-
-    MatrixXd values_flat(rank(),output_offset.back());
-    if (reflect_output)
-      values_flat.noalias()=beta_*(
-        reflected_ttcf2it_*diagonal_flat+
-        reflected_cf2it_*off_diagonal_flat);
-    else
-      values_flat.noalias()=beta_*(
-        ttcf2it_*diagonal_flat+cf2it_*off_diagonal_flat);
+    work.resize(rank(),output_offset.back());
+    convolution_product(work,reflect_output ? reflected_ttcf2it_ : ttcf2it_,diagonal_flat,false);
+    convolution_product(work,reflect_output ? reflected_cf2it_ : cf2it_,off_diagonal_flat,true);
+    diagonal_flat.resize(0,0);
+    off_diagonal_flat.resize(0,0);
+    work*=beta_;
 
     std::vector<std::vector<MatrixXd>> values(count);
     for (int item=0;item<count;++item) {
-      values[item].assign(rank(),MatrixXd::Zero(nr[item],nc[item]));
-      for (int l=0;l<rank();++l)
-        for (int i=0;i<nr[item];++i)
-          for (int j=0;j<nc[item];++j)
-            values[item][l](i,j)=
-              values_flat(l,output_offset[item]+i*nc[item]+j);
+      values[item].resize(rank());
+      for (auto& node:values[item]) node.resize(nr[item],nc[item]);
+      for (int i=0;i<nr[item];++i)
+        for (int j=0;j<nc[item];++j) {
+          const Eigen::Index column=output_offset[item]+i*nc[item]+j;
+          for (int l=0;l<rank();++l)
+            values[item][l](i,j)=work(l,column);
+        }
     }
     return values;
   }
@@ -906,6 +914,25 @@ public:
   }
 
 private:
+  // Solver builds already link BLAS. Standalone DLR users retain the Eigen
+  // implementation. Use GEMM on wide transforms, with both terms accumulating
+  // directly in the caller's output slab.
+  static void convolution_product(MatrixXd& out,const MatrixXd& left,
+                                  const MatrixXd& right,bool add)
+  {
+#ifdef EDMFT_DLR_USE_BLAS
+    if (!MatrixXd::IsRowMajor && right.cols()>=32 &&
+        right.cols()<=std::numeric_limits<int>::max()) {
+      xgemm("N","N",left.rows(),right.cols(),left.cols(),1.0,
+            left.data(),left.rows(),right.data(),right.rows(),
+            add ? 1.0 : 0.0,out.data(),out.rows());
+      return;
+    }
+#endif
+    if (add) out.noalias()+=left*right;
+    else out.noalias()=left*right;
+  }
+
   std::vector<MatrixXd>
   transform_matrix_function(const std::vector<MatrixXd>& input,
                             bool values_to_coefficients_transform) const

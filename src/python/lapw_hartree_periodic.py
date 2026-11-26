@@ -332,25 +332,35 @@ class PeriodicHartreeResponse:
         self.size = offset + 2 * len(reps)
         # Same radial ordering as the Density template; spherical output differs
         # in units (r V) and PW differs in normalization, documented above.
-        acomp, dcomp, scomp = [], [], []
+        # Allocate the final atom blocks once. Concatenating per-atom A and
+        # D matrices would temporarily store both entire matrices twice.
+        keys_by_atom = [[] for _ in range(s.nat)]
+        for k, (atom, _, _) in enumerate(self.keys):
+            keys_by_atom[atom].append(k)
+        harmonics_by_atom = [
+            sorted({(abs(self.keys[k][1]), sign * self.keys[k][2])
+                    for k in keys for sign in (-1, 1)})
+            for keys in keys_by_atom
+        ]
+        count = sum(len(lm) for lm in harmonics_by_atom)
+        self.A = np.zeros((len(reps), count), complex)
+        self.D = np.zeros((count, len(reps)), complex)
+        self.S = np.zeros((count, len(self.keys)), complex)
         boundary = np.zeros((len(self.keys), len(reps)), complex)
         first = np.r_[0, np.cumsum(s.mult)[:-1]]
-        for atom in range(s.nat):
-            keys = [k for k, key in enumerate(self.keys) if key[0] == atom]
-            lm = sorted(
-                set(
-                    (abs(self.keys[k][1]), m)
-                    for k in keys
-                    for m in ({self.keys[k][2], -self.keys[k][2]})
-                )
-            )
+        start = 0
+        for atom, (keys, lm) in enumerate(zip(keys_by_atom, harmonics_by_atom)):
             if not lm or any(l > ncon for l, m in lm):
                 raise ValueError("missing atom harmonics or l exceeds smoothing order")
+            block = slice(start, start + len(lm))
+            start = block.stop
+            pseudo = self.A[:, block]
+            correction = self.D[block]
+            conversion = self.S[block]
             y = self.stars.harmonic_average(
                 reciprocal, s.pos[first[atom]], native_local_axes(s.rotloc[atom]), lm
             )
             lm_index = {key: i for i, key in enumerate(lm)}
-            conversion = np.zeros((len(lm), len(self.keys)), complex)
             for k in keys:
                 a, signed_l, m = self.keys[k]
                 l = abs(signed_l)
@@ -371,8 +381,6 @@ class PeriodicHartreeResponse:
                     self.boundary_factors[k] * factor
                     * spherical_jn(l, norm * s.rmt[atom]) * y[lm_index[l, m]]
                 )
-            correction = np.zeros((len(lm), len(reps)), complex)
-            pseudo = np.zeros((len(reps), len(lm)), complex)
             radius = s.rmt[atom]
             x = norm[1:] * radius
             for i, (l, m) in enumerate(lm):
@@ -399,12 +407,6 @@ class PeriodicHartreeResponse:
                     / x ** (ncon - l + 1)
                     * y[i, 1:].conj()
                 )
-            acomp.append(pseudo)
-            dcomp.append(correction)
-            scomp.append(conversion)
-        self.A = np.concatenate(acomp, axis=1)
-        self.D = np.concatenate(dcomp, axis=0)
-        self.S = np.concatenate(scomp, axis=0)
         self.B = boundary
         site_radii = np.repeat(s.rmt, s.mult)
         self.reanalysis = NativeHartreeReanalysis(
@@ -440,11 +442,13 @@ class PeriodicHartreeResponse:
         radial_y, ir_y = self._split(y)
         bars = [op.pullback(z) for op, z in zip(self.radial, radial_y)]
         boundary_y = np.array([b for c, b in bars])
-        p_y = self.B.conj().T @ boundary_y + self.reanalysis.pullback(ir_y)
-        q_y = self.A.conj().T @ p_y
-        moment_y = -(self.S.conj().T @ q_y).real
+        # M^H v = conj(M^T conj(v)); only conjugate vectors so the large
+        # read-only harmonic and plane-wave matrices never have to be copied.
+        p_y = (self.B.T @ boundary_y).conj() + self.reanalysis.pullback(ir_y)
+        q_y = (self.A.T @ p_y.conj()).conj()
+        moment_y = -(self.S.T @ q_y.conj()).real
         radial = [c + w * b for (c, _), w, b in zip(bars, self.moments, moment_y)]
-        rho_y = self.diagonal * p_y + self.D.conj().T @ q_y
+        rho_y = self.diagonal * p_y + (self.D.T @ q_y.conj()).conj()
         return np.concatenate(radial + [rho_y.view(float)])
 
     def native_potential_output(

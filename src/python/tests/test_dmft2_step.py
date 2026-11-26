@@ -109,6 +109,41 @@ class ExecutionTests(unittest.TestCase):
                 self.assertEqual((inp.read_bytes(), definition.read_bytes()), original)
                 self.assertFalse(list(Path(".").glob(".dmft2-response-input-*")))
 
+    def test_named_final_measurements_from_tot(self):
+        for value, native_mode, screened in [
+            (True, "FOR", False), ("FOR", "FOR", False), ("FORT", "FOR", True),
+            ("STRF", "STRF", False), ("STRFT", "STRF", True),
+        ]:
+            with self.subTest(value=value), case_directory("TOT"):
+                native = []
+                def inspect(root, mpi, definition, output):
+                    native.append(step.input_mode(step.entries(Path(definition).read_text())[5]))
+                with patch.object(step, "preflight"), patch.object(step, "run_core", side_effect=inspect), \
+                     patch.object(step, "compute_response", return_value={}) as response:
+                    step.execute("sample", ".", phase="defer", final_force=value)
+                    result = step.execute("sample", ".", phase="final", final_force=value)
+                self.assertEqual(native, ["TOT", native_mode])
+                logical = "FOR" if value is True else value
+                self.assertEqual(result["requested_mode"], logical)
+                self.assertEqual(response.call_count, int(screened))
+                if screened:
+                    self.assertEqual(response.call_args.args[1]["mode"], logical)
+                self.assertEqual(step.input_mode("sample.in2"), "TOT")
+
+    def test_final_setting_validation_and_precedence(self):
+        with self.assertRaisesRegex(ValueError, "force_last"):
+            step.final_force_mode("STRTFT")
+        self.assertEqual(step.final_force_mode(" fort "), "FORT")
+        with case_directory("FOR"):
+            self.assertEqual(step.request("sample", final_force="STRFT")["mode"], "FOR")
+        with case_directory("TOT", charge="m"):
+            self.assertEqual(step.request("sample", final_force="FORT")["mode"], "TOT")
+        with case_directory("TOT"):
+            Path("sample.stress_response.json").write_text('{"enabled":false}')
+            req = step.request("sample", final_force="STRFT")
+            self.assertEqual(req["mode"], "STRFT")
+            self.assertFalse(req["enabled"])
+
     def test_energy_only_never_responds(self):
         with case_directory(charge="m"), patch.object(step, "run_core"), patch.object(
             step, "compute_response"
@@ -129,7 +164,7 @@ class ExecutionTests(unittest.TestCase):
                     def record(name, **kwargs):
                         calls.append(name)
                         if name in ("dmft2", "lattice_charge_step"):
-                            self.assertTrue(kwargs["final_force"])
+                            self.assertEqual(kwargs["final_force"], expected_mode)
                     for name in ("dmft2", "lattice_charge_step", "lcore", "scf", "scf1", "mixer", "scfm"):
                         stack.enter_context(patch.object(driver, name,
                             side_effect=lambda *args, n=name, **kwargs: record(n, **kwargs)))
@@ -137,15 +172,70 @@ class ExecutionTests(unittest.TestCase):
                     args = (io.StringIO(), SimpleNamespace(case="sample", WIENROOT="."),
                             io.StringIO(), None, params, "", {"m_extn": ext}, True)
                     self.assertFalse(driver.final_response_pass(*args))
-                    params["force_last"] = True
-                    self.assertTrue(driver.final_response_pass(*args))
-                    self.assertEqual(calls, ["lattice_charge_step" if ext else "dmft2",
-                                             "lcore", "scf", "scf1", "mixer", "scfm"])
+                    for value, expected_mode in ((True, "FOR"), ("FORT", "FORT"), ("STRFT", "STRFT")):
+                        calls.clear()
+                        params["force_last"] = value
+                        self.assertTrue(driver.final_response_pass(*args))
+                        # A screened magnetic measurement owns both channels.
+                        first = "lattice_charge_step" if ext and value is True else "dmft2"
+                        self.assertEqual(calls, [first, "lcore", "scf", "scf1", "mixer", "scfm"])
             Path("sample.inm").write_text("MSR1a\n")
             self.assertFalse(driver.final_response_pass(*args))
             Path("sample.inm").write_text("MSR1\n")
             Path("sample.in2").write_text("FOR\n")
             self.assertFalse(driver.final_response_pass(*args))
+
+    def test_scheduled_lapw0_stress_tracks_active_in2_and_restores_input(self):
+        import run_dmft as driver
+        for suffix in ('in2', 'in2c'):
+            for mode in ('FOR', 'FORT', 'STRF', 'STRFT', True, False):
+                with self.subTest(suffix=suffix, mode=mode), case_directory('TOT'):
+                    if suffix == 'in2c':
+                        Path('sample.in2').rename('sample.in2c')
+                        d = Path('dmft2.def')
+                        d.write_text(d.read_text().replace("sample.in2'", "sample.in2c'"))
+                        Path('sample.in2').write_text('FOR\n')
+                    Path('sample.inm').write_text('MSR1\n')
+                    path = Path('sample.in0')
+                    original = b'TOT  XC_PBESOL\r\n  NR2V\tIFFT\r\n'
+                    path.write_bytes(original)
+                    with driver.final_lapw0_input('sample', mode, io.StringIO()):
+                        expected = b'STR' if mode in ('STRF', 'STRFT') else b'TOT'
+                        self.assertEqual(path.read_bytes(), expected + original[3:])
+                        self.assertEqual(step.input_mode('sample.' + suffix), 'TOT')
+                    self.assertEqual(path.read_bytes(), original)
+
+    def test_final_lapw0_failure_and_live_edits(self):
+        import run_dmft as driver
+        with case_directory('TOT'):
+            Path('sample.inm').write_text('MSR1\n')
+            path, shared = Path('sample.in0'), Path('shared.in0')
+            shared.write_text('TOT XC_PBE\n')
+            path.symlink_to(shared)
+            with self.assertRaisesRegex(RuntimeError, 'failure'):
+                with driver.final_lapw0_input('sample', 'STRFT', io.StringIO()):
+                    self.assertEqual(shared.read_text(), 'TOT XC_PBE\n')
+                    self.assertEqual(path.read_text(), 'STR XC_PBE\n')
+                    raise RuntimeError('failure')
+            self.assertTrue(path.is_symlink())
+            self.assertEqual(path.readlink(), shared)
+            path.unlink()
+            path.write_text('TOT XC_PBE\n')
+            with driver.final_lapw0_input('sample', 'STRF', io.StringIO()):
+                path.write_text('STR XC_PBESOL\n')
+            self.assertEqual(path.read_text(), 'TOT XC_PBESOL\n')
+
+    def test_final_lapw0_respects_explicit_inputs(self):
+        import run_dmft as driver
+        for in0, in2, inm, charge in [('STR', 'TOT', 'MSR1', 'c'), ('TOT', 'FOR', 'MSR1', 'c'),
+                                       ('TOT', 'TOT', 'MSR1a', 'c'), ('TOT', 'TOT', 'MSR1', 'm')]:
+            with self.subTest(in0=in0, in2=in2, inm=inm, charge=charge), case_directory(in2, charge):
+                Path('sample.inm').write_text(inm + '\n')
+                path = Path('sample.in0')
+                path.write_text(in0 + ' XC_PBESOL\n')
+                with driver.final_lapw0_input('sample', 'STRFT', io.StringIO()):
+                    self.assertEqual(step.input_mode(path), in0)
+                self.assertEqual(step.input_mode(path), in0)
 
     def test_mode_aliases_preserve_prepared_files(self):
         for alias, native in [("STRT", "STR"), ("STRFT", "STRF")]:

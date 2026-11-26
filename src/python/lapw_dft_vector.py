@@ -66,8 +66,6 @@ def load_vectors(path, nat, nlo, parallel):
                 result.append((offset, header[4], header[5], header[6]))
         if not result:
             raise ValueError("empty WIEN vector file")
-        if len({r[2] for r in result}) != 1:
-            raise ValueError("DFT response requires a fixed stored-band count")
         return result
 
     all_k = parallel.root_call(inventory)

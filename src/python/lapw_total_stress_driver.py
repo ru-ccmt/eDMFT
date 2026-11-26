@@ -191,10 +191,19 @@ def run_prepared(
             diagnostic_gap_cutoff=diagnostic_gap_cutoff,
             electronic_model=electronic_model,
         )) for channel in policy.channels]
+        band_counts = {}
         for branch in branches:
+            channel = branch.spin_channel or "primary"
+            counts = [int(r.nstored) for r in branch.records]
+            low = parallel.reduce(min(counts), "min")
+            high = parallel.reduce(max(counts), "max")
+            retained = branch.model.eps.shape[1]
+            band_counts[channel] = dict(stored_min=low, stored_max=high, retained=retained)
+            if low != high:
+                progress(f"Bands [{channel}]: {low}–{high} stored per k point; "
+                         f"{retained} explicit, remaining states in the LAPW H/O complement.")
             warning = branch.model.window_gap_warning()
             if warning:
-                channel = getattr(branch, "spin_channel", "") or "primary"
                 progress(f"WARNING [{channel}]: {warning}")
         v = combine_valence(*branches) if policy.magnetic else branches[0]
         timings["prepare_valence_seconds"] = v.preparation_seconds
@@ -361,6 +370,7 @@ def run_prepared(
             converged=True,
             case=case,
             physical_policy=policy.record(),
+            band_counts=band_counts,
             snapshot=str(snapshot),
             source_fingerprints=expected,
             valence_fingerprints=v.fingerprints,

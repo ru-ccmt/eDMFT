@@ -1,4 +1,5 @@
 module w_atpar
+  USE stress_rela_operator, ONLY: rela_atom_operator
   IMPLICIT NONE
   TYPE nsp_geometry_atom
      LOGICAL :: ready=.FALSE.
@@ -43,6 +44,9 @@ module w_atpar
   ! Spherical potential in ATPAR's Hartree-r convention.  Keep an atom
   ! cache because dmft2 loops over k points outside the atom loop.
   REAL*8 , ALLOCATABLE :: w_VR(:,:)
+  ! Owned by the same radial basis and MPI rank as w_VR. Reset when ATPAR
+  ! builds a new potential; fill each inequivalent atom on its first use.
+  TYPE(rela_atom_operator), ALLOCATABLE :: rela_operator(:)
 
   REAL*8 , ALLOCATABLE :: w_rholm(:,:,:)
   
@@ -145,6 +149,7 @@ CONTAINS
     DEALLOCATE( w_ap1lo )
     DEALLOCATE( w_bp1lo )
     DEALLOCATE( w_VR )
+    if (allocated(rela_operator)) deallocate(rela_operator)
 
     DEALLOCATE( w_rholm )
   END SUBROUTINE w_deallocate
@@ -177,6 +182,7 @@ CONTAINS
     DEALLOCATE( w_ap1lo )
     DEALLOCATE( w_bp1lo )
     DEALLOCATE( w_VR )
+    if (allocated(rela_operator)) deallocate(rela_operator)
   END SUBROUTINE w_deallocate1
   SUBROUTINE w_deallocate2
     IMPLICIT NONE
@@ -210,6 +216,8 @@ CONTAINS
     ! atoms.  dmft2 loops over k points first, so cache every atom here while
     ! the radial functions and spherical potential are already available.
     if (STRESS) call init_stress_cache(nat)
+    if (allocated(rela_operator)) deallocate(rela_operator)
+    if (STRESS .and. rel) allocate(rela_operator(nat))
     
     CALL init_V_vsp(filename_V_sph, 18, ISCF)
 !!! BRISI

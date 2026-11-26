@@ -74,6 +74,22 @@ class SpinWorkflowTests(unittest.TestCase):
                 step.execute('sample','/unused',phase='final',output=io.StringIO())
             self.assertEqual(events,['core','core','average','response'])
 
+    def test_scheduled_strft_applies_to_both_charges_after_common_mu_search(self):
+        with fixture(ferro=True):
+            Path('sample.in2').write_text('TOT\n')
+            native = []
+            def read_mode(root, mpi, definition, output):
+                files = step.entries(Path(definition).read_text())
+                native.append((step.charge_mode(files[2]), step.input_mode(files[5])))
+            with patch.object(step, 'preflight'), patch.object(step, 'run_core', side_effect=read_mode), \
+                 patch('dmft2_spin.run_fermif'), patch('dmft2_spin.average_charge') as average, \
+                 patch.object(step, 'compute_response', return_value={}) as response:
+                step.execute('sample', '.', phase='final', final_force='STRFT', output=io.StringIO())
+            self.assertEqual(native, [('e', 'TOT'), ('e', 'TOT'), ('c', 'STRF'), ('c', 'STRF')])
+            average.assert_called_once()
+            response.assert_called_once()
+            self.assertEqual(step.input_mode('sample.in2'), 'TOT')
+
     def test_no_extra_charge_solve_during_native_search_phase(self):
         for ferro,expected in [(False,['dmft2']),(True,['dmft2_eigen','dmft2_eigendn','fermif'])]:
             with fixture(ferro=ferro):

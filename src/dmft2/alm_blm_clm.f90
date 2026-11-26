@@ -351,14 +351,14 @@ contains
     INTEGER,parameter :: strain_a(6)=(/1,2,3,2,1,1/), &
          strain_b(6)=(/1,2,3,3,3,2/)
     INTEGER :: lmfull,lmlo,ii,ibb,i,i3,l,m,index,index1,iq,ia,ib, &
-         igamma,iv,it,jlo
+         iv,it,jlo
     REAL*8 :: twopi,fac,arg1,arg2,argt2,bkrot2(3),bkrot3(3), &
          bkrloc(3),akg,rmt2,h_al,h_bl,jprime,jsecond,dal,dbl,radial
-    COMPLEX*16 :: phshel,cfac,dy,cone,czero
-    COMPLEX*16 :: ca_st_lm(3,-1:1,-1:1)
+    COMPLEX*16 :: phshel,cfac,cone,czero
     COMPLEX*16,allocatable :: yl(:),h_yl(:,:),dh_yl(:,:,:), &
          dh_alyl(:,:,:),dh_blyl(:,:,:),salm0(:,:,:),sblm0(:,:,:), &
          sclm0(:,:,:,:),tmp(:,:)
+    complex*16 :: grad_y(3),gradient_factor(3,-1:1,-1:1,(lmax2+1)**2)
     LOGICAL :: nonzero_shft
 
     lmfull=(lmax2+1)*(lmax2+1)
@@ -383,6 +383,12 @@ contains
          sclm0(lmlo,base_count,nloat,6))
     salm0=0.d0; sblm0=0.d0; sclm0=0.d0
 
+    ! c_factor depends only on (l,m), independently of every plane wave.
+    do l=0,lmax2
+       do m=-l,l
+          call c_factor(l,m,gradient_factor(:,:,:,l*(l+1)+m+1))
+       enddo
+    enddo
     do ii=1,n0-nnlo,iblock
        ibb=min(iblock,n0-nnlo-ii+1)
        h_yl=0.d0; dh_yl=0.d0
@@ -404,28 +410,23 @@ contains
              do m=-l,l
                 index=l*(l+1)+m+1
                 h_yl(index,i3)=conjg(yl(index))*phshel
-                call c_factor(l,m,ca_st_lm)
+                ! Differentiate Y_lm once in its three Cartesian directions,
+                ! then contract that gradient with each symmetric strain.
+                grad_y=czero
+                if (akg.gt.1.d-14) then
+                   do iv=-1,1,2
+                      if(l+iv<0) cycle
+                      do it=-1,1
+                         if(abs(m+it)>l+iv) cycle
+                         index1=(l+iv)*(l+iv+1)+m+it+1
+                         grad_y=grad_y+conjg(gradient_factor(:,iv,it,index))*conjg(yl(index1))
+                      enddo
+                   enddo
+                   grad_y=matmul(transpose(rotloc(:,:,jatom)),grad_y)*(-0.5d0*phshel/akg)
+                endif
                 do iq=1,6
                    ia=strain_a(iq); ib=strain_b(iq)
-                   dy=czero
-                   if (akg.gt.1.d-14) then
-                      do igamma=1,3
-                         do iv=-1,1,2
-                            if (l+iv.lt.0) cycle
-                            do it=-1,1
-                               if (m+it.lt.-(l+iv) .or. &
-                                    m+it.gt.(l+iv)) cycle
-                               index1=(l+iv)*(l+iv+1)+m+it+1
-                               dy=dy-0.5d0* &
-                                    conjg(ca_st_lm(igamma,iv,it))* &
-                                    (rotloc(igamma,ia,jatom)*bkrot3(ib)+ &
-                                     rotloc(igamma,ib,jatom)*bkrot3(ia))* &
-                                    conjg(yl(index1))*phshel/akg
-                            enddo
-                         enddo
-                      enddo
-                   endif
-                   dh_yl(index,i3,iq)=dy
+                   dh_yl(index,i3,iq)=grad_y(ia)*bkrot3(ib)+grad_y(ib)*bkrot3(ia)
                 enddo
              enddo
           enddo

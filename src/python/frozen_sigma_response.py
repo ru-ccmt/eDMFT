@@ -154,8 +154,16 @@ def inverse_sqrt_derivative(x, ds):
 
 class FrozenSigmaResponse:
     @classmethod
-    def from_export(cls, prefix, *, parallel=SERIAL, **context_options):
-        """Read a standalone EDMFT_RESPONSE_EXPORT from a central TOT run."""
+    def from_export(cls, prefix, *, parallel=SERIAL, lapw_complement=False,
+                    retained=None, **context_options):
+        """Read a central TOT export, keeping the physical DMFT window fixed.
+
+        For a native H/O response the rectangular model contains the lowest
+        bands available at every k. LAPWComplementBasis reconstructs the
+        orthogonal remainder at each k from H and O, including any extra
+        eigenvectors present in the export. Keep the original records intact.
+        Standalone stored-band diagnostics have no such complement.
+        """
         prefix = Path(prefix)
         m = parallel.root_call(lambda: Metadata.read(str(prefix) + ".meta"))
 
@@ -174,15 +182,29 @@ class FrozenSigmaResponse:
                 range(1, len(files) + 1)
             ):
                 raise ValueError("missing or out-of-order k-point exports")
-            signature = lambda h: tuple(h[[4, 5, 6, 7, 8]])
-            if any(signature(h) != signature(headers[0]) for h in headers):
-                raise ValueError(
-                    "response requires a fixed band count and fixed-index window"
-                )
-            return files, [float(h[2]) ** 3 for h in headers]
+            # Compare global indices before distributing k points. In
+            # particular the common count must not depend on MPI ownership.
+            first, wfirst, wlast = headers[0][[5, 7, 8]]
+            for h in headers:
+                n, lo, hi, wl, wh = h[4:9]
+                if (lo, wl, wh) != (first, wfirst, wlast):
+                    raise ValueError("response requires a common first band and a fixed-index DMFT window")
+                if not (1 <= lo <= wl <= wh <= hi and hi - lo + 1 == n):
+                    raise ValueError(f"incomplete stored band range or DMFT window at k point {h[1]}")
+            counts = [int(h[4]) for h in headers]
+            common = min(counts)
+            if not lapw_complement and (max(counts) != common or retained is not None):
+                raise ValueError("variable or truncated stored bands require the native LAPW H/O complement")
+            if retained is not None:
+                if int(retained) != retained or not 0 < retained <= common:
+                    raise ValueError("retained count exceeds available bands or is invalid")
+                common = int(retained)
+            if common <= wlast - first:
+                raise ValueError("retained space misses DMFT window")
+            return files, headers, common
 
-        paths, costs = parallel.root_call(inventory)
-        ownership = parallel.partition(costs)
+        paths, headers, common = parallel.root_call(inventory)
+        ownership = parallel.partition([float(h[2]) ** 3 for h in headers])
         records = []
         kw = []
         for index in ownership:
@@ -190,9 +212,10 @@ class FrozenSigmaResponse:
             with path.open("rb") as fh:
                 if fh.read(8) != b"EDMRPK01":
                     raise ValueError("bad k export magic")
-                version, k, nbas, iso, n, first, last, wfirst, wlast, m2, o, nlo = (
-                    np.fromfile(fh, "<i4", 12)
-                )
+                header = np.fromfile(fh, "<i4", 12)
+                if not np.array_equal(header, headers[index]):
+                    raise ValueError(f"k-point export changed during response inventory: {path}")
+                version, k, nbas, iso, n, first, last, wfirst, wlast, m2, o, nlo = header
                 if version != 1 or iso != 1:
                     raise ValueError("initial response requires non-SOC export v1")
 
@@ -234,18 +257,11 @@ class FrozenSigmaResponse:
         if [r.kpoint for r in records] != (ownership + 1).tolist():
             raise ValueError("missing or out-of-order k-point exports")
 
-        def signature(r):
-            return (r.nstored, r.nemin, r.nemax, r.dm_nemin, r.dm_nemax)
-
-        if any(signature(r) != signature(records[0]) for r in records):
-            raise ValueError(
-                "response requires a fixed band count and fixed-index window"
-            )
         if abs(parallel.sum(sum(kw)) - 1) > 1e-10:
             raise ValueError(
                 "k-point weights do not sum to one: incomplete or magnetic export"
             )
-        normalized = np.array([r.projector for r in records])
+        normalized = np.array([r.projector[:common] for r in records])
         local = m.local_columns(normalized)
         raw_local = np.zeros_like(local)
         for c, n in enumerate(m.dimensions):
@@ -261,7 +277,7 @@ class FrozenSigmaResponse:
         d = records[0]
         obj = cls(
             m,
-            np.array([r.energies for r in records]),
+            np.array([r.energies[:common] for r in records]),
             raw,
             normalized,
             np.array(kw),

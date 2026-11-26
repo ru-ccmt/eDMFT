@@ -426,27 +426,56 @@ class InterstitialDensity:
         grid = np.fft.fftn(waves, axes=(-3, -2, -1))
         return grid[(slice(None),) + self.index].T
 
+    def density_from_weighted_coefficients(self, weighted):
+        """Fourier stars of Re sum_b psi[weighted]_b * conj(psi[C]_b) / volume.
+
+        For a moderate plane-wave count, sum products on differences G-G'.
+        Taking the real part on the FFT grid pairs the coefficients at d and
+        -d. This matters for a rectangular complement density, where weighted
+        need not equal C times a Hermitian matrix. Wrap onto the same native
+        grid before star summation, including the zero and Nyquist channels.
+        """
+        g = self.direct_labels
+        if g is not None:
+            fourier = np.zeros(self.ng, complex)
+            bra = self.c.conj().T
+            # Bound temporary storage for the Gram block and G-G' indices.
+            rows = max(1, min(len(g), (4 * 1024**2) // (48 * len(g))))
+            for first in range(0, len(g), rows):
+                block = slice(first, first + rows)
+                differences = tuple(g[block, j, None] - g[None, :, j] for j in range(3))
+                indices = np.ravel_multi_index(differences, self.shape, mode="wrap").ravel()
+                pairs = (weighted[block] @ bra).ravel()
+                fourier.real += np.bincount(indices, weights=pairs.real, minlength=self.ng)
+                fourier.imag += np.bincount(indices, weights=pairs.imag, minlength=self.ng)
+            fourier = fourier.reshape(self.shape)
+            neg = np.ix_(*[(-np.arange(n)) % n for n in self.shape])
+            return self.stars.action((fourier + fourier[neg].conj()) / (2 * self.volume))
+
+        # The large-plane-wave case stays on the FFT path. Independent bands
+        # can be accumulated in blocks before the one final density FFT.
+        bands = max(1, (64 * 1024**2) // (4 * self.ng * np.dtype(complex).itemsize))
+        density = np.zeros(self.shape)
+        for first in range(0, self.c.shape[1], bands):
+            block = slice(first, first + bands)
+            psi = self._waves(self.c[:, block]) if self.psi is None else self.psi[..., block]
+            waves = self._waves(weighted[:, block])
+            density += np.einsum("...n,...n->...", waves, psi.conj()).real
+        return self.stars.action(np.fft.fftn(density) / (self.ng * self.volume))
+
     def value(self, rho):
         rho = checked(rho, (self.c.shape[1],) * 2, "band density", hermitian=True)
-        psi = self.psi if self.psi is not None else self._waves(self.c)
-        n = np.einsum("...n,...n->...", self._waves(self.c @ rho), psi.conj()).real
-        return self.stars.action(np.fft.fftn(n) / (self.ng * self.volume))
+        return self.density_from_weighted_coefficients(self.c @ rho)
 
     def action(self, rho, rho_dot, coefficient_dot=None):
-        result = self.value(rho_dot)
+        rho_dot = checked(rho_dot, (self.c.shape[1],) * 2, "band density", hermitian=True)
+        weighted = self.c @ rho_dot
         if coefficient_dot is not None:
-            rho = checked(
-                rho, (self.c.shape[1],) * 2, "central density", hermitian=True
-            )
+            rho = checked(rho, rho_dot.shape, "central density", hermitian=True)
             dc = checked(coefficient_dot, self.c.shape, "coefficient derivative")
-            n = (
-                2
-                * np.einsum(
-                    "...n,...n->...", self._waves(dc), self._waves(self.c @ rho).conj()
-                ).real
-            )
-            result += self.stars.action(np.fft.fftn(n) / (self.ng * self.volume))
-        return result
+            # Hermiticity of rho joins the two coefficient derivatives as 2 Re.
+            weighted = weighted + 2 * (dc @ rho)
+        return self.density_from_weighted_coefficients(weighted)
 
     def potential_times_coefficients(self, covector):
         star_grid = self.stars.pullback(covector)

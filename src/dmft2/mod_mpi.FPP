@@ -17,10 +17,10 @@ MODULE com_mpi
   INTEGER, PARAMETER :: clen = 100      ! Length of characters in command-line
   CHARACTER*100, ALLOCATABLE :: argv(:) ! Command-line arguments
   INTEGER      :: nargs                 ! Number of command line arguments
-  LOGICAL      :: vector_para           ! is this parallel Wien2K run?
+  LOGICAL      :: vector_para=.false.           ! is this parallel Wien2K run?
   LOGICAL      :: Qprint
   INTEGER      :: vectors(20,3)        ! which vector files should be read
-  INTEGER      :: nvector
+  INTEGER      :: nvector=0
   CHARACTER*200:: VECFN(4)
   CHARACTER*200:: fvectors(20,4)
   INTEGER      :: pr_proc, pr_procr
@@ -323,19 +323,30 @@ CONTAINS
 
   ! Broadcast a trial chemical potential or the end-of-search signal.
   ! Workers keep their eigenvalues and k-point weights locally.
-  SUBROUTINE Bcast_Density_request(EF, evaluate)
+  SUBROUTINE Bcast_Density_request(EF, evaluate, failure)
     IMPLICIT NONE
     REAL*8, intent(inout) :: EF
     LOGICAL, intent(inout) :: evaluate
+    character(*), optional, intent(in) :: failure
     REAL*8 :: request(2)
 
     if (myrank.eq.master) then
        request(1) = 0.d0
        if (evaluate) request(1) = 1.d0
+       if (present(failure)) request(1)=-1.d0
        request(2) = EF
     endif
     CALL MPI_BCAST(request, 2, MPI_DOUBLE_PRECISION, master, MPI_COMM_WORLD, ierr)
     if (ierr.ne.0) print *, 'ERROR in MPI_BCAST density request', ierr
+    ! A failed master search releases the workers already waiting here.
+    ! All ranks can now finalize and the driver receives a nonzero status.
+    if (request(1)<0.d0) then
+       if (present(failure)) then
+          call mesh_failure(failure)
+       else
+          call mesh_failure('Chemical-potential search failed on rank zero.')
+       endif
+    endif
     evaluate = (request(1).ne.0.d0)
     EF = request(2)
   END SUBROUTINE Bcast_Density_request
@@ -547,75 +558,7 @@ CONTAINS
     if (ierr.ne.0) print *, 'ERROR in MPI_BCAST 6', ierr
   END SUBROUTINE Bcast_Projector
   
-  subroutine Scatter_Vector_data()
-    IMPLICIT NONE
-    INTEGER       :: idat(2)
-    CHARACTER*180 :: sdat(4), xend
-    INTEGER,       allocatable :: idat_all(:,:)
-    CHARACTER*180, allocatable :: sdat_all(:,:)
-    INTEGER       :: ierr, irank, inkp, ik_start, i
-    CHARACTER*180 :: vec_up, vec_dn, ene_dn, ene_up
-    CHARACTER*67  :: ERRMSG
-    !
-    allocate( idat_all(2,nprocs), sdat_all(4,nprocs) )
-    if (myrank.eq.master) then
-       DO i=1,nprocs
-          READ (999,*,END=970,ERR=970) irank,inkp,ik_start,vec_up,vec_dn,ene_dn,ene_up  ! can jump to 20
-          idat_all(1,irank+1) = inkp       ! number of k-points
-          idat_all(2,irank+1) = ik_start   ! what is the first k-point in this vector file
-          sdat_all(1,irank+1) = vec_up     ! filenames....
-          sdat_all(2,irank+1) = vec_dn
-          sdat_all(3,irank+1) = ene_dn
-          sdat_all(4,irank+1) = ene_up
-       ENDDO
-       !print *, 'idat_all, sdat_all='
-       !do i=1,nprocs
-       !   print *, i, idat_all(1:2,i)
-       !   print *, i, TRIM(sdat_all(1,i)), TRIM(sdat_all(2,i)), TRIM(sdat_all(3,i)), TRIM(sdat_all(4,i))
-       !end do
-    end if
 
-    call MPI_Scatter(idat_all, 2,  MPI_INTEGER, idat, 2, MPI_INT,  master, MPI_COMM_WORLD, ierr)
-    if (ierr.NE.0) then
-       WRITE(6,*) 'ERROR in MPI_Scatter 1'
-       call stop_MPI
-       STOP 'MPI ERROR 1'
-    endif
-    call MPI_Scatter(sdat_all, 4*180, MPI_CHAR, sdat, 4*180, MPI_CHAR, master, MPI_COMM_WORLD, ierr)
-    if (ierr.NE.0) then
-       WRITE(6,*) 'ERROR in MPI_Scatter 2'
-       call stop_MPI
-       STOP 'MPI ERROR 2'
-    endif
-    deallocate( idat_all, sdat_all )
-    
-    nvector=1
-    vectors(nvector,1) = 1         ! the successive number of vector file
-    vectors(nvector,2) = idat(1)   ! number of k-points
-    vectors(nvector,3) = idat(2)   ! what is the first k-point in this vector file
-    ! THIS IS NEW PART FROM SUMMER 2016
-    ! Here we decided to take filenames from the dmft2.def-file, so that user
-    ! has flexibility to change the order of files from the input.
-    call get_xend(xend,sdat(1))  ! This will extract the suffix from _processes_ files, i.e., xend=='_myrank'
-    ! Now we add xend to the filenames from 
-    call add_xend(sdat(1), vecfn(1), xend) ! case.vectorso
-    call add_xend(sdat(2), vecfn(2), xend) ! case.vectorsodn
-    call add_xend(sdat(3), vecfn(3), xend) ! case.energysodn
-    call add_xend(sdat(4), vecfn(4), xend) ! case.energyso
-    ! THIS IS NEW PART FROM SUMMER 2016
-    !
-    fvectors(nvector,1) = sdat(1)  ! filenames....
-    fvectors(nvector,2) = sdat(2)
-    fvectors(nvector,3) = sdat(3)
-    fvectors(nvector,4) = sdat(4)
-    !print*, myrank, vectors(1,1), vectors(1,2), vectors(1,3)
-    !print*, myrank, TRIM(fvectors(1,1)), TRIM(fvectors(1,2)), TRIM(fvectors(1,3)), TRIM(fvectors(1,4))
-    return
-970 CONTINUE
-    WRITE (ERRMSG,'(A,A)')  'read error _processes_'
-    CALL OUTERR('DMFT',ERRMSG)
-    STOP 'DMFT - Error'
-  end subroutine Scatter_Vector_data
 #else
 
 ! What needs to be done for serial job
@@ -731,10 +674,12 @@ CONTAINS
     REAL*8, intent(inout) :: EF
   END SUBROUTINE Bcast_MPI
 
-  SUBROUTINE Bcast_Density_request(EF, evaluate)
+  SUBROUTINE Bcast_Density_request(EF, evaluate, failure)
     IMPLICIT NONE
     REAL*8, intent(inout) :: EF
     LOGICAL, intent(inout) :: evaluate
+    character(*), optional, intent(in) :: failure
+    if (present(failure)) call mesh_failure(failure)
   END SUBROUTINE Bcast_Density_request
 
   SUBROUTINE Reduce_Density_sum(local_charge, total_charge)
@@ -764,10 +709,168 @@ CONTAINS
     INTEGER, intent(inout) ::  max_nrad, n_al_ucase, Nri
   END SUBROUTINE Bcast_Projector
 
+#endif
   subroutine Scatter_Vector_data()
+    IMPLICIT NONE
+    INTEGER       :: idat(2)
+    CHARACTER*180 :: sdat(4), xend
+    INTEGER,       allocatable :: idat_all(:,:)
+    CHARACTER*180, allocatable :: sdat_all(:,:)
+    INTEGER       :: ierr, irank, inkp, ik_start, i, ios
+    CHARACTER*180 :: vec_up, vec_dn, ene_dn, ene_up
+    integer :: invalid_map
+    !
+    allocate( idat_all(2,nprocs), sdat_all(4,nprocs) )
+    invalid_map=0
+    if (myrank.eq.master) then
+       idat_all=-1
+       DO i=1,nprocs
+          READ (999,*,END=970,ERR=970) irank,inkp,ik_start,vec_up,vec_dn,ene_dn,ene_up  ! can jump to 20
+          if (irank<0.or.irank>=nprocs.or.inkp<0.or.ik_start<0) goto 970
+          if (idat_all(1,irank+1)/=-1) goto 970
+          idat_all(1,irank+1) = inkp       ! number of k-points
+          idat_all(2,irank+1) = ik_start   ! what is the first k-point in this vector file
+          sdat_all(1,irank+1) = vec_up     ! filenames....
+          sdat_all(2,irank+1) = vec_dn
+          sdat_all(3,irank+1) = ene_dn
+          sdat_all(4,irank+1) = ene_up
+       ENDDO
+       ! Reading only a prefix would silently integrate the wrong BZ.
+       read(999,*,iostat=ios) irank
+       if (ios>=0) goto 970
+       goto 980
+970    invalid_map=1
+980    continue
+    endif
+    call Bcast_Size(invalid_map)
+    if (invalid_map/=0) call mesh_failure('Invalid native _processes_: expected one unique row per LAPW1 rank. Check the generating MPI size.')
+#ifdef _MPI
+    call MPI_Scatter(idat_all, 2,  MPI_INTEGER, idat, 2, MPI_INT,  master, MPI_COMM_WORLD, ierr)
+    if (ierr.NE.0) then
+       WRITE(6,*) 'ERROR in MPI_Scatter 1'
+       call stop_MPI
+       STOP 'MPI ERROR 1'
+    endif
+    call MPI_Scatter(sdat_all, 4*180, MPI_CHAR, sdat, 4*180, MPI_CHAR, master, MPI_COMM_WORLD, ierr)
+    if (ierr.NE.0) then
+       WRITE(6,*) 'ERROR in MPI_Scatter 2'
+       call stop_MPI
+       STOP 'MPI ERROR 2'
+    endif
+#else
+    idat=idat_all(:,1)
+    sdat=sdat_all(:,1)
+#endif
+    deallocate( idat_all, sdat_all )
+
+    nvector=1
+    vectors(nvector,1) = 1         ! the successive number of vector file
+    vectors(nvector,2) = idat(1)   ! number of k-points
+    vectors(nvector,3) = idat(2)   ! what is the first k-point in this vector file
+    ! THIS IS NEW PART FROM SUMMER 2016
+    ! Here we decided to take filenames from the dmft2.def-file, so that user
+    ! has flexibility to change the order of files from the input.
+    call get_xend(xend,sdat(1))  ! This will extract the suffix from _processes_ files, i.e., xend=='_myrank'
+    ! Now we add xend to the filenames from
+    call add_xend(sdat(1), vecfn(1), xend) ! case.vectorso
+    call add_xend(sdat(2), vecfn(2), xend) ! case.vectorsodn
+    call add_xend(sdat(3), vecfn(3), xend) ! case.energysodn
+    call add_xend(sdat(4), vecfn(4), xend) ! case.energyso
+    ! THIS IS NEW PART FROM SUMMER 2016
+    !
+    fvectors(nvector,1) = sdat(1)  ! filenames....
+    fvectors(nvector,2) = sdat(2)
+    fvectors(nvector,3) = sdat(3)
+    fvectors(nvector,4) = sdat(4)
+    !print*, myrank, vectors(1,1), vectors(1,2), vectors(1,3)
+    !print*, myrank, TRIM(fvectors(1,1)), TRIM(fvectors(1,2)), TRIM(fvectors(1,3)), TRIM(fvectors(1,4))
+    return
   end subroutine Scatter_Vector_data
 
+  ! A worker can be blocked inside a collectivity, e.g. the EF service loop.
+  ! MPI_Abort propagates rank-local input errors; serial users also get an
+  ! unsuccessful exit status for the driver.
+  subroutine abort_dmft2(message)
+    use iso_fortran_env, only: error_unit
+    character(*), intent(in) :: message
+    write(error_unit,'(a,i0,3a)') 'DMFT2 rank ',myrank,': ',trim(message)
+    flush(error_unit)
+    if (myrank==master) then
+       write(6,'(2a)') 'ERROR: ',trim(message)
+       flush(6)
+    endif
+#ifdef _MPI
+    call MPI_Abort(MPI_COMM_WORLD,2,ierr)
 #endif
+    error stop 2
+  end subroutine abort_dmft2
+
+  ! Use this path only for a decision already identical on every rank.
+  subroutine mesh_failure(message)
+    use iso_fortran_env, only: error_unit
+    character(*), intent(in) :: message
+    if (myrank==master) then
+       write(error_unit,'(2a)') 'DMFT2: ',trim(message)
+       write(6,'(2a)') 'ERROR: ',trim(message)
+       flush(error_unit)
+       flush(6)
+    endif
+    call stop_MPI()
+    if (myrank==master) stop 2
+    stop
+  end subroutine mesh_failure
+
+  ! Every rank finishes its local vector scan, including idle ranks. Report
+  ! the first failing rank's filename to the master and finalize together.
+  subroutine check_input_scan(message)
+    character(*), intent(inout) :: message
+    integer :: sender,failed_rank
+    sender=nprocs
+    if (len_trim(message)>0) sender=myrank
+#ifdef _MPI
+    call MPI_Allreduce(sender,failed_rank,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,ierr)
+    if (failed_rank<nprocs) call MPI_Bcast(message,len(message),MPI_CHARACTER,failed_rank,MPI_COMM_WORLD,ierr)
+#else
+    failed_rank=sender
+#endif
+    if (failed_rank<nprocs) call mesh_failure(message)
+  end subroutine check_input_scan
+
+  subroutine fail_density_search(message)
+    character(*), intent(in) :: message
+    real*8 :: trial
+    logical :: evaluate
+    trial=0.d0
+    evaluate=.false.
+    call Bcast_Density_request(trial,evaluate,message)
+  end subroutine fail_density_search
+
+  subroutine check_vector_coverage(numkpt)
+    integer, intent(in) :: numkpt
+    integer, allocatable :: edges(:)
+    integer :: i, first, count, active
+    ! Record two edges per assigned interval. The prefix sum must be one
+    ! everywhere. Idle ranks contribute zero; filenames and shard sizes
+    ! play no role in this cross-rank check.
+    allocate(edges(0:numkpt)); edges=0
+    do i=1,nvector
+       first=vectors(i,3); count=vectors(i,2)
+       if (count==0) cycle
+       if (first<0.or.count<0.or.first>numkpt-count) &
+            call abort_dmft2('Split-vector k-point range exceeds the mesh. Check the process maps.')
+       edges(first)=edges(first)+1
+       edges(first+count)=edges(first+count)-1
+    enddo
+#ifdef _MPI
+    call MPI_Allreduce(MPI_IN_PLACE,edges,numkpt+1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+#endif
+    active=0
+    do i=0,numkpt-1
+       active=active+edges(i)
+       if (active/=1) call mesh_failure('Split-vector process maps leave a gap or assign a k point twice.')
+    enddo
+  end subroutine check_vector_coverage
+
 END MODULE com_mpi
 
 SUBROUTINE FilenameMPI3(infout, ii)

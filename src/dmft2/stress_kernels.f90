@@ -975,6 +975,8 @@ SUBROUTINE val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,RMT)
                                gaunt2 = GAUNT(l,lp,sp,m,mp,tp)
                                DO alpha = 1,3
                                   DO beta = 1,3
+                                     ! All radial products below share this angular factor.
+                                     if (((c_am(alpha,t)*c_am(beta,u)+c_am(beta,t)*c_am(alpha,u))*gaunt1*gaunt2)==0.d0) cycle
                                      
                                      DO num = nemin,nemax
                                         !HERE IS THE FORMULA F1
@@ -1053,6 +1055,8 @@ SUBROUTINE val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,RMT)
                             CALL c_factor(1,t,ca_st_lm)                            
                             DO alpha = 1,3
                                DO beta = 1,3
+                                  ! All radial products below share this angular factor.
+                                  if (((c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u))*gaunt1)==0.d0) cycle
                                   DO num = nemin,nemax
                                   
                                      !HERE IS THE SUM OF F2
@@ -1129,6 +1133,8 @@ SUBROUTINE val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,RMT)
                             
                             DO alpha =1,3
                                DO beta = 1,3
+                                  ! All radial products below share this angular factor.
+                                  if (((c_am(alpha,t)*ca_st_lm(beta,v,u)+c_am(beta,t)*ca_st_lm(alpha,v,u))*gaunt1)==0.d0) cycle
                                   DO num = nemin,nemax
                                      !HERE IS THE FORMULA F3+F4-F5                                     
                                      F3_buf(alpha,beta,num) = F3_buf(alpha,beta,num) + &
@@ -1242,6 +1248,8 @@ SUBROUTINE val_kinstrmt(nemin,nemax,alm,blm,clm,F_buf_total,RMT)
                                
                                DO alpha = 1,3
                                   DO beta = 1,3                                                                          
+                                     ! All radial products below share this angular factor.
+                                     if ((ca_st_lm(alpha,v,u)*ca_st_lm11(beta,v1,t)+ca_st_lm(beta,v,u)*ca_st_lm11(alpha,v1,t))==0.d0) cycle
                                      DO num = nemin,nemax
                                      
                                         !HERE IS THE FORMULA FROM F6                                                                                                                        

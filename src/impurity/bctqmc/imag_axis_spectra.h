@@ -1290,7 +1290,7 @@ public:
 
 
 void FindLargestEigenvalues(Array<double,2>& gm,
-			    const Array<double,2>& Gm, const Array<double,1>& tau, const Cix& cix, int itt, MPIcls& mpi)
+			    const Array<double,2>& Gm, const Array<double,1>& tau, const Cix& cix, int itt, MPIcls& mpi, bool write_history)
 {
   gm.resize(cix.Nblock,tau.size());
   gm=0;
@@ -1344,6 +1344,7 @@ void FindLargestEigenvalues(Array<double,2>& gm,
   mpi.AllReduceSum_simple_array(gm);
   if (mpi.rank==mpi.master){
     fmt::print(*mpi.out,"t_pre={:.4f} t_diag={:.4f}\n",t_prep_HS.count(), t_diag1.count());
+    if (!write_history) return;
     ofstream out("Gpp_blocks."+to_string(itt+1));
     for (int it=0; it<tau.size(); ++it){
       out<<tau(it)<<" ";
@@ -1431,7 +1432,7 @@ retVals GetLambda0_in_sector(int ib,
 auto DeterminePseudoPropagators(Array<double,2>& Gm,
 				const Array<double,1>& tau, const Array<double,1>& tau_dh, const Array<double,2>& Sm,
 				const Cix& cix, double beta, double lambda0_fixed, int followPeak_fixed, int itt, MPIcls& mpi,
-				const json& pars, double peak_pos=0)
+				const json& pars, double peak_pos, bool write_measurements)
 {
   retVals r(100,-1);
   
@@ -1927,7 +1928,7 @@ auto DeterminePseudoPropagators(Array<double,2>& Gm,
   //fmt::print(clog,"\n");
 
   
-  if (mpi.rank==mpi.master){
+  if (mpi.rank==mpi.master && write_measurements){
     double small=5e-7;
     // We skipped several states when computing Probability, because they are equivalent to some other state.
     // Now we need to set all these empty values.

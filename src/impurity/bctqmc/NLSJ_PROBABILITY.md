@@ -1,8 +1,8 @@
 # Atomic NLSJ labels in Probability2.dat
 
-`Probability.dat` remains unchanged. At each probability update, the master
-rank also writes `Probability2.dat` with one row per atomic-Hamiltonian
-eigenstate:
+The master rank writes `Probability.dat` and `Probability2.dat` on physical
+measurement steps, or every iteration with `fastFilesystem=true`. Each row
+in `Probability2.dat` describes one atomic-Hamiltonian eigenstate.
 
 ```text
 state block eigen P E_cix E_F0 E_gc N L S J label_weight status

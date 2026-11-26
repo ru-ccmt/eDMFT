@@ -181,82 +181,54 @@ SUBROUTINE val_overlap_interstitial_stress(isize,overlap_stress,nemin, &
 END SUBROUTINE val_overlap_interstitial_stress
        
 
-subroutine val_kin_interstitial(isize,kin_int_fn,nemin,nemax,band_weight)
-   use xa3,   only: a, k3
-   use param, only: nume
-   use stress_pw, only:F1p
-   use defs
-   implicit none
-   integer, intent(in)    :: isize,nemin,nemax
-   real*8,  intent(in)    :: band_weight(nume)
-   real*8 , intent(inout) :: kin_int_fn(1:3,1:3)
- COMPLEX*16,ALLOCATABLE   :: thetagp(:)
-   complex*16               :: kin_int_buf(1:3,1:3,nume)   
-   integer                  :: ialpha, ibeta, tot_G, gx, gxp, num
-   integer, allocatable     :: Xxx(:),Yyy(:),Zzz(:)    
-       tot_G = 0
-       DO gx = 1, isize
-          DO gxp = 1, isize
-             tot_G = tot_G + 1
-          ENDDO
-       ENDDO
-       allocate(thetagp(tot_G),Xxx(tot_G),Yyy(tot_G),Zzz(tot_G))
-       
-       tot_G = 0
-       DO gx = 1, isize
-          DO gxp = 1, isize
-             tot_G = tot_G + 1
-             Xxx(tot_G) = k3(1,gx) - k3(1,gxp)
-             Yyy(tot_G) = k3(2,gx) - k3(2,gxp)
-             Zzz(tot_G) = k3(3,gx) - k3(3,gxp)
-          ENDDO
-       ENDDO       
-       call step_fun(xxx,yyy,zzz,tot_G,thetagp)
-       deallocate(Xxx,Yyy,Zzz) 
-       
-       kin_int_buf = zeroc       
-       DO ialpha = 1, 3
-          DO ibeta = 1, 3
-              DO num = nemin, nemax
-                 tot_G = 0
-                 DO gx = 1, isize
-                    DO gxp = 1, isize
-                       tot_G = tot_G + 1
+! For each plane wave G contract the mask with all the current pseudo-bands:
+!   M(G,n) = sum_Gp Theta(G-Gp) A(Gp,n).
+! The band sum of Re[A(G,n)* M(G,n)] (conjugating A) then multiplies the
+! same Cartesian outer product for every tensor component. BAND_WEIGHT is
+! supplied by the caller: it can be signed for complementary-window and
+! projector-normalization terms. The slab bounds the workspace at O(N_G).
+subroutine val_kin_interstitial(isize, kin_int_fn, nemin, nemax, band_weight)
+  use xa3, only: a, k3
+  use stress_pw, only: F1p
+  use param, only: nume
+  implicit none
+  integer, intent(in) :: isize, nemin, nemax
+  real*8, intent(in) :: band_weight(nume)
+  real*8, intent(inout) :: kin_int_fn(3,3)
+  integer, parameter :: block_size=32
+  integer :: first, rows, row, axis, g, band, nbands, alpha, beta
+  integer, allocatable :: delta_g(:,:,:)
+  complex*16, allocatable :: theta(:,:), masked(:,:)
+  complex*16, parameter :: one=(1.d0,0.d0), zero=(0.d0,0.d0)
+  real*8 :: weighted_density
 
-                   kin_int_buf(ialpha,ibeta,num) = kin_int_buf(ialpha,ibeta,num) - &
-                   conjg(a(gx,num))*a(gxp,num)*F1P(gx,ialpha)*F1P(gx,ibeta)*thetagp(tot_G)
-                    ENDDO
-                 ENDDO
-              ENDDO              
-          ENDDO
-       ENDDO
-       
-       
-       ! Do not obtain these weights from module XA.  CMP_DMFT_STRESS is used
-       ! not only for the physical density matrix but also for two derivative
-       ! response matrices (the fixed-normalization complementary-band
-       ! response and the k-global projector-normalization response).  Those
-       ! Hermitian response matrices are diagonalized into signed pseudo-band
-       ! weights.  Importing XA::WEIGHT here silently reused the physical
-       ! occupations for every response call and therefore added nearly the
-       ! entire physical interstitial kinetic stress once per response pass.
-       !
-       ! The eigenvectors in XA3::A already belong to the current pseudo-band
-       ! contraction.  BAND_WEIGHT must belong to the same contraction; it is
-       ! passed explicitly so eigenvectors and weights can no longer get out
-       ! of sync.
-       DO num = nemin, nemax
-          DO ialpha = 1, 3
-             DO ibeta = 1, 3
-                kin_int_fn(ialpha,ibeta) = kin_int_fn(ialpha,ibeta) - &
-                     2.d0*band_weight(num)* &
-                     real(kin_int_buf(ialpha,ibeta,num))
-             ENDDO
-          ENDDO
-       ENDDO
-       deallocate(thetagp)   
-   
-   
-return
-end subroutine
-
+  nbands=nemax-nemin+1
+  if (nbands<=0 .or. isize<=0) return
+  allocate(delta_g(isize,block_size,3), theta(isize,block_size), masked(block_size,nbands))
+  do first=1,isize,block_size
+     rows=min(block_size,isize-first+1)
+     do axis=1,3
+        do row=1,rows
+           delta_g(:,row,axis)=k3(axis,first+row-1)-k3(axis,1:isize)
+        enddo
+     enddo
+     call step_fun(delta_g(1,1,1),delta_g(1,1,2),delta_g(1,1,3),isize*rows,theta)
+     ! theta is stored as (Gp,G), with argument G-Gp. Use its transpose
+     ! without conjugating the mask, including for noncentrosymmetric cells.
+     call zgemm('T','N',rows,nbands,isize,one,theta,isize,a(1,nemin),size(a,1),zero,masked,block_size)
+     do row=1,rows
+        g=first+row-1
+        weighted_density=0.d0
+        do band=nemin,nemax
+           weighted_density=weighted_density+band_weight(band)* &
+                real(conjg(a(g,band))*masked(row,band-nemin+1),kind=8)
+        enddo
+        do beta=1,3
+           do alpha=1,3
+              kin_int_fn(alpha,beta)=kin_int_fn(alpha,beta)+ &
+                   2.d0*weighted_density*F1p(g,alpha)*F1p(g,beta)
+           enddo
+        enddo
+     enddo
+  enddo
+end subroutine val_kin_interstitial

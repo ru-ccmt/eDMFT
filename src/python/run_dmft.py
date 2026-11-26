@@ -2,6 +2,9 @@
 # @Copyright 2007 Kristjan Haule
 import sys, os, re, glob, shutil, socket, time
 from os.path import getsize
+from contextlib import contextmanager
+from pathlib import Path
+import tempfile
 from copy import deepcopy
 import subprocess
 from functools import reduce
@@ -83,6 +86,7 @@ class Params:
                         print(c+"->", sp[c], '(None)', file=self.log)
         # updates the dictonary
         self.p.update(sp)
+        dmft2_step.final_force_mode(self.p.get('force_last', False))
     
     def __getitem__(self, x):
         return self.p[x]
@@ -306,6 +310,69 @@ def mixer_moves_atoms(case):
     return mode[4:5] in ('a', 'b')
 
 
+def update_lapw(fday, w2k, dmfe, p, para, wopt, fh_info):
+    """Generate the potential and its matching scalar and optional SOC bands."""
+    lapw0(fday, w2k.case, w2k.WIENROOT, para, fh_info)
+    fday.flush()
+    lapw1(fday, w2k.case, w2k.WIENROOT, para, p['dftKS'], dmfe, wopt, fh_info)
+    fday.flush()
+    if wopt['so']:
+        lapwso(fday, w2k.case, w2k.WIENROOT, para, p['dftKS'], dmfe, fh_info)
+        fday.flush()
+
+
+@contextmanager
+def final_lapw0_input(case, force_last, info):
+    """Supply the LAPW0 stress on the same final charge as a scheduled IN2 stress.
+
+    DMFT2 can use a private IN2 through its definition file. LAPW0, the response
+    snapshot and the mixer take the case files from the working directory.
+    Keep the stress input visible for the entire measurement.
+    """
+    mode = dmft2_step.final_force_mode(force_last)
+    if mode not in ('STRF', 'STRFT') or mixer_moves_atoms(case):
+        yield
+        return
+    req = dmft2_step.request(case)
+    if req['mode'] != 'TOT' or dmft2_step.charge_mode(req['files'][2]) != 'c':
+        yield
+        return
+
+    path = Path(case + '.in0')
+    original = path.read_bytes()
+    field = re.match(rb'[ \t]*(\S+)', original)
+    token = field[1] if field else b''
+    if token.upper() == b'STR':
+        yield
+        return
+    if token.upper() != b'TOT':
+        raise ValueError(f"{path}: final {mode} needs LAPW0 mode TOT or STR, found {token!r}")
+
+    from structure_relaxation import atomic_write
+    start, end = field.span(1)
+    active = original[:start] + b'STR' + original[end:]
+    with tempfile.TemporaryDirectory(dir=path.parent, prefix='.final-lapw0-') as directory:
+        # Keep an existing symlink intact in the backup. The temporary STR
+        # header is private even if several calculations share its target.
+        saved = Path(directory) / 'original'
+        shutil.copy2(path, saved, follow_symlinks=False)
+        print(f'force_last={mode}: {path} TOT -> STR for final LAPW0', file=info, flush=True)
+        atomic_write(path, active)
+        try:
+            yield
+        finally:
+            if path.is_file() and not path.is_symlink():
+                current = path.read_bytes()
+                if current == active:
+                    os.replace(saved, path)
+                else:
+                    # Keep any live edits to the XC choice, grid or other lines.
+                    current_field = re.match(rb'[ \t]*(\S+)', current)
+                    if current_field and current_field[1] == b'STR':
+                        a, b = current_field.span(1)
+                        atomic_write(path, current[:a] + token + current[b:])
+
+
 def final_response_pass(fday, w2k, fh_info, dmfe, p, para, wopt, matsubara):
     """Measure the requested native force or screened response once at the final charge.
 
@@ -318,21 +385,28 @@ def final_response_pass(fday, w2k, fh_info, dmfe, p, para, wopt, matsubara):
     """
     case, WIEN = w2k.case, w2k.WIENROOT
     req = dmft2_step.request(case)
-    # FOR already supplied native forces on each ordinary charge iteration.
-    # Only a fixed-geometry TOT run can request an extra native measurement.
-    native_force = (req["mode"] == "TOT" and p["force_last"] and not mixer_moves_atoms(case))
-    if not (req["enabled"] or native_force):
+    # An explicit mode in IN2 takes precedence. In a fixed-geometry TOT
+    # run, select the private final input before deciding who runs the spins
+    # and whether a shared screened response is needed.
+    final_mode = False
+    if req["mode"] == "TOT" and p["force_last"] and not mixer_moves_atoms(case):
+        final_mode = dmft2_step.final_force_mode(p["force_last"])
+        req = dmft2_step.request(case, final_force=final_mode)
+    if not (req["enabled"] or final_mode):
         return False
+    if final_mode:
+        print(f'force_last: final {final_mode} measurement (live input stays TOT)', file=fh_info, flush=True)
+        if final_mode in dmft2_step.ALIASES and not req["enabled"]:
+            print(f'Screened response disabled in {req["config_path"]}. '
+                  f'Computing {dmft2_step.ALIASES[final_mode]} only.', file=fh_info, flush=True)
     if req["enabled"]:
         print('Final dmft2 -> response -> lcore -> SCF -> mixer pass', file=fh_info, flush=True)
-    else:
-        print('force_last=True: calculating final native forces with a private FOR input', file=fh_info, flush=True)
     if not req["enabled"] and wopt["m_extn"]:
         # The ordinary magnetic path can require fresh spectra for a common
         # mu, then both spin charges and their average before the mixer.
-        lattice_charge_step(fday, w2k, fh_info, dmfe, p, para, wopt, matsubara, final_force=True)
+        lattice_charge_step(fday, w2k, fh_info, dmfe, p, para, wopt, matsubara, final_force=final_mode)
     else:
-        dmft2(fday, case, fh_info, dmfe, response_phase='final', final_force=native_force)
+        dmft2(fday, case, fh_info, dmfe, response_phase='final', final_force=final_mode)
     lcore(fday, case, WIEN, wopt, fh_info)
     scf(case, wopt)
     scf1(fday, case, WIEN)
@@ -365,6 +439,85 @@ def scf1(fday, case, WIEN):
             shutil.copy2(name, name+'_old')		#save last cycle
             
         
+def saved_impurity_occupation(iat, solver_name, iparams, log):
+    """Recover the last solver measurement for a charge-only restart."""
+    if solver_name in ('OCA', 'NCA'):
+        files = [('AlocOut', 'Aloc.imp')]
+    else:
+        # Current QMC writes the estimator in Gf.out. Older versions also
+        # stored it in Sig.out. The processed sig.out can lack this header.
+        files = [('Gf', 'Gf.out'), ('Sig', 'Sig.out')]
+    for key, default in files:
+        if solver_name == 'BCTQMC' and 'f'+key in iparams:
+            key = 'f'+key
+        filename = os.path.join('imp.'+str(iat), iparams.get(key, [default])[0])
+        try:
+            with open(filename) as stream:
+                header = stream.readline().strip()
+        except FileNotFoundError:
+            continue
+        if not header.startswith('#'):
+            continue
+        # The bold solver reports both nd (atomic density, returned by
+        # HighFrequency) and nf (Matsubara sum). Ordinary CTQMC reports nf.
+        if solver_name in ('OCA', 'NCA'):
+            field = 'ntot'
+        elif solver_name == 'BCTQMC' or re.search(r'\bnd\s*=', header):
+            field = 'nd'
+        else:
+            field = 'nf'
+        match = re.search(r'\b' + field + r'\s*=\s*([^\s,;]+)', header)
+        if match:
+            try:
+                occupation = float(match[1].replace('D', 'E').replace('d', 'e'))
+            except ValueError:
+                continue
+            if isfinite(occupation):
+                print(f'Frozen impurity {iat}: {field}={occupation} from {filename}', file=log)
+                return occupation
+    print(f'Frozen impurity {iat}: occupation unavailable in saved solver output', file=log)
+    return nan
+
+
+def restart_occupations(impurities, p, log):
+    # dmft_copy.py already carries Eorb_imp.dat along with the frozen
+    # self-energy. Old archives lack these comments, but may retain Gf.out.
+    saved = {}
+    if os.path.isfile('Eorb_imp.dat'):
+        with open('Eorb_imp.dat') as stream:
+            for line in stream:
+                m = re.fullmatch(r'# n_imp\[(\d+)\] = (\S+)\s*', line)
+                if m:
+                    try:
+                        value = float(m[2])
+                    except ValueError:
+                        continue
+                    if isfinite(value):
+                        saved[int(m[1])] = value
+    occupations = zeros(len(impurities))
+    for iat in impurities:
+        if iat in saved:
+            occupations[iat] = saved[iat]
+            print(f'Frozen impurity {iat}: n_imp={saved[iat]} from Eorb_imp.dat', file=log)
+        else:
+            occupations[iat] = saved_impurity_occupation(
+                iat, p['solver'], p['iparams'+str(iat)], log)
+    return occupations
+
+
+def occupation_residual(n_imp, nc, previous):
+    """Signed mismatch and its change since the preceding completed outer cycle."""
+    diff = sum(n_imp - nc)
+    if previous is None:
+        return diff, nan
+    old_imp, old_nc = previous
+    # A frozen impurity can be supplied without its solver output. Its
+    # unknown constant cancels from the change, but its absolute value
+    # (and hence the signed mismatch) remains unavailable.
+    delta_imp = where(isnan(n_imp) & isnan(old_imp), 0., n_imp - old_imp)
+    return diff, abs(sum(delta_imp - (asarray(nc) - old_nc)))
+
+
 def Diff(fday, case, dEF, diff_nimp, ddiff_nimp):
     #
     with open(case+'.scf', 'r') as fs:
@@ -397,8 +550,10 @@ def Diff(fday, case, dEF, diff_nimp, ddiff_nimp):
     print(':ENERGY convergence: '+str(dene))
     print(':CHARGE convergence: '+str(drho))
     print(':EF     convergence: '+str(dEF))
-    print(':NIMP   convergence: '+str(ddiff_nimp))
-    print(':NIMP   difference : '+str(diff_nimp))
+    for label, value in (('convergence:', ddiff_nimp), ('difference :', diff_nimp)):
+        message = ':NIMP   ' + label + ' ' + (f'{value:.10g}' if isfinite(value) else 'n/a')
+        print(message)
+        print(message, file=fday)
     return (drho, dene)
 
 
@@ -687,7 +842,7 @@ if __name__ == '__main__':
               'remove_broyd'  : 1000,      # How many dft steps before broyden files are removed
               'Ferro'         : False,     # For ferromagnetic (or ferrimagnetic) metals it should be set to True, so that the chemical potential is properly computed
               'relax'         : False,     # opt-in internal-coordinate and cell optimization
-              'force_last': False, # fixed geometry: use FOR once after TOT charge iterations
+              'force_last': False, # optional final measurement after fixed-geometry TOT iterations
               'force_Ene_diff': 0.001,     # When checking if force is converged, we require Energy to be converged as well up to this difference
               'force_Rho_diff': 0.01,      # When checking if force is converged, we require Charge to be converged as well up to this difference
               }
@@ -741,7 +896,9 @@ if __name__ == '__main__':
         relax_shear_modulus [GPa] 60          # initial shear stiffness for the cell step
         relax_refresh_bohr [Bohr] 0.08        # remeasure after this internal displacement
         relax_max_steps 20                    # maximum screened evaluations in this invocation
-        force_last     [bool] False           # TOT: compute native forces once at the final fixed-geometry charge
+        force_last     [bool/str] False       # fixed geometry with TOT: False=off, True='FOR' (ordinary forces)
+                                             # 'FORT'=screened forces, 'STRF'=ordinary stress and forces,
+                                             # 'STRFT'=screened stress and forces. Both stress modes temporarily set TOT to STR in case.in0.
                                               # FOR: compute forces on every charge step
         runIMP         [True| False] True     # Run impurity solver or skip this step
         runGF          [True| False] True     # Run dmft1 for G and Delta, or skip this step
@@ -1063,11 +1220,8 @@ if __name__ == '__main__':
         
         # Starting with LAPW
         print('\n   cycle %s \t%s %s/%s to go\n' % (0,time.asctime(),charge_cycles,charge_cycles%p['riter']), file=fday)
-        lapw0(fday,w2k.case,w2k.WIENROOT,para, fh_info); fday.flush()
-        lapw1(fday,w2k.case,w2k.WIENROOT,para,p['dftKS'],dmfe,wopt,fh_info); fday.flush()
-        if wopt['so']: lapwso(fday,w2k.case,w2k.WIENROOT,para,p['dftKS'],dmfe, fh_info)
-        fday.flush()
-        
+        update_lapw(fday, w2k, dmfe, p, para, wopt, fh_info)
+
     if para and (not p['dftKS']): convert_processes.convert(wopt['so'], fh_info)
     
     #####################
@@ -1076,7 +1230,7 @@ if __name__ == '__main__':
     icycle = nimp = 0
     istep0=0
     nl_imp = None
-    diff_nimp,ddiff_nimp,pdiff_nimp=1,1,0
+    previous_occupation = None
     (RelaxingStructure, mix_method) = fstc.AreWeRelaxingStructure2(w2k.case)
     print('Relaxing Structure=', RelaxingStructure, file=fh_info)
     
@@ -1139,9 +1293,11 @@ if __name__ == '__main__':
                 nimp += 1
                 UpdateAtom = (p['UpdateAtom']!=0 and mod(nimp,p['UpdateAtom'])==0)
                 
+                measured_occupations = {}
                 for iat in list(iSigind.keys()):   # Over all inequivalent impurity problems
                     ni=SolveImpurity(EF, solver[iat], iat, extn, p, UpdateAtom, nl_imp[iat], fh_info, fh_pinfo, fday)
                     n_imp[iat] += ni
+                    measured_occupations[iat] = ni
                     print('STOP  IMPURITY_'+str(iat), file=sys.stderr)
                 SGather(dmfe.ROOT, fh_info, p, wopt['m_extn'])
                 
@@ -1150,6 +1306,7 @@ if __name__ == '__main__':
                 ZEorb = 0.0
                 dat=[]
                 for iat in list(iSigind.keys()):   # Over all inequivalent impurity problems
+                    dat.append(f'# n_imp[{iat}] = {measured_occupations[iat]:.17g}\n')
                     if os.path.exists(solver[iat].dir+'/Eorb.dat'):
                         dat += ['--- impurity '+str(iat)+' with degeneracy '+str(len(imp2latt[iat]))+' ---\n']
                         datw = open(solver[iat].dir+'/Eorb.dat','r').readlines()
@@ -1178,8 +1335,12 @@ if __name__ == '__main__':
 
             itt += 1   # END DMFT INNER LOOP
             
-        if itt:
-            n_imp *= 1./itt
+        if sigmas:
+            # One entry per actual solver pass, even if runIMP was toggled
+            # during the inner loop. itt also counts steps with no solve.
+            n_imp /= len(sigmas)
+        else:
+            n_imp = restart_occupations(iSigind, p, fh_info)
         
         if int(len(sigmas)*p['saver'])>1 :
             sigmas.reverse()
@@ -1197,8 +1358,8 @@ if __name__ == '__main__':
             print(' changing TOT to FOR in case.in2 files', file=fh_info)
             print(' increasing max_lda_iterations to ', p['max_lda_iterations'], file=fh_info)
         
-        diff_nimp=1
-        for ita in range(p['max_lda_iterations']):
+        lda_steps = range(p['max_lda_iterations'])
+        for ita in lda_steps:
             if ita%2 == 1 : p.refresh()
 
             dEF, recomputeEF = lattice_charge_step(
@@ -1221,6 +1382,7 @@ if __name__ == '__main__':
             nd,Vdc = CreateEorb(w2k.case, wopt, inl.siginds, imp2latt)
 
             nc = ConvertFromLatticeToImp(nd, imp2latt)
+            diff_nimp, ddiff_nimp = occupation_residual(n_imp, nc, previous_occupation)
 
             lcore(fday,w2k.case,w2k.WIENROOT,wopt,fh_info);       fday.flush()
             if block is not None:
@@ -1243,7 +1405,6 @@ if __name__ == '__main__':
             (ETOT,SUM,XSUM,YSUM,ZSUM,EORB,XEORB,ZEORB) = FindEtot(w2k.case,wopt)
             
             fh_pinfo.write( '%3d %3s.%4s %12.6f %12.6f %15.6f %15.6f %15.6f ' % (istep0, icycle, ita, EF, Vdc, ETOT, ETOT-SUM+ZSUM-EORB+ZEORB, ETOT-SUM+YSUM-EORB+XEORB) )
-            diff_nimp=0
             for iat in list(iSigind.keys()):   # Over all inequivalent impurity problems
                 if os.path.exists('imp.'+str(iat)+'/Eimp.inp'):
                     fEimp = open('imp.'+str(iat)+'/Eimp.inp', 'r')
@@ -1251,7 +1412,6 @@ if __name__ == '__main__':
                 else: # If runGF=False, this is not available
                     Eimp=array([0,0])
                 fh_pinfo.write( '%12.6f %12.6f %12.6f %12.6f ' % (nc[iat], n_imp[iat], Eimp[0], Eimp[-1]) )
-                diff_nimp += n_imp[iat]-nc[iat]
             fh_pinfo.write('\n')
             fh_pinfo.flush()
             istep0 += 1
@@ -1274,12 +1434,11 @@ if __name__ == '__main__':
             cycles_left = builtins.max(0, charge_cycles-istep1)
             print('\n:ITT%-2d   cycle %s \t%s %s/%s to go\n' % (istep2, istep1,time.asctime(),cycles_left,cycles_left%p['riter']), file=fday)
             
-            lapw0(fday,w2k.case,w2k.WIENROOT,para, fh_info); fday.flush()
-            lapw1(fday,w2k.case,w2k.WIENROOT,para,p['dftKS'],dmfe,wopt,fh_info); fday.flush()
-            if wopt['so']: lapwso(fday,w2k.case,w2k.WIENROOT,para,p['dftKS'],dmfe, fh_info)
-                
-            fday.flush()
-            
+            # At a cycle boundary, wait for the outer stopping decision. The
+            # last potential must be generated with the final LAPW0 mode.
+            if not succi and ita < lda_steps[-1]:
+                update_lapw(fday, w2k, dmfe, p, para, wopt, fh_info)
+
             if succi : break
             if ita>0 and ita%p['remove_broyd']==0 :
                 if block is not None:
@@ -1288,10 +1447,10 @@ if __name__ == '__main__':
                     for f in glob.glob('*.broyd*'):
                         os.remove(f)
 
-        ddiff_nimp = abs(pdiff_nimp-diff_nimp)
-        pdiff_nimp = diff_nimp
-        
-        drho, dene = Diff(fday, w2k.case, dEF, diff_nimp, ddiff_nimp);fday.flush()
+        # The original first-cycle stopping test compares the imbalance
+        # to zero. Preserve it without reporting it as a measured change.
+        occupation_stop = abs(diff_nimp) if previous_occupation is None else ddiff_nimp
+        previous_occupation = (n_imp, nc)
         
         icycle += 1   # END CHARGE LOOP
         if RelaxingStructure: # When dmft/impurity loop restarts, we should relax again
@@ -1304,24 +1463,29 @@ if __name__ == '__main__':
             toclean = glob.glob('*.broyd*')
             for f in toclean: os.remove(f)
         
-        if (block is None or (block.frozen and drho<=p['cc'] and dene<=p['ec'])) and not RelaxingStructure and ddiff_nimp<p['nc'] and drho<2*p['cc'] and dene<2*p['ec']:
+        if (block is None or (block.frozen and drho<=p['cc'] and dene<=p['ec'])) and not RelaxingStructure and occupation_stop<p['nc'] and drho<2*p['cc'] and dene<2*p['ec']:
             # impurity occupation is not changing much anymore, and charge and energy is converged, hence we can safely stop if structure is not relaxing.
             break
         
+        if icycle < charge_cycles:
+            update_lapw(fday, w2k, dmfe, p, para, wopt, fh_info)
+
     if istep0 > 0:
         p.refresh()
-        if block is not None:
-            def ordinary_measurement(filename):
-                # Same density, self-energy, structure, LAPW states and full
-                # FOR publication as STRFT below. No mixer between measurements.
-                lattice_charge_step(fday, w2k, fh_info, dmfe, p, para, wopt, inl.matsubara)
-                lcore(fday, w2k.case, w2k.WIENROOT, wopt, fh_info)
-                suffix = os.path.relpath(filename)[len(w2k.case):]
-                scf(w2k.case, wopt, outfile=suffix)
-            block.before_screen(drho, dene, ddiff_nimp, p, ordinary_measurement)
-        final_response_pass(fday, w2k, fh_info, dmfe, p, para, wopt, inl.matsubara)
-        if block is not None:
-            block.after_screen(p)
+        with final_lapw0_input(w2k.case, p['force_last'], fh_info):
+            update_lapw(fday, w2k, dmfe, p, para, wopt, fh_info)
+            if block is not None:
+                def ordinary_measurement(filename):
+                    # Same density, self-energy, structure, LAPW states and full
+                    # FOR publication as STRFT below. No mixer between measurements.
+                    lattice_charge_step(fday, w2k, fh_info, dmfe, p, para, wopt, inl.matsubara)
+                    lcore(fday, w2k.case, w2k.WIENROOT, wopt, fh_info)
+                    suffix = os.path.relpath(filename)[len(w2k.case):]
+                    scf(w2k.case, wopt, outfile=suffix)
+                block.before_screen(drho, dene, occupation_stop, p, ordinary_measurement)
+            final_response_pass(fday, w2k, fh_info, dmfe, p, para, wopt, inl.matsubara)
+            if block is not None:
+                block.after_screen(p)
 
     if block is not None:
         relaxation.reset_mixer_history(w2k.case, block.directory.parent, 'screened measurement complete')
@@ -1342,10 +1506,13 @@ if __name__ == '__main__':
     if cleanup_allowed:
         # Vector removal belongs to the guarded callbacks above. This legacy
         # list must not override keep_temporary_files or delete alias targets.
-        toclean = glob.glob('dmft[1|2].error*')+(glob.glob('*.broyd*') if block is None else [])+glob.glob('dmft')+glob.glob('dmft2')+glob.glob('_processes*')+glob.glob('lapw1')+glob.glob('*.output1_*')+glob.glob('*.scf1_*')+glob.glob('lapw1_*.[def|error]')
+        toclean = glob.glob('dmft[1|2].error*')+(glob.glob('*.broyd*') if block is None else [])+glob.glob('dmft')+glob.glob('dmft2')+glob.glob('lapw1')+glob.glob('*.output1_*')+glob.glob('*.scf1_*')+glob.glob('lapw1_*.[def|error]')
         for f in toclean: os.remove(f)
         for filename in glob.glob('*'):
-            if os.path.islink(filename) or '.vector' in filename:
+            # Preserve the split-vector maps, including an empty WIEN2k
+            # per-rank map marking an idle worker. The producer replaces
+            # this metadata with its next layout; vectors may live off-site.
+            if filename.startswith('_processes_') or os.path.islink(filename) or '.vector' in filename:
                 continue
             if os.path.isfile(filename) and os.stat(filename).st_size == 0:
                 os.remove(filename)

@@ -150,10 +150,23 @@ def charge_mode(path):
     raise ValueError(f"empty dmft2 input: {path}")
 
 
-def request(case, definition="dmft2.def", config_path=None, disabled=False):
+def final_force_mode(value):
+    """Decode the fixed-geometry measurement requested by params.dat."""
+    if isinstance(value, (bool, int)) and value in (0, 1):
+        return "FOR" if value else None
+    if isinstance(value, str):
+        mode = value.strip().upper()
+        if mode in {"FOR", "FORT", "STRF", "STRFT"}:
+            return mode
+    raise ValueError("force_last must be False, True (= FOR), 'FOR', 'FORT', 'STRF', or 'STRFT'")
+
+
+def request(case, definition="dmft2.def", config_path=None, disabled=False, *, final_force=False):
     """Read live controls; an explicit disabled setting overrides IN2 aliases."""
     defs = entries(Path(definition).read_text())
     mode = input_mode(defs[5])
+    if final_force and mode == "TOT" and charge_mode(defs[2]) == "c":
+        mode = final_force_mode(final_force)
     path = Path(config_path) if config_path else Path(case + ".stress_response.json")
     if config_path and not path.is_file():
         raise ValueError(f"response configuration does not exist: {path}")
@@ -217,9 +230,8 @@ def execution_definition(definition, final_force=False):
     text = Path(definition).read_text()
     source = Path(entries(text)[5])
     mode = input_mode(source)
-    native_mode = ALIASES.get(mode, mode)
-    if final_force and mode == "TOT":
-        native_mode = "FOR"
+    effective = final_force_mode(final_force) if final_force and mode == "TOT" else mode
+    native_mode = ALIASES.get(effective, effective)
     if native_mode == mode:
         yield str(definition)
         return
@@ -756,6 +768,7 @@ def compute_response(case, req, root, mpi, run_id, output, *, captured_soc=None)
         if spec is not None and spec.origin:
             scripts[spec.origin] = sha256(spec.origin)
     identity = {
+        "mode": req["mode"],
         "inputs": fingerprints,
         "executables": identities,
         "scripts": scripts,
@@ -1060,7 +1073,8 @@ def execute(
     if phase not in {"standalone", "defer", "final"}:
         raise ValueError("invalid response phase")
     output = output or sys.stdout
-    req = request(case, definition, config_path, disabled)
+    scheduled = final_force if phase == "final" else False
+    req = request(case, definition, config_path, disabled, final_force=scheduled)
     is_charge = charge_mode(req["files"][2]) == "c"
     # FOR includes the explicit SOC operator on its actual charge pass.
     # The screened charge adjoint remains final-only. A private TOT -> FOR
@@ -1069,7 +1083,7 @@ def execute(
     option = solver_control.get("soc_operator_force")
     if "soc_operator_force" in solver_control and type(option) is not bool:
         raise ValueError("solver.soc_operator_force must be true or false")
-    native_force = req["mode"] == "FOR" or (req["mode"] == "TOT" and final_force and phase == "final")
+    native_force = req["mode"] == "FOR"
     direct_soc = False
     if (is_charge and native_force and option is not False and not disabled
             and req["config"].get("enabled", True)
@@ -1127,14 +1141,14 @@ def execute(
                                    override=req["config"].get("solver",{}).get("physical_policy"))
             run_channels([definition,"dmft2dn.def"],policy,
                 lambda label,df: run_core(root,mpi,df,output),
-                lambda bands: run_fermif(Path(root)/"fermif",bands,output))
+                lambda bands: run_fermif(Path(root)/"fermif",bands,output),
+                final_force=scheduled)
             average_charge(case,root,output)
             status["physical_policy"] = policy.record()
         else:
-            # A phonon measurement uses a private FOR input on the final
-            # charge pass. The next run can start from the same TOT input.
-            measure_force = final_force and is_charge and phase == "final"
-            with execution_definition(definition, final_force=measure_force) as native:
+            # The native reader needs the base mode. The response below uses
+            # the full requested mode, while the live IN2 stays intact.
+            with execution_definition(definition, final_force=scheduled if is_charge else False) as native:
                 if capture is None:
                     run_core(root, mpi, native, output)
                 else:

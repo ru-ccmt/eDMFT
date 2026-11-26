@@ -69,7 +69,8 @@ subroutine val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
    use atspdt, only: el
    use xa, only: band_energy=>e
    use dmft_stress, only: stress_rela_setup_wall,stress_rela_band_wall
-   use w_atpar, only: w_vr,w_rrad1,w_rrad2,w_rade1,w_rade2, &
+   use stress_rela_operator, only: build_rela_operator,apply_rela_operator
+   use w_atpar, only: rela_operator,w_vr,w_rrad1,w_rrad2,w_rade1,w_rade2, &
                        w_radp1,w_radp2,w_radpe1,w_radpe2, &
                        w_a1lo,w_b1lo,w_ap1lo,w_bp1lo
    use lo, only: ilo_src=>ilo,loor_src=>loor,rlo_src=>rlo,elo_src=>elo
@@ -121,7 +122,8 @@ subroutine val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
    integer :: ilo(0:lmax2)
    logical :: loor(nloat,0:lmax2),rlo(nloat,0:lmax2)
    real*8 :: elo(0:lmax2,nloat)
-   logical :: sdlo(nloat,0:lomax)
+   logical :: sdlo(nloat,0:lomax),reference
+   character(len=32) :: reference_env
 
    buf_corr = (0.d0,0.d0)
    buf_sr   = (0.d0,0.d0)
@@ -130,6 +132,18 @@ subroutine val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
    if(.not.rel) return
 
    call walltim(setup_wall_begin)
+   call get_environment_variable('EDMFT_STRESS_RELA_REFERENCE',reference_env)
+   call get_environment_variable('WIEN_STRESS_RELA_DIAG',diag_env,status=diag_status)
+   ! Keep the original per-band quadrature available as an independent
+   ! numerical reference, including its angular/flux diagnostic printouts.
+   reference=(reference_env/='' .and. reference_env/='0') .or. &
+             (diag_status==0 .and. diag_env/='' .and. diag_env/='0')
+   if (.not.reference) then
+      if (allocated(rela_operator(jatom)%kernel)) then
+         call contract_cached()
+         return
+      endif
+   endif
 
    vr=w_vr(:,jatom)
    rrad1=w_rrad1(:,:,jatom); rrad2=w_rrad2(:,:,jatom)
@@ -258,9 +272,6 @@ subroutine val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
       max_d_err=max(max_d_err,abs(d_norm-dble(l*(l+1))))
       max_d_err=max(max_d_err,abs(hd_cross))
    enddo
-   diag_env=''
-   call get_environment_variable('WIEN_STRESS_RELA_DIAG',diag_env, &
-                                 status=diag_status)
    if(diag_status.eq.0 .and. len_trim(diag_env).gt.0 .and. &
       trim(diag_env).ne.'0') then
       write(6,'(A,2(1X,ES23.15))') ':DBG_RELA_ANGULAR:', &
@@ -508,6 +519,17 @@ subroutine val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
       trim(diag_env).ne.'0') then
       write(6,'(A,I5,2(1X,ES23.15))') ':DBG_RELA_FLUX:',jatom, &
                                       max_flux_err,max_flux_boundary_err
+   endif
+
+   ! Cache the integrated atomic bilinears, before inserting any k-dependent
+   ! ALM/BLM/CLM or pseudo-band energies. Thus the density, window, and
+   ! normalization passes all use the same radial and angular integrals.
+   if (.not.reference) then
+      call build_rela_operator(rela_operator(jatom),rmesh,dx(jatom),lf,ldf,sf,sdf,qd,qu,dvry,ilo,loor, &
+           nmap,outmap,hmap,dmap,nmap2,outmap2,hmap2,old_small_scale,small_surf_scale, &
+           ensmall_scale,ennat_scale,massv_scale)
+      call contract_cached()
+      return
    endif
 
    ! Band loop.  For each radial point, form the large-component gradient,
@@ -835,6 +857,15 @@ subroutine val_rela_kinstrmt(nemin,nemax,jatom,alm,blm,clm, &
 997 write(6,*) 'Invalid WIEN_STRESS_RELA_OLD_SMALL_SCALE: ', &
                trim(small_scale_env)
     stop 'WIEN_STRESS_RELA_OLD_SMALL_SCALE must be a real number'
+contains
+   subroutine contract_cached()
+      call walltim(band_wall_begin)
+      stress_rela_setup_wall=stress_rela_setup_wall+band_wall_begin-setup_wall_begin
+      call apply_rela_operator(rela_operator(jatom),nemin,nemax,alm,blm,clm,band_energy, &
+           buf_corr,buf_sr,buf_old,buf_surf)
+      call walltim(band_wall_end)
+      stress_rela_band_wall=stress_rela_band_wall+band_wall_end-band_wall_begin
+   end subroutine
 end subroutine val_rela_kinstrmt
 
 

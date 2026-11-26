@@ -8,6 +8,7 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
      matsubara, lgTrans, lg_deg, ntcix, nipc, ikp, maxdim2, iorbital, &
      iSx, norbitals, projectorGradientDirect, cix_orb, cixdim, nindo, &
      Sigind)
+  use grouped_embedding
   USE adaptive_matsubara, ONLY: tail_moment=>moment,weight_difference,check_sum
   USE defs,  ONLY: pi, IMAG
   USE xa,    ONLY: E
@@ -70,6 +71,8 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
      end Function ProductTrace2
   end interface
   ! locals
+  integer,allocatable :: slot(:),channel(:)
+  complex*16,allocatable :: embedding(:,:,:)
   COMPLEX*16 :: sigma_winf(maxsize,ncix)
   COMPLEX*16, allocatable :: Wsum(:,:), WEsum(:,:), w0inf(:)
   COMPLEX*16, allocatable :: WSigPair(:,:), SigDirect(:,:), SigScratch(:,:), &
@@ -262,6 +265,7 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
      allocate(Gij(nbands,nbands), Sigmaij(nbands,nbands))
      allocate(pivots(nbands),luWork(64*nbands))
      sginf=czero
+     call group_components(sigma,STrans,csize,slot,channel,embedding)
      dynamicLog=0.d0
      if (allocated(weight_difference).and.Qforce) then
         allocate(check_energy(nbands,nbands),check_static(nbands))
@@ -277,9 +281,7 @@ SUBROUTINE cmp_dmft_weights2(Aweight, gloc, logG, dens, Gdloc, Gdloc0, &
         if (inTail.and.abs((2*jomq(iom)-1)*pi/beta-omega(iom)).gt.1.d-6) &
              print *, 'ERROR: ', iom, (2*jomq(iom)-1)*pi/beta, omega(iom)
 
-        Sigmaij=czero
-        CALL AddSigma_optimized2(Sigmaij,sigma(:,:,iom),STrans,csize,1, &
-             nbands,ncix,maxsize)
+        call embed_at(Sigmaij,embedding,sigma(:,:,iom),slot,channel,STrans,csize)
         Gij=-Sigmaij
         do i=1,nbands
            Gij(i,i)=Gij(i,i)+(z-E(i+DM_nemin-1))

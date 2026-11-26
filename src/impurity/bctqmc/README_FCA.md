@@ -338,12 +338,28 @@ with `N_min_order=3`) is rejected before sampling.
 
 ## Output
 
-`aStval.4` is now saved immediately after all FCA pseudo-self-energy tasks
-and MPI reductions finish, BEFORE physical G/F evaluation. Wait for
-`FCA self checkpoint saved: file=aStval.4 ...` in the log, not merely the
-self-task 100% progress line. The file is closed and atomically renamed
-before that marker. Phi and optional topology/cut diagnostics are available
-at the same phase boundary. This also applies on pseudo-only iterations.
+The default `"fastFilesystem": false` keeps the final `PPG.0`, `PPSigma.0`,
+physical observables and per-order analytic outputs. The solver writes the
+per-order files and imaginary-axis probability tables on physical measurement
+steps. Set `"fastFilesystem": true` for the original every-iteration output,
+including numbered pseudo-particle files and imaginary-axis block diagnostics.
+
+In quiet mode, `pp_checkpoint_every` defaults to 10. Every tenth inner
+iteration replaces one `PPSigma.checkpoint` with the mixed pseudo-self-energy.
+Use 0 for final output only. The checkpoint and final restart use the
+configured `PPSig` prefix and are each replaced after the new file closes.
+To resume an interrupted run from the rolling checkpoint, copy it to
+`PPSigma.0` with the matching `Sindex.dat` before relaunching. A successful
+run writes its final restart directly to `PPSigma.0`.
+
+On physical measurement steps, the solver saves `aStval.4` immediately after
+the FCA pseudo-self-energy tasks and MPI reductions finish, before physical
+G/F evaluation. With `fastFilesystem=true` it also saves this file on
+pseudo-only evaluations. The log entry `FCA self checkpoint saved` confirms
+the file has closed and the atomic rename has completed. Explicitly enabled
+topology and cut diagnostics keep their own output controls. FCA per-task
+timing CSVs follow `fastFilesystem` by default. An explicit `fca_live_profile`
+setting overrides that default.
 
 Stopping the job after this marker preserves the complete FCA self-energy
 for comparison with `Stval.4`. It does NOT finish the Dyson iteration or save
@@ -366,6 +382,18 @@ written regardless of this diagnostic setting. For analytic imaginary-axis
 `Skugler.out` estimator is enabled by default when its analytic-order and
 unpruned matrix-OCA requirements are met. Explicit PARAMS values override
 these defaults.
+
+For imaginary-axis `N_min_order=Norder=3`, `tca_lagged` defaults to true.
+The first step computes the third-order pseudo-self-energy for the current
+hybridization. NCA, OCA and Dyson then iterate with this TCA term fixed.
+Once the inner residual drops below `diff_stop`, the solver recomputes TCA.
+Convergence requires both the total residual and the change in the TCA
+term to pass the probability-weighted tolerance. The final step measures
+physical observables with fresh diagrams. With a reduced-pole fit and an
+explicit full-pole final audit, convergence is tested on the reduced-pole
+iteration map. `Nitt=1` performs one fresh measurement. Set
+`"tca_lagged": false` to recompute TCA every iteration.
+
 Physical files are written only on measurement iterations. As with the older
 orders, these filenames describe the latest evaluation, not iteration archives.
 The cut files ALREADY include the topology symmetry factor. Their sum is the

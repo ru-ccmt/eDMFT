@@ -495,7 +495,7 @@ void CreateSigma000(Array<complex<double>,2>& Sm,
     for (int i=0; i<om.size(); i++) Sm(l,i) = complex<double>(Smr(i), Sm(l,i).imag());
   }
   
-  if (mpi.rank==mpi.master){//DEBUG and fastFilesystem){
+  if (mpi.rank==mpi.master && fastFilesystem){
     ofstream out("PPSig_start"); out.precision(12);
     for (int iw=0; iw<om.size(); ++iw){
       out<<om(iw)<<" ";
@@ -511,7 +511,7 @@ void CreateSigma000(Array<double,2>& Sigt,
 		    const Cix& cix, double beta, bool fastFilesystem, MPIcls& mpi){
   // This is for imaginary axis calculation
   const bool DEBUG=false;
-  const bool saveG0=true;
+  const bool saveG0=fastFilesystem && mpi.rank==mpi.master;
   ostream& clog = *mpi.out;
   // If previous pseudo-particles self-energy is not found, it creates a guess using atomic type NCA approximation.
   // We assume that G0(pp,tau) = exp(-E_pp*tau) and evaluate NCA diagrams with it.
@@ -623,7 +623,7 @@ void CreateSigma000(Array<double,2>& Sigt,
     for (int it=0; it<tau.size(); ++it) pDelta(s,it) = Deltas(it,s);//Deltas[s][it];
     for (int it=0; it<tau.size(); ++it) mDelta(s,it) = Deltas[s](Interp(beta-tau(it),tau));
   }
-  if (mpi.rank==mpi.master){//DEBUG){
+  if (mpi.rank==mpi.master && fastFilesystem){
     ofstream test("checkDelta.dat");
     for (int it=0; it<tau.size(); ++it){
       test<<tau(it)<<" ";
@@ -669,7 +669,7 @@ void CreateSigma000(Array<double,2>& Sigt,
       }
     }
   }
-  if (mpi.rank==mpi.master){//DEBUG and fastFilesystem){
+  if (mpi.rank==mpi.master && fastFilesystem){
     ofstream out("PPSig_start"); out.precision(12);
     for (int it=0; it<tau.size(); ++it){
       out<<tau(it)<<" ";

@@ -4281,6 +4281,8 @@ END FUNCTION Density_local
 ! broadcast to the workers, which evaluate their local bands in
 ! Serve_Density_requests.  Only one real occupancy per rank is reduced.
 REAL*8 FUNCTION Density(EF)
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+  use com_mpi, only: fail_density_search
   USE com, ONLY: elecn
   USE muzero, ONLY: wprint
   USE com_mpi, ONLY: Bcast_Density_request, Reduce_Density_sum
@@ -4290,11 +4292,13 @@ REAL*8 FUNCTION Density(EF)
   REAL*8 :: trial_EF, local_charge, total_charge, Density_local
   LOGICAL :: evaluate
 
+  if (.not.ieee_is_finite(EF)) call fail_density_search('Nonfinite trial chemical potential.')
   trial_EF = EF
   evaluate = .TRUE.
   CALL Bcast_Density_request(trial_EF, evaluate)
   local_charge = Density_local(trial_EF)
   CALL Reduce_Density_sum(local_charge, total_charge)
+  if (.not.ieee_is_finite(total_charge)) call fail_density_search('Nonfinite integrated charge in the chemical-potential search.')
   if (wprint) WRITE(*,'(A,f13.8,A,f14.8,A,f10.4,A,f14.8)') &
        'EF[eV]=', EF*Ry2eV, ' Density=', total_charge, ' N=', elecn, ' EF[Ry]=', EF
   Density = total_charge-elecn
@@ -4316,6 +4320,72 @@ SUBROUTINE Serve_Density_requests()
   enddo
 END SUBROUTINE Serve_Density_requests
 
+module grouped_embedding
+  use, intrinsic :: iso_fortran_env, only: int64
+  implicit none
+  private
+  public :: group_components, embed_at
+contains
+  ! Sum embedding matrices only when the entire complex Matsubara series is
+  ! identical. Equivalent atoms can have different (rotated) matrices.
+  ! This factors the finite sum over components without altering the window,
+  ! the frequency mesh, or any independent off-diagonal self-energy.
+  subroutine group_components(sig,transform,count,slot,channel,embedding)
+    complex*16,intent(in) :: sig(:,:,:),transform(:,:,:,:)
+    integer,intent(in) :: count(:)
+    integer,allocatable,intent(out) :: slot(:),channel(:)
+    complex*16,allocatable,intent(out) :: embedding(:,:,:)
+    integer(int64), parameter :: max_cache_bytes=64_int64*1024*1024
+    integer :: alloc_status
+    integer :: n,ic,it,g,ng,group(size(sig,1),size(sig,2))
+    n=size(transform,3)
+    allocate(slot(sum(count)),channel(sum(count)))
+    ng=0
+    do ic=1,size(count)
+       do it=1,count(ic)
+          do g=1,ng
+             if(all(sig(it,ic,:)==sig(slot(g),channel(g),:))) exit
+          enddo
+          if(g>ng) then
+             ng=g
+             slot(g)=it
+             channel(g)=ic
+          endif
+          group(it,ic)=g
+       enddo
+    enddo
+    ! Large low-symmetry windows can have many distinct components. Keep
+    ! the original contraction when grouping saves nothing or costs too much.
+    if (ng==sum(count)) return
+    if (int(n,int64)*n*ng>max_cache_bytes/16_int64) return
+    allocate(embedding(n,n,ng),stat=alloc_status)
+    if (alloc_status/=0) return
+    embedding=0.d0
+    do ic=1,size(count)
+       do it=1,count(ic)
+          g=group(it,ic)
+          embedding(:,:,g)=embedding(:,:,g)+transform(it,ic,:,:)
+       enddo
+    enddo
+  end subroutine
+
+  subroutine embed_at(out,embedding,sig,slot,channel,transform,count)
+    complex*16, contiguous, intent(out) :: out(:,:)
+    complex*16, contiguous, intent(in) :: sig(:,:),transform(:,:,:,:)
+    complex*16, allocatable, intent(in) :: embedding(:,:,:)
+    integer,intent(in) :: slot(:),channel(:),count(:)
+    integer :: g
+    out=0.d0
+    if (.not.allocated(embedding)) then
+       call AddSigma_optimized2(out,sig,transform,count,1,size(out,1),size(sig,2),size(sig,1))
+       return
+    endif
+    do g=1,size(embedding,3)
+       out=out+sig(slot(g),channel(g))*embedding(:,:,g)
+    enddo
+  end subroutine
+end module
+
 module Fermi
   contains
 ! Charge and slope of a single k point at fixed Sigma. This is the same
@@ -4324,6 +4394,7 @@ module Fermi
 ! Replacing them by eig(H_KS+Sigma_infinity) changes the finite-cutoff sum.
 subroutine mu_charge_slope(energy,sigma,transform,csize,omega,weights,beta,mu,charge,slope,failed)
   use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+  use grouped_embedding
   implicit none
   real*8, intent(in) :: energy(:),omega(:),weights(:),beta,mu
   complex*16, intent(in), contiguous :: sigma(:,:,:),transform(:,:,:,:)
@@ -4334,6 +4405,8 @@ subroutine mu_charge_slope(energy,sigma,transform,csize,omega,weights,beta,mu,ch
   complex*16 :: dummy(1),z,g0
   real*8, allocatable :: ref(:),rwork(:)
   integer, allocatable :: piv(:)
+  complex*16,allocatable :: embedding(:,:,:)
+  integer,allocatable :: slot(:),channel(:)
   integer :: n,i,j,iw,info,nw,nc,ms
   real*8 :: f,ferm
   complex*16 :: tr,sq
@@ -4341,6 +4414,7 @@ subroutine mu_charge_slope(energy,sigma,transform,csize,omega,weights,beta,mu,ch
   nw=size(omega)
   nc=size(csize)
   ms=size(sigma,1)
+  call group_components(sigma,transform,csize,slot,channel,embedding)
   failed=0
   charge=0.d0
   slope=0.d0
@@ -4365,11 +4439,11 @@ subroutine mu_charge_slope(energy,sigma,transform,csize,omega,weights,beta,mu,ch
   !$omp do schedule(static)
   do iw=1,nw
      z=cmplx(mu,omega(iw),kind=8)
-     g=0.d0
+     call embed_at(g,embedding,sigma(:,:,iw),slot,channel,transform,csize)
+     g=-g
      do i=1,n
-        g(i,i)=z-energy(i)
+        g(i,i)=g(i,i)+(z-energy(i))
      enddo
-     call AddSigma_optimized2(g,sigma(:,:,iw),transform,csize,-1,n,nc,ms)
      call zgetrf(n,n,g,n,piv,info)
      if (info==0) call zgetri(n,g,n,piv,work,size(work),info)
      if (info/=0) then
@@ -4723,33 +4797,39 @@ SUBROUTINE cmp_EF(EF, recomputeEF, wmax_nbands, Olapm, SOlapm, omega, sigma, nnl
         tEF = DM_EF
         dd = Density(tEF)
         
-        def = abs(dd)/elecn*1.
-        if (def.LT.0.00001) def=0.00001
-        if (def.GT.0.05)  def=0.05
-        ! new
-        !print *, 'dd=', dd, 'de=', def
-        dd2 = Density(tEF-def*sign(1.0d0,dd))
-        !print *, 'dd2=', dd2, 'de=', def
-        def = 0.5 * abs(dd)*def/abs(dd2-dd)  ! 0.5*|n-n0|*1/(dn/de)
-        !print *, 'new-def=', def
-        if (def.LT.0.00001) def=0.00001
-        ! new
-
-        if (abs(dd).gt.1e-10) then
-           if (dd.lt.0) then
-              do while (dd.lt.0)
-                 tEF = tEF + def
-                 dd = Density(tEF)
-              end do
-              Ea = tEF-def
-              Eb = tEF
-           else
-              do while (dd.gt.0)
-                 tEF = tEF - def
-                 dd = Density(tEF)
+        if (abs(dd)>1.d-10) then
+           ! Estimate the first step only when the slope can be resolved.
+           ! A flat density is legitimate in a gap. Double the trial step
+           ! if the initial step does not bracket the target and bound the
+           ! number of trials even for inconsistent charge inputs.
+           def=max(1.d-5,min(0.05d0,abs(dd)/max(1.d0,abs(elecn))))
+           Ea=tEF
+           previous=dd
+           step=-sign(def,dd)
+           Eb=Ea+step
+           dd2=Density(Eb)
+           if (dd2/=0.d0.and.((dd2>0.d0).eqv.(dd>0.d0))) then
+              if (abs(dd2-dd)>epsilon(dd)*max(1.d0,abs(dd),abs(dd2))) &
+                   def=max(1.d-5,min(0.05d0,0.5d0*abs(dd)*def/abs(dd2-dd)))
+              step=-sign(def,dd)
+              do attempt=1,64
+                 Eb=Ea+step
+                 dd2=Density(Eb)
+                 if (dd2==0.d0.or.((dd2>0.d0).neqv.(dd>0.d0))) exit
+                 Ea=Eb
+                 previous=dd2
+                 step=2.d0*step
               enddo
-              Ea = tEF
-              Eb = tEF+def
+              if (attempt>64) then
+                 write(6,'(a,4es16.6)') 'Unable to bracket charge: mu (Ry), N, target N, previous residual ', &
+                       Eb,dd2+elecn,elecn,previous
+                 call fail_density_search('Cannot bracket target charge in 64 expansions. Check mesh, bands and target electron count.')
+              endif
+           endif
+           if (Eb<Ea) then
+              tEF=Ea
+              Ea=Eb
+              Eb=tEF
            endif
            wprint = .FALSE.
            CALL brent ( Density, fatol, itmax, Ea, Eb, xatol, xrtol )

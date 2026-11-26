@@ -6,10 +6,11 @@ volume and site frames. For monoclinic CXZ the matrix and vector files label
 k differently, even though they use the same G labels.
 
 For eDMFT each spin branch uses scalar KS vectors, normalized single-site
-projector 5 and a fixed band-index window. Retained KS counts agree across
-k, while the full LAPW dimension can vary. Complement states must be
-thermally empty. The driver attaches the radial-energy search response to
-these fixed-energy maps. Sphere radii and local frames are held fixed.
+projector 5 and a fixed band-index window. WIEN can store different numbers
+of bands at different k points. We keep the common lowest bands explicitly.
+The H/O complement at each k supplies the remaining virtual states and is
+checked to be thermally empty. The driver attaches the radial-energy search
+response to these fixed-energy maps. Sphere radii and local frames are held fixed.
 
 Preparation reduces each rank's complement once. Subsequent actions use
 retained/retained and complement/retained blocks. Close the prepared state
@@ -338,7 +339,9 @@ def _prepare_snapshot(
         )
 
         records, kw = load_vectors(central / (case + ".vector"), s.nat, mat.nlo_total, parallel)
-        available = records[0].nstored
+        # Use one rectangular explicit block across MPI ranks; the remaining
+        # virtual states at each k enter through the native H/O complement.
+        available = parallel.reduce(min(r.nstored for r in records), "min")
         nret = available if nret is None else nret
         if int(nret) != nret or not 0 < nret <= available:
             raise ValueError("invalid DFT retained count")
@@ -351,15 +354,12 @@ def _prepare_snapshot(
             parallel=parallel,
         )
     else:
-        exported, records = CachedFrozenSigmaResponse.from_export(
+        model, records = CachedFrozenSigmaResponse.from_export(
             central / ("response_dn" if spin_channel else "response"),
             parallel=parallel, cache_mb=cache_mb, diagnostic_gap_cutoff=diagnostic_gap_cutoff,
+            lapw_complement=True, retained=nret,
         )
-        if nret is None:
-            nret = exported.eps.shape[1]
-        if int(nret) != nret or not 0 < nret <= exported.eps.shape[1]:
-            raise ValueError("invalid retained count")
-        nret = int(nret)
+        nret = model.eps.shape[1]
     mat.cv = [
         (r.energies[:nret].copy(), r.coefficients[:, :nret, 0].copy(), r.labels)
         for r in records
@@ -368,23 +368,7 @@ def _prepare_snapshot(
         raise ValueError("native LO count differs from vector header")
     # Only retained eigenvectors enter response preparation. Exported high-state
     # data, if present, is not used to construct the complement.
-    if not dft and nret <= max(exported.W):
-        raise ValueError("retained space misses DMFT window")
     if not dft:
-        normalized = np.array([r.projector[:nret] for r in records])
-        raw_native = np.zeros_like(normalized)
-        for orb, ic in enumerate(exported.meta.cix):
-            if ic >= 0:
-                for j in range(exported.meta.nindo[orb]):
-                    raw_native[:, :, j, orb] = exported.raw[
-                        :, :nret, exported.meta.isx[j, orb], ic
-                    ]
-        model = CachedFrozenSigmaResponse(
-            exported.meta, exported.eps[:, :nret], raw_native, normalized,
-            exported.kw, exported.W, parallel=parallel, cache_mb=cache_mb,
-            diagnostic_gap_cutoff=diagnostic_gap_cutoff,
-        )
-        del exported
         overlap = model.overlap(model.raw[:, model.W])
         for ic, n in enumerate(model.meta.dimensions):
             active = np.flatnonzero(model.meta.active[:n, ic])
@@ -393,9 +377,6 @@ def _prepare_snapshot(
             ss = overlap[:, :, ic][ix]
             if not np.allclose(x @ ss @ x, np.eye(len(active)), atol=2e-9, rtol=0):
                 raise ValueError("normalization is stale for the exported global k sum")
-    mat.cv = [
-        (ev[:nret].copy(), c[:, :nret].copy(), labels) for ev, c, labels in mat.cv
-    ]
     bases = []
     k_coordinates = []
     for k, (ev, c, labels) in enumerate(mat.cv):

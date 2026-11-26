@@ -297,11 +297,9 @@ class CompactSpatialValenceDensity:
             radial[a] = atom.kernel.component_action(herm(dd))
         fourier = np.zeros(len(self.template.pw), complex)
         for k, (op, cq) in enumerate(zip(self.retained.interstitial, self.ir)):
-            psi = op.psi if op.psi is not None else op._waves(op.c)
-            # The factor two is physical QR+RQ, not an extra spin weight.
-            waves = op._waves(op.c @ rr[k] + 2 * cq @ qr[k])
-            density = np.einsum("...n,...n->...", waves, psi.conj()).real
-            fourier += op.stars.action(np.fft.fftn(density) / (op.ng * op.volume))
+            # The factor two is the contribution of the conjugate QR and RQ blocks.
+            weighted = op.c @ rr[k] + 2 * (cq @ qr[k])
+            fourier += op.density_from_weighted_coefficients(weighted)
         return self.retained._assemble(radial, fourier)
 
     def pullback(self, vector):
